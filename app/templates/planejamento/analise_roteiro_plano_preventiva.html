@@ -1,0 +1,510 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Análise de Roteiro e Plano de Preventiva{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .match-badge {
+        font-size: 0.75rem;
+    }
+    .table-container {
+        max-height: 500px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Planejamento</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise de Roteiro e Plano de Preventiva</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Análise de Roteiro e Plano de Preventiva</h1>
+                <p class="lead">Análise de relacionamentos entre as tabelas PlanoPreventiva e RoteiroPreventiva</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-2">
+                <div class="card stat-card shadow-sm bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Planos</h5>
+                        <p class="card-text display-6">{{ total_planos }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card stat-card shadow-sm bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Roteiros</h5>
+                        <p class="card-text display-6">{{ total_roteiros }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card stat-card shadow-sm bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Relacionamentos</h5>
+                        <p class="card-text display-6">{{ total_relacionamentos }}</p>
+                        <small>Matches encontrados</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card stat-card shadow-sm bg-success text-white" style="background-color: #28a745 !important;">
+                    <div class="card-body">
+                        <h5 class="card-title">Vinculados</h5>
+                        <p class="card-text display-6">{{ total_vinculados }}</p>
+                        <small>Já vinculados</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card stat-card shadow-sm bg-warning text-dark">
+                    <div class="card-body">
+                        <h5 class="card-title">Planos Sem</h5>
+                        <p class="card-text display-6">{{ total_planos_sem_relacao }}</p>
+                        <small>Sem roteiro</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card stat-card shadow-sm bg-danger text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Roteiros Sem</h5>
+                        <p class="card-text display-6">{{ total_roteiros_sem_relacao }}</p>
+                        <small>Sem plano</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-filter me-2"></i>Filtros
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="get" action="{% url 'analise_roteiro_plano_preventiva' %}" id="filterForm">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label for="filter_maquina" class="form-label">Filtrar por Máquina</label>
+                            <input type="text" class="form-control" id="filter_maquina" name="filter_maquina" value="{{ filter_maquina|default:'' }}" placeholder="Código da máquina...">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="filter_descr_seqplamanu" class="form-label">Filtrar por Descrição Sequência</label>
+                            <input type="text" class="form-control" id="filter_descr_seqplamanu" name="filter_descr_seqplamanu" value="{{ filter_descr_seqplamanu|default:'' }}" placeholder="Descrição sequência...">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="filter_tipo" class="form-label">Tipo de Visualização</label>
+                            <select class="form-select" id="filter_tipo" name="filter_tipo">
+                                <option value="all" {% if filter_tipo == 'all' %}selected{% endif %}>Todos</option>
+                                <option value="matched" {% if filter_tipo == 'matched' %}selected{% endif %}>Apenas Relacionamentos</option>
+                                <option value="planos_sem" {% if filter_tipo == 'planos_sem' %}selected{% endif %}>Planos sem Roteiro</option>
+                                <option value="roteiros_sem" {% if filter_tipo == 'roteiros_sem' %}selected{% endif %}>Roteiros sem Plano</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search me-2"></i>Filtrar
+                            </button>
+                            <a href="{% url 'analise_roteiro_plano_preventiva' %}" class="btn btn-secondary">
+                                <i class="fas fa-redo me-2"></i>Limpar Filtros
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Relacionamentos Encontrados -->
+        {% if filter_tipo == 'all' or filter_tipo == 'matched' %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-link me-2"></i>Relacionamentos Encontrados
+                    <span class="badge bg-light text-dark ms-2">{{ total_relacionamentos }}</span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table class="table table-hover table-striped mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Máquina</th>
+                                <th>Plano</th>
+                                <th>Seq. Manutenção</th>
+                                <th>Seq. Tarefa</th>
+                                <th>Descrição Sequência (DESCR_SEQPLAMANU)</th>
+                                <th>Match Score</th>
+                                <th>Campos Match</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if relacionamentos %}
+                                {% for rel in relacionamentos %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ rel.plano.cd_maquina|default:"-" }}</strong>
+                                        {% if rel.plano.descr_maquina %}
+                                            <br><small class="text-muted">{{ rel.plano.descr_maquina|truncatewords:5 }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>{{ rel.plano.numero_plano|default:"-" }}</strong>
+                                        {% if rel.plano.descr_plano %}
+                                            <br><small class="text-muted">{{ rel.plano.descr_plano|truncatewords:3 }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ rel.plano.sequencia_manutencao|default:"-" }}</td>
+                                    <td>{{ rel.plano.sequencia_tarefa|default:"-" }}</td>
+                                    <td>
+                                        {% if rel.descr_seqplamanu %}
+                                            <span class="badge bg-info match-badge" title="{{ rel.descr_seqplamanu }}">{{ rel.descr_seqplamanu|truncatewords:6 }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if rel.match_score %}
+                                            {% if rel.match_score >= 95 %}
+                                                <span class="badge bg-success">{{ rel.match_score|floatformat:1 }}%</span>
+                                            {% elif rel.match_score >= 80 %}
+                                                <span class="badge bg-warning text-dark">{{ rel.match_score|floatformat:1 }}%</span>
+                                            {% else %}
+                                                <span class="badge bg-info">{{ rel.match_score|floatformat:1 }}%</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if rel.campos_match %}
+                                            <small>
+                                                {% for campo in rel.campos_match %}
+                                                    <span class="badge bg-secondary">{{ campo }}</span>
+                                                {% endfor %}
+                                            </small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if rel.ja_vinculado %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-link"></i> Vinculado
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="fas fa-unlink"></i> Não Vinculado
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'visualizar_analise_plano_roteiro' rel.plano.id rel.roteiro.id %}" class="btn btn-sm btn-outline-info" title="Ver Análise Detalhada">
+                                                <i class="fas fa-chart-line"></i>
+                                            </a>
+                                            <a href="{% url 'visualizar_manutencao_preventiva' rel.plano.id %}" class="btn btn-sm btn-outline-primary" title="Ver Plano">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'visualizar_roteiro_preventiva' rel.roteiro.id %}" class="btn btn-sm btn-outline-success" title="Ver Roteiro">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if not rel.ja_vinculado %}
+                                            <form method="post" action="{% url 'analise_roteiro_plano_preventiva' %}" style="display: inline;" onsubmit="return confirm('Deseja vincular este Plano ao Roteiro? O campo DESCR_SEQPLAMANU será atualizado.');">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="link_records" value="1">
+                                                <input type="hidden" name="plano_id" value="{{ rel.plano.id }}">
+                                                <input type="hidden" name="roteiro_id" value="{{ rel.roteiro.id }}">
+                                                <button type="submit" class="btn btn-sm btn-primary" title="Vincular Registros">
+                                                    <i class="fas fa-link"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="9" class="text-center py-4">
+                                        <i class="fas fa-info-circle fa-2x text-muted mb-2"></i>
+                                        <p class="text-muted mb-0">Nenhum relacionamento encontrado com os filtros aplicados.</p>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Planos sem Roteiro -->
+        {% if filter_tipo == 'all' or filter_tipo == 'planos_sem' %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Planos sem Roteiro Correspondente
+                    <span class="badge bg-dark text-white ms-2">{{ total_planos_sem_relacao }}</span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table class="table table-hover table-striped mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Máquina</th>
+                                <th>Plano</th>
+                                <th>Seq. Manutenção</th>
+                                <th>Seq. Tarefa</th>
+                                <th>Descrição Tarefa</th>
+                                <th>ID</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if planos_sem_relacao %}
+                                {% for plano in planos_sem_relacao %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ plano.cd_maquina|default:"-" }}</strong>
+                                        {% if plano.descr_maquina %}
+                                            <br><small class="text-muted">{{ plano.descr_maquina|truncatewords:5 }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>{{ plano.numero_plano|default:"-" }}</strong>
+                                        {% if plano.descr_plano %}
+                                            <br><small class="text-muted">{{ plano.descr_plano|truncatewords:3 }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ plano.sequencia_manutencao|default:"-" }}</td>
+                                    <td>{{ plano.sequencia_tarefa|default:"-" }}</td>
+                                    <td>
+                                        {% if plano.descr_tarefa %}
+                                            <small>{{ plano.descr_tarefa|truncatewords:8 }}</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ plano.id }}</td>
+                                    <td>
+                                        <a href="{% url 'visualizar_manutencao_preventiva' plano.id %}" class="btn btn-sm btn-primary" title="Ver Plano">
+                                            <i class="fas fa-eye"></i> Ver
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-4">
+                                        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                                        <p class="text-muted mb-0">Todos os planos têm roteiros correspondentes!</p>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Roteiros sem Plano -->
+        {% if filter_tipo == 'all' or filter_tipo == 'roteiros_sem' %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-exclamation-circle me-2"></i>Roteiros sem Plano Correspondente
+                    <span class="badge bg-light text-dark ms-2">{{ total_roteiros_sem_relacao }}</span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table class="table table-hover table-striped mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Máquina</th>
+                                <th>Plano</th>
+                                <th>Seq. Plano</th>
+                                <th>Tarefa</th>
+                                <th>Descrição Tarefa</th>
+                                <th>ID</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if roteiros_sem_relacao %}
+                                {% for roteiro in roteiros_sem_relacao %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ roteiro.cd_maquina|default:"-" }}</strong>
+                                        {% if roteiro.descr_maquina %}
+                                            <br><small class="text-muted">{{ roteiro.descr_maquina|truncatewords:5 }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>{{ roteiro.cd_planmanut|default:"-" }}</strong>
+                                        {% if roteiro.descr_planmanut %}
+                                            <br><small class="text-muted">{{ roteiro.descr_planmanut|truncatewords:3 }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ roteiro.seq_seqplamanu|default:"-" }}</td>
+                                    <td>{{ roteiro.cd_tarefamanu|default:"-" }}</td>
+                                    <td>
+                                        {% if roteiro.descr_tarefamanu %}
+                                            <small>{{ roteiro.descr_tarefamanu|truncatewords:8 }}</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ roteiro.id }}</td>
+                                    <td>
+                                        <a href="{% url 'visualizar_roteiro_preventiva' roteiro.id %}" class="btn btn-sm btn-success" title="Ver Roteiro">
+                                            <i class="fas fa-eye"></i> Ver
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-4">
+                                        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                                        <p class="text-muted mb-0">Todos os roteiros têm planos correspondentes!</p>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Agrupamento por Descrição Sequência -->
+        {% if agrupado_com_percentuais %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>Agrupamento por Descrição Sequência (Top 20)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Descrição Sequência</th>
+                                <th class="text-center">Quantidade</th>
+                                <th class="text-center">Percentual</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for descr, dados in agrupado_com_percentuais.items %}
+                            <tr>
+                                <td>
+                                    <strong>{{ descr }}</strong>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-primary">{{ dados.quantidade }}</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-info">{{ dados.percentual }}%</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_tipo %}filter_tipo={{ filter_tipo }}&{% endif %}page=1">Primeira</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_tipo %}filter_tipo={{ filter_tipo }}&{% endif %}page={{ page_obj.previous_page_number }}">Anterior</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_tipo %}filter_tipo={{ filter_tipo }}&{% endif %}page={{ page_obj.next_page_number }}">Próxima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_tipo %}filter_tipo={{ filter_tipo }}&{% endif %}page={{ page_obj.paginator.num_pages }}">Última</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Info Box -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Informações
+                </h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Critérios de Relacionamento (Matching Flexível):</strong></p>
+                <ul>
+                    <li><strong>Código da Máquina</strong> (peso: 30%) - cd_maquina = cd_maquina</li>
+                    <li><strong>Código Funcionário</strong> (peso: 20%) - cd_funcionario = cd_funciomanu</li>
+                    <li><strong>Nome Funcionário</strong> (peso: 15%) - nome_funcionario = nome_funciomanu</li>
+                    <li><strong>Código Tipo CA</strong> (peso: 15%) - cd_atividade = cd_tpcentativ</li>
+                    <li><strong>Número do Plano</strong> (peso: 10%) - numero_plano = cd_planmanut</li>
+                    <li><strong>Sequência Manutenção</strong> (peso: 5%) - sequencia_manutencao = seq_seqplamanu</li>
+                    <li><strong>Sequência Tarefa</strong> (peso: 5%) - sequencia_tarefa = cd_tarefamanu</li>
+                </ul>
+                <p class="mb-2"><strong>Threshold de Match:</strong> {{ threshold_match }}% de correspondência</p>
+                <p class="mb-0"><small class="text-muted">Os relacionamentos são encontrados quando o score de correspondência é igual ou superior a {{ threshold_match }}%. Você pode vincular manualmente os registros para atualizar o campo DESCR_SEQPLAMANU no PlanoPreventiva.</small></p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+

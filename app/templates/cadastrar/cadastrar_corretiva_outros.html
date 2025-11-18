@@ -1,0 +1,392 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Cadastrar Ordem Corretiva/Outros{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Ordens Corretivas</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Cadastrar</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Cadastrar Ordem Corretiva/Outros</h1>
+                <p class="lead">Preencha os dados para cadastrar uma nova ordem de serviço</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-plus-circle me-2"></i>Dados da Ordem de Serviço
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Aviso sobre campos obrigatórios -->
+                        <div class="alert alert-info mb-4">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Campos obrigatórios:</strong> Os campos marcados com <span class="text-danger">*</span> são obrigatórios e devem ser preenchidos.
+                        </div>
+                        
+                        <form method="post" class="needs-validation" novalidate>
+                            {% csrf_token %}
+                            
+                            <!-- Ordem de Serviço -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-file-alt me-2"></i>Ordem de Serviço
+                                    </h6>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.cd_ordemserv.id_for_label }}" class="form-label">
+                                        {{ form.cd_ordemserv.label }}
+                                    </label>
+                                    {{ form.cd_ordemserv }}
+                                    {% if form.cd_ordemserv.errors %}
+                                        <div class="text-danger small">{{ form.cd_ordemserv.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.cd_tpordservtv.id_for_label }}" class="form-label">
+                                        {{ form.cd_tpordservtv.label }}
+                                    </label>
+                                    {{ form.cd_tpordservtv }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.descr_tpordservtv.id_for_label }}" class="form-label">
+                                        {{ form.descr_tpordservtv.label }}
+                                    </label>
+                                    {{ form.descr_tpordservtv }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.descr_sitordsetv.id_for_label }}" class="form-label">
+                                        {{ form.descr_sitordsetv.label }}
+                                    </label>
+                                    {{ form.descr_sitordsetv }}
+                                </div>
+                            </div>
+
+                            <!-- Máquina -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-industry me-2"></i>Máquina
+                                    </h6>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.cd_maquina.id_for_label }}" class="form-label">
+                                        {{ form.cd_maquina.label }}
+                                    </label>
+                                    {{ form.cd_maquina }}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.descr_maquina.id_for_label }}" class="form-label">
+                                        {{ form.descr_maquina.label }}
+                                    </label>
+                                    {{ form.descr_maquina }}
+                                </div>
+                            </div>
+
+                            <!-- Unidades -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-building me-2"></i>Unidades
+                                    </h6>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.cd_unid.id_for_label }}" class="form-label">
+                                        {{ form.cd_unid.label }}
+                                    </label>
+                                    {{ form.cd_unid }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.nome_unid.id_for_label }}" class="form-label">
+                                        {{ form.nome_unid.label }}
+                                    </label>
+                                    {{ form.nome_unid }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.cd_unid_exec.id_for_label }}" class="form-label">
+                                        {{ form.cd_unid_exec.label }}
+                                    </label>
+                                    {{ form.cd_unid_exec }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.nome_unid_exec.id_for_label }}" class="form-label">
+                                        {{ form.nome_unid_exec.label }}
+                                    </label>
+                                    {{ form.nome_unid_exec }}
+                                </div>
+                            </div>
+
+                            <!-- Setor e Centro de Atividade -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-tools me-2"></i>Setor e Centro de Atividade
+                                    </h6>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.cd_setormanut.id_for_label }}" class="form-label">
+                                        {{ form.cd_setormanut.label }}
+                                    </label>
+                                    {{ form.cd_setormanut }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.descr_setormanut.id_for_label }}" class="form-label">
+                                        {{ form.descr_setormanut.label }}
+                                    </label>
+                                    {{ form.descr_setormanut }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.cd_tpcentativ.id_for_label }}" class="form-label">
+                                        {{ form.cd_tpcentativ.label }}
+                                    </label>
+                                    {{ form.cd_tpcentativ }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.descr_abrev_tpcentativ.id_for_label }}" class="form-label">
+                                        {{ form.descr_abrev_tpcentativ.label }}
+                                    </label>
+                                    {{ form.descr_abrev_tpcentativ }}
+                                </div>
+                            </div>
+
+                            <!-- Solicitação -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-user me-2"></i>Solicitação
+                                    </h6>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.dt_entrada.id_for_label }}" class="form-label">
+                                        {{ form.dt_entrada.label }}
+                                    </label>
+                                    {{ form.dt_entrada }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.dt_abertura_solicita.id_for_label }}" class="form-label">
+                                        {{ form.dt_abertura_solicita.label }}
+                                    </label>
+                                    {{ form.dt_abertura_solicita }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.cd_func_solic_os.id_for_label }}" class="form-label">
+                                        {{ form.cd_func_solic_os.label }}
+                                    </label>
+                                    {{ form.cd_func_solic_os }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.nm_func_solic_os.id_for_label }}" class="form-label">
+                                        {{ form.nm_func_solic_os.label }}
+                                    </label>
+                                    {{ form.nm_func_solic_os }}
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label for="{{ form.descr_queixa.id_for_label }}" class="form-label">
+                                        {{ form.descr_queixa.label }}
+                                    </label>
+                                    {{ form.descr_queixa }}
+                                </div>
+                            </div>
+
+                            <!-- Execução -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-wrench me-2"></i>Execução
+                                    </h6>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.cd_func_exec.id_for_label }}" class="form-label">
+                                        {{ form.cd_func_exec.label }}
+                                    </label>
+                                    {{ form.cd_func_exec }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.nm_func_exec.id_for_label }}" class="form-label">
+                                        {{ form.nm_func_exec.label }}
+                                    </label>
+                                    {{ form.nm_func_exec }}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.exec_tarefas.id_for_label }}" class="form-label">
+                                        {{ form.exec_tarefas.label }}
+                                    </label>
+                                    {{ form.exec_tarefas }}
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label for="{{ form.descr_obsordserv.id_for_label }}" class="form-label">
+                                        {{ form.descr_obsordserv.label }}
+                                    </label>
+                                    {{ form.descr_obsordserv }}
+                                </div>
+                            </div>
+
+                            <!-- Datas -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-calendar me-2"></i>Datas
+                                    </h6>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.dt_encordmanu.id_for_label }}" class="form-label">
+                                        {{ form.dt_encordmanu.label }}
+                                    </label>
+                                    {{ form.dt_encordmanu }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.dt_aberordser.id_for_label }}" class="form-label">
+                                        {{ form.dt_aberordser.label }}
+                                    </label>
+                                    {{ form.dt_aberordser }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.dt_iniparmanu.id_for_label }}" class="form-label">
+                                        {{ form.dt_iniparmanu.label }}
+                                    </label>
+                                    {{ form.dt_iniparmanu }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.dt_fimparmanu.id_for_label }}" class="form-label">
+                                        {{ form.dt_fimparmanu.label }}
+                                    </label>
+                                    {{ form.dt_fimparmanu }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.dt_prev_exec.id_for_label }}" class="form-label">
+                                        {{ form.dt_prev_exec.label }}
+                                    </label>
+                                    {{ form.dt_prev_exec }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.dt_ficapomanu.id_for_label }}" class="form-label">
+                                        {{ form.dt_ficapomanu.label }}
+                                    </label>
+                                    {{ form.dt_ficapomanu }}
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <label for="{{ form.dt_inic_iteficmanu.id_for_label }}" class="form-label">
+                                        {{ form.dt_inic_iteficmanu.label }}
+                                    </label>
+                                    {{ form.dt_inic_iteficmanu }}
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <label for="{{ form.dt_fim_iteficmanu.id_for_label }}" class="form-label">
+                                        {{ form.dt_fim_iteficmanu.label }}
+                                    </label>
+                                    {{ form.dt_fim_iteficmanu }}
+                                </div>
+                            </div>
+
+                            <!-- Tipo de Manutenção e Classificação -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-cog me-2"></i>Tipo de Manutenção e Classificação
+                                    </h6>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.cd_tpmanuttv.id_for_label }}" class="form-label">
+                                        {{ form.cd_tpmanuttv.label }}
+                                    </label>
+                                    {{ form.cd_tpmanuttv }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.descr_tpmanuttv.id_for_label }}" class="form-label">
+                                        {{ form.descr_tpmanuttv.label }}
+                                    </label>
+                                    {{ form.descr_tpmanuttv }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.cd_clasorigos.id_for_label }}" class="form-label">
+                                        {{ form.cd_clasorigos.label }}
+                                    </label>
+                                    {{ form.cd_clasorigos }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.descr_clasorigos.id_for_label }}" class="form-label">
+                                        {{ form.descr_clasorigos.label }}
+                                    </label>
+                                    {{ form.descr_clasorigos }}
+                                </div>
+                            </div>
+
+                            <!-- Funcionário Executor OS -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-user-tie me-2"></i>Funcionário Executor OS
+                                    </h6>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.cd_func_exec_os.id_for_label }}" class="form-label">
+                                        {{ form.cd_func_exec_os.label }}
+                                    </label>
+                                    {{ form.cd_func_exec_os }}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.nm_func_exec_os.id_for_label }}" class="form-label">
+                                        {{ form.nm_func_exec_os.label }}
+                                    </label>
+                                    {{ form.nm_func_exec_os }}
+                                </div>
+                            </div>
+
+                            <!-- Recomendações -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-comment me-2"></i>Recomendações e Observações
+                                    </h6>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.descr_recomenos.id_for_label }}" class="form-label">
+                                        {{ form.descr_recomenos.label }}
+                                    </label>
+                                    {{ form.descr_recomenos }}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.descr_seqplamanu.id_for_label }}" class="form-label">
+                                        {{ form.descr_seqplamanu.label }}
+                                    </label>
+                                    {{ form.descr_seqplamanu }}
+                                </div>
+                            </div>
+
+                            <!-- Botões -->
+                            <div class="d-flex justify-content-between mt-4">
+                                <a href="{% url 'consultar_corretivas_outros' %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>Cancelar
+                                </a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-2"></i>Salvar Ordem de Serviço
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+

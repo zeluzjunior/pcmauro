@@ -1,0 +1,544 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Visualizar Item de Estoque {{ item.codigo_item }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_estoque' %}" class="text-white">Estoque</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Visualizar Item {{ item.codigo_item }}</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Visualizar Item de Estoque</h1>
+                <p class="lead">Detalhes completos do item {{ item.codigo_item }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        <div class="row">
+            <div class="col-12">
+                <!-- Fotos e Documentação -->
+                <div class="row mb-4">
+                    <!-- Foto do Item -->
+                    <div class="col-md-4 mb-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-image me-2"></i>Foto do Item
+                                </h5>
+                            </div>
+                            <div class="card-body d-flex flex-column">
+                                {% if item.foto_item %}
+                                    <div class="text-center flex-grow-1 d-flex align-items-center justify-content-center mb-3">
+                                        <a href="#" data-bs-toggle="modal" data-bs-target="#modalFotoItem" style="cursor: pointer;">
+                                            <img src="{{ item.foto_item.url }}" alt="Foto do item {{ item.codigo_item }}" class="img-fluid rounded shadow" style="max-width: 100%; max-height: 300px; object-fit: contain;">
+                                        </a>
+                                    </div>
+                                    <div class="text-center">
+                                        <form method="post" action="{% url 'atualizar_foto_item' item.id %}" enctype="multipart/form-data" class="formFotoItem" id="formFotoItemUpdate">
+                                            {% csrf_token %}
+                                            <input type="file" name="foto_item" accept="image/*" class="form-control form-control-sm mb-2 inputFotoItem" id="inputFotoItemUpdate">
+                                            <button type="submit" class="btn btn-sm btn-primary upload-photo-btn" id="btnFotoItemUpdate">
+                                                <i class="fas fa-upload me-1"></i>Atualizar Foto
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center py-4 flex-grow-1 d-flex flex-column align-items-center justify-content-center">
+                                        <i class="fas fa-image fa-4x text-muted mb-3"></i>
+                                        <p class="text-muted mb-3">Nenhuma foto foi enviada.</p>
+                                        <form method="post" action="{% url 'atualizar_foto_item' item.id %}" enctype="multipart/form-data" class="formFotoItem" id="formFotoItemNew">
+                                            {% csrf_token %}
+                                            <input type="file" name="foto_item" accept="image/*" class="form-control form-control-sm mb-2 inputFotoItem" required id="inputFotoItemNew">
+                                            <button type="submit" class="btn btn-sm btn-primary upload-photo-btn" id="btnFotoItemNew">
+                                                <i class="fas fa-upload me-1"></i>Enviar Foto
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Documentação Técnica -->
+                    <div class="col-md-4 mb-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-file-pdf me-2"></i>Documentação Técnica
+                                </h5>
+                            </div>
+                            <div class="card-body d-flex flex-column">
+                                {% if item.documentacao_tecnica %}
+                                    <div class="text-center flex-grow-1 d-flex align-items-center justify-content-center mb-3">
+                                        <div>
+                                            <i class="fas fa-file-pdf fa-5x text-danger mb-3"></i>
+                                            <p class="text-muted small mb-0">{{ item.documentacao_tecnica.name|truncatechars:30 }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="text-center mb-2">
+                                        <a href="{{ item.documentacao_tecnica.url }}" target="_blank" class="btn btn-sm btn-info mb-2">
+                                            <i class="fas fa-eye me-1"></i>Visualizar PDF
+                                        </a>
+                                    </div>
+                                    <div class="text-center">
+                                        <form method="post" action="{% url 'atualizar_documentacao_tecnica' item.id %}" enctype="multipart/form-data" class="formDocumentacao" id="formDocumentacaoUpdate">
+                                            {% csrf_token %}
+                                            <input type="file" name="documentacao_tecnica" accept=".pdf" class="form-control form-control-sm mb-2 inputDocumentacao" id="inputDocumentacaoUpdate">
+                                            <button type="submit" class="btn btn-sm btn-info upload-photo-btn" id="btnDocumentacaoUpdate">
+                                                <i class="fas fa-upload me-1"></i>Atualizar PDF
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center py-4 flex-grow-1 d-flex flex-column align-items-center justify-content-center">
+                                        <i class="fas fa-file-pdf fa-4x text-muted mb-3"></i>
+                                        <p class="text-muted mb-3">Nenhuma documentação foi enviada.</p>
+                                        <form method="post" action="{% url 'atualizar_documentacao_tecnica' item.id %}" enctype="multipart/form-data" class="formDocumentacao" id="formDocumentacaoNew">
+                                            {% csrf_token %}
+                                            <input type="file" name="documentacao_tecnica" accept=".pdf" class="form-control form-control-sm mb-2 inputDocumentacao" required id="inputDocumentacaoNew">
+                                            <button type="submit" class="btn btn-sm btn-info upload-photo-btn" id="btnDocumentacaoNew">
+                                                <i class="fas fa-upload me-1"></i>Enviar PDF
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Foto Detalhada -->
+                    <div class="col-md-4 mb-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-camera me-2"></i>Foto Detalhada
+                                </h5>
+                            </div>
+                            <div class="card-body d-flex flex-column">
+                                {% if item.foto_detalhada %}
+                                    <div class="text-center flex-grow-1 d-flex align-items-center justify-content-center mb-3">
+                                        <a href="#" data-bs-toggle="modal" data-bs-target="#modalFotoDetalhada" style="cursor: pointer;">
+                                            <img src="{{ item.foto_detalhada.url }}" alt="Foto detalhada do item {{ item.codigo_item }}" class="img-fluid rounded shadow" style="max-width: 100%; max-height: 300px; object-fit: contain;">
+                                        </a>
+                                    </div>
+                                    <div class="text-center">
+                                        <form method="post" action="{% url 'atualizar_foto_detalhada' item.id %}" enctype="multipart/form-data" class="formFotoDetalhada" id="formFotoDetalhadaUpdate">
+                                            {% csrf_token %}
+                                            <input type="file" name="foto_detalhada" accept="image/*" class="form-control form-control-sm mb-2 inputFotoDetalhada" id="inputFotoDetalhadaUpdate">
+                                            <button type="submit" class="btn btn-sm btn-success upload-photo-btn" id="btnFotoDetalhadaUpdate">
+                                                <i class="fas fa-upload me-1"></i>Atualizar Foto
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center py-4 flex-grow-1 d-flex flex-column align-items-center justify-content-center">
+                                        <i class="fas fa-camera fa-4x text-muted mb-3"></i>
+                                        <p class="text-muted mb-3">Nenhuma foto detalhada foi enviada.</p>
+                                        <form method="post" action="{% url 'atualizar_foto_detalhada' item.id %}" enctype="multipart/form-data" class="formFotoDetalhada" id="formFotoDetalhadaNew">
+                                            {% csrf_token %}
+                                            <input type="file" name="foto_detalhada" accept="image/*" class="form-control form-control-sm mb-2 inputFotoDetalhada" required id="inputFotoDetalhadaNew">
+                                            <button type="submit" class="btn btn-sm btn-success upload-photo-btn" id="btnFotoDetalhadaNew">
+                                                <i class="fas fa-upload me-1"></i>Enviar Foto
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modais para visualização em tamanho real -->
+                {% if item.foto_item %}
+                <div class="modal fade" id="modalFotoItem" tabindex="-1" aria-labelledby="modalFotoItemLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title" id="modalFotoItemLabel">
+                                    <i class="fas fa-image me-2"></i>Foto do Item - {{ item.codigo_item }}
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-center">
+                                <img src="{{ item.foto_item.url }}" alt="Foto do item {{ item.codigo_item }}" class="img-fluid rounded shadow">
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if item.foto_detalhada %}
+                <div class="modal fade" id="modalFotoDetalhada" tabindex="-1" aria-labelledby="modalFotoDetalhadaLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-success text-white">
+                                <h5 class="modal-title" id="modalFotoDetalhadaLabel">
+                                    <i class="fas fa-camera me-2"></i>Foto Detalhada - {{ item.codigo_item }}
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-center">
+                                <img src="{{ item.foto_detalhada.url }}" alt="Foto detalhada do item {{ item.codigo_item }}" class="img-fluid rounded shadow">
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Informações Principais -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Informações Principais
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Código do Item</label>
+                                <p class="form-control-plaintext">{{ item.codigo_item }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Descrição do Item</label>
+                                <p class="form-control-plaintext">{{ item.descricao_item|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Unidade de Medida</label>
+                                <p class="form-control-plaintext">
+                                    {% if item.unidade_medida %}
+                                        <span class="badge bg-info">{{ item.unidade_medida }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Descrição Destino de Uso</label>
+                                <p class="form-control-plaintext">{{ item.descricao_dest_uso|default:"Não informado" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Localização no Estoque -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-warehouse me-2"></i>Localização no Estoque
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Estante</label>
+                                <p class="form-control-plaintext">
+                                    {% if item.estante %}
+                                        <span class="badge bg-secondary">{{ item.estante }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Prateleira</label>
+                                <p class="form-control-plaintext">
+                                    {% if item.prateleira %}
+                                        <span class="badge bg-secondary">{{ item.prateleira }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Coluna</label>
+                                <p class="form-control-plaintext">
+                                    {% if item.coluna %}
+                                        <span class="badge bg-secondary">{{ item.coluna }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Sequência</label>
+                                <p class="form-control-plaintext">
+                                    {% if item.sequencia %}
+                                        <span class="badge bg-secondary">{{ item.sequencia }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quantidade e Valor -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-calculator me-2"></i>Quantidade e Valor
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Quantidade em Estoque</label>
+                                <p class="form-control-plaintext">
+                                    <span class="badge bg-success fs-6">{{ item.quantidade|floatformat:2 }}</span>
+                                    {% if item.unidade_medida %}
+                                        <span class="text-muted ms-2">{{ item.unidade_medida }}</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Valor Unitário</label>
+                                <p class="form-control-plaintext">
+                                    <span class="badge bg-warning text-dark fs-6">R$ {{ item.valor|floatformat:2 }}</span>
+                                </p>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label fw-bold">Valor Total</label>
+                                <p class="form-control-plaintext">
+                                    <span class="badge bg-primary fs-5">R$ {{ item.valor_total|floatformat:2 }}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controle de Estoque -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clipboard-check me-2"></i>Controle de Estoque
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Controla Estoque Mínimo</label>
+                                <p class="form-control-plaintext">
+                                    {% if item.controla_estoque_minimo %}
+                                        {% if item.controla_estoque_minimo|upper == 'SIM' %}
+                                            <span class="badge bg-success">Sim</span>
+                                        {% elif item.controla_estoque_minimo|upper == 'NÃO' or item.controla_estoque_minimo|upper == 'NAO' %}
+                                            <span class="badge bg-secondary">Não</span>
+                                        {% else %}
+                                            <span class="badge bg-info">{{ item.controla_estoque_minimo }}</span>
+                                        {% endif %}
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Classificação Tempo Sem Consumo</label>
+                                <p class="form-control-plaintext">
+                                    {% if item.classificacao_tempo_sem_consumo %}
+                                        <span class="badge bg-warning text-dark">{{ item.classificacao_tempo_sem_consumo }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações do Sistema -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-database me-2"></i>Informações do Sistema
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">ID do Registro</label>
+                                <p class="form-control-plaintext">{{ item.id }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Data de Criação</label>
+                                <p class="form-control-plaintext">{{ item.created_at|date:"d/m/Y H:i:s" }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Última Atualização</label>
+                                <p class="form-control-plaintext">{{ item.updated_at|date:"d/m/Y H:i:s" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Máquinas Relacionadas -->
+                {% if maquinas_relacionadas %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-cog me-2"></i>Máquinas Relacionadas ({{ maquinas_relacionadas.count }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Código da Máquina</th>
+                                        <th>Descrição</th>
+                                        <th>Quantidade Necessária</th>
+                                        <th>Observações</th>
+                                        <th class="text-center">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for maquina_peca in maquinas_relacionadas %}
+                                        <tr>
+                                            <td>
+                                                <strong>
+                                                    <a href="{% url 'visualizar_maquina' maquina_peca.maquina.id %}" class="text-decoration-none">
+                                                        {{ maquina_peca.maquina.cd_maquina }}
+                                                    </a>
+                                                </strong>
+                                            </td>
+                                            <td>
+                                                <a href="{% url 'visualizar_maquina' maquina_peca.maquina.id %}" class="text-decoration-none">
+                                                    {{ maquina_peca.maquina.descr_maquina|default:"Sem descrição" }}
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-info">{{ maquina_peca.quantidade }}</span>
+                                            </td>
+                                            <td>{{ maquina_peca.observacoes|default:"-" }}</td>
+                                            <td class="text-center">
+                                                <a href="{% url 'visualizar_maquina' maquina_peca.maquina.id %}" class="btn btn-sm btn-primary">
+                                                    <i class="fas fa-eye"></i> Ver Máquina
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Botões de Ação -->
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{% url 'consultar_estoque' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Voltar para Lista de Estoque
+                    </a>
+                    <div>
+                        <a href="{% url 'consultar_estoque' %}?search={{ item.codigo_item }}" class="btn btn-outline-primary">
+                            <i class="fas fa-search me-2"></i>Buscar Itens Similares
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Garantir que os formulários de upload funcionem corretamente
+window.addEventListener('load', function() {
+    // Aguardar um pouco para garantir que main.js já carregou
+    setTimeout(function() {
+        // Função auxiliar para configurar formulário de upload
+        function setupUploadForm(formId, inputId, btnId, formName) {
+            const form = document.getElementById(formId);
+            if (!form) {
+                console.log(`Formulário ${formName} não encontrado: ${formId}`);
+                return;
+            }
+            
+            console.log(`Formulário ${formName} encontrado: ${formId}`);
+            
+            // Remover listeners do main.js do botão
+            const submitBtn = document.getElementById(btnId);
+            if (submitBtn) {
+                // Clonar e substituir o botão para remover listeners do main.js
+                const newBtn = submitBtn.cloneNode(true);
+                newBtn.id = btnId; // Preservar o ID
+                submitBtn.parentNode.replaceChild(newBtn, submitBtn);
+                const cleanBtn = document.getElementById(btnId);
+                
+                // Adicionar listener no botão - executar ANTES de qualquer outro
+                cleanBtn.addEventListener('click', function(e) {
+                    console.log(`=== BOTÃO ${formName} CLICADO ===`);
+                    const fileInput = document.getElementById(inputId);
+                    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        alert('Por favor, selecione um arquivo para enviar.');
+                        return false;
+                    }
+                    console.log(`Arquivo selecionado: ${fileInput.files[0].name}, Tamanho: ${fileInput.files[0].size}`);
+                    console.log(`Enviando formulário ${formName}...`);
+                    // Não prevenir - deixar o formulário ser enviado normalmente
+                }, true); // Use capture phase para executar antes de outros listeners
+            } else {
+                console.error(`Botão ${btnId} não encontrado`);
+            }
+            
+            // Adicionar listener no formulário - executar ANTES de qualquer outro
+            form.addEventListener('submit', function(e) {
+                console.log(`=== FORM ${formName} SUBMIT ===`);
+                
+                const fileInput = document.getElementById(inputId);
+                if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    alert('Por favor, selecione um arquivo para enviar.');
+                    return false;
+                }
+                
+                console.log(`Arquivo selecionado: ${fileInput.files[0].name}, Tamanho: ${fileInput.files[0].size}`);
+                console.log(`Formulário ${formName} será enviado normalmente`);
+                // NÃO chamar e.preventDefault() - deixar o formulário ser enviado normalmente
+            }, true); // Use capture phase para executar antes de outros listeners
+        }
+        
+        // Configurar todos os formulários de upload
+        setupUploadForm('formFotoItemUpdate', 'inputFotoItemUpdate', 'btnFotoItemUpdate', 'Foto Item Update');
+        setupUploadForm('formFotoItemNew', 'inputFotoItemNew', 'btnFotoItemNew', 'Foto Item New');
+        setupUploadForm('formDocumentacaoUpdate', 'inputDocumentacaoUpdate', 'btnDocumentacaoUpdate', 'Documentação Update');
+        setupUploadForm('formDocumentacaoNew', 'inputDocumentacaoNew', 'btnDocumentacaoNew', 'Documentação New');
+        setupUploadForm('formFotoDetalhadaUpdate', 'inputFotoDetalhadaUpdate', 'btnFotoDetalhadaUpdate', 'Foto Detalhada Update');
+        setupUploadForm('formFotoDetalhadaNew', 'inputFotoDetalhadaNew', 'btnFotoDetalhadaNew', 'Foto Detalhada New');
+    }, 1000); // Aguardar 1 segundo para garantir que main.js já carregou e adicionou seus listeners
+});
+</script>
+{% endblock %}
+

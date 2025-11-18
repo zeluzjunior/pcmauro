@@ -1,0 +1,489 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Consultar Ordens Corretivas/Outros{% endblock %}
+
+{% block extra_css %}
+<style>
+    .table-container {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+    }
+    .filter-input {
+        width: 100%;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        margin-top: 4px;
+    }
+    .filter-input:focus {
+        outline: none;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    .filter-header {
+        padding: 8px !important;
+    }
+    .filter-row th {
+        background-color: #e9ecef;
+        padding: 4px 8px !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 153, 0, 0.171)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Ordens Corretivas</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Consultar Ordens Corretivas/Outros</h1>
+                <p class="lead">Visualize todas as ordens de serviço corretivas cadastradas no sistema</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Actions Bar -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <form method="get" action="{% url 'consultar_corretivas_outros' %}" class="d-flex">
+                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por OS, máquina, funcionário ou descrição..." value="{{ request.GET.search }}">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Filtros Avançados -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-secondary text-white">
+                        <button class="btn btn-link text-white text-decoration-none p-0 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="false" aria-controls="filtrosCollapse">
+                            <h5 class="mb-0">
+                                <i class="fas fa-filter me-2"></i>Filtros Avançados
+                                <i class="fas fa-chevron-down float-end"></i>
+                            </h5>
+                        </button>
+                    </div>
+                    <div class="collapse" id="filtrosCollapse">
+                        <div class="card-body">
+                            <form method="get" id="filtrosForm">
+                                <!-- Preservar busca geral -->
+                                <input type="hidden" name="search" value="{{ request.GET.search }}">
+                                
+                                <div class="row g-3">
+                                    <!-- Filtro por Setor -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_setor" class="form-label">Setor de Manutenção</label>
+                                        <select class="form-select" id="filtro_setor" name="filtro_setor">
+                                            <option value="">Todos os setores</option>
+                                            {% for setor in setores_unicos %}
+                                                <option value="{{ setor }}" {% if filtro_setor == setor %}selected{% endif %}>{{ setor|truncatewords:5 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Unidade -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_unidade" class="form-label">Unidade</label>
+                                        <select class="form-select" id="filtro_unidade" name="filtro_unidade">
+                                            <option value="">Todas as unidades</option>
+                                            {% for unidade in unidades_unicas %}
+                                                <option value="{{ unidade }}" {% if filtro_unidade == unidade %}selected{% endif %}>{{ unidade|truncatewords:5 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Tipo de OS -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_tipo_os" class="form-label">Tipo de Ordem de Serviço</label>
+                                        <select class="form-select" id="filtro_tipo_os" name="filtro_tipo_os">
+                                            <option value="">Todos os tipos</option>
+                                            {% for tipo in tipos_os_unicos %}
+                                                <option value="{{ tipo }}" {% if filtro_tipo_os == tipo %}selected{% endif %}>{{ tipo|truncatewords:5 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Situação -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_situacao" class="form-label">Situação da Ordem</label>
+                                        <select class="form-select" id="filtro_situacao" name="filtro_situacao">
+                                            <option value="">Todas as situações</option>
+                                            {% for situacao in situacoes_unicas %}
+                                                <option value="{{ situacao }}" {% if filtro_situacao == situacao %}selected{% endif %}>{{ situacao|truncatewords:5 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Funcionário Solicitante -->
+                                    <div class="col-md-4">
+                                        <label for="filtro_solicitante" class="form-label">Funcionário Solicitante</label>
+                                        <input type="text" class="form-control" id="filtro_solicitante" name="filtro_solicitante" placeholder="Nome do solicitante..." value="{{ filtro_solicitante }}">
+                                    </div>
+                                    
+                                    <!-- Filtro por Funcionário Executor -->
+                                    <div class="col-md-4">
+                                        <label for="filtro_executor" class="form-label">Funcionário Executor</label>
+                                        <input type="text" class="form-control" id="filtro_executor" name="filtro_executor" placeholder="Nome do executor..." value="{{ filtro_executor }}">
+                                    </div>
+                                    
+                                    <!-- Filtro por Código da Máquina -->
+                                    <div class="col-md-4">
+                                        <label for="filtro_maquina" class="form-label">Código da Máquina</label>
+                                        <input type="text" class="form-control" id="filtro_maquina" name="filtro_maquina" placeholder="Código da máquina..." value="{{ filtro_maquina }}">
+                                    </div>
+                                    
+                                    <!-- Filtro por Data de Entrada -->
+                                    <div class="col-md-6">
+                                        <label class="form-label">Data de Entrada (Período)</label>
+                                        <div class="row g-2">
+                                            <div class="col-6">
+                                                <input type="date" class="form-control" id="data_entrada_inicio" name="data_entrada_inicio" value="{{ data_entrada_inicio }}" placeholder="Data inicial">
+                                            </div>
+                                            <div class="col-6">
+                                                <input type="date" class="form-control" id="data_entrada_fim" name="data_entrada_fim" value="{{ data_entrada_fim }}" placeholder="Data final">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Filtro por Status da Ordem -->
+                                    <div class="col-md-6">
+                                        <label class="form-label">Status da Ordem</label>
+                                        <div class="mt-2">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="filtro_ordens_abertas" name="filtro_ordens_abertas" value="1" {% if filtro_ordens_abertas == '1' %}checked{% endif %}>
+                                                <label class="form-check-label" for="filtro_ordens_abertas">
+                                                    Ordens Abertas
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="filtro_ordens_fechadas" name="filtro_ordens_fechadas" value="1" {% if filtro_ordens_fechadas == '1' %}checked{% endif %}>
+                                                <label class="form-check-label" for="filtro_ordens_fechadas">
+                                                    Ordens Fechadas
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Botões de Ação -->
+                                    <div class="col-md-6 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary me-2">
+                                            <i class="fas fa-filter me-2"></i>Aplicar Filtros
+                                        </button>
+                                        <a href="{% url 'consultar_corretivas_outros' %}" class="btn btn-outline-secondary">
+                                            <i class="fas fa-times me-2"></i>Limpar Filtros
+                                        </a>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total</h5>
+                        <p class="card-text display-6">{{ total_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Mostrando</h5>
+                        <p class="card-text display-6">{{ ordens|length }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Setores</h5>
+                        <p class="card-text display-6">{{ setores_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Unidades</h5>
+                        <p class="card-text display-6">{{ unidades_count }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-list me-2"></i>Lista de Ordens de Serviço Corretivas
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table class="table table-hover table-striped mb-0" id="corretivasTable">
+                        <thead>
+                            <tr>
+                                <th>OS</th>
+                                <th>Máquina</th>
+                                <th>Descrição</th>
+                                <th>Setor</th>
+                                <th>Solicitante</th>
+                                <th>Executor</th>
+                                <th>Data Entrada</th>
+                                <th>Data Encerramento</th>
+                                <th>Tipo</th>
+                                <th>Ações</th>
+                            </tr>
+                            <tr class="filter-row">
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar OS..." data-column="0">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Máquina..." data-column="1">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Descrição..." data-column="2">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Setor..." data-column="3">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Solicitante..." data-column="4">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Executor..." data-column="5">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Data Entrada..." data-column="6">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Data Encerramento..." data-column="7">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Tipo..." data-column="8">
+                                </th>
+                                <th class="filter-header">
+                                    <!-- Sem filtro na coluna de ações -->
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if ordens %}
+                                {% for ordem in ordens %}
+                                <tr>
+                                    <td><strong>{{ ordem.cd_ordemserv }}</strong></td>
+                                    <td>
+                                        {% if ordem.cd_maquina %}
+                                            <span class="badge bg-secondary">{{ ordem.cd_maquina }}</span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ ordem.descr_maquina|default:"-"|truncatewords:8 }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ ordem.cd_setormanut|default:"-" }}</span>
+                                        {% if ordem.descr_setormanut %}
+                                            <br><small class="text-muted">{{ ordem.descr_setormanut|truncatewords:5 }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ordem.nm_func_solic_os %}
+                                            {{ ordem.nm_func_solic_os|truncatewords:3 }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ordem.nm_func_exec %}
+                                            {{ ordem.nm_func_exec|truncatewords:3 }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ordem.dt_entrada %}
+                                            <small>{{ ordem.dt_entrada }}</small>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ordem.dt_encordmanu %}
+                                            <small>{{ ordem.dt_encordmanu }}</small>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ordem.descr_tpordservtv %}
+                                            <span class="badge bg-warning text-dark">{{ ordem.descr_tpordservtv }}</span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'visualizar_corretiva_outros' ordem.id %}" class="btn btn-sm btn-primary" title="Visualizar detalhes">
+                                            <i class="fas fa-eye me-1"></i>Visualizar
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="10" class="text-center py-5">
+                                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                        <p class="text-muted">Nenhuma ordem encontrada.</p>
+                                        <a href="{% url 'cadastrar_corretiva_outros' %}" class="btn btn-primary">
+                                            <i class="fas fa-plus-circle me-2"></i>Cadastrar Primeira Ordem
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if ordens.has_other_pages %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if ordens.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1">Primeira</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ ordens.previous_page_number }}">Anterior</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Página {{ ordens.number }} de {{ ordens.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if ordens.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ ordens.next_page_number }}">Próxima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ ordens.paginator.num_pages }}">Última</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('corretivasTable');
+    const filterInputs = document.querySelectorAll('.filter-input');
+    
+    if (!table || !filterInputs.length) return;
+    
+    // Função para filtrar a tabela
+    function filterTable() {
+        const filters = [];
+        filterInputs.forEach(input => {
+            const columnIndex = parseInt(input.getAttribute('data-column'));
+            const filterValue = input.value.toLowerCase().trim();
+            filters[columnIndex] = filterValue;
+        });
+        
+        const rows = table.querySelectorAll('tbody tr');
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            let showRow = true;
+            
+            // Verificar cada coluna (exceto a última que é ações)
+            for (let i = 0; i < filters.length; i++) {
+                if (filters[i]) {
+                    const cell = row.cells[i];
+                    if (cell) {
+                        const cellText = cell.textContent.toLowerCase().trim();
+                        if (!cellText.includes(filters[i])) {
+                            showRow = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (showRow) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+    
+    // Adicionar event listeners aos campos de filtro
+    filterInputs.forEach(input => {
+        input.addEventListener('input', filterTable);
+        input.addEventListener('keyup', filterTable);
+    });
+    
+    // Botão para limpar todos os filtros
+    const clearFiltersBtn = document.createElement('button');
+    clearFiltersBtn.type = 'button';
+    clearFiltersBtn.className = 'btn btn-sm btn-outline-secondary mt-2';
+    clearFiltersBtn.innerHTML = '<i class="fas fa-times me-1"></i>Limpar Filtros';
+    clearFiltersBtn.addEventListener('click', function() {
+        filterInputs.forEach(input => {
+            input.value = '';
+        });
+        filterTable();
+    });
+    
+    // Adicionar botão de limpar filtros após a tabela
+    const tableContainer = document.querySelector('.table-container');
+    if (tableContainer) {
+        const clearBtnContainer = document.createElement('div');
+        clearBtnContainer.className = 'p-2 border-top';
+        clearBtnContainer.appendChild(clearFiltersBtn);
+        tableContainer.parentElement.appendChild(clearBtnContainer);
+    }
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Visualizar Local {{ local.local }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_locais_e_cas' %}" class="text-white">Locais e CAs</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'visualizar_centro_de_atividade' local.centro_atividade.id %}" class="text-white">CA {{ local.centro_atividade.ca }}</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Local {{ local.local }}</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Visualizar Local</h1>
+                <p class="lead">Detalhes completos do Local {{ local.local }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <div class="row">
+            <div class="col-12">
+                <!-- Informações do Local -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-map-marker-alt me-2"></i>Informações do Local
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label fw-bold">Local</label>
+                                <p class="form-control-plaintext fs-5">{{ local.local }}</p>
+                            </div>
+                            {% if local.observacoes %}
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label fw-bold">Observações</label>
+                                <p class="form-control-plaintext">{{ local.observacoes }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações do Centro de Atividade -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-building me-2"></i>Centro de Atividade Relacionado
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">CA (Código do Centro de Atividade)</label>
+                                <p class="form-control-plaintext">
+                                    <a href="{% url 'visualizar_centro_de_atividade' local.centro_atividade.id %}" class="text-decoration-none">
+                                        <span class="badge bg-primary fs-6">{{ local.centro_atividade.ca }}</span>
+                                    </a>
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Sigla</label>
+                                <p class="form-control-plaintext">
+                                    {% if local.centro_atividade.sigla %}
+                                        <span class="badge bg-secondary fs-6">{{ local.centro_atividade.sigla }}</span>
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label fw-bold">Descrição do Centro de Atividade</label>
+                                <p class="form-control-plaintext">{{ local.centro_atividade.descricao|default:"Não informado" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Máquinas Relacionadas -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-industry me-2"></i>Máquinas Principais Relacionadas
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if maquinas %}
+                            <div class="table-responsive">
+                                <table class="table table-hover table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Código da Máquina</th>
+                                            <th>Descrição</th>
+                                            <th>Setor de Manutenção</th>
+                                            <th>Unidade</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for maquina in maquinas %}
+                                        <tr>
+                                            <td><strong>{{ maquina.cd_maquina }}</strong></td>
+                                            <td>{{ maquina.descr_maquina|default:"-"|truncatewords:10 }}</td>
+                                            <td>
+                                                {% if maquina.cd_setormanut %}
+                                                    <span class="badge bg-secondary">{{ maquina.cd_setormanut }}</span>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ maquina.nome_unid|default:"-" }}</td>
+                                            <td>
+                                                <a href="{% url 'visualizar_maquina' maquina.id %}" class="btn btn-sm btn-primary" title="Visualizar máquina">
+                                                    <i class="fas fa-eye me-1"></i>Visualizar
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-3">
+                                <p class="text-muted mb-0">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Total de máquinas principais relacionadas a este local: <strong>{{ maquinas.count }}</strong>
+                                </p>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info mb-0">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Nenhuma máquina principal relacionada a este local.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Informações do Sistema -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-database me-2"></i>Informações do Sistema
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">ID do Registro</label>
+                                <p class="form-control-plaintext">{{ local.id }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Data de Criação</label>
+                                <p class="form-control-plaintext">{{ local.created_at|date:"d/m/Y H:i:s" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Última Atualização</label>
+                                <p class="form-control-plaintext">{{ local.updated_at|date:"d/m/Y H:i:s" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botões de Ação -->
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{% url 'visualizar_centro_de_atividade' local.centro_atividade.id %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Voltar para Centro de Atividade
+                    </a>
+                    <div>
+                        <a href="{% url 'consultar_locais_e_cas' %}" class="btn btn-info">
+                            <i class="fas fa-list me-2"></i>Ver Todos os CAs
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+

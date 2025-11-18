@@ -1,0 +1,265 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gerenciar Projeto - Administração{% endblock %}
+
+{% block extra_css %}
+<style>
+    .danger-zone {
+        border: 2px solid #dc3545;
+        border-radius: 8px;
+        padding: 20px;
+        background-color: #fff5f5;
+    }
+    .table-stats {
+        font-size: 0.9rem;
+    }
+    .action-card {
+        transition: transform 0.2s;
+    }
+    .action-card:hover {
+        transform: translateY(-5px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 153, 0, 0.171)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Administração</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Gerenciar Projeto</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-cog me-2"></i>Gerenciar Projeto
+                </h1>
+                <p class="lead">Painel de administração e gerenciamento do sistema</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white action-card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-industry me-2"></i>Máquinas
+                        </h5>
+                        <p class="card-text display-6">{{ maquinas_count }}</p>
+                        <small>Registros cadastrados</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white action-card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-wrench me-2"></i>Ordens Corretivas
+                        </h5>
+                        <p class="card-text display-6">{{ ordens_count }}</p>
+                        <small>Registros cadastrados</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white action-card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-building me-2"></i>Centros de Atividade
+                        </h5>
+                        <p class="card-text display-6">{{ centros_count }}</p>
+                        <small>Registros cadastrados</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white action-card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-user-tie me-2"></i>Manutentores
+                        </h5>
+                        <p class="card-text display-6">{{ manutentores_count }}</p>
+                        <small>Registros cadastrados</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Database Tables Overview -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-database me-2"></i>Visão Geral das Tabelas
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-stats">
+                        <thead>
+                            <tr>
+                                <th>Tabela</th>
+                                <th>Descrição</th>
+                                <th class="text-center">Total de Registros</th>
+                                <th class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tabela in tabelas_info %}
+                            <tr>
+                                <td>
+                                    <strong>
+                                        <i class="{{ tabela.icone }} me-2"></i>{{ tabela.nome }}
+                                    </strong>
+                                </td>
+                                <td>{{ tabela.descricao|default:"Tabela do sistema" }}</td>
+                                <td class="text-center">
+                                    <span class="badge bg-{{ tabela.cor }} {% if tabela.cor == 'warning' %}text-dark{% endif %}">
+                                        {{ tabela.count }}
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-danger" onclick="confirmarLimpeza('{{ tabela.key }}', '{{ tabela.count }}', '{{ tabela.nome }}')">
+                                        <i class="fas fa-trash me-1"></i>Limpar
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="danger-zone mb-4">
+            <h4 class="text-danger mb-3">
+                <i class="fas fa-exclamation-triangle me-2"></i>Zona de Perigo
+            </h4>
+            <p class="text-muted mb-3">
+                <strong>Atenção:</strong> As ações abaixo são irreversíveis. Certifique-se de que deseja prosseguir antes de executar qualquer operação.
+            </p>
+            
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <div class="card border-danger">
+                        <div class="card-body">
+                            <h5 class="card-title text-danger">
+                                <i class="fas fa-database me-2"></i>Limpar Tabela Individual
+                            </h5>
+                            <p class="card-text">Limpe registros de uma tabela específica.</p>
+                            <form method="post" action="{% url 'limpar_tabela' %}" id="limparTabelaForm" style="display: none;">
+                                {% csrf_token %}
+                                <input type="hidden" name="tabela" id="tabelaInput" value="">
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <div class="card border-danger">
+                        <div class="card-body">
+                            <h5 class="card-title text-danger">
+                                <i class="fas fa-bomb me-2"></i>Limpar Todas as Tabelas
+                            </h5>
+                            <p class="card-text">Limpe todos os registros de todas as tabelas do sistema.</p>
+                            <button type="button" class="btn btn-danger" onclick="confirmarLimpezaTotal()">
+                                <i class="fas fa-exclamation-triangle me-2"></i>Limpar Tudo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+</section>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="confirmModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Confirmar Ação
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="modalMessage"></p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Esta ação é irreversível!</strong> Todos os dados serão permanentemente removidos.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmButton">
+                    <i class="fas fa-trash me-2"></i>Confirmar e Limpar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function confirmarLimpeza(tabela, count, tabelaNome) {
+        const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        const modalMessage = document.getElementById('modalMessage');
+        const confirmButton = document.getElementById('confirmButton');
+        
+        modalMessage.innerHTML = `Você está prestes a limpar a tabela <strong>${tabelaNome}</strong>.<br><br>Total de registros que serão removidos: <strong>${count}</strong>`;
+        
+        confirmButton.onclick = function() {
+            document.getElementById('tabelaInput').value = tabela;
+            document.getElementById('limparTabelaForm').submit();
+        };
+        
+        modal.show();
+    }
+    
+    function confirmarLimpezaTotal() {
+        const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        const modalMessage = document.getElementById('modalMessage');
+        const confirmButton = document.getElementById('confirmButton');
+        
+        const total = {{ total_geral }};
+        const tabelasList = [
+            {% for tabela in tabelas_info %}
+            '{{ tabela.nome }} ({{ tabela.count }})'{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
+        const tabelasHtml = tabelasList.map(t => `- ${t}`).join('<br>');
+        
+        modalMessage.innerHTML = `Você está prestes a limpar <strong>TODAS</strong> as tabelas do sistema.<br><br>Total de registros que serão removidos: <strong>${total}</strong><br><br>Isso inclui:<br>${tabelasHtml}`;
+        
+        confirmButton.onclick = function() {
+            document.getElementById('tabelaInput').value = 'todos';
+            document.getElementById('limparTabelaForm').submit();
+        };
+        
+        modal.show();
+    }
+</script>
+{% endblock %}
+

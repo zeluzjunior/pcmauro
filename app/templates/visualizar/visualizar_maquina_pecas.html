@@ -1,0 +1,504 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Peças de Máquina {{ maquina.cd_maquina }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_maquinas' %}" class="text-white">Máquinas</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'visualizar_maquina' maquina.id %}" class="text-white">Máquina {{ maquina.cd_maquina }}</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Peças de Reposição</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-cog me-2"></i>Peças de Reposição
+                </h1>
+                <p class="lead">Gerenciar peças de estoque relacionadas à máquina {{ maquina.cd_maquina }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        <div class="row">
+            <div class="col-12">
+                <!-- Códigos Aurora e Fabricante -->
+                <div class="row mb-4">
+                    <!-- Código Aurora -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-qrcode me-2"></i>Código Aurora
+                                </h5>
+                            </div>
+                            <div class="card-body d-flex flex-column">
+                                {% if maquina.codigo_aurora %}
+                                    <div class="text-center flex-grow-1 d-flex align-items-center justify-content-center mb-3">
+                                        <a href="#" data-bs-toggle="modal" data-bs-target="#modalCodigoAurora" style="cursor: pointer;">
+                                            <img src="{{ maquina.codigo_aurora.url }}" alt="Código Aurora da máquina {{ maquina.cd_maquina }}" class="img-fluid rounded shadow" style="max-width: 100%; max-height: 300px; object-fit: contain;">
+                                        </a>
+                                    </div>
+                                    <div class="text-center">
+                                        <form method="post" action="{% url 'atualizar_codigo_aurora' maquina.id %}" enctype="multipart/form-data" class="formCodigoAurora" id="formCodigoAuroraUpdate">
+                                            {% csrf_token %}
+                                            <input type="file" name="codigo_aurora" accept="image/*" class="form-control form-control-sm mb-2 inputCodigoAurora" id="inputCodigoAuroraUpdate">
+                                            <button type="submit" class="btn btn-sm btn-primary upload-photo-btn" id="btnCodigoAuroraUpdate">
+                                                <i class="fas fa-upload me-1"></i>Atualizar Foto
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center py-4 flex-grow-1 d-flex flex-column align-items-center justify-content-center">
+                                        <i class="fas fa-qrcode fa-4x text-muted mb-3"></i>
+                                        <p class="text-muted mb-3">Nenhuma foto do código Aurora foi enviada.</p>
+                                        <form method="post" action="{% url 'atualizar_codigo_aurora' maquina.id %}" enctype="multipart/form-data" class="formCodigoAurora" id="formCodigoAuroraNew">
+                                            {% csrf_token %}
+                                            <input type="file" name="codigo_aurora" accept="image/*" class="form-control form-control-sm mb-2 inputCodigoAurora" required id="inputCodigoAuroraNew">
+                                            <button type="submit" class="btn btn-sm btn-primary upload-photo-btn" id="btnCodigoAuroraNew">
+                                                <i class="fas fa-upload me-1"></i>Enviar Foto
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Código do Fabricante -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-barcode me-2"></i>Código do Fabricante
+                                </h5>
+                            </div>
+                            <div class="card-body d-flex flex-column">
+                                {% if maquina.codigo_fabricante %}
+                                    <div class="text-center flex-grow-1 d-flex align-items-center justify-content-center mb-3">
+                                        <a href="#" data-bs-toggle="modal" data-bs-target="#modalCodigoFabricante" style="cursor: pointer;">
+                                            <img src="{{ maquina.codigo_fabricante.url }}" alt="Código do Fabricante da máquina {{ maquina.cd_maquina }}" class="img-fluid rounded shadow" style="max-width: 100%; max-height: 300px; object-fit: contain;">
+                                        </a>
+                                    </div>
+                                    <div class="text-center">
+                                        <form method="post" action="{% url 'atualizar_codigo_fabricante' maquina.id %}" enctype="multipart/form-data" class="formCodigoFabricante" id="formCodigoFabricanteUpdate">
+                                            {% csrf_token %}
+                                            <input type="file" name="codigo_fabricante" accept="image/*" class="form-control form-control-sm mb-2 inputCodigoFabricante" id="inputCodigoFabricanteUpdate">
+                                            <button type="submit" class="btn btn-sm btn-success upload-photo-btn" id="btnCodigoFabricanteUpdate">
+                                                <i class="fas fa-upload me-1"></i>Atualizar Foto
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center py-4 flex-grow-1 d-flex flex-column align-items-center justify-content-center">
+                                        <i class="fas fa-barcode fa-4x text-muted mb-3"></i>
+                                        <p class="text-muted mb-3">Nenhuma foto do código do fabricante foi enviada.</p>
+                                        <form method="post" action="{% url 'atualizar_codigo_fabricante' maquina.id %}" enctype="multipart/form-data" class="formCodigoFabricante" id="formCodigoFabricanteNew">
+                                            {% csrf_token %}
+                                            <input type="file" name="codigo_fabricante" accept="image/*" class="form-control form-control-sm mb-2 inputCodigoFabricante" required id="inputCodigoFabricanteNew">
+                                            <button type="submit" class="btn btn-sm btn-success upload-photo-btn" id="btnCodigoFabricanteNew">
+                                                <i class="fas fa-upload me-1"></i>Enviar Foto
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modais para visualização em tamanho real -->
+                <!-- Modal Código Aurora -->
+                {% if maquina.codigo_aurora %}
+                <div class="modal fade" id="modalCodigoAurora" tabindex="-1" aria-labelledby="modalCodigoAuroraLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title" id="modalCodigoAuroraLabel">
+                                    <i class="fas fa-qrcode me-2"></i>Código Aurora - Máquina {{ maquina.cd_maquina }}
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-center">
+                                <img src="{{ maquina.codigo_aurora.url }}" alt="Código Aurora da máquina {{ maquina.cd_maquina }}" class="img-fluid rounded shadow">
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Modal Código Fabricante -->
+                {% if maquina.codigo_fabricante %}
+                <div class="modal fade" id="modalCodigoFabricante" tabindex="-1" aria-labelledby="modalCodigoFabricanteLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-success text-white">
+                                <h5 class="modal-title" id="modalCodigoFabricanteLabel">
+                                    <i class="fas fa-barcode me-2"></i>Código do Fabricante - Máquina {{ maquina.cd_maquina }}
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-center">
+                                <img src="{{ maquina.codigo_fabricante.url }}" alt="Código do Fabricante da máquina {{ maquina.cd_maquina }}" class="img-fluid rounded shadow">
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Informações Principais -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Informações Principais
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Código da Máquina</label>
+                                <p class="form-control-plaintext">{{ maquina.cd_maquina }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Código Total Máquina</label>
+                                <p class="form-control-plaintext">{{ maquina.cs_tt_maquina|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label fw-bold">Descrição da Máquina</label>
+                                <p class="form-control-plaintext">{{ maquina.descr_maquina|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Código Prioridade Máquina</label>
+                                <p class="form-control-plaintext">
+                                    {% if maquina.cd_priomaqutv %}
+                                        <span class="badge bg-warning text-dark">{{ maquina.cd_priomaqutv }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Unidade -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-building me-2"></i>Unidade
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Código Unidade</label>
+                                <p class="form-control-plaintext">{{ maquina.cd_unid|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Nome Unidade</label>
+                                <p class="form-control-plaintext">{{ maquina.nome_unid|default:"Não informado" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Setor de Manutenção -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-tools me-2"></i>Setor de Manutenção
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Código Setor Manutenção</label>
+                                <p class="form-control-plaintext">
+                                    {% if maquina.cd_setormanut %}
+                                        <span class="badge bg-secondary">{{ maquina.cd_setormanut }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Descrição Setor Manutenção</label>
+                                <p class="form-control-plaintext">{{ maquina.descr_setormanut|default:"Não informado" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Máquina e Peças de Reposição -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-cog me-2"></i>Máquina e Peças de Reposição
+                        </h5>
+                    </div>
+                    <div class="card-body">
+
+                        <!-- Formulário para adicionar peça -->
+                        <div class="mb-4">
+                            <h6 class="mb-3">
+                                <i class="fas fa-plus-circle me-2"></i>Adicionar Peça de Estoque
+                            </h6>
+                            <form method="post" action="{% url 'adicionar_peca_maquina' maquina.id %}?redirect_to=maquinas_pecas" id="adicionarPecaForm">
+                                {% csrf_token %}
+                                <div class="row">
+                                    <div class="col-md-5 mb-3">
+                                        <label for="item_estoque_id" class="form-label">Item de Estoque</label>
+                                        <select class="form-select" id="item_estoque_id" name="item_estoque_id" required>
+                                            <option value="">Selecione um item...</option>
+                                            {% for item in itens_disponiveis %}
+                                                <option value="{{ item.id }}">
+                                                    {{ item.codigo_item }} - {{ item.descricao_item|default:"Sem descrição" }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 mb-3">
+                                        <label for="quantidade" class="form-label">Quantidade</label>
+                                        <input type="number" class="form-control" id="quantidade" name="quantidade" value="1" min="0.01" step="0.01" required>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label for="observacoes" class="form-label">Observações</label>
+                                        <input type="text" class="form-control" id="observacoes" name="observacoes" placeholder="Opcional">
+                                    </div>
+                                    <div class="col-md-2 mb-3 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-success w-100">
+                                            <i class="fas fa-plus me-1"></i>Adicionar
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <hr>
+
+                        <!-- Lista de peças relacionadas -->
+                        <div>
+                            <h6 class="mb-3">
+                                <i class="fas fa-list me-2"></i>Peças Relacionadas ({{ pecas_relacionadas.count }})
+                            </h6>
+                            {% if pecas_relacionadas %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Código Item</th>
+                                                <th>Descrição</th>
+                                                <th>Unidade Medida</th>
+                                                <th>Quantidade Necessária</th>
+                                                <th>Observações</th>
+                                                <th class="text-center">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for peca in pecas_relacionadas %}
+                                                <tr>
+                                                    <td>
+                                                        <strong>
+                                                            <a href="{% url 'visualizar_item_estoque' peca.item_estoque.id %}" class="text-decoration-none">
+                                                                {{ peca.item_estoque.codigo_item }}
+                                                            </a>
+                                                        </strong>
+                                                    </td>
+                                                    <td>
+                                                        <a href="{% url 'visualizar_item_estoque' peca.item_estoque.id %}" class="text-decoration-none">
+                                                            {{ peca.item_estoque.descricao_item|default:"Sem descrição" }}
+                                                        </a>
+                                                    </td>
+                                                    <td>{{ peca.item_estoque.unidade_medida|default:"-" }}</td>
+                                                    <td>{{ peca.quantidade }}</td>
+                                                    <td>{{ peca.observacoes|default:"-" }}</td>
+                                                    <td class="text-center">
+                                                        <form method="post" action="{% url 'remover_peca_maquina' maquina.id peca.id %}?redirect_to=maquinas_pecas" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja remover esta peça?');">
+                                                            {% csrf_token %}
+                                                            <button type="submit" class="btn btn-sm btn-danger">
+                                                                <i class="fas fa-trash"></i>
+                                                            </button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>Nenhuma peça de estoque foi relacionada a esta máquina ainda.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botões de Ação -->
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{% url 'visualizar_maquina' maquina.id %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Voltar para Máquina
+                    </a>
+                    <a href="{% url 'consultar_maquinas' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-list me-2"></i>Lista de Máquinas
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Garantir que o formulário seja enviado corretamente
+window.addEventListener('load', function() {
+    // Formulário de adicionar peça
+    const form = document.querySelector('form[action*="adicionar-peca"]');
+    console.log('Form encontrado:', form);
+    
+    if (form) {
+        // Adicionar ID ao formulário para facilitar a seleção
+        if (!form.id) {
+            form.id = 'adicionarPecaForm';
+        }
+        
+        // Remover qualquer listener anterior que possa estar interferindo
+        const newForm = form.cloneNode(true);
+        form.parentNode.replaceChild(newForm, form);
+        const cleanForm = document.getElementById('adicionarPecaForm') || document.querySelector('form[action*="adicionar-peca"]');
+        
+        if (cleanForm) {
+            // Adicionar listener no formulário - executar ANTES de qualquer outro
+            cleanForm.addEventListener('submit', function(e) {
+                console.log('=== FORM SUBMIT EVENT TRIGGERED ===');
+                
+                const itemSelect = document.getElementById('item_estoque_id');
+                const quantidadeInput = document.getElementById('quantidade');
+                
+                console.log('Item select:', itemSelect, 'Value:', itemSelect ? itemSelect.value : 'N/A');
+                console.log('Quantidade input:', quantidadeInput, 'Value:', quantidadeInput ? quantidadeInput.value : 'N/A');
+                
+                // Validação básica
+                if (!itemSelect || !itemSelect.value) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    alert('Por favor, selecione um item de estoque.');
+                    return false;
+                }
+                
+                if (!quantidadeInput || !quantidadeInput.value || parseFloat(quantidadeInput.value) <= 0) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    alert('Por favor, informe uma quantidade válida.');
+                    return false;
+                }
+                
+                console.log('Form will submit normally...');
+                // NÃO chamar e.preventDefault() - deixar o formulário ser enviado normalmente
+            }, true); // Use capture phase para executar antes de outros listeners
+            
+            // Listener no botão para debug
+            const submitBtn = cleanForm.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.addEventListener('click', function(e) {
+                    console.log('=== SUBMIT BUTTON CLICKED ===');
+                    // Não prevenir o comportamento padrão - deixar o formulário ser enviado
+                }, true);
+            }
+        }
+    }
+    
+    // Formulários de upload de fotos - garantir que funcionem corretamente
+    // Aguardar um pouco para garantir que main.js já carregou
+    setTimeout(function() {
+        // Função auxiliar para configurar formulário de upload
+        function setupUploadForm(formId, inputId, btnId, formName) {
+            const form = document.getElementById(formId);
+            if (!form) {
+                console.log(`Formulário ${formName} não encontrado: ${formId}`);
+                return;
+            }
+            
+            console.log(`Formulário ${formName} encontrado: ${formId}`);
+            
+            // Remover listeners do main.js do botão
+            const submitBtn = document.getElementById(btnId);
+            if (submitBtn) {
+                // Clonar e substituir o botão para remover listeners do main.js
+                const newBtn = submitBtn.cloneNode(true);
+                newBtn.id = btnId; // Preservar o ID
+                submitBtn.parentNode.replaceChild(newBtn, submitBtn);
+                const cleanBtn = document.getElementById(btnId);
+                
+                // Adicionar listener no botão - executar ANTES de qualquer outro
+                cleanBtn.addEventListener('click', function(e) {
+                    console.log(`=== BOTÃO ${formName} CLICADO ===`);
+                    const fileInput = document.getElementById(inputId);
+                    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        alert('Por favor, selecione uma foto para enviar.');
+                        return false;
+                    }
+                    console.log(`Arquivo selecionado: ${fileInput.files[0].name}, Tamanho: ${fileInput.files[0].size}`);
+                    console.log(`Enviando formulário ${formName}...`);
+                    // Não prevenir - deixar o formulário ser enviado normalmente
+                }, true); // Use capture phase para executar antes de outros listeners
+            } else {
+                console.error(`Botão ${btnId} não encontrado`);
+            }
+            
+            // Adicionar listener no formulário - executar ANTES de qualquer outro
+            form.addEventListener('submit', function(e) {
+                console.log(`=== FORM ${formName} SUBMIT ===`);
+                
+                const fileInput = document.getElementById(inputId);
+                if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    alert('Por favor, selecione uma foto para enviar.');
+                    return false;
+                }
+                
+                console.log(`Arquivo selecionado: ${fileInput.files[0].name}, Tamanho: ${fileInput.files[0].size}`);
+                console.log(`Formulário ${formName} será enviado normalmente`);
+                // NÃO chamar e.preventDefault() - deixar o formulário ser enviado normalmente
+            }, true); // Use capture phase para executar antes de outros listeners
+        }
+        
+        // Configurar todos os formulários de upload
+        setupUploadForm('formCodigoAuroraUpdate', 'inputCodigoAuroraUpdate', 'btnCodigoAuroraUpdate', 'Código Aurora Update');
+        setupUploadForm('formCodigoAuroraNew', 'inputCodigoAuroraNew', 'btnCodigoAuroraNew', 'Código Aurora New');
+        setupUploadForm('formCodigoFabricanteUpdate', 'inputCodigoFabricanteUpdate', 'btnCodigoFabricanteUpdate', 'Código Fabricante Update');
+        setupUploadForm('formCodigoFabricanteNew', 'inputCodigoFabricanteNew', 'btnCodigoFabricanteNew', 'Código Fabricante New');
+    }, 1000); // Aguardar 1 segundo para garantir que main.js já carregou e adicionou seus listeners
+});
+</script>
+{% endblock %}
+

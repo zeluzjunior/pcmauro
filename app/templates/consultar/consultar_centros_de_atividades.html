@@ -1,0 +1,313 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Consultar Centros de Atividades{% endblock %}
+
+{% block extra_css %}
+<style>
+    .table-container {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+    }
+    .filter-input {
+        width: 100%;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        margin-top: 4px;
+    }
+    .filter-input:focus {
+        outline: none;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    .filter-header {
+        padding: 8px !important;
+    }
+    .filter-row th {
+        background-color: #e9ecef;
+        padding: 4px 8px !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Centros de Atividades</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar Centros de Atividades</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Consultar Centros de Atividades</h1>
+                <p class="lead">Visualize todos os Centros de Atividade cadastrados no sistema</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Actions Bar -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <form method="get" action="{% url 'consultar_locais_e_cas' %}" id="searchForm" class="d-flex">
+                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por CA, sigla, descrição, encarregado ou local..." value="{{ search_query|default:'' }}">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total</h5>
+                        <p class="card-text display-6">{{ total_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Mostrando</h5>
+                        <p class="card-text display-6" id="visible-count">{{ cas|length }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Siglas</h5>
+                        <p class="card-text display-6">{{ siglas_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Encarregados</h5>
+                        <p class="card-text display-6">{{ encarregados_count }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-list me-2"></i>Lista de Centros de Atividade
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <form method="get" action="{% url 'consultar_locais_e_cas' %}" id="filterForm">
+                    <!-- Preservar busca geral -->
+                    <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                    
+                <div class="table-container">
+                        <table class="table table-hover table-striped mb-0" id="casTable">
+                        <thead>
+                            <tr>
+                                <th>CA</th>
+                                <th>Sigla</th>
+                                <th>Descrição</th>
+                                <th>Índice</th>
+                                <th>Encarregado Responsável</th>
+                                <th>Local</th>
+                                <th>Ações</th>
+                            </tr>
+                                <tr class="filter-row">
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_ca" class="filter-input" placeholder="Filtrar CA..." value="{{ filter_ca|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_sigla" class="filter-input" placeholder="Filtrar Sigla..." value="{{ filter_sigla|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_descricao" class="filter-input" placeholder="Filtrar Descrição..." value="{{ filter_descricao|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_indice" class="filter-input" placeholder="Filtrar Índice..." value="{{ filter_indice|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_encarregado" class="filter-input" placeholder="Filtrar Encarregado..." value="{{ filter_encarregado|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_local" class="filter-input" placeholder="Filtrar Local..." value="{{ filter_local|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <!-- Sem filtro na coluna de ações -->
+                                    </th>
+                                </tr>
+                        </thead>
+                        <tbody>
+                            {% if cas %}
+                                {% for ca_item in cas %}
+                                <tr>
+                                    <td><strong>{{ ca_item.ca }}</strong></td>
+                                    <td>
+                                        {% if ca_item.sigla %}
+                                            <span class="badge bg-secondary">{{ ca_item.sigla }}</span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ ca_item.descricao|default:"-"|truncatewords:10 }}</td>
+                                    <td>
+                                        {% if ca_item.indice %}
+                                            <span class="badge bg-info text-dark">{{ ca_item.indice }}</span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ ca_item.encarregado_responsavel|default:"-" }}</td>
+                                    <td>
+                                        {% if ca_item.locais.all %}
+                                            {% for local in ca_item.locais.all %}
+                                                <span class="badge bg-primary me-1">{{ local.local }}</span>
+                                            {% endfor %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'visualizar_centro_de_atividade' ca_item.id %}" class="btn btn-sm btn-primary" title="Visualizar detalhes">
+                                            <i class="fas fa-eye me-1"></i>Visualizar
+                                        </a>
+                                            <a href="{% url 'editar_ca_e_locais' ca_item.id %}" class="btn btn-sm btn-warning" title="Editar">
+                                                <i class="fas fa-edit me-1"></i>Editar
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-5">
+                                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                        <p class="text-muted">Nenhum Centro de Atividade encontrado.</p>
+                                        <a href="{% url 'cadastrar_local_e_cas' %}" class="btn btn-primary">
+                                            <i class="fas fa-plus-circle me-2"></i>Cadastrar Primeiro CA
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if cas.has_other_pages %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if cas.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_ca %}filter_ca={{ filter_ca }}&{% endif %}{% if filter_sigla %}filter_sigla={{ filter_sigla }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_indice %}filter_indice={{ filter_indice }}&{% endif %}{% if filter_encarregado %}filter_encarregado={{ filter_encarregado }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page=1">Primeira</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_ca %}filter_ca={{ filter_ca }}&{% endif %}{% if filter_sigla %}filter_sigla={{ filter_sigla }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_indice %}filter_indice={{ filter_indice }}&{% endif %}{% if filter_encarregado %}filter_encarregado={{ filter_encarregado }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page={{ cas.previous_page_number }}">Anterior</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Página {{ cas.number }} de {{ cas.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if cas.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_ca %}filter_ca={{ filter_ca }}&{% endif %}{% if filter_sigla %}filter_sigla={{ filter_sigla }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_indice %}filter_indice={{ filter_indice }}&{% endif %}{% if filter_encarregado %}filter_encarregado={{ filter_encarregado }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page={{ cas.next_page_number }}">Próxima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_ca %}filter_ca={{ filter_ca }}&{% endif %}{% if filter_sigla %}filter_sigla={{ filter_sigla }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_indice %}filter_indice={{ filter_indice }}&{% endif %}{% if filter_encarregado %}filter_encarregado={{ filter_encarregado }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page={{ cas.paginator.num_pages }}">Última</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const filterForm = document.getElementById('filterForm');
+    const filterInputs = document.querySelectorAll('.filter-input');
+    let filterTimeout;
+    
+    // Função para submeter o formulário de filtros
+    function submitFilters() {
+        clearTimeout(filterTimeout);
+        filterTimeout = setTimeout(function() {
+            filterForm.submit();
+        }, 500); // Aguardar 500ms após o usuário parar de digitar
+    }
+    
+    // Adicionar event listeners aos campos de filtro
+    filterInputs.forEach(input => {
+        input.addEventListener('input', submitFilters);
+        input.addEventListener('keyup', function(e) {
+            // Se pressionar Enter, submeter imediatamente
+            if (e.key === 'Enter') {
+                clearTimeout(filterTimeout);
+                filterForm.submit();
+            }
+        });
+    });
+    
+    // Botão para limpar todos os filtros
+    const clearFiltersBtn = document.createElement('button');
+    clearFiltersBtn.type = 'button';
+    clearFiltersBtn.className = 'btn btn-sm btn-outline-secondary mt-2';
+    clearFiltersBtn.innerHTML = '<i class="fas fa-times me-1"></i>Limpar Filtros';
+    clearFiltersBtn.addEventListener('click', function() {
+        filterInputs.forEach(input => {
+            input.value = '';
+        });
+        // Limpar também o campo de busca geral
+        const searchInput = document.querySelector('input[name="search"]');
+        if (searchInput) {
+            searchInput.value = '';
+        }
+        filterForm.submit();
+    });
+    
+    // Adicionar botão de limpar filtros após a tabela
+    const tableContainer = document.querySelector('.table-container');
+    if (tableContainer) {
+        const clearBtnContainer = document.createElement('div');
+        clearBtnContainer.className = 'p-2 border-top';
+        clearBtnContainer.appendChild(clearFiltersBtn);
+        tableContainer.parentElement.appendChild(clearBtnContainer);
+    }
+});
+</script>
+{% endblock %}
+

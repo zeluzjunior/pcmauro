@@ -1,0 +1,362 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Meu Projeto Django{% endblock %}</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg" style="background-color: #ff9800;">
+        <div class="container-fluid">
+            <button class="btn btn-link text-dark me-3" id="sidebarToggle" type="button" aria-label="Toggle sidebar">
+                <i class="fas fa-bars fs-5"></i>
+            </button>
+            <a class="navbar-brand" href="{% url 'home' %}">
+                <i class="fas fa-home me-2"></i>Sistema PCM FAC 
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'home' %}">
+                            <i class="fas fa-home me-1"></i>Página Principal
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'centros_de_atividade' %}active{% endif %}" href="{% url 'centros_de_atividade' %}">
+                            <i class="fas fa-calendar-alt me-1"></i>Planejamento
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="manutencaoDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-tools me-1"></i>Manutenção
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="manutencaoDropdown">
+                            <li><a class="dropdown-item" href="#" data-sidebar-toggle="plano-collapse"><i class="fas fa-clipboard-list me-2"></i>Plano de Preventiva</a></li>
+                            <li><a class="dropdown-item" href="#" data-sidebar-toggle="preventiva-collapse"><i class="fas fa-tools me-2"></i>Manutenção Preventiva</a></li>
+                            <li><a class="dropdown-item" href="#" data-sidebar-toggle="corretiva-collapse"><i class="fas fa-wrench me-2"></i>Manutenção Corretiva</a></li>
+                            <li><a class="dropdown-item" href="#" data-sidebar-toggle="terceiro-collapse"><i class="fas fa-users-cog me-2"></i>Manutenção de Terceiros</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" data-sidebar-toggle="ordens-collapse"><i class="fas fa-file-alt me-2"></i>Ordens de Serviço</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="cadastrosDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-database me-1"></i>Cadastros
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="cadastrosDropdown">
+                            <li><a class="dropdown-item" href="{% url 'cadastrar_maquina' %}"><i class="fas fa-plus-circle me-2"></i>Cadastrar Máquina</a></li>
+                            <li><a class="dropdown-item" href="{% url 'consultar_maquinas' %}"><i class="fas fa-industry me-2"></i>Consultar Máquinas</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" data-sidebar-toggle="manutentor-collapse"><i class="fas fa-user-tie me-2"></i>Manutentores</a></li>
+                            <li><a class="dropdown-item" href="#" data-sidebar-toggle="local-collapse"><i class="fas fa-map-marker-alt me-2"></i>Locais e CAs</a></li>
+                            <li><a class="dropdown-item" href="{% url 'consultar_locais' %}"><i class="fas fa-map-marker-alt me-2"></i>Consultar Locais</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="consultarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-search me-1"></i>Consultar
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="consultarDropdown">
+                            <li><a class="dropdown-item" href="#" data-consultar="plano"><i class="fas fa-clipboard-list me-2"></i>Consultar Plano</a></li>
+                            <li><a class="dropdown-item" href="#" data-consultar="preventiva"><i class="fas fa-tools me-2"></i>Consultar Manutenção</a></li>
+                            <li><a class="dropdown-item" href="#" data-consultar="corretiva"><i class="fas fa-wrench me-2"></i>Consultar Corretiva</a></li>
+                            <li><a class="dropdown-item" href="#" data-consultar="terceiro"><i class="fas fa-users-cog me-2"></i>Consultar Mant. de Terceiros</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" data-consultar="ordens"><i class="fas fa-file-alt me-2"></i>Consultar Ordens</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'consultar_maquinas' %}"><i class="fas fa-industry me-2"></i>Consultar Máquinas</a></li>
+                            <li><a class="dropdown-item" href="#" data-consultar="manutentor"><i class="fas fa-user-tie me-2"></i>Consultar Manutentores</a></li>
+                            <li><a class="dropdown-item" href="#" data-consultar="local"><i class="fas fa-map-marker-alt me-2"></i>Consultar Local ou CA</a></li>
+                            <li><a class="dropdown-item" href="{% url 'consultar_estoque' %}"><i class="fas fa-boxes me-2"></i>Consultar Estoque</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" data-consultar="visitas"><i class="fas fa-calendar-check me-2"></i>Consultar Agendamentos</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-sidebar-toggle="visitas-collapse">
+                            <i class="fas fa-calendar-check me-1"></i>Agendamentos
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="utilidadesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-cog me-1"></i>Utilidades
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="utilidadesDropdown">
+                            <li><a class="dropdown-item" href="#" data-sidebar-toggle="importar-collapse"><i class="fas fa-upload me-2"></i>Importar Dados</a></li>
+                            <li><a class="dropdown-item" href="#" data-sidebar-toggle="ajuda-collapse"><i class="fas fa-question-circle me-2"></i>Ajuda</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if request.resolver_match.url_name == 'gerenciar_projeto' %}active{% endif %}" href="#" id="administradorDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user-shield me-1"></i>Administrador
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="administradorDropdown">
+                            <li><a class="dropdown-item" href="{% url 'gerenciar_projeto' %}"><i class="fas fa-cog me-2"></i>Gerenciar Projeto</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'admin:index' %}"><i class="fas fa-user-shield me-2"></i>Django Admin</a></li>
+                        </ul>
+                    </li>
+                </ul>
+                
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'admin:index' %}">
+                            <i class="fas fa-user-shield me-1"></i>Admin
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-0">
+        <div class="row g-0 flex-nowrap">
+            <!-- Sidebar -->
+            <div class="sidebar-wrapper" id="sidebar">
+                <div class="sidebar p-3 bg-white border-end" style="min-height: calc(100vh - 56px);">
+
+                    <ul class="list-unstyled ps-0">
+
+                        <!-- Planejamento de Manutenção -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded" data-bs-toggle="collapse" data-bs-target="#planejamento-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Planejamento de Manutenção</span>
+                            </button>
+                            <div class="collapse" id="planejamento-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'centros_de_atividade' %}" class="link-dark rounded">Centros de Atividades</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
+                        <li class="border-top my-3"></li>
+                        <!-- Plano de Preventiva -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded" data-bs-toggle="collapse" data-bs-target="#plano-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Plano de Preventiva</span>
+                            </button>
+                            <div class="collapse" id="plano-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'em_desenvolvimento' %}" class="link-dark rounded">Análise</a></li>
+                                    <li><a href="{% url 'em_desenvolvimento' %}" class="link-dark rounded">Cadastrar Plano</a></li>
+                                    <li><a href="{% url 'em_desenvolvimento' %}" class="link-dark rounded">Consultar Plano</a></li>
+                                    <li><a href="{% url 'consultar_roteiro_preventiva' %}" class="link-dark rounded">Consultar Roteiro Preventiva</a></li>
+                                    <li><a href="{% url 'analise_roteiro_plano_preventiva' %}" class="link-dark rounded">Análise de Roteiro e Plano de Preventiva</a></li>
+                                    <li><a href="{% url 'maquina_primaria_secundaria' %}" class="link-dark rounded">Agrupar Máquinas Primárias e Secundárias</a></li>
+                                </ul>
+                            </div>
+                        </li>
+                        <!-- Manutenção Preventiva -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded" data-bs-toggle="collapse" data-bs-target="#preventiva-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Manutenção Preventiva</span>
+                            </button>
+                            <div class="collapse" id="preventiva-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'em_desenvolvimento' %}" class="link-dark rounded">Cadastrar Manutenção</a></li>
+                                    <li><a href="{% url 'consultar_manutencoes_preventivas' %}" class="link-dark rounded">Consultar Manutenções Preventivas</a></li>
+                                </ul>
+                            </div>
+                        </li>
+                        <li class="border-top my-3"></li>
+
+                        <!--- manutenção corretiva -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded" data-bs-toggle="collapse" data-bs-target="#corretiva-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Manutenção Corretiva</span>
+                            </button>
+                            <div class="collapse" id="corretiva-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'analise_corretiva_outros' %}" class="link-dark rounded">Análise</a></li>
+                                    <li><a href="{% url 'em_desenvolvimento' %}" class="link-dark rounded">Cadastrar Corretiva</a></li>
+                                    <li><a href="{% url 'consultar_corretivas_outros' %}" class="link-dark rounded">Consultar Corretiva</a></li>
+                                </ul>
+                            </div>
+                        </li>
+                        <li class="border-top my-3"></li>
+                        <!-- manutenção de terceiros -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#terceiro-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Manutenção de Terceiros</span>
+                            </button>
+                            <div class="collapse" id="terceiro-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'cadastrar_manutencao_terceiro' %}" class="link-dark rounded">Cadastrar Mant. de Terceiros</a></li>
+                                    <li><a href="{% url 'consultar_manutencao_terceiros' %}" class="link-dark rounded">Consultar Mant. de Terceiros</a></li>
+                                </ul>
+                            </div>
+                        </li>
+                        <!-- Visitas e Agendamentos -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#visitas-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Visitas e Agendamentos</span>
+                            </button>
+                            <div class="collapse" id="visitas-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="#" class="link-dark rounded">Novo Agendamento</a></li>
+                                    <li><a href="#" class="link-dark rounded">Consultar Agendamentos</a></li>
+                                </ul>
+                            </div>
+                        </li>
+                        <li class="border-top my-3"></li>
+                        <!-- Estoque Almoxarifado -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#estoque-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Estoque e Almoxarifado</span>
+                            </button>
+                            <div class="collapse" id="estoque-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="#" class="link-dark rounded">Análise de Estoque</a></li>
+                                    <li><a href="{% url 'consultar_estoque' %}" class="link-dark rounded">Consultar Estoque</a></li>
+                                    <li><a href="{% url 'importar_estoque' %}" class="link-dark rounded">Importar Estoque</a></li>
+                                </ul>
+                            </div>
+                        </li>
+                        <li class="border-top my-3"></li>
+                        <!-- Máquinas -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#maquinas-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Máquinas [ok] </span>
+                            </button>
+                            <div class="collapse" id="maquinas-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'analise_maquinas' %}" class="link-dark rounded">Análise</a></li>
+                                    <li><a href="{% url 'cadastrar_maquina' %}" class="link-dark rounded">Cadastrar Máquina</a></li>
+                                    <li><a href="{% url 'consultar_maquinas' %}" class="link-dark rounded">Consultar Máquinas</a></li>
+                                </ul>
+                            </div>
+                        </li>
+                        
+                        <!--- Manutentores -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#manutentor-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Manutentores</span>
+                            </button>
+                            <div class="collapse" id="manutentor-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'cadastrar_manutentor' %}" class="link-dark rounded">Cadastrar Manutentor</a></li>
+                                    <li><a href="{% url 'consultar_manutentores' %}" class="link-dark rounded">Consultar Manutentores</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
+                        <!-- Setores e CA -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#local-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Locais e CAs</span>
+                            </button>
+                            <div class="collapse" id="local-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'cadastrar_local_e_cas' %}" class="link-dark rounded">Cadastrar Local ou CA</a></li>
+                                    <li><a href="{% url 'consultar_locais_e_cas' %}" class="link-dark rounded">Consultar Local ou CA</a></li>
+                                    <li><a href="{% url 'consultar_locais' %}" class="link-dark rounded">Consultar Locais</a></li>
+                                </ul>
+                            </div>
+                        </li>
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#importar-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Importar Dados</span>
+                            </button>
+                            <div class="collapse" id="importar-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'importar_maquinas' %}" class="link-dark rounded">Máquinas</a></li>
+                                    <li><a href="{% url 'importar_manutentores' %}" class="link-dark rounded">Manutentores</a></li>
+                                    <li><a href="{% url 'importar_ordens_corretivas_e_outros' %}" class="link-dark rounded">Ordens Corretivas e Outros</a></li>
+                                    <li><a href="{% url 'importar_ordens_preventivas' %}" class="link-dark rounded">Ordens Preventivas</a></li>
+                                    <li><a href="{% url 'importar_plano_preventiva' %}" class="link-dark rounded">Plano Preventiva</a></li>
+                                    <li><a href="{% url 'importar_roteiro_preventiva' %}" class="link-dark rounded">Roteiro Preventiva</a></li>
+                                    <li><a href="{% url 'importar_locais_e_cas' %}" class="link-dark rounded">Locais e CAs</a></li>
+                                    <li><a href="{% url 'importar_estoque' %}" class="link-dark rounded">Estoque</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
+                        <li class="border-top my-3"></li>
+                        <!-- Administrador -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#administrador-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Administrador</span>
+                            </button>
+                            <div class="collapse" id="administrador-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'gerenciar_projeto' %}" class="link-dark rounded">Gerenciar Projeto</a></li>
+                                    <li><a href="{% url 'admin:index' %}" class="link-dark rounded">Django Admin</a></li>
+                                </ul>
+                            </div>
+                        </li>
+                        <li class="border-top my-3"></li>
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#ajuda-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Ajuda</span>
+                            </button>
+                            <div class="collapse" id="ajuda-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="#" class="link-dark rounded">...</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <main class="main-content-wrapper flex-fill" id="mainContent">
+        {% if messages %}
+            <div class="container mt-3">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Meu Projeto Django</h5>
+                    <p class="mb-0">Desenvolvido com Django e Bootstrap</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="mb-0">
+                        <i class="fas fa-calendar me-1"></i>
+                        {% now "Y" %} - Todos os direitos reservados
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap 5 JS Bundle (includes Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="{% static 'js/main.js' %}"></script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Cadastrar Local e CA{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Locais e CAs</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Cadastrar Local e CA</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Cadastrar Local e CA</h1>
+                <p class="lead">Preencha os dados para cadastrar um novo Centro de Atividade</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-plus-circle me-2"></i>Dados do Centro de Atividade
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Aviso sobre campos obrigatórios -->
+                        <div class="alert alert-info mb-4">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Campos obrigatórios:</strong> Os campos marcados com <span class="text-danger">*</span> são obrigatórios e devem ser preenchidos.
+                        </div>
+                        
+                        <form method="post" class="needs-validation" novalidate>
+                            {% csrf_token %}
+                            
+                            <!-- Informações Principais -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-info-circle me-2"></i>Informações Principais
+                                    </h6>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.ca.id_for_label }}" class="form-label">
+                                        {{ form.ca.label }}
+                                        {% if form.ca|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.ca }}
+                                    {% if form.ca.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.ca.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Código único identificador do Centro de Atividade{% if form.ca|is_required %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.sigla.id_for_label }}" class="form-label">
+                                        {{ form.sigla.label }}
+                                        {% if form.sigla|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.sigla }}
+                                    {% if form.sigla.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.sigla.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Sigla ou abreviação do CA{% if not form.sigla|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label for="{{ form.descricao.id_for_label }}" class="form-label">
+                                        {{ form.descricao.label }}
+                                        {% if form.descricao|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.descricao }}
+                                    {% if form.descricao.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.descricao.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Descrição completa do Centro de Atividade{% if not form.descricao|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                            </div>
+
+                            <!-- Informações Adicionais -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-info me-2"></i>Informações Adicionais
+                                    </h6>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.indice.id_for_label }}" class="form-label">
+                                        {{ form.indice.label }}
+                                    </label>
+                                    {{ form.indice }}
+                                    {% if form.indice.errors %}
+                                        <div class="text-danger small">{{ form.indice.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Índice do Centro de Atividade</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.encarregado_responsavel.id_for_label }}" class="form-label">
+                                        {{ form.encarregado_responsavel.label }}
+                                    </label>
+                                    {{ form.encarregado_responsavel }}
+                                    {% if form.encarregado_responsavel.errors %}
+                                        <div class="text-danger small">{{ form.encarregado_responsavel.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Nome do encarregado responsável pelo CA</div>
+                                </div>
+                            </div>
+
+                            <!-- Locais do Centro de Atividade -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-map-marker-alt me-2"></i>Locais do Centro de Atividade
+                                    </h6>
+                                    <p class="text-muted small mb-3">Você pode adicionar múltiplos locais para este Centro de Atividade.</p>
+                                </div>
+                                <div class="col-12">
+                                    {{ formset.management_form }}
+                                    <div id="formset-container">
+                                        {% for form in formset %}
+                                            <div class="formset-form card mb-3" style="{% if form.DELETE.value %}display: none;{% endif %}">
+                                                <div class="card-body">
+                                                    <div class="row">
+                                                        <div class="col-md-10">
+                                                            <div class="mb-3">
+                                    <label for="{{ form.local.id_for_label }}" class="form-label">
+                                                                    Local <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.local }}
+                                    {% if form.local.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.local.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label for="{{ form.observacoes.id_for_label }}" class="form-label">
+                                                                    Observações
+                                                                </label>
+                                                                {{ form.observacoes }}
+                                                                {% if form.observacoes.errors %}
+                                                                    <div class="text-danger small mt-1">
+                                                                        <i class="fas fa-exclamation-circle me-1"></i>{{ form.observacoes.errors|first }}
+                                                                    </div>
+                                                                {% endif %}
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-2 d-flex align-items-end">
+                                                            {% if form.DELETE %}
+                                                                {{ form.DELETE }}
+                                                            {% endif %}
+                                                            {% if form.id %}
+                                                                {{ form.id }}
+                                                            {% endif %}
+                                                            <button type="button" class="btn btn-danger btn-sm remove-form" style="{% if not form.DELETE.value %}display: block;{% else %}display: none;{% endif %}">
+                                                                <i class="fas fa-trash"></i> Remover
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% empty %}
+                                            <div class="alert alert-info">
+                                                <i class="fas fa-info-circle me-2"></i>Nenhum local cadastrado. Clique em "Adicionar Outro Local" para adicionar.
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="add-form">
+                                        <i class="fas fa-plus me-1"></i>Adicionar Outro Local
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Botões -->
+                            <div class="d-flex justify-content-between mt-4">
+                                <a href="{% url 'consultar_locais_e_cas' %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>Cancelar
+                                </a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-2"></i>Salvar Centro de Atividade
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const formsetContainer = document.getElementById('formset-container');
+    const addFormBtn = document.getElementById('add-form');
+    const totalFormsInput = document.querySelector('#id_locais-TOTAL_FORMS');
+    let formCount = totalFormsInput ? parseInt(totalFormsInput.value) : 0;
+
+    // Add new form
+    if (addFormBtn) {
+        addFormBtn.addEventListener('click', function() {
+            const newFormHtml = `
+                <div class="formset-form card mb-3">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-10">
+                                <div class="mb-3">
+                                    <label class="form-label">Local <span class="text-danger">*</span></label>
+                                    <input type="text" name="locais-${formCount}-local" class="form-control" maxlength="255" placeholder="Local do Centro de Atividade" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Observações</label>
+                                    <textarea name="locais-${formCount}-observacoes" class="form-control" rows="2" placeholder="Observações sobre o local (opcional)"></textarea>
+                                </div>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <input type="hidden" name="locais-${formCount}-id" id="id_locais-${formCount}-id">
+                                <input type="hidden" name="locais-${formCount}-DELETE" id="id_locais-${formCount}-DELETE">
+                                <button type="button" class="btn btn-danger btn-sm remove-form">
+                                    <i class="fas fa-trash"></i> Remover
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            // Remove empty message if exists
+            const emptyAlert = formsetContainer.querySelector('.alert-info');
+            if (emptyAlert) {
+                emptyAlert.remove();
+            }
+            formsetContainer.insertAdjacentHTML('beforeend', newFormHtml);
+            formCount++;
+            if (totalFormsInput) {
+                totalFormsInput.value = formCount;
+            }
+        });
+    }
+
+    // Remove form
+    if (formsetContainer) {
+        formsetContainer.addEventListener('click', function(e) {
+            if (e.target.closest('.remove-form')) {
+                const formCard = e.target.closest('.formset-form');
+                const deleteInput = formCard.querySelector('input[name*="-DELETE"]');
+                if (deleteInput) {
+                    deleteInput.value = 'on';
+                    formCard.style.display = 'none';
+                } else {
+                    formCard.remove();
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+
+{% endblock %}
+

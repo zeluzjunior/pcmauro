@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Home - Meu Projeto Django{% endblock %}
+
+{% block extra_css %}
+<!-- FullCalendar CSS -->
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.min.css' rel='stylesheet' />
+<style>
+    #calendar {
+        max-width: 100%;
+        margin: 0 auto;
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .fc-event {
+        cursor: pointer;
+    }
+    .fc-toolbar-title {
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+
+
+
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h1 class="display-4 fw-bold">Planejamento e Controle de Manutenções - FAC</h1>
+                <p class="lead">-</p>
+
+            </div>
+            <div class="col-lg-4 text-center">
+                <div class="d-flex gap-3">
+                    <a href="{% url 'about' %}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-info-circle me-2"></i>-
+                    </a>
+                    <a href="{% url 'contact' %}" class="btn btn-outline-light btn-lg">
+                        <i class="fas fa-envelope me-2"></i>-
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Photo Gallery Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row text-center">
+            <div class="col-md-3 mb-4">
+                <div class="card border-0 bg-primary text-white">
+                    <div class="card-body">
+                        <i class="fas fa-users fa-2x mb-2"></i>
+                        <h3 class="display-4 fw-bold">1,234</h3>
+                        <p class="mb-0">Usuários Ativos</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-4">
+                <div class="card border-0 bg-success text-white">
+                    <div class="card-body">
+                        <i class="fas fa-chart-line fa-2x mb-2"></i>
+                        <h3 class="display-4 fw-bold">98%</h3>
+                        <p class="mb-0">Satisfação</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-4">
+                <div class="card border-0 bg-warning text-white">
+                    <div class="card-body">
+                        <i class="fas fa-clock fa-2x mb-2"></i>
+                        <h3 class="display-4 fw-bold">24/7</h3>
+                        <p class="mb-0">Suporte</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-4">
+                <div class="card border-0 bg-info text-white">
+                    <div class="card-body">
+                        <i class="fas fa-globe fa-2x mb-2"></i>
+                        <h3 class="display-4 fw-bold">50+</h3>
+                        <p class="mb-0">Países</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row text-center mb-5">
+            <div class="col-12">
+                <h2 class="display-5 fw-bold text-gradient">Recursos Principais</h2>
+                <p class="lead">Descubra as funcionalidades incríveis do nosso projeto</p>
+            </div>
+        </div>
+        
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-mobile-alt fa-3x text-primary mb-3"></i>
+                        <h5 class="card-title">Responsivo</h5>
+                        <p class="card-text">Design totalmente responsivo que funciona perfeitamente em todos os dispositivos.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-bolt fa-3x text-warning mb-3"></i>
+                        <h5 class="card-title">Rápido</h5>
+                        <p class="card-text">Otimizado para performance com carregamento rápido e experiência fluida.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-shield-alt fa-3x text-success mb-3"></i>
+                        <h5 class="card-title">Seguro</h5>
+                        <p class="card-text">Implementa as melhores práticas de segurança do Django.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Calendar Section -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row text-center mb-5">
+            <div class="col-12">
+                <h2 class="display-5 fw-bold">Calendário de Manutenções</h2>
+                <p class="lead">Visualize ordens de serviço e eventos de manutenção</p>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div id="calendar"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- FullCalendar JS -->
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.min.js'></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'pt-br',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,listWeek'
+            },
+            buttonText: {
+                today: 'Hoje',
+                month: 'Mês',
+                week: 'Semana',
+                list: 'Lista'
+            },
+            events: [
+                {% for evento in eventos %}
+                {
+                    title: '{{ evento.title|escapejs }}',
+                    start: '{{ evento.start }}',
+                    {% if evento.end %}end: '{{ evento.end }}',{% endif %}
+                    color: '{{ evento.color }}',
+                    {% if evento.url %}url: '{{ evento.url }}',{% endif %}
+                }{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ],
+            eventClick: function(info) {
+                if (info.event.url) {
+                    info.jsEvent.preventDefault();
+                    window.location.href = info.event.url;
+                }
+            },
+            height: 'auto',
+            contentHeight: 600
+        });
+        
+        calendar.render();
+    });
+</script>
+{% endblock %}

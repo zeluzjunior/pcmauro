@@ -1,0 +1,391 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Visualizar Roteiro Preventiva{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_roteiro_preventiva' %}" class="text-white">Roteiros Preventiva</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Visualizar Roteiro Preventiva</li>
+                    </ol>
+                </nav>
+                <div class="mt-3">
+                    <h1 class="display-3 fw-bold mb-2">
+                        Roteiro Preventiva - Máquina {{ roteiro.cd_maquina|default:"N/A" }}
+                    </h1>
+                    <p class="lead mb-1">
+                        <span class="badge bg-light text-dark fs-6 me-2">Plano: {{ roteiro.cd_planmanut|default:"N/A" }}</span>
+                        {% if roteiro.seq_seqplamanu %}
+                            <span class="badge bg-light text-dark fs-6 me-2">Seq. Plano: {{ roteiro.seq_seqplamanu }}</span>
+                        {% endif %}
+                        {% if roteiro.cd_tarefamanu %}
+                            <span class="badge bg-success text-white fs-6">Tarefa: {{ roteiro.cd_tarefamanu }}</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        <div class="row">
+            <div class="col-12">
+                <!-- Informações do Plano de Manutenção -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clipboard-list me-2"></i>Informações do Plano de Manutenção
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Código do Plano</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.cd_planmanut|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-9 col-lg-10">
+                                <label class="form-label fw-bold small">Descrição do Plano</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.descr_planmanut|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Sequência Plano</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.seq_seqplamanu|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-9 col-lg-10">
+                                <label class="form-label fw-bold small">Descrição Sequência</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.descr_seqplamanu|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold small">Descrição Recomendações</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.descr_recomenos|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Data Final Execução</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.cf_dt_final_execucao|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Período Máximo</label>
+                                <p class="form-control-plaintext mb-0">
+                                    {% if roteiro.cs_qtde_periodo_max %}
+                                        <span class="badge bg-info">{{ roteiro.cs_qtde_periodo_max }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Total Tempo (Calc.)</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.cs_tot_temp|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Total Tempo (Final)</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.cf_tot_temp|default:"Não informado" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações da Tarefa -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-tasks me-2"></i>Informações da Tarefa
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Código da Tarefa</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.cd_tarefamanu|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-9 col-lg-10">
+                                <label class="form-label fw-bold small">Descrição da Tarefa</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.descr_tarefamanu|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-6 col-lg-4">
+                                <label class="form-label fw-bold small">Descrição Período</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.descr_periodo|default:"Não informado" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações de Execução -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-calendar-check me-2"></i>Informações de Execução
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Data Primeira Execução</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.dt_primexec|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Tempo Preventivo</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.tempo_prev|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Período (dias)</label>
+                                <p class="form-control-plaintext mb-0">
+                                    {% if roteiro.qtde_periodo %}
+                                        <span class="badge bg-info">{{ roteiro.qtde_periodo }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Tempo Preventivo (Final)</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.cf_temp_prev|default:"Não informado" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações da Máquina -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-industry me-2"></i>Informações da Máquina
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Código da Máquina</label>
+                                <p class="form-control-plaintext mb-0">
+                                    {% if roteiro.maquina %}
+                                        <a href="{% url 'visualizar_maquina' roteiro.maquina.id %}" class="text-decoration-none">
+                                            <strong>{{ roteiro.cd_maquina }}</strong>
+                                        </a>
+                                    {% else %}
+                                        {{ roteiro.cd_maquina|default:"Não informado" }}
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-9 col-lg-10">
+                                <label class="form-label fw-bold small">Descrição da Máquina</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.descr_maquina|default:"Não informado" }}</p>
+                            </div>
+                            {% if roteiro.maquina %}
+                            <div class="col-12">
+                                <a href="{% url 'visualizar_maquina' roteiro.maquina.id %}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-eye me-2"></i>Visualizar Máquina Completa
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações da Ordem de Serviço -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-alt me-2"></i>Informações da Ordem de Serviço
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Código Ordem Serviço</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.cd_ordemserv|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">ID Ordem Serviço</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.ordemserv_id|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Data Abertura</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.dt_abertura|default:"Não informado" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações do Funcionário -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-user-tie me-2"></i>Funcionário Responsável
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Código Funcionário</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.cd_funciomanu|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-6 col-lg-4">
+                                <label class="form-label fw-bold small">Nome Funcionário</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.nome_funciomanu|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">ID Funcionário</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.funciomanu_id|default:"Não informado" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações da Unidade e Setor -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-building me-2"></i>Informações da Unidade e Setor
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Código Unidade</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.cd_unid|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-9 col-lg-10">
+                                <label class="form-label fw-bold small">Nome Unidade</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.nome_unid|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Código Setor</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.cd_setormanut|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-9 col-lg-10">
+                                <label class="form-label fw-bold small">Descrição Setor</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.descr_setormanut|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Código Tipo CA</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.cd_tpcentativ|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-9 col-lg-10">
+                                <label class="form-label fw-bold small">Descrição Abreviada Tipo CA</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.descr_abrev_tpcentativ|default:"Não informado" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações do Item (se houver) -->
+                {% if roteiro.cd_item or roteiro.descr_item %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-box me-2"></i>Informações do Item
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">ID Item Plano</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.itemplanma_id|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Código Item</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.cd_item|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-6 col-lg-4">
+                                <label class="form-label fw-bold small">Descrição Item</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.descr_item|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">ID Item</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.item_id|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Quantidade</label>
+                                <p class="form-control-plaintext mb-0">
+                                    {% if roteiro.qtde %}
+                                        <span class="badge bg-info">{{ roteiro.qtde }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Quantidade Saldo</label>
+                                <p class="form-control-plaintext mb-0">
+                                    {% if roteiro.qtde_saldo %}
+                                        <span class="badge bg-warning text-dark">{{ roteiro.qtde_saldo }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Quantidade Reserva</label>
+                                <p class="form-control-plaintext mb-0">
+                                    {% if roteiro.qtde_reserva %}
+                                        <span class="badge bg-danger">{{ roteiro.qtde_reserva }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Informações do Sistema -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Informações do Sistema
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Data de Criação</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.created_at|date:"d/m/Y H:i:s" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Data de Atualização</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.updated_at|date:"d/m/Y H:i:s" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'consultar_roteiro_preventiva' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Voltar para Lista
+                            </a>
+                            <a href="{% url 'importar_roteiro_preventiva' %}" class="btn btn-primary">
+                                <i class="fas fa-upload me-2"></i>Importar Roteiros
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+

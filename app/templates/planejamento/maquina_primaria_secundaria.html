@@ -1,0 +1,556 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Agrupar Máquinas Primárias e Secundárias{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Plano de Preventiva</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Agrupar Máquinas Primárias e Secundárias</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-sitemap me-2"></i>Agrupar Máquinas Primárias e Secundárias
+                </h1>
+                <p class="lead">Gerencie o agrupamento de máquinas primárias e secundárias</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Formulário para Criar Relacionamento -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-lg border-0">
+                    <div class="card-header bg-gradient-primary text-white py-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <h5 class="mb-0">
+                            <i class="fas fa-link me-2"></i>Criar Novo Relacionamento
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <form method="post" action="{% url 'maquina_primaria_secundaria' %}" id="relacionamentoForm">
+                            {% csrf_token %}
+                            <input type="hidden" name="criar_relacionamento" value="1">
+                            
+                            <div class="row g-4">
+                                <!-- Máquina Primária -->
+                                <div class="col-12">
+                                    <div class="card border-primary shadow-sm">
+                                        <div class="card-header bg-primary text-white">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-star me-2"></i>Máquina Primária
+                                                <span class="text-danger">*</span>
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <!-- Campo de busca em uma linha -->
+                                            <div class="row mb-3">
+                                                <div class="col-12">
+                                                    <label for="busca_maquina_primaria" class="form-label small text-muted">
+                                                        <i class="fas fa-search me-1"></i>Buscar Máquina Primária
+                                                    </label>
+                                                    <input type="text" class="form-control" id="busca_maquina_primaria" placeholder="Digite para filtrar..." autocomplete="off">
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Select abaixo do campo de busca -->
+                                            <div class="row mb-3">
+                                                <div class="col-12">
+                                                    <label for="maquina_primaria" class="form-label small text-muted">Selecione a máquina primária</label>
+                                                    <select class="form-select" id="maquina_primaria" name="maquina_primaria" required size="8" style="min-height: 200px;">
+                                                        <option value="">-- Selecione uma máquina primária --</option>
+                                                        {% for maquina in maquinas_primarias %}
+                                                            <option value="{{ maquina.id }}" data-search-text="{{ maquina.cd_maquina|lower }} {{ maquina.descr_maquina|default:''|lower }} {{ maquina.descr_setormanut|default:''|lower }}">
+                                                                {{ maquina.cd_maquina }} - {{ maquina.descr_maquina|default:"Sem descrição" }}
+                                                                {% if maquina.descr_setormanut %}
+                                                                    ({{ maquina.descr_setormanut }})
+                                                                {% endif %}
+                                                            </option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Preview da máquina primária selecionada -->
+                                            <div class="row">
+                                                <div class="col-12">
+                                                    <div id="previewPrimaria" class="alert alert-primary mb-0" style="display: none;">
+                                                        <small>
+                                                            <i class="fas fa-check-circle me-1"></i>
+                                                            <strong id="previewPrimariaTexto"></strong>
+                                                        </small>
+                                                    </div>
+                                                    <div class="form-text mt-2">
+                                                        <i class="fas fa-info-circle me-1"></i>
+                                                        <small>Máquinas com <strong>descr_gerenc = "MÁQUINAS PRINCIPAL"</strong></small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Máquinas Secundárias -->
+                                <div class="col-12">
+                                    <div class="card border-info shadow-sm">
+                                        <div class="card-header bg-info text-white">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-cogs me-2"></i>Máquinas Secundárias
+                                                <span class="text-danger">*</span>
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <!-- Campo de busca em uma linha -->
+                                            <div class="row mb-3">
+                                                <div class="col-12">
+                                                    <label for="busca_maquina_secundaria" class="form-label small text-muted">
+                                                        <i class="fas fa-search me-1"></i>Buscar Máquina Secundária
+                                                    </label>
+                                                    <input type="text" class="form-control" id="busca_maquina_secundaria" placeholder="Digite para filtrar..." autocomplete="off">
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Select abaixo do campo de busca -->
+                                            <div class="row mb-3">
+                                                <div class="col-12">
+                                                    <label for="maquina_secundaria_select" class="form-label small text-muted">Selecione uma máquina para adicionar</label>
+                                                    <select class="form-select" id="maquina_secundaria_select" size="8" style="min-height: 200px;">
+                                                        <option value="">-- Selecione uma máquina secundária --</option>
+                                                        {% for maquina in maquinas_secundarias %}
+                                                            <option value="{{ maquina.id }}" data-search-text="{{ maquina.cd_maquina|lower }} {{ maquina.descr_maquina|default:''|lower }} {{ maquina.descr_setormanut|default:''|lower }} {{ maquina.descr_gerenc|default:''|lower }}" data-maquina-texto="{{ maquina.cd_maquina }} - {{ maquina.descr_maquina|default:"Sem descrição" }}{% if maquina.descr_setormanut %} ({{ maquina.descr_setormanut }}){% endif %}{% if maquina.descr_gerenc %} [{{ maquina.descr_gerenc }}]{% endif %}">
+                                                                {{ maquina.cd_maquina }} - {{ maquina.descr_maquina|default:"Sem descrição" }}
+                                                                {% if maquina.descr_setormanut %}
+                                                                    ({{ maquina.descr_setormanut }})
+                                                                {% endif %}
+                                                                {% if maquina.descr_gerenc %}
+                                                                    [{{ maquina.descr_gerenc }}]
+                                                                {% endif %}
+                                                            </option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Lista de máquinas selecionadas abaixo do select -->
+                                            <div class="row">
+                                                <div class="col-12">
+                                                    <div id="maquinasSelecionadasPreview" class="mb-3" style="min-height: 80px;">
+                                                        <label class="form-label small text-muted mb-2">
+                                                            <i class="fas fa-list-check me-1"></i>Máquinas Selecionadas:
+                                                            <span id="contadorSelecionadas" class="badge bg-info ms-2">0</span>
+                                                        </label>
+                                                        <div id="listaPreviewSelecionadas" class="d-flex flex-wrap gap-2 p-2 border rounded" style="min-height: 50px;">
+                                                            <div class="text-muted small w-100" style="display: block;" id="nenhumaSelecionada">
+                                                                <i class="fas fa-info-circle me-1"></i>Nenhuma máquina selecionada ainda. Selecione uma máquina acima para adicioná-la à lista.
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-text mt-2">
+                                                        <i class="fas fa-info-circle me-1"></i>
+                                                        <small>Máquinas com <strong>descr_gerenc ≠ "MÁQUINAS PRINCIPAL"</strong></small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Observações e Botão Submit -->
+                            <div class="row mt-4">
+                                <div class="col-12">
+                                    <div class="card border-secondary">
+                                        <div class="card-body">
+                                            <label for="observacoes" class="form-label">
+                                                <i class="fas fa-sticky-note me-2"></i><strong>Observações</strong>
+                                                <span class="text-muted small">(opcional)</span>
+                                            </label>
+                                            <textarea class="form-control" id="observacoes" name="observacoes" rows="2" placeholder="Adicione observações sobre este relacionamento..."></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Botão Submit -->
+                            <div class="row mt-4">
+                                <div class="col-12">
+                                    <div class="d-grid gap-2">
+                                        <button type="submit" class="btn btn-success btn-lg shadow-sm" id="btnConfirmarRelacao">
+                                            <i class="fas fa-check-circle me-2"></i>Confirmar Relação das Máquinas
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Hidden inputs para máquinas selecionadas -->
+                            <div id="hiddenInputsContainer"></div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista de Relacionamentos Existentes -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list me-2"></i>Relacionamentos Existentes ({{ relacionamentos.count }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if relacionamentos %}
+                            <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                                <table class="table table-hover table-sm">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th style="width: 25%;">Primária</th>
+                                            <th style="width: 25%;">Secundária</th>
+                                            <th style="width: 30%;">Observações</th>
+                                            <th style="width: 20%;" class="text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for rel in relacionamentos %}
+                                            <tr>
+                                                <td>
+                                                    <strong>
+                                                        <a href="{% url 'visualizar_maquina' rel.maquina_primaria.id %}" class="text-decoration-none" target="_blank">
+                                                            {{ rel.maquina_primaria.cd_maquina }}
+                                                        </a>
+                                                    </strong>
+                                                    <br>
+                                                    <small class="text-muted">{{ rel.maquina_primaria.descr_maquina|truncatewords:5|default:"-" }}</small>
+                                                </td>
+                                                <td>
+                                                    <strong>
+                                                        <a href="{% url 'visualizar_maquina' rel.maquina_secundaria.id %}" class="text-decoration-none" target="_blank">
+                                                            {{ rel.maquina_secundaria.cd_maquina }}
+                                                        </a>
+                                                    </strong>
+                                                    <br>
+                                                    <small class="text-muted">{{ rel.maquina_secundaria.descr_maquina|truncatewords:5|default:"-" }}</small>
+                                                </td>
+                                                <td>
+                                                    <small>{{ rel.observacoes|truncatewords:10|default:"-" }}</small>
+                                                </td>
+                                                <td class="text-center">
+                                                    <form method="post" action="{% url 'maquina_primaria_secundaria' %}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja remover este relacionamento?');">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="remover_relacionamento" value="1">
+                                                        <input type="hidden" name="relacionamento_id" value="{{ rel.id }}">
+                                                        <button type="submit" class="btn btn-sm btn-danger">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info text-center mb-0">
+                                <i class="fas fa-info-circle me-2"></i>Nenhum relacionamento cadastrado ainda.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estatísticas -->
+        <div class="row mt-4">
+            <div class="col-md-4 mb-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <h6 class="card-title">Máquinas Primárias</h6>
+                        <h2 class="mb-0">{{ maquinas_primarias.count }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        <h6 class="card-title">Máquinas Secundárias</h6>
+                        <h2 class="mb-0">{{ maquinas_secundarias.count }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <h6 class="card-title">Relacionamentos</h6>
+                        <h2 class="mb-0">{{ relacionamentos.count }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Executar após o main.js carregar
+window.addEventListener('load', function() {
+    const form = document.getElementById('relacionamentoForm');
+    const submitBtn = document.getElementById('btnConfirmarRelacao');
+    
+    if (!form || !submitBtn) {
+        console.error('Form or submit button not found!');
+        return;
+    }
+    
+    // Remover qualquer listener do main.js que possa estar interferindo
+    const newForm = form.cloneNode(true);
+    form.parentNode.replaceChild(newForm, form);
+    const cleanForm = document.getElementById('relacionamentoForm');
+    
+    const newSubmitBtn = submitBtn.cloneNode(true);
+    submitBtn.parentNode.replaceChild(newSubmitBtn, submitBtn);
+    const cleanSubmitBtn = document.getElementById('btnConfirmarRelacao');
+    
+    // Armazenar máquinas selecionadas
+    let maquinasSelecionadas = []; // Array de objetos {id, texto}
+    
+    // Referências aos elementos
+    const buscaSecundaria = document.getElementById('busca_maquina_secundaria');
+    const selectSecundaria = document.getElementById('maquina_secundaria_select');
+    const previewContainer = document.getElementById('listaPreviewSelecionadas');
+    const contador = document.getElementById('contadorSelecionadas');
+    const nenhumaSelecionada = document.getElementById('nenhumaSelecionada');
+    const hiddenInputsContainer = document.getElementById('hiddenInputsContainer');
+    
+    // Função para filtrar opções de um select baseado no texto de busca
+    function filtrarSelect(buscaInput, select) {
+        const termoBusca = buscaInput.value.toLowerCase().trim();
+        const options = select.querySelectorAll('option');
+        
+        options.forEach(function(option) {
+            if (option.value === '') {
+                // Sempre mostrar a opção vazia
+                option.style.display = '';
+                return;
+            }
+            
+            // Não mostrar opções que já foram selecionadas (exceto se estiver buscando por elas)
+            const isSelected = option.getAttribute('data-selected') === 'true';
+            if (isSelected && !termoBusca) {
+                option.style.display = 'none';
+                return;
+            }
+            
+            const searchText = option.getAttribute('data-search-text') || option.textContent.toLowerCase();
+            if (searchText.includes(termoBusca)) {
+                // Se está buscando, mostrar mesmo se estiver selecionada (para permitir ver o que foi selecionado)
+                option.style.display = '';
+            } else {
+                option.style.display = 'none';
+            }
+        });
+    }
+    
+    // Função para adicionar máquina à lista quando selecionada
+    function adicionarMaquinaSelecionada() {
+        if (!selectSecundaria.value) {
+            return;
+        }
+        
+        const option = selectSecundaria.options[selectSecundaria.selectedIndex];
+        const id = selectSecundaria.value;
+        const texto = option.getAttribute('data-maquina-texto') || option.text;
+        
+        // Verificar se já não está na lista
+        if (maquinasSelecionadas.find(m => m.id === id)) {
+            // Máquina já está selecionada, apenas resetar o select
+            selectSecundaria.value = '';
+            return;
+        }
+        
+        // Adicionar à lista
+        maquinasSelecionadas.push({
+            id: id,
+            texto: texto
+        });
+        
+        // Esconder a opção do select (marcar como selecionada)
+        option.style.display = 'none';
+        option.setAttribute('data-selected', 'true');
+        
+        // Resetar o select
+        selectSecundaria.value = '';
+        
+        // Atualizar preview
+        atualizarPreviewSelecionadas();
+    }
+    
+    // Função para remover máquina da lista
+    function removerMaquinaSelecionada(maquinaId) {
+        maquinasSelecionadas = maquinasSelecionadas.filter(m => m.id !== maquinaId);
+        
+        // Mostrar novamente a opção no select
+        const option = selectSecundaria.querySelector(`option[value="${maquinaId}"]`);
+        if (option) {
+            option.style.display = '';
+            option.removeAttribute('data-selected');
+        }
+        
+        atualizarPreviewSelecionadas();
+    }
+    
+    // Função para atualizar o preview visual
+    function atualizarPreviewSelecionadas() {
+        // Atualizar contador
+        if (contador) {
+            contador.textContent = maquinasSelecionadas.length;
+        }
+        
+        // Limpar preview anterior
+        if (previewContainer) {
+            previewContainer.innerHTML = '';
+            
+            if (maquinasSelecionadas.length > 0) {
+                // Esconder mensagem de nenhuma selecionada
+                if (nenhumaSelecionada) {
+                    nenhumaSelecionada.style.display = 'none';
+                }
+                
+                // Criar badges para cada máquina selecionada
+                maquinasSelecionadas.forEach(function(maquina) {
+                    const badge = document.createElement('div');
+                    badge.className = 'badge bg-info text-white p-2 d-flex align-items-center gap-2 mb-1';
+                    badge.style.fontSize = '0.875rem';
+                    badge.innerHTML = `
+                        <i class="fas fa-cog"></i>
+                        <span>${maquina.texto}</span>
+                        <button type="button" class="btn-close btn-close-white" style="font-size: 0.6rem;" data-maquina-id="${maquina.id}" title="Remover"></button>
+                    `;
+                    
+                    // Adicionar listener para remover ao clicar no X
+                    const btnClose = badge.querySelector('.btn-close');
+                    btnClose.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        removerMaquinaSelecionada(maquina.id);
+                    });
+                    
+                    previewContainer.appendChild(badge);
+                });
+            } else {
+                // Mostrar mensagem de nenhuma selecionada
+                if (nenhumaSelecionada) {
+                    nenhumaSelecionada.style.display = 'block';
+                }
+            }
+        }
+    }
+    
+    // Adicionar listener para busca da máquina primária
+    setTimeout(function() {
+        const buscaPrimaria = document.getElementById('busca_maquina_primaria');
+        const selectPrimaria = document.getElementById('maquina_primaria');
+        const previewPrimaria = document.getElementById('previewPrimaria');
+        const previewPrimariaTexto = document.getElementById('previewPrimariaTexto');
+        
+        if (buscaPrimaria && selectPrimaria) {
+            buscaPrimaria.addEventListener('input', function() {
+                filtrarSelect(buscaPrimaria, selectPrimaria);
+            });
+            
+            // Atualizar preview quando selecionar máquina primária
+            selectPrimaria.addEventListener('change', function() {
+                if (selectPrimaria.value) {
+                    const option = selectPrimaria.options[selectPrimaria.selectedIndex];
+                    previewPrimariaTexto.textContent = option.text;
+                    previewPrimaria.style.display = 'block';
+                } else {
+                    previewPrimaria.style.display = 'none';
+                }
+            });
+        }
+    }, 100);
+    
+    // Adicionar listener para busca de máquinas secundárias
+    if (buscaSecundaria && selectSecundaria) {
+        buscaSecundaria.addEventListener('input', function() {
+            filtrarSelect(buscaSecundaria, selectSecundaria);
+        });
+        
+        // Adicionar máquina à lista quando selecionar no dropdown
+        selectSecundaria.addEventListener('change', function() {
+            if (selectSecundaria.value) {
+                adicionarMaquinaSelecionada();
+            }
+        });
+    }
+    
+    // Adicionar listener no formulário - executar ANTES de qualquer outro
+    cleanForm.addEventListener('submit', function(e) {
+        console.log('=== FORM SUBMIT EVENT TRIGGERED ===');
+        
+        const maquinaPrimaria = document.getElementById('maquina_primaria').value;
+        
+        console.log('Máquina Primária:', maquinaPrimaria);
+        console.log('Máquinas Secundárias selecionadas:', maquinasSelecionadas);
+        
+        // Validações
+        if (!maquinaPrimaria) {
+            e.preventDefault();
+            e.stopPropagation();
+            alert('Por favor, selecione uma máquina primária.');
+            return false;
+        }
+        
+        if (maquinasSelecionadas.length === 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            alert('Por favor, selecione pelo menos uma máquina secundária.');
+            return false;
+        }
+        
+        // Criar hidden inputs para cada máquina secundária selecionada
+        hiddenInputsContainer.innerHTML = '';
+        maquinasSelecionadas.forEach(function(maquina) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'maquinas_secundarias';
+            input.value = maquina.id;
+            hiddenInputsContainer.appendChild(input);
+        });
+        
+        console.log('Formulário será enviado com:', {
+            maquina_primaria: maquinaPrimaria,
+            maquinas_secundarias: maquinasSelecionadas.map(m => m.id)
+        });
+        
+        // Desabilitar botão e mostrar loading
+        cleanSubmitBtn.disabled = true;
+        cleanSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
+        
+        // IMPORTANTE: NÃO chamar e.preventDefault() - deixar o formulário ser enviado normalmente
+        console.log('Form will submit normally...');
+    }, true); // Use capture phase para executar antes de outros listeners
+});
+</script>
+{% endblock %}

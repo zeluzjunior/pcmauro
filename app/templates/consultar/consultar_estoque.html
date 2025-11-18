@@ -1,0 +1,479 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Consultar Estoque{% endblock %}
+
+{% block extra_css %}
+<style>
+    .table-container {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+    }
+    .filter-input {
+        width: 100%;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        margin-top: 4px;
+    }
+    .filter-input:focus {
+        outline: none;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    .filter-header {
+        padding: 8px !important;
+    }
+    .filter-row th {
+        background-color: #e9ecef;
+        padding: 4px 8px !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 153, 0, 0.171)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Estoque</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Consultar Estoque</h1>
+                <p class="lead">Visualize todos os itens de estoque cadastrados no sistema</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Actions Bar -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <form method="get" action="{% url 'consultar_estoque' %}" class="d-flex">
+                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por código, descrição, unidade de medida..." value="{{ request.GET.search }}">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Filtros Avançados -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-secondary text-white">
+                        <button class="btn btn-link text-white text-decoration-none p-0 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="false" aria-controls="filtrosCollapse">
+                            <h5 class="mb-0">
+                                <i class="fas fa-filter me-2"></i>Filtros Avançados
+                                <i class="fas fa-chevron-down float-end"></i>
+                            </h5>
+                        </button>
+                    </div>
+                    <div class="collapse" id="filtrosCollapse">
+                        <div class="card-body">
+                            <form method="get" id="filtrosForm">
+                                <!-- Preservar busca geral -->
+                                <input type="hidden" name="search" value="{{ request.GET.search }}">
+                                
+                                <div class="row g-3">
+                                    <!-- Filtro por Unidade de Medida -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_unidade_medida" class="form-label">Unidade de Medida</label>
+                                        <select class="form-select" id="filtro_unidade_medida" name="filtro_unidade_medida">
+                                            <option value="">Todas as unidades</option>
+                                            {% for unidade in unidades_medida_unicas %}
+                                                <option value="{{ unidade }}" {% if filtro_unidade_medida == unidade %}selected{% endif %}>{{ unidade }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Destino de Uso -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_destino_uso" class="form-label">Destino de Uso</label>
+                                        <select class="form-select" id="filtro_destino_uso" name="filtro_destino_uso">
+                                            <option value="">Todos os destinos</option>
+                                            {% for destino in destinos_uso_unicos %}
+                                                <option value="{{ destino }}" {% if filtro_destino_uso == destino %}selected{% endif %}>{{ destino|truncatewords:5 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Controla Estoque Mínimo -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_controla_estoque" class="form-label">Controla Estoque Mínimo</label>
+                                        <select class="form-select" id="filtro_controla_estoque" name="filtro_controla_estoque">
+                                            <option value="">Todos</option>
+                                            <option value="SIM" {% if filtro_controla_estoque == 'SIM' %}selected{% endif %}>SIM</option>
+                                            <option value="NÃO" {% if filtro_controla_estoque == 'NÃO' %}selected{% endif %}>NÃO</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Classificação Tempo Sem Consumo -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_classificacao" class="form-label">Classificação Tempo Sem Consumo</label>
+                                        <select class="form-select" id="filtro_classificacao" name="filtro_classificacao">
+                                            <option value="">Todas as classificações</option>
+                                            {% for classificacao in classificacoes_unicas %}
+                                                <option value="{{ classificacao }}" {% if filtro_classificacao == classificacao %}selected{% endif %}>{{ classificacao|truncatewords:5 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Estante -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_estante" class="form-label">Estante</label>
+                                        <input type="number" class="form-control" id="filtro_estante" name="filtro_estante" placeholder="Número da estante..." value="{{ filtro_estante }}">
+                                    </div>
+                                    
+                                    <!-- Filtro por Prateleira -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_prateleira" class="form-label">Prateleira</label>
+                                        <input type="number" class="form-control" id="filtro_prateleira" name="filtro_prateleira" placeholder="Número da prateleira..." value="{{ filtro_prateleira }}">
+                                    </div>
+                                    
+                                    <!-- Filtro por Quantidade -->
+                                    <div class="col-md-6">
+                                        <label class="form-label">Quantidade</label>
+                                        <div class="row g-2">
+                                            <div class="col-6">
+                                                <input type="number" step="0.01" class="form-control" id="quantidade_min" name="quantidade_min" placeholder="Mínima" value="{{ quantidade_min }}">
+                                            </div>
+                                            <div class="col-6">
+                                                <input type="number" step="0.01" class="form-control" id="quantidade_max" name="quantidade_max" placeholder="Máxima" value="{{ quantidade_max }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Botões de Ação -->
+                                    <div class="col-md-12 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary me-2">
+                                            <i class="fas fa-filter me-2"></i>Aplicar Filtros
+                                        </button>
+                                        <a href="{% url 'consultar_estoque' %}" class="btn btn-outline-secondary">
+                                            <i class="fas fa-times me-2"></i>Limpar Filtros</a>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total</h5>
+                        <p class="card-text display-6">{{ total_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Mostrando</h5>
+                        <p class="card-text display-6">{{ itens|length }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Unidades de Medida</h5>
+                        <p class="card-text display-6">{{ unidades_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Destinos de Uso</h5>
+                        <p class="card-text display-6">{{ destinos_count }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-list me-2"></i>Lista de Itens de Estoque
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table class="table table-hover table-striped mb-0" id="estoqueTable">
+                        <thead>
+                            <tr>
+                                <th>Código Item</th>
+                                <th>Descrição</th>
+                                <th>Localização</th>
+                                <th>Unidade Medida</th>
+                                <th>Quantidade</th>
+                                <th>Valor</th>
+                                <th>Destino Uso</th>
+                                <th>Controla Estoque Mínimo</th>
+                                <th>Classificação</th>
+                                <th class="text-center">Ações</th>
+                            </tr>
+                            <tr class="filter-row">
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Código..." data-column="0">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Descrição..." data-column="1">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Localização..." data-column="2">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Unidade..." data-column="3">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Quantidade..." data-column="4">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Valor..." data-column="5">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Destino..." data-column="6">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Controla..." data-column="7">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Classificação..." data-column="8">
+                                </th>
+                                <th class="filter-header text-center">
+                                    <!-- Sem filtro na coluna de ações -->
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if itens %}
+                                {% for item in itens %}
+                                <tr>
+                                    <td>
+                                        <strong>
+                                            <a href="{% url 'visualizar_item_estoque' item.id %}" class="text-decoration-none">
+                                                {{ item.codigo_item }}
+                                            </a>
+                                        </strong>
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'visualizar_item_estoque' item.id %}" class="text-decoration-none">
+                                            {{ item.descricao_item|default:"-"|truncatewords:8 }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {% if item.estante or item.prateleira or item.coluna %}
+                                            <span class="badge bg-secondary">
+                                                {% if item.estante %}E:{{ item.estante }}{% endif %}
+                                                {% if item.prateleira %} P:{{ item.prateleira }}{% endif %}
+                                                {% if item.coluna %} C:{{ item.coluna }}{% endif %}
+                                            </span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.unidade_medida %}
+                                            <span class="badge bg-info">{{ item.unidade_medida }}</span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.quantidade %}
+                                            <strong>{{ item.quantidade }}</strong>
+                                        {% else %}
+                                            0
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.valor %}
+                                            R$ {{ item.valor|floatformat:2 }}
+                                        {% else %}
+                                            R$ 0,00
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.descricao_dest_uso %}
+                                            {{ item.descricao_dest_uso|truncatewords:5 }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.controla_estoque_minimo %}
+                                            <span class="badge bg-{% if item.controla_estoque_minimo|upper == 'SIM' %}success{% else %}secondary{% endif %}">
+                                                {{ item.controla_estoque_minimo|upper }}
+                                            </span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.classificacao_tempo_sem_consumo %}
+                                            <span class="badge bg-warning text-dark">{{ item.classificacao_tempo_sem_consumo|truncatewords:3 }}</span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <a href="{% url 'visualizar_item_estoque' item.id %}" class="btn btn-sm btn-primary" title="Visualizar detalhes">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="10" class="text-center py-5">
+                                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                        <p class="text-muted">Nenhum item de estoque encontrado.</p>
+                                        <a href="{% url 'importar_estoque' %}" class="btn btn-primary">
+                                            <i class="fas fa-upload me-2"></i>Importar Itens
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if itens.has_other_pages %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if itens.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1">Primeira</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ itens.previous_page_number }}">Anterior</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Página {{ itens.number }} de {{ itens.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if itens.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ itens.next_page_number }}">Próxima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ itens.paginator.num_pages }}">Última</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('estoqueTable');
+    const filterInputs = document.querySelectorAll('.filter-input');
+    
+    if (!table || !filterInputs.length) return;
+    
+    // Função para filtrar a tabela
+    function filterTable() {
+        const filters = [];
+        filterInputs.forEach(input => {
+            const columnIndex = parseInt(input.getAttribute('data-column'));
+            const filterValue = input.value.toLowerCase().trim();
+            filters[columnIndex] = filterValue;
+        });
+        
+        const rows = table.querySelectorAll('tbody tr');
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            let showRow = true;
+            
+            // Verificar cada coluna (exceto a última que é ações)
+            for (let i = 0; i < filters.length; i++) {
+                if (filters[i]) {
+                    const cell = row.cells[i];
+                    if (cell) {
+                        const cellText = cell.textContent.toLowerCase().trim();
+                        if (!cellText.includes(filters[i])) {
+                            showRow = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (showRow) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+    
+    // Adicionar event listeners aos campos de filtro
+    filterInputs.forEach(input => {
+        input.addEventListener('input', filterTable);
+        input.addEventListener('keyup', filterTable);
+    });
+    
+    // Botão para limpar todos os filtros
+    const clearFiltersBtn = document.createElement('button');
+    clearFiltersBtn.type = 'button';
+    clearFiltersBtn.className = 'btn btn-sm btn-outline-secondary mt-2';
+    clearFiltersBtn.innerHTML = '<i class="fas fa-times me-1"></i>Limpar Filtros';
+    clearFiltersBtn.addEventListener('click', function() {
+        filterInputs.forEach(input => {
+            input.value = '';
+        });
+        filterTable();
+    });
+    
+    // Adicionar botão de limpar filtros após a tabela
+    const tableContainer = document.querySelector('.table-container');
+    if (tableContainer) {
+        const clearBtnContainer = document.createElement('div');
+        clearBtnContainer.className = 'p-2 border-top';
+        clearBtnContainer.appendChild(clearFiltersBtn);
+        tableContainer.parentElement.appendChild(clearBtnContainer);
+    }
+});
+</script>
+{% endblock %}
+

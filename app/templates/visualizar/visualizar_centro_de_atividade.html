@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Visualizar CA {{ ca.ca }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_locais_e_cas' %}" class="text-white">Locais e CAs</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Visualizar CA {{ ca.ca }}</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Visualizar Centro de Atividade</h1>
+                <p class="lead">Detalhes completos do CA {{ ca.ca }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <div class="row">
+            <div class="col-12">
+                <!-- Informações Principais -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Informações Principais
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">CA (Código do Centro de Atividade)</label>
+                                <p class="form-control-plaintext">{{ ca.ca }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Sigla</label>
+                                <p class="form-control-plaintext">
+                                    {% if ca.sigla %}
+                                        <span class="badge bg-secondary fs-6">{{ ca.sigla }}</span>
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label fw-bold">Descrição</label>
+                                <p class="form-control-plaintext">{{ ca.descricao|default:"Não informado" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações Adicionais -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info me-2"></i>Informações Adicionais
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Índice</label>
+                                <p class="form-control-plaintext">
+                                    {% if ca.indice %}
+                                        <span class="badge bg-info text-dark fs-6">{{ ca.indice }}</span>
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Encarregado Responsável</label>
+                                <p class="form-control-plaintext">{{ ca.encarregado_responsavel|default:"Não informado" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Locais do Centro de Atividade -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-map-marker-alt me-2"></i>Locais do Centro de Atividade
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if ca.locais.all %}
+                            <div class="row">
+                                {% for local in ca.locais.all %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card border-warning">
+                                            <div class="card-body">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <h6 class="card-title text-primary mb-0">
+                                                        <i class="fas fa-map-marker-alt me-2"></i>Local {{ forloop.counter }}
+                                                    </h6>
+                                                    <a href="{% url 'visualizar_local' local.id %}" class="btn btn-sm btn-outline-primary" title="Visualizar detalhes do local">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label fw-bold small">Local:</label>
+                                                    <p class="mb-0">{{ local.local }}</p>
+                                                </div>
+                                                {% if local.observacoes %}
+                                                    <div class="mb-2">
+                                                        <label class="form-label fw-bold small">Observações:</label>
+                                                        <p class="mb-0 text-muted small">{{ local.observacoes|truncatewords:15 }}</p>
+                                                    </div>
+                                                {% endif %}
+                                                <div class="mt-2 pt-2 border-top">
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-calendar me-1"></i>
+                                                        Criado em: {{ local.created_at|date:"d/m/Y H:i:s" }}<br>
+                                                        <i class="fas fa-edit me-1"></i>
+                                                        Atualizado em: {{ local.updated_at|date:"d/m/Y H:i:s" }}
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info mb-0">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Nenhum local cadastrado para este Centro de Atividade.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Informações do Sistema -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-database me-2"></i>Informações do Sistema
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">ID do Registro</label>
+                                <p class="form-control-plaintext">{{ ca.id }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Data de Criação</label>
+                                <p class="form-control-plaintext">{{ ca.created_at|date:"d/m/Y H:i:s" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Última Atualização</label>
+                                <p class="form-control-plaintext">{{ ca.updated_at|date:"d/m/Y H:i:s" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botões de Ação -->
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{% url 'consultar_locais_e_cas' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Voltar para Lista
+                    </a>
+                    <div>
+                        <a href="{% url 'consultar_locais_e_cas' %}?search={{ ca.ca }}" class="btn btn-info">
+                            <i class="fas fa-search me-2"></i>Buscar Similar
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+

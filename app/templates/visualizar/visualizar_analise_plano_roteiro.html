@@ -1,0 +1,425 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Análise: Plano ↔ Roteiro{% endblock %}
+
+{% block extra_css %}
+<style>
+    .comparison-card {
+        transition: transform 0.2s;
+        border-left: 4px solid;
+    }
+    .comparison-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .match-badge {
+        font-size: 0.9rem;
+        padding: 0.5rem 1rem;
+    }
+    .field-match {
+        background-color: #d4edda;
+        border-left: 4px solid #28a745;
+    }
+    .field-no-match {
+        background-color: #f8d7da;
+        border-left: 4px solid #dc3545;
+    }
+    .field-partial {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+    }
+    .score-display {
+        font-size: 3rem;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'analise_roteiro_plano_preventiva' %}" class="text-white">Análise Roteiro/Plano</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise Detalhada</li>
+                    </ol>
+                </nav>
+                <div class="mt-3">
+                    <h1 class="display-4 fw-bold mb-2">
+                        Análise de Relacionamento
+                    </h1>
+                    <p class="lead mb-1">
+                        <span class="badge bg-primary fs-6 me-2">Plano ID: {{ plano.id }}</span>
+                        <span class="badge bg-success fs-6 me-2">Roteiro ID: {{ roteiro.id }}</span>
+                        {% if ja_vinculado %}
+                            <span class="badge bg-success fs-6">
+                                <i class="fas fa-link"></i> Vinculado
+                            </span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark fs-6">
+                                <i class="fas fa-unlink"></i> Não Vinculado
+                            </span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Match Score Card -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header {% if match_score >= 95 %}bg-success{% elif match_score >= 80 %}bg-warning{% else %}bg-info{% endif %} text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Score de Correspondência
+                        </h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="score-display {% if match_score >= 95 %}text-success{% elif match_score >= 80 %}text-warning{% else %}text-info{% endif %}">
+                            {{ match_score|floatformat:1 }}%
+                        </div>
+                        <p class="text-muted mb-0">
+                            {% if match_score >= 95 %}
+                                <i class="fas fa-check-circle text-success"></i> Correspondência Excelente
+                            {% elif match_score >= 80 %}
+                                <i class="fas fa-exclamation-triangle text-warning"></i> Correspondência Boa
+                            {% else %}
+                                <i class="fas fa-info-circle text-info"></i> Correspondência Parcial
+                            {% endif %}
+                        </p>
+                        {% if campos_match %}
+                            <div class="mt-3">
+                                <strong>Campos que correspondem:</strong>
+                                {% for campo in campos_match %}
+                                    <span class="badge bg-secondary me-1">{{ campo }}</span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison Table -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-balance-scale me-2"></i>Comparação de Campos
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 25%;">Campo</th>
+                                        <th style="width: 35%;">Plano Preventiva</th>
+                                        <th style="width: 35%;">Roteiro Preventiva</th>
+                                        <th style="width: 5%;" class="text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="{% if comparacao.cd_maquina.match %}field-match{% else %}field-no-match{% endif %}">
+                                        <td><strong>Código Máquina</strong><br><small class="text-muted">(Peso: 30%)</small></td>
+                                        <td>{{ comparacao.cd_maquina.plano|default:"-" }}</td>
+                                        <td>{{ comparacao.cd_maquina.roteiro|default:"-" }}</td>
+                                        <td class="text-center">
+                                            {% if comparacao.cd_maquina.match %}
+                                                <i class="fas fa-check-circle text-success"></i>
+                                            {% else %}
+                                                <i class="fas fa-times-circle text-danger"></i>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr class="{% if comparacao.cd_funcionario.match %}field-match{% else %}field-no-match{% endif %}">
+                                        <td><strong>Código Funcionário</strong><br><small class="text-muted">(Peso: 20%)</small></td>
+                                        <td>{{ comparacao.cd_funcionario.plano|default:"-" }}</td>
+                                        <td>{{ comparacao.cd_funcionario.roteiro|default:"-" }}</td>
+                                        <td class="text-center">
+                                            {% if comparacao.cd_funcionario.match %}
+                                                <i class="fas fa-check-circle text-success"></i>
+                                            {% else %}
+                                                <i class="fas fa-times-circle text-danger"></i>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr class="{% if comparacao.nome_funcionario.match %}field-match{% else %}field-no-match{% endif %}">
+                                        <td><strong>Nome Funcionário</strong><br><small class="text-muted">(Peso: 15%)</small></td>
+                                        <td>{{ comparacao.nome_funcionario.plano|default:"-" }}</td>
+                                        <td>{{ comparacao.nome_funcionario.roteiro|default:"-" }}</td>
+                                        <td class="text-center">
+                                            {% if comparacao.nome_funcionario.match %}
+                                                <i class="fas fa-check-circle text-success"></i>
+                                            {% else %}
+                                                <i class="fas fa-times-circle text-danger"></i>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr class="{% if comparacao.cd_atividade.match %}field-match{% else %}field-no-match{% endif %}">
+                                        <td><strong>Código Tipo CA</strong><br><small class="text-muted">(Peso: 15%)</small></td>
+                                        <td>{{ comparacao.cd_atividade.plano|default:"-" }}</td>
+                                        <td>{{ comparacao.cd_atividade.roteiro|default:"-" }}</td>
+                                        <td class="text-center">
+                                            {% if comparacao.cd_atividade.match %}
+                                                <i class="fas fa-check-circle text-success"></i>
+                                            {% else %}
+                                                <i class="fas fa-times-circle text-danger"></i>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr class="{% if comparacao.numero_plano.match %}field-match{% else %}field-no-match{% endif %}">
+                                        <td><strong>Número do Plano</strong><br><small class="text-muted">(Peso: 10%)</small></td>
+                                        <td>{{ comparacao.numero_plano.plano|default:"-" }}</td>
+                                        <td>{{ comparacao.numero_plano.roteiro|default:"-" }}</td>
+                                        <td class="text-center">
+                                            {% if comparacao.numero_plano.match %}
+                                                <i class="fas fa-check-circle text-success"></i>
+                                            {% else %}
+                                                <i class="fas fa-times-circle text-danger"></i>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr class="{% if comparacao.sequencia_manutencao.match %}field-match{% else %}field-no-match{% endif %}">
+                                        <td><strong>Sequência Manutenção</strong><br><small class="text-muted">(Peso: 5%)</small></td>
+                                        <td>{{ comparacao.sequencia_manutencao.plano|default:"-" }}</td>
+                                        <td>{{ comparacao.sequencia_manutencao.roteiro|default:"-" }}</td>
+                                        <td class="text-center">
+                                            {% if comparacao.sequencia_manutencao.match %}
+                                                <i class="fas fa-check-circle text-success"></i>
+                                            {% else %}
+                                                <i class="fas fa-times-circle text-danger"></i>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr class="{% if comparacao.sequencia_tarefa.match %}field-match{% else %}field-no-match{% endif %}">
+                                        <td><strong>Sequência Tarefa</strong><br><small class="text-muted">(Peso: 5%)</small></td>
+                                        <td>{{ comparacao.sequencia_tarefa.plano|default:"-" }}</td>
+                                        <td>{{ comparacao.sequencia_tarefa.roteiro|default:"-" }}</td>
+                                        <td class="text-center">
+                                            {% if comparacao.sequencia_tarefa.match %}
+                                                <i class="fas fa-check-circle text-success"></i>
+                                            {% else %}
+                                                <i class="fas fa-times-circle text-danger"></i>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Side by Side Comparison -->
+        <div class="row mb-4">
+            <!-- Plano Preventiva Details -->
+            <div class="col-md-6">
+                <div class="card shadow-sm comparison-card" style="border-left-color: #0d6efd;">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clipboard-list me-2"></i>Plano Preventiva (ID: {{ plano.id }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label fw-bold small">Máquina</label>
+                                <p class="form-control-plaintext mb-0">
+                                    <strong>{{ plano.cd_maquina|default:"-" }}</strong>
+                                    {% if plano.descr_maquina %}
+                                        <br><small class="text-muted">{{ plano.descr_maquina }}</small>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Número do Plano</label>
+                                <p class="form-control-plaintext mb-0">{{ plano.numero_plano|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Descrição do Plano</label>
+                                <p class="form-control-plaintext mb-0">{{ plano.descr_plano|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Sequência Manutenção</label>
+                                <p class="form-control-plaintext mb-0">{{ plano.sequencia_manutencao|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Sequência Tarefa</label>
+                                <p class="form-control-plaintext mb-0">{{ plano.sequencia_tarefa|default:"-" }}</p>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold small">Descrição da Tarefa</label>
+                                <p class="form-control-plaintext mb-0">{{ plano.descr_tarefa|default:"-" }}</p>
+                            </div>
+                            {% if plano.descr_seqplamanu %}
+                            <div class="col-12">
+                                <label class="form-label fw-bold small text-success">
+                                    <i class="fas fa-info-circle me-1"></i>DESCR_SEQPLAMANU
+                                </label>
+                                <p class="form-control-plaintext mb-0">
+                                    <span class="badge bg-success text-white p-2">{{ plano.descr_seqplamanu }}</span>
+                                </p>
+                            </div>
+                            {% endif %}
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Código Funcionário</label>
+                                <p class="form-control-plaintext mb-0">{{ plano.cd_funcionario|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Nome Funcionário</label>
+                                <p class="form-control-plaintext mb-0">{{ plano.nome_funcionario|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Código Atividade</label>
+                                <p class="form-control-plaintext mb-0">{{ plano.cd_atividade|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Data Execução</label>
+                                <p class="form-control-plaintext mb-0">{{ plano.dt_execucao|default:"-" }}</p>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <a href="{% url 'visualizar_manutencao_preventiva' plano.id %}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-eye me-1"></i> Ver Detalhes do Plano
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Roteiro Preventiva Details -->
+            <div class="col-md-6">
+                <div class="card shadow-sm comparison-card" style="border-left-color: #198754;">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-route me-2"></i>Roteiro Preventiva (ID: {{ roteiro.id }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label fw-bold small">Máquina</label>
+                                <p class="form-control-plaintext mb-0">
+                                    <strong>{{ roteiro.cd_maquina|default:"-" }}</strong>
+                                    {% if roteiro.descr_maquina %}
+                                        <br><small class="text-muted">{{ roteiro.descr_maquina }}</small>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Código Plano Manutenção</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.cd_planmanut|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Descrição Plano Manutenção</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.descr_planmanut|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Sequência Plano Manutenção</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.seq_seqplamanu|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Código Tarefa Manutenção</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.cd_tarefamanu|default:"-" }}</p>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold small">Descrição Tarefa Manutenção</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.descr_tarefamanu|default:"-" }}</p>
+                            </div>
+                            {% if roteiro.descr_seqplamanu %}
+                            <div class="col-12">
+                                <label class="form-label fw-bold small text-success">
+                                    <i class="fas fa-info-circle me-1"></i>DESCR_SEQPLAMANU
+                                </label>
+                                <p class="form-control-plaintext mb-0">
+                                    <span class="badge bg-success text-white p-2">{{ roteiro.descr_seqplamanu }}</span>
+                                </p>
+                            </div>
+                            {% endif %}
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Código Funcionário</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.cd_funciomanu|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Nome Funcionário</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.nome_funciomanu|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Código Tipo CA</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.cd_tpcentativ|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Data Primeira Execução</label>
+                                <p class="form-control-plaintext mb-0">{{ roteiro.dt_primexec|default:"-" }}</p>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <a href="{% url 'visualizar_roteiro_preventiva' roteiro.id %}" class="btn btn-success btn-sm">
+                                <i class="fas fa-eye me-1"></i> Ver Detalhes do Roteiro
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <a href="{% url 'analise_roteiro_plano_preventiva' %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>Voltar para Análise
+                                </a>
+                            </div>
+                            <div>
+                                {% if not ja_vinculado %}
+                                <form method="post" action="{% url 'analise_roteiro_plano_preventiva' %}" style="display: inline;" onsubmit="return confirm('Deseja vincular este Plano ao Roteiro? O campo DESCR_SEQPLAMANU será atualizado.');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="link_records" value="1">
+                                    <input type="hidden" name="plano_id" value="{{ plano.id }}">
+                                    <input type="hidden" name="roteiro_id" value="{{ roteiro.id }}">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-link me-2"></i>Vincular Registros
+                                    </button>
+                                </form>
+                                {% else %}
+                                <span class="badge bg-success p-2">
+                                    <i class="fas fa-check-circle me-1"></i>Registros já vinculados
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+

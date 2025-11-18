@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}5345 - SEI - Embalagem Industrializados{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'fotos_home/embalagem_industrializados_img1.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Centros de Atividade</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">5345 - SEI - Embalagem Industrializados</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">SEI - 5345</h1>
+                <p class="lead">Embalagem Industrializados</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Overview Section -->
+        <div class="row mb-5">
+            <div class="col-lg-8">
+                <h2 class="display-5 fw-bold mb-4">Visão Geral</h2>
+                <p class="lead">
+                    Esta seção apresenta informações sobre o centro de atividade de Embalagem Industrializados.
+                </p>
+                <p>
+                    Este setor é responsável pelas operações relacionadas a Embalagem Industrializados,
+                    garantindo a qualidade e segurança dos produtos.
+                </p>
+            </div>
+            <div class="col-lg-4 text-center">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <i class="fas fa-industry fa-5x text-primary mb-3"></i>
+                        <h5 class="card-title">Código: SEI - 5345</h5>
+                        <p class="text-muted">Embalagem Industrializados</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Information Cards -->
+        <div class="row g-4 mb-5">
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <i class="fas fa-tasks fa-3x text-primary mb-3"></i>
+                        <h5 class="card-title">Processos</h5>
+                        <p class="card-text">
+                            Informações sobre os processos realizados neste centro de atividade.
+                        </p>
+                        <a href="#" class="btn btn-outline-primary btn-sm">
+                            Ver Detalhes <i class="fas fa-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <i class="fas fa-cog fa-3x text-success mb-3"></i>
+                        <h5 class="card-title">Equipamentos</h5>
+                        <p class="card-text">
+                            Lista de equipamentos e máquinas utilizadas neste setor.
+                        </p>
+                        <a href="#" class="btn btn-outline-success btn-sm">
+                            Ver Equipamentos <i class="fas fa-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <i class="fas fa-clipboard-check fa-3x text-warning mb-3"></i>
+                        <h5 class="card-title">Ordens de Serviço</h5>
+                        <p class="card-text">
+                            Acompanhamento de ordens de serviço relacionadas a este centro.
+                        </p>
+                        <a href="#" class="btn btn-outline-warning btn-sm">
+                            Ver Ordens <i class="fas fa-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Additional Information Section -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Informações Adicionais
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="fw-bold">Características Principais</h6>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-check text-success me-2"></i>Área de produção</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Processo especializado</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Controle de qualidade</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>Segurança alimentar</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="fw-bold">Responsabilidades</h6>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-check text-primary me-2"></i>Operações do setor</li>
+                                    <li><i class="fas fa-check text-primary me-2"></i>Manutenção preventiva</li>
+                                    <li><i class="fas fa-check text-primary me-2"></i>Controle de qualidade</li>
+                                    <li><i class="fas fa-check text-primary me-2"></i>Documentação</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Back to Home Button -->
+        <div class="row mt-5">
+            <div class="col-12 text-center">
+                <a href="{% url 'home' %}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-arrow-left me-2"></i>Voltar para Home
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

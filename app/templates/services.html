@@ -1,0 +1,250 @@
+{% extends 'base.html' %}
+
+{% block title %}Serviços - Meu Projeto Django{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 bg-primary text-white">
+    <div class="container">
+        <div class="row">
+            <div class="col-12 text-center">
+                <h1 class="display-4 fw-bold">Nossos Serviços</h1>
+                <p class="lead">Soluções completas para suas necessidades digitais</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Services Section -->
+<section class="py-5">
+    <div class="container">
+        <!-- Main Services -->
+        <div class="row g-4 mb-5">
+            <div class="col-lg-4 col-md-6">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-laptop-code fa-4x text-primary mb-3"></i>
+                        <h5 class="card-title">Desenvolvimento Web</h5>
+                        <p class="card-text">
+                            Criação de sites e aplicações web modernas, responsivas e otimizadas 
+                            para todos os dispositivos usando as melhores tecnologias.
+                        </p>
+                        <ul class="list-unstyled text-start">
+                            <li><i class="fas fa-check text-success me-2"></i>Django & Python</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Bootstrap 5</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Responsive Design</li>
+                            <li><i class="fas fa-check text-success me-2"></i>SEO Otimizado</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <a href="{% url 'contact' %}" class="btn btn-primary w-100">
+                            <i class="fas fa-arrow-right me-2"></i>Saiba Mais
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4 col-md-6">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-mobile-alt fa-4x text-success mb-3"></i>
+                        <h5 class="card-title">Aplicações Mobile</h5>
+                        <p class="card-text">
+                            Desenvolvimento de aplicativos móveis nativos e híbridos que 
+                            proporcionam uma experiência excepcional aos usuários.
+                        </p>
+                        <ul class="list-unstyled text-start">
+                            <li><i class="fas fa-check text-success me-2"></i>React Native</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Flutter</li>
+                            <li><i class="fas fa-check text-success me-2"></i>iOS & Android</li>
+                            <li><i class="fas fa-check text-success me-2"></i>API Integration</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <a href="{% url 'contact' %}" class="btn btn-success w-100">
+                            <i class="fas fa-arrow-right me-2"></i>Saiba Mais
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4 col-md-6">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-database fa-4x text-warning mb-3"></i>
+                        <h5 class="card-title">Banco de Dados</h5>
+                        <p class="card-text">
+                            Projetos e otimização de bancos de dados para garantir 
+                            performance, segurança e escalabilidade.
+                        </p>
+                        <ul class="list-unstyled text-start">
+                            <li><i class="fas fa-check text-success me-2"></i>PostgreSQL</li>
+                            <li><i class="fas fa-check text-success me-2"></i>MySQL</li>
+                            <li><i class="fas fa-check text-success me-2"></i>MongoDB</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Redis</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <a href="{% url 'contact' %}" class="btn btn-warning w-100">
+                            <i class="fas fa-arrow-right me-2"></i>Saiba Mais
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4 col-md-6">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-cloud fa-4x text-info mb-3"></i>
+                        <h5 class="card-title">Cloud Computing</h5>
+                        <p class="card-text">
+                            Migração e gerenciamento de aplicações na nuvem para 
+                            maior flexibilidade e redução de custos.
+                        </p>
+                        <ul class="list-unstyled text-start">
+                            <li><i class="fas fa-check text-success me-2"></i>AWS</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Google Cloud</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Azure</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Docker</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <a href="{% url 'contact' %}" class="btn btn-info w-100">
+                            <i class="fas fa-arrow-right me-2"></i>Saiba Mais
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4 col-md-6">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-shield-alt fa-4x text-danger mb-3"></i>
+                        <h5 class="card-title">Segurança</h5>
+                        <p class="card-text">
+                            Implementação de medidas de segurança robustas para 
+                            proteger seus dados e aplicações contra ameaças.
+                        </p>
+                        <ul class="list-unstyled text-start">
+                            <li><i class="fas fa-check text-success me-2"></i>SSL/TLS</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Firewall</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Backup</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Monitoramento</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <a href="{% url 'contact' %}" class="btn btn-danger w-100">
+                            <i class="fas fa-arrow-right me-2"></i>Saiba Mais
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4 col-md-6">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-headset fa-4x text-secondary mb-3"></i>
+                        <h5 class="card-title">Suporte Técnico</h5>
+                        <p class="card-text">
+                            Suporte especializado 24/7 para garantir que suas 
+                            aplicações funcionem perfeitamente.
+                        </p>
+                        <ul class="list-unstyled text-start">
+                            <li><i class="fas fa-check text-success me-2"></i>24/7 Support</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Manutenção</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Atualizações</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Consultoria</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <a href="{% url 'contact' %}" class="btn btn-secondary w-100">
+                            <i class="fas fa-arrow-right me-2"></i>Saiba Mais
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Process Section -->
+        <div class="row">
+            <div class="col-12 text-center mb-5">
+                <h2 class="display-5 fw-bold">Nosso Processo</h2>
+                <p class="lead">Como trabalhamos para entregar o melhor resultado</p>
+            </div>
+        </div>
+        
+        <div class="row g-4">
+            <div class="col-md-3 text-center">
+                <div class="card border-0">
+                    <div class="card-body">
+                        <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
+                             style="width: 80px; height: 80px;">
+                            <span class="h3 mb-0">1</span>
+                        </div>
+                        <h5>Análise</h5>
+                        <p class="text-muted">Entendemos suas necessidades e objetivos</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 text-center">
+                <div class="card border-0">
+                    <div class="card-body">
+                        <div class="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
+                             style="width: 80px; height: 80px;">
+                            <span class="h3 mb-0">2</span>
+                        </div>
+                        <h5>Planejamento</h5>
+                        <p class="text-muted">Criamos um plano detalhado do projeto</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 text-center">
+                <div class="card border-0">
+                    <div class="card-body">
+                        <div class="bg-warning text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
+                             style="width: 80px; height: 80px;">
+                            <span class="h3 mb-0">3</span>
+                        </div>
+                        <h5>Desenvolvimento</h5>
+                        <p class="text-muted">Implementamos a solução com qualidade</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 text-center">
+                <div class="card border-0">
+                    <div class="card-body">
+                        <div class="bg-info text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
+                             style="width: 80px; height: 80px;">
+                            <span class="h3 mb-0">4</span>
+                        </div>
+                        <h5>Entrega</h5>
+                        <p class="text-muted">Entregamos e oferecemos suporte contínuo</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="py-5 bg-primary text-white">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h2 class="display-5 fw-bold mb-3">Pronto para começar seu projeto?</h2>
+                <p class="lead mb-0">
+                    Entre em contato conosco e vamos transformar suas ideias em realidade!
+                </p>
+            </div>
+            <div class="col-lg-4 text-lg-end">
+                <a href="{% url 'contact' %}" class="btn btn-light btn-lg">
+                    <i class="fas fa-rocket me-2"></i>Começar Agora
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

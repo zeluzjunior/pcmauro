@@ -1,0 +1,383 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Visualizar Manutentor {{ manutentor.Cadastro }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_manutentores' %}" class="text-white">Manutentores</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Visualizar Manutentor {{ manutentor.Cadastro }}</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Visualizar Manutentor</h1>
+                <p class="lead">Detalhes completos do manutentor {{ manutentor.Nome|default:manutentor.Cadastro }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        <div class="row">
+            <div class="col-12">
+                <!-- Informações Principais -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-user-tie me-2"></i>Informações Principais
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Cadastro</label>
+                                <p class="form-control-plaintext">
+                                    <span class="badge bg-primary fs-6">{{ manutentor.Cadastro }}</span>
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Nome</label>
+                                <p class="form-control-plaintext">{{ manutentor.Nome|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Data de Admissão</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutentor.Admissao %}
+                                        <span class="badge bg-info">{{ manutentor.Admissao|date:"d/m/Y" }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Cargo</label>
+                                <p class="form-control-plaintext">{{ manutentor.Cargo|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label fw-bold">Posto</label>
+                                <p class="form-control-plaintext">{{ manutentor.Posto|default:"Não informado" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações de Trabalho -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-briefcase me-2"></i>Informações de Trabalho
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Tipo</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutentor.tipo %}
+                                        <span class="badge bg-primary">{{ manutentor.get_tipo_display }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Turno</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutentor.turno %}
+                                        <span class="badge bg-warning text-dark">{{ manutentor.get_turno_display }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Local de Trabalho</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutentor.local_trab %}
+                                        <span class="badge bg-success">{{ manutentor.get_local_trab_display }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Tempo de Trabalho</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutentor.tempo_trabalho %}
+                                        <span class="badge bg-secondary">{{ manutentor.tempo_trabalho }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Horário Início</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutentor.horario_inicio %}
+                                        <span class="badge bg-info">{{ manutentor.horario_inicio|time:"H:i" }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Horário Fim</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutentor.horario_fim %}
+                                        <span class="badge bg-info">{{ manutentor.horario_fim|time:"H:i" }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações do Sistema -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-database me-2"></i>Informações do Sistema
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Cadastro (ID)</label>
+                                <p class="form-control-plaintext">{{ manutentor.Cadastro }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Data de Criação</label>
+                                <p class="form-control-plaintext">{{ manutentor.created_at|date:"d/m/Y H:i:s" }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Última Atualização</label>
+                                <p class="form-control-plaintext">{{ manutentor.updated_at|date:"d/m/Y H:i:s" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Máquinas Relacionadas -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-cog me-2"></i>Máquinas Relacionadas
+                            <span class="badge bg-light text-dark ms-2">{{ maquinas_relacionadas.count }}</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Formulário para adicionar máquina -->
+                        <div class="mb-4">
+                            <h6 class="mb-3">
+                                <i class="fas fa-plus-circle me-2"></i>Adicionar Máquina
+                            </h6>
+                            <form method="post" action="{% url 'adicionar_maquina_manutentor' manutentor.Cadastro %}" id="adicionarMaquinaForm">
+                                {% csrf_token %}
+                                <div class="row">
+                                    <div class="col-md-7 mb-3">
+                                        <label for="maquina_id" class="form-label">Máquina</label>
+                                        <select class="form-select" id="maquina_id" name="maquina_id" required>
+                                            <option value="">Selecione uma máquina...</option>
+                                            {% for maquina in maquinas_disponiveis %}
+                                                <option value="{{ maquina.id }}">
+                                                    {{ maquina.cd_maquina }} - {{ maquina.descr_maquina|default:"Sem descrição" }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label for="observacoes" class="form-label">Observações</label>
+                                        <input type="text" class="form-control" id="observacoes" name="observacoes" placeholder="Opcional">
+                                    </div>
+                                    <div class="col-md-2 mb-3 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-success w-100" id="btnAdicionarMaquina">
+                                            <i class="fas fa-plus me-1"></i>Adicionar
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <hr>
+
+                        <!-- Lista de máquinas relacionadas -->
+                        <div>
+                            <h6 class="mb-3">
+                                <i class="fas fa-list me-2"></i>Máquinas Relacionadas ({{ maquinas_relacionadas.count }})
+                            </h6>
+                            {% if maquinas_relacionadas %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Código da Máquina</th>
+                                                <th>Descrição</th>
+                                                <th>Setor de Manutenção</th>
+                                                <th>Observações</th>
+                                                <th class="text-center">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for manutentor_maquina in maquinas_relacionadas %}
+                                                <tr>
+                                                    <td>
+                                                        <strong>
+                                                            <a href="{% url 'visualizar_maquina' manutentor_maquina.maquina.id %}" class="text-decoration-none">
+                                                                {{ manutentor_maquina.maquina.cd_maquina }}
+                                                            </a>
+                                                        </strong>
+                                                    </td>
+                                                    <td>
+                                                        <a href="{% url 'visualizar_maquina' manutentor_maquina.maquina.id %}" class="text-decoration-none">
+                                                            {{ manutentor_maquina.maquina.descr_maquina|default:"Sem descrição" }}
+                                                        </a>
+                                                    </td>
+                                                    <td>{{ manutentor_maquina.maquina.descr_setormanut|default:"-" }}</td>
+                                                    <td>{{ manutentor_maquina.observacoes|default:"-" }}</td>
+                                                    <td class="text-center">
+                                                        <div class="btn-group" role="group">
+                                                            <a href="{% url 'visualizar_maquina' manutentor_maquina.maquina.id %}" class="btn btn-sm btn-primary">
+                                                                <i class="fas fa-eye"></i> Ver
+                                                            </a>
+                                                            <form method="post" action="{% url 'remover_maquina_manutentor' manutentor.Cadastro manutentor_maquina.id %}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja remover esta máquina?');">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="btn btn-sm btn-danger">
+                                                                    <i class="fas fa-trash"></i>
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>Nenhuma máquina foi relacionada a este manutentor ainda.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botões de Ação -->
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{% url 'consultar_manutentores' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Voltar para Lista de Manutentores
+                    </a>
+                    <div>
+                        <a href="{% url 'editar_manutentor' manutentor.Cadastro %}" class="btn btn-warning">
+                            <i class="fas fa-edit me-2"></i>Editar Manutentor
+                        </a>
+                        <a href="{% url 'consultar_manutentores' %}?search={{ manutentor.Cadastro }}" class="btn btn-outline-primary">
+                            <i class="fas fa-search me-2"></i>Buscar Manutentores Similares
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Garantir que o formulário de adicionar máquina funcione corretamente
+window.addEventListener('load', function() {
+    console.log('=== INICIANDO CONFIGURAÇÃO DO FORMULÁRIO ADICIONAR MÁQUINA ===');
+    
+    // Aguardar um pouco para garantir que main.js já carregou
+    setTimeout(function() {
+        const form = document.getElementById('adicionarMaquinaForm');
+        const submitBtn = document.getElementById('btnAdicionarMaquina');
+        const maquinaSelect = document.getElementById('maquina_id');
+        
+        console.log('Form encontrado:', form);
+        console.log('Submit button encontrado:', submitBtn);
+        console.log('Máquina select encontrado:', maquinaSelect);
+        
+        if (!form || !submitBtn || !maquinaSelect) {
+            console.error('Elementos do formulário não encontrados!');
+            return;
+        }
+        
+        // Remover qualquer listener anterior que possa estar interferindo
+        const newForm = form.cloneNode(true);
+        form.parentNode.replaceChild(newForm, form);
+        const cleanForm = document.getElementById('adicionarMaquinaForm');
+        
+        // Clonar e substituir o botão para remover listeners do main.js
+        const newBtn = submitBtn.cloneNode(true);
+        newBtn.id = 'btnAdicionarMaquina'; // Preservar o ID
+        submitBtn.parentNode.replaceChild(newBtn, submitBtn);
+        const cleanBtn = document.getElementById('btnAdicionarMaquina');
+        
+        // Atualizar referências após clonagem
+        const cleanMaquinaSelect = document.getElementById('maquina_id');
+        
+        if (cleanForm && cleanBtn && cleanMaquinaSelect) {
+            console.log('Todos os elementos limpos encontrados');
+            
+            // Adicionar listener no botão - executar ANTES de qualquer outro
+            cleanBtn.addEventListener('click', function(e) {
+                console.log('=== SUBMIT BUTTON CLICKED ===');
+                
+                if (!cleanMaquinaSelect || !cleanMaquinaSelect.value) {
+                    console.log('Nenhuma máquina selecionada');
+                    e.preventDefault();
+                    e.stopPropagation();
+                    alert('Por favor, selecione uma máquina.');
+                    return false;
+                }
+                
+                console.log('Máquina selecionada:', cleanMaquinaSelect.value);
+                console.log('Formulário será enviado normalmente');
+                // Não prevenir o comportamento padrão - deixar o formulário ser enviado
+            }, true); // Use capture phase para executar antes de outros listeners
+            
+            // Adicionar listener no formulário - executar ANTES de qualquer outro
+            cleanForm.addEventListener('submit', function(e) {
+                console.log('=== FORM SUBMIT EVENT TRIGGERED ===');
+                
+                console.log('Máquina select:', cleanMaquinaSelect, 'Value:', cleanMaquinaSelect ? cleanMaquinaSelect.value : 'N/A');
+                
+                // Validação básica
+                if (!cleanMaquinaSelect || !cleanMaquinaSelect.value) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    alert('Por favor, selecione uma máquina.');
+                    return false;
+                }
+                
+                console.log('Máquina selecionada:', cleanMaquinaSelect.value);
+                console.log('Form will submit normally...');
+                // NÃO chamar e.preventDefault() - deixar o formulário ser enviado normalmente
+            }, true); // Use capture phase para executar antes de outros listeners
+        } else {
+            console.error('Elementos limpos não encontrados após clonagem');
+        }
+    }, 1000); // Aguardar 1 segundo para garantir que main.js já carregou e adicionou seus listeners
+});
+</script>
+{% endblock %}

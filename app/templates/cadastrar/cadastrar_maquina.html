@@ -1,0 +1,308 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Cadastrar Máquina{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Máquinas</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Cadastrar Máquina</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Cadastrar Máquina</h1>
+                <p class="lead">Preencha os dados para cadastrar uma nova máquina</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-plus-circle me-2"></i>Dados da Máquina
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Aviso sobre campos obrigatórios -->
+                        <div class="alert alert-info mb-4">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Campos obrigatórios:</strong> Os campos marcados com <span class="text-danger">*</span> são obrigatórios e devem ser preenchidos.
+                        </div>
+                        
+                        <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                            {% csrf_token %}
+                            
+                            <!-- Informações Principais -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-info-circle me-2"></i>Informações Principais
+                                    </h6>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.cd_maquina.id_for_label }}" class="form-label">
+                                        {{ form.cd_maquina.label }}
+                                        {% if form.cd_maquina|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.cd_maquina }}
+                                    {% if form.cd_maquina.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.cd_maquina.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Código único identificador da máquina{% if form.cd_maquina|is_required %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.descr_maquina.id_for_label }}" class="form-label">
+                                        {{ form.descr_maquina.label }}
+                                    </label>
+                                    {{ form.descr_maquina }}
+                                    {% if form.descr_maquina.errors %}
+                                        <div class="text-danger small">{{ form.descr_maquina.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.cs_tt_maquina.id_for_label }}" class="form-label">
+                                        {{ form.cs_tt_maquina.label }}
+                                    </label>
+                                    {{ form.cs_tt_maquina }}
+                                    {% if form.cs_tt_maquina.errors %}
+                                        <div class="text-danger small">{{ form.cs_tt_maquina.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.cd_priomaqutv.id_for_label }}" class="form-label">
+                                        {{ form.cd_priomaqutv.label }}
+                                    </label>
+                                    {{ form.cd_priomaqutv }}
+                                    {% if form.cd_priomaqutv.errors %}
+                                        <div class="text-danger small">{{ form.cd_priomaqutv.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Unidade -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-building me-2"></i>Unidade
+                                    </h6>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.cd_unid.id_for_label }}" class="form-label">
+                                        {{ form.cd_unid.label }}
+                                    </label>
+                                    {{ form.cd_unid }}
+                                    {% if form.cd_unid.errors %}
+                                        <div class="text-danger small">{{ form.cd_unid.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.nome_unid.id_for_label }}" class="form-label">
+                                        {{ form.nome_unid.label }}
+                                    </label>
+                                    {{ form.nome_unid }}
+                                    {% if form.nome_unid.errors %}
+                                        <div class="text-danger small">{{ form.nome_unid.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Setor de Manutenção -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-tools me-2"></i>Setor de Manutenção
+                                    </h6>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.cd_setormanut.id_for_label }}" class="form-label">
+                                        {{ form.cd_setormanut.label }}
+                                    </label>
+                                    {{ form.cd_setormanut }}
+                                    {% if form.cd_setormanut.errors %}
+                                        <div class="text-danger small">{{ form.cd_setormanut.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.descr_setormanut.id_for_label }}" class="form-label">
+                                        {{ form.descr_setormanut.label }}
+                                    </label>
+                                    {{ form.descr_setormanut }}
+                                    {% if form.descr_setormanut.errors %}
+                                        <div class="text-danger small">{{ form.descr_setormanut.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Informações Adicionais -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-info me-2"></i>Informações Adicionais
+                                    </h6>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.nro_patrimonio.id_for_label }}" class="form-label">
+                                        {{ form.nro_patrimonio.label }}
+                                    </label>
+                                    {{ form.nro_patrimonio }}
+                                    {% if form.nro_patrimonio.errors %}
+                                        <div class="text-danger small">{{ form.nro_patrimonio.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.cd_modelo.id_for_label }}" class="form-label">
+                                        {{ form.cd_modelo.label }}
+                                    </label>
+                                    {{ form.cd_modelo }}
+                                    {% if form.cd_modelo.errors %}
+                                        <div class="text-danger small">{{ form.cd_modelo.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.cd_grupo.id_for_label }}" class="form-label">
+                                        {{ form.cd_grupo.label }}
+                                    </label>
+                                    {{ form.cd_grupo }}
+                                    {% if form.cd_grupo.errors %}
+                                        <div class="text-danger small">{{ form.cd_grupo.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.cd_tpcentativ.id_for_label }}" class="form-label">
+                                        {{ form.cd_tpcentativ.label }}
+                                    </label>
+                                    {{ form.cd_tpcentativ }}
+                                    {% if form.cd_tpcentativ.errors %}
+                                        <div class="text-danger small">{{ form.cd_tpcentativ.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.descr_gerenc.id_for_label }}" class="form-label">
+                                        {{ form.descr_gerenc.label }}
+                                    </label>
+                                    {{ form.descr_gerenc }}
+                                    {% if form.descr_gerenc.errors %}
+                                        <div class="text-danger small">{{ form.descr_gerenc.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Foto da Máquina -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-camera me-2"></i>Foto da Máquina
+                                    </h6>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label for="{{ form.foto.id_for_label }}" class="form-label">
+                                        {{ form.foto.label }}
+                                    </label>
+                                    {{ form.foto }}
+                                    {% if form.foto.errors %}
+                                        <div class="text-danger small">{{ form.foto.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Formatos aceitos: JPG, PNG, GIF. Tamanho máximo recomendado: 5MB</div>
+                                </div>
+                            </div>
+
+                            <!-- Placa de Identificação -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-id-card me-2"></i>Placa de Identificação
+                                    </h6>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label for="{{ form.placa_identificacao.id_for_label }}" class="form-label">
+                                        {{ form.placa_identificacao.label }}
+                                    </label>
+                                    {{ form.placa_identificacao }}
+                                    {% if form.placa_identificacao.errors %}
+                                        <div class="text-danger small">{{ form.placa_identificacao.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Formatos aceitos: JPG, PNG, GIF. Tamanho máximo recomendado: 5MB</div>
+                                </div>
+                            </div>
+
+                            <!-- Arquivos PDF -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-file-pdf me-2"></i>Arquivos PDF
+                                    </h6>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label for="{{ form.arquivo_pdf.id_for_label }}" class="form-label">
+                                        {{ form.arquivo_pdf.label }}
+                                        {% if form.arquivo_pdf|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.arquivo_pdf }}
+                                    {% if form.arquivo_pdf.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.arquivo_pdf.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Upload de arquivo PDF relacionado à máquina{% if not form.arquivo_pdf|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.diagrama_eletrico.id_for_label }}" class="form-label">
+                                        {{ form.diagrama_eletrico.label }}
+                                        {% if form.diagrama_eletrico|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.diagrama_eletrico }}
+                                    {% if form.diagrama_eletrico.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.diagrama_eletrico.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Upload de arquivo PDF do diagrama elétrico{% if not form.diagrama_eletrico|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.pecas_reposicao.id_for_label }}" class="form-label">
+                                        {{ form.pecas_reposicao.label }}
+                                        {% if form.pecas_reposicao|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.pecas_reposicao }}
+                                    {% if form.pecas_reposicao.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.pecas_reposicao.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Upload de arquivo PDF de peças de reposição{% if not form.pecas_reposicao|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                            </div>
+
+                            <!-- Botões -->
+                            <div class="d-flex justify-content-between mt-4">
+                                <a href="{% url 'consultar_maquinas' %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>Cancelar
+                                </a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-2"></i>Salvar Máquina
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+

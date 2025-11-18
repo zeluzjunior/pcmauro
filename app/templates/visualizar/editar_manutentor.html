@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Editar Manutentor {{ manutentor.Cadastro }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_manutentores' %}" class="text-white">Manutentores</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'visualizar_manutentor' manutentor.Cadastro %}" class="text-white">Manutentor {{ manutentor.Cadastro }}</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Editar</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Editar Manutentor</h1>
+                <p class="lead">Atualize os dados do manutentor {{ manutentor.Nome|default:manutentor.Cadastro }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-edit me-2"></i>Editar Dados do Manutentor
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'editar_manutentor' manutentor.Cadastro %}" id="editarManutentorForm">
+                            {% csrf_token %}
+                            
+                            <!-- Informações Principais -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-user-tie me-2"></i>Informações Principais
+                                    </h6>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.Cadastro.id_for_label }}" class="form-label">
+                                        {{ form.Cadastro.label }}
+                                        {% if form.Cadastro|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.Cadastro }}
+                                    {% if form.Cadastro.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.Cadastro.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        <i class="fas fa-info-circle me-1"></i>Código único identificador do manutentor (não pode ser alterado)
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.Nome.id_for_label }}" class="form-label">
+                                        {{ form.Nome.label }}
+                                        {% if form.Nome|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.Nome }}
+                                    {% if form.Nome.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.Nome.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Nome completo do manutentor{% if not form.Nome|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.Admissao.id_for_label }}" class="form-label">
+                                        {{ form.Admissao.label }}
+                                        {% if form.Admissao|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.Admissao }}
+                                    {% if form.Admissao.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.Admissao.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Data de admissão (formato: DD/MM/YYYY){% if not form.Admissao|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.Cargo.id_for_label }}" class="form-label">
+                                        {{ form.Cargo.label }}
+                                        {% if form.Cargo|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.Cargo }}
+                                    {% if form.Cargo.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.Cargo.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Cargo do manutentor{% if not form.Cargo|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label for="{{ form.Posto.id_for_label }}" class="form-label">
+                                        {{ form.Posto.label }}
+                                        {% if form.Posto|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.Posto }}
+                                    {% if form.Posto.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.Posto.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Posto do manutentor{% if not form.Posto|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                            </div>
+
+                            <!-- Informações de Trabalho -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-info border-bottom pb-2 mb-3">
+                                        <i class="fas fa-briefcase me-2"></i>Informações de Trabalho
+                                    </h6>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.tipo.id_for_label }}" class="form-label">
+                                        {{ form.tipo.label }}
+                                        {% if form.tipo|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.tipo }}
+                                    {% if form.tipo.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.tipo.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Tipo de manutentor{% if not form.tipo|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.turno.id_for_label }}" class="form-label">
+                                        {{ form.turno.label }}
+                                        {% if form.turno|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.turno }}
+                                    {% if form.turno.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.turno.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Turno de trabalho{% if not form.turno|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.local_trab.id_for_label }}" class="form-label">
+                                        {{ form.local_trab.label }}
+                                        {% if form.local_trab|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.local_trab }}
+                                    {% if form.local_trab.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.local_trab.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Local de trabalho{% if not form.local_trab|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.tempo_trabalho.id_for_label }}" class="form-label">
+                                        {{ form.tempo_trabalho.label }}
+                                        {% if form.tempo_trabalho|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.tempo_trabalho }}
+                                    {% if form.tempo_trabalho.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.tempo_trabalho.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Tempo de trabalho (ex: 8 horas){% if not form.tempo_trabalho|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.horario_inicio.id_for_label }}" class="form-label">
+                                        {{ form.horario_inicio.label }}
+                                        {% if form.horario_inicio|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.horario_inicio }}
+                                    {% if form.horario_inicio.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.horario_inicio.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Horário de início{% if not form.horario_inicio|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.horario_fim.id_for_label }}" class="form-label">
+                                        {{ form.horario_fim.label }}
+                                        {% if form.horario_fim|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.horario_fim }}
+                                    {% if form.horario_fim.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.horario_fim.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Horário de fim{% if not form.horario_fim|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                            </div>
+
+                            <!-- Botões de Ação -->
+                            <div class="d-flex justify-content-between mt-4">
+                                <a href="{% url 'visualizar_manutentor' manutentor.Cadastro %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>Cancelar
+                                </a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-2"></i>Salvar Alterações
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+

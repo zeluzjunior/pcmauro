@@ -1,0 +1,387 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Home - Meu Projeto Django{% endblock %}
+
+{% block content %}
+
+
+<!-- Photo Gallery Section -->
+<section class="py-5">
+    <div class="container">
+
+
+        <!-- Frigorífico -->
+        <div class="row text-center mb-5">
+            <div class="col-12">
+                <h2 class="display-5 fw-bold text-gradient">Centro de Atividades e Setores: Frigorífico</h2>
+                <p class="lead"></p>
+            </div>
+            <div class="col-12">
+                <div class="photo-gallery">
+                    <div class="row g-2">
+                        <!-- Row 1 -->
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/recepcao_img1.jpg' %}" alt="Gallery Image 1" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'recepcao' %}" class="gallery-link">REC - 2216 - Recepção de Suínos</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/area_suja_img1.jpg' %}" alt="Gallery Image 2" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'abate_area_suja' %}" class="gallery-link">ABT - 2488 - Abate e Resfriamento - Área Suja</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/area_limpa_img1.jpg' %}" alt="Gallery Image 3" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'area_limpa' %}" class="gallery-link">ABT - 2488 - Abate e Resfriamento - Área Limpa</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/camaras_img1.jpg' %}" alt="Gallery Image 4" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'camaras' %}" class="gallery-link">ABT - 2488 - Abate e Resfriamento - Câmaras de Resfriamento</a>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Row 2 -->
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/bet_img1.jpg' %}" alt="Gallery Image 5" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'bet' %}" class="gallery-link">BET - 2232 - Beneficiamento de Tripas</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/salga_img1.jpg' %}" alt="Gallery Image 6" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'salga' %}" class="gallery-link">SLG - 2241 - Salga</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/min_img1.jpg' %}" alt="Gallery Image 7" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'min' %}" class="gallery-link">MIN - 2721 - Miúdos Internos</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/mex_img1.jpg' %}" alt="Gallery Image 8" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'mex' %}" class="gallery-link">MEX - 2729 - Miúdos Externos</a>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Row 3 -->
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/epj_img1.jpg' %}" alt="Gallery Image 9" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'epj' %}" class="gallery-link">EPJ - 2224 - Espostejamento</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/cms_img1.jpg' %}" alt="Gallery Image 10" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'cms' %}" class="gallery-link">CMS - 4120 - Produção CMS</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/lbm_img1.jpg' %}" alt="Gallery Image 11" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'lbm' %}" class="gallery-link">LBM - 2470 - Lavagem Bacias / Monoblocos</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/dpe_img1.jpg' %}" alt="Gallery Image 12" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'dpe' %}" class="gallery-link">DPE - 2461 - Depósito e Preparação de Embalagens</a>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Row 4 -->
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/secundaria_img1.jpg' %}" alt="Gallery Image 13" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'secundaria' %}" class="gallery-link">EMB - 4138 - Embalagem Secundária</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/tca_img1.jpg' %}" alt="Gallery Image 14" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'tca' %}" class="gallery-link">TCA - 2313 - Túneis e Câmaras</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/tca_gea_img1.jpg' %}" alt="Gallery Image 15" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'tca_gea' %}" class="gallery-link">TCA - 2313 - Túneis e Câmaras - Túnel GEA</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/expedicao_img1.jpg' %}" alt="Gallery Image 16" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'expedicao' %}" class="gallery-link">EXD - 2348 - Expedição</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <hr><br>
+        <!-- Indústria -->
+        <div class="row text-center mb-5">
+            <div class="col-12">
+                <h2 class="display-5 fw-bold text-gradient">Centro de Atividades e Setores: Indústria</h2>
+                <p class="lead"></p>
+            </div>
+            <div class="col-12">
+                <div class="photo-gallery">
+                    <div class="row g-2">
+                        <!-- Row 1 -->
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/frescal_img1.jpg' %}" alt="Gallery Image 1" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'frescal' %}" class="gallery-link">SFR - 4057 - Embutideos Frescais</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/presunto_img1.jpg' %}" alt="Gallery Image 2" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'presunto' %}" class="gallery-link">PRU - 2291 - Presuntaria</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/estufa_img1.jpg' %}" alt="Gallery Image 3" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'estufa' %}" class="gallery-link">EST - 4588 - Estufas</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/fatiados_img1.jpg' %}" alt="Gallery Image 4" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'fatiados' %}" class="gallery-link">SFT - 4600 - Fatiados</a>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Row 2 -->
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/condimentaria_img1.jpg' %}" alt="Gallery Image 5" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'condimentaria' %}" class="gallery-link">COD - 4472 - Condimentaria</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/defumados_img1.jpg' %}" alt="Gallery Image 6" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'defumados' %}" class="gallery-link">DEF - 2496 - Defumados</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/marinados_img1.jpg' %}" alt="Gallery Image 7" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'marinados' %}" class="gallery-link">SMR - 2267 - Marinados</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/cozidos_img1.jpg' %}" alt="Gallery Image 8" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'cozidos' %}" class="gallery-link">2283 - CEB - Embutidos Cozidos</a>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Row 3 -->
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/preparo_de_massa_img1.jpg' %}" alt="Gallery Image 9" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'preparo_de_massa' %}" class="gallery-link">2276 - SPM - Preparo de Massa</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/curados_img1.jpg' %}" alt="Gallery Image 10" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'curados' %}" class="gallery-link">CUR - 2267 - Embutidos Curados</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gallery-item">
+                                <img src="{% static 'fotos_home/embalagem_industrializados_img1.jpg' %}" alt="Gallery Image 11" class="gallery-image">
+                                <div class="gallery-overlay">
+                                    <a href="{% url 'embalagem_industrializados' %}" class="gallery-link">5345 - SEI - Embalagem Industrializados</a>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</section>
+
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <h1 class="display-4 fw-bold">Bem-vindo ao Meu Projeto</h1>
+                <p class="lead">Uma aplicação Django moderna e responsiva com Bootstrap 5</p>
+                <div class="d-flex gap-3">
+                    <a href="{% url 'about' %}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-info-circle me-2"></i>Saiba Mais
+                    </a>
+                    <a href="{% url 'contact' %}" class="btn btn-outline-light btn-lg">
+                        <i class="fas fa-envelope me-2"></i>Contato
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-6 text-center">
+                <i class="fas fa-rocket fa-10x text-warning"></i>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row text-center mb-5">
+            <div class="col-12">
+                <h2 class="display-5 fw-bold text-gradient">Recursos Principais</h2>
+                <p class="lead">Descubra as funcionalidades incríveis do nosso projeto</p>
+            </div>
+        </div>
+        
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-mobile-alt fa-3x text-primary mb-3"></i>
+                        <h5 class="card-title">Responsivo</h5>
+                        <p class="card-text">Design totalmente responsivo que funciona perfeitamente em todos os dispositivos.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-bolt fa-3x text-warning mb-3"></i>
+                        <h5 class="card-title">Rápido</h5>
+                        <p class="card-text">Otimizado para performance com carregamento rápido e experiência fluida.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-shield-alt fa-3x text-success mb-3"></i>
+                        <h5 class="card-title">Seguro</h5>
+                        <p class="card-text">Implementa as melhores práticas de segurança do Django.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Statistics Section -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row text-center">
+            <div class="col-md-3 mb-4">
+                <div class="card border-0 bg-primary text-white">
+                    <div class="card-body">
+                        <i class="fas fa-users fa-2x mb-2"></i>
+                        <h3 class="display-4 fw-bold">1,234</h3>
+                        <p class="mb-0">Usuários Ativos</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-4">
+                <div class="card border-0 bg-success text-white">
+                    <div class="card-body">
+                        <i class="fas fa-chart-line fa-2x mb-2"></i>
+                        <h3 class="display-4 fw-bold">98%</h3>
+                        <p class="mb-0">Satisfação</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-4">
+                <div class="card border-0 bg-warning text-white">
+                    <div class="card-body">
+                        <i class="fas fa-clock fa-2x mb-2"></i>
+                        <h3 class="display-4 fw-bold">24/7</h3>
+                        <p class="mb-0">Suporte</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-4">
+                <div class="card border-0 bg-info text-white">
+                    <div class="card-body">
+                        <i class="fas fa-globe fa-2x mb-2"></i>
+                        <h3 class="display-4 fw-bold">50+</h3>
+                        <p class="mb-0">Países</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+
+{% endblock %}
+

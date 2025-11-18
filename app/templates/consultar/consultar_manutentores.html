@@ -1,0 +1,444 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Consultar Manutentores{% endblock %}
+
+{% block extra_css %}
+<style>
+    .table-container {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+    }
+    .filter-input {
+        width: 100%;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        margin-top: 4px;
+    }
+    .filter-input:focus {
+        outline: none;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    .filter-header {
+        padding: 8px !important;
+    }
+    .filter-row th {
+        background-color: #e9ecef;
+        padding: 4px 8px !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Manutentores</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar Manutentores</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Consultar Manutentores</h1>
+                <p class="lead">Visualize todos os manutentores cadastrados no sistema</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Actions Bar -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <form method="get" action="{% url 'consultar_manutentores' %}" class="d-flex">
+                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por cadastro, nome, cargo, tipo, turno ou local..." value="{{ request.GET.search }}">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Filtros Avançados -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-secondary text-white">
+                        <button class="btn btn-link text-white text-decoration-none p-0 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="false" aria-controls="filtrosCollapse">
+                            <h5 class="mb-0">
+                                <i class="fas fa-filter me-2"></i>Filtros Avançados
+                                <i class="fas fa-chevron-down float-end"></i>
+                            </h5>
+                        </button>
+                    </div>
+                    <div class="collapse" id="filtrosCollapse">
+                        <div class="card-body">
+                            <form method="get" id="filtrosForm">
+                                <!-- Preservar busca geral -->
+                                <input type="hidden" name="search" value="{{ request.GET.search }}">
+                                
+                                <div class="row g-3">
+                                    <!-- Filtro por Tipo -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_tipo" class="form-label">Tipo de Manutentor</label>
+                                        <select class="form-select" id="filtro_tipo" name="filtro_tipo">
+                                            <option value="">Todos os tipos</option>
+                                            {% for tipo_value, tipo_label in tipos_manutentor %}
+                                                <option value="{{ tipo_value }}" {% if filtro_tipo == tipo_value %}selected{% endif %}>{{ tipo_label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Turno -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_turno" class="form-label">Turno</label>
+                                        <select class="form-select" id="filtro_turno" name="filtro_turno">
+                                            <option value="">Todos os turnos</option>
+                                            {% for turno_value, turno_label in turnos %}
+                                                <option value="{{ turno_value }}" {% if filtro_turno == turno_value %}selected{% endif %}>{{ turno_label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Local de Trabalho -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_local_trab" class="form-label">Local de Trabalho</label>
+                                        <select class="form-select" id="filtro_local_trab" name="filtro_local_trab">
+                                            <option value="">Todos os locais</option>
+                                            {% for local_value, local_label in locais_trabalho %}
+                                                <option value="{{ local_value }}" {% if filtro_local_trab == local_value %}selected{% endif %}>{{ local_label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Cargo -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_cargo" class="form-label">Cargo</label>
+                                        <select class="form-select" id="filtro_cargo" name="filtro_cargo">
+                                            <option value="">Todos os cargos</option>
+                                            {% for cargo in cargos_unicos %}
+                                                <option value="{{ cargo }}" {% if filtro_cargo == cargo %}selected{% endif %}>{{ cargo|truncatewords:5 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Posto -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_posto" class="form-label">Posto</label>
+                                        <select class="form-select" id="filtro_posto" name="filtro_posto">
+                                            <option value="">Todos os postos</option>
+                                            {% for posto in postos_unicos %}
+                                                <option value="{{ posto }}" {% if filtro_posto == posto %}selected{% endif %}>{{ posto|truncatewords:5 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Data de Admissão -->
+                                    <div class="col-md-6">
+                                        <label class="form-label">Data de Admissão (Período)</label>
+                                        <div class="row g-2">
+                                            <div class="col-6">
+                                                <input type="date" class="form-control" id="data_admissao_inicio" name="data_admissao_inicio" value="{{ data_admissao_inicio }}" placeholder="Data inicial">
+                                            </div>
+                                            <div class="col-6">
+                                                <input type="date" class="form-control" id="data_admissao_fim" name="data_admissao_fim" value="{{ data_admissao_fim }}" placeholder="Data final">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Botões de Ação -->
+                                    <div class="col-md-3 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary me-2">
+                                            <i class="fas fa-filter me-2"></i>Aplicar Filtros
+                                        </button>
+                                        <a href="{% url 'consultar_manutentores' %}" class="btn btn-outline-secondary">
+                                            <i class="fas fa-times me-2"></i>Limpar Filtros
+                                        </a>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total</h5>
+                        <p class="card-text display-6">{{ total_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Mostrando</h5>
+                        <p class="card-text display-6">{{ manutentores|length }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Tipos</h5>
+                        <p class="card-text display-6">{{ tipos_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Turnos</h5>
+                        <p class="card-text display-6">{{ turnos_count }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-list me-2"></i>Lista de Manutentores
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table class="table table-hover table-striped mb-0" id="manutentoresTable">
+                        <thead>
+                            <tr>
+                                <th>Cadastro</th>
+                                <th>Nome</th>
+                                <th>Cargo</th>
+                                <th>Posto</th>
+                                <th>Tipo</th>
+                                <th>Turno</th>
+                                <th>Local de Trabalho</th>
+                                <th>Horário</th>
+                                <th>Ações</th>
+                            </tr>
+                            <tr class="filter-row">
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Cadastro..." data-column="0">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Nome..." data-column="1">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Cargo..." data-column="2">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Posto..." data-column="3">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Tipo..." data-column="4">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Turno..." data-column="5">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Local..." data-column="6">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Horário..." data-column="7">
+                                </th>
+                                <th class="filter-header">
+                                    <!-- Sem filtro na coluna de ações -->
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if manutentores %}
+                                {% for manutentor in manutentores %}
+                                <tr>
+                                    <td>
+                                        <strong>
+                                            <a href="{% url 'visualizar_manutentor' manutentor.Cadastro %}" class="text-decoration-none">
+                                                {{ manutentor.Cadastro }}
+                                            </a>
+                                        </strong>
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'visualizar_manutentor' manutentor.Cadastro %}" class="text-decoration-none">
+                                            {{ manutentor.Nome|default:"-" }}
+                                        </a>
+                                    </td>
+                                    <td>{{ manutentor.Cargo|default:"-"|truncatewords:5 }}</td>
+                                    <td>{{ manutentor.Posto|default:"-"|truncatewords:5 }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ manutentor.get_tipo_display|default:"-" }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ manutentor.get_turno_display|default:"-" }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">{{ manutentor.get_local_trab_display|default:"-" }}</span>
+                                    </td>
+                                    <td>
+                                        {% if manutentor.horario_inicio and manutentor.horario_fim %}
+                                            {{ manutentor.horario_inicio|time:"H:i" }} - {{ manutentor.horario_fim|time:"H:i" }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'visualizar_manutentor' manutentor.Cadastro %}" class="btn btn-sm btn-primary" title="Visualizar detalhes">
+                                                <i class="fas fa-eye me-1"></i>Visualizar
+                                            </a>
+                                            <a href="{% url 'editar_manutentor' manutentor.Cadastro %}" class="btn btn-sm btn-warning" title="Editar manutentor">
+                                                <i class="fas fa-edit me-1"></i>Editar
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="9" class="text-center py-5">
+                                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                        <p class="text-muted">Nenhum manutentor encontrado.</p>
+                                        <a href="{% url 'cadastrar_manutentor' %}" class="btn btn-primary">
+                                            <i class="fas fa-plus-circle me-2"></i>Cadastrar Primeiro Manutentor
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if manutentores.has_other_pages %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if manutentores.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1">Primeira</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ manutentores.previous_page_number }}">Anterior</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Página {{ manutentores.number }} de {{ manutentores.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if manutentores.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ manutentores.next_page_number }}">Próxima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ manutentores.paginator.num_pages }}">Última</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('manutentoresTable');
+    const filterInputs = document.querySelectorAll('.filter-input');
+    
+    if (!table || !filterInputs.length) return;
+    
+    // Função para filtrar a tabela
+    function filterTable() {
+        const filters = [];
+        filterInputs.forEach(input => {
+            const columnIndex = parseInt(input.getAttribute('data-column'));
+            const filterValue = input.value.toLowerCase().trim();
+            filters[columnIndex] = filterValue;
+        });
+        
+        const rows = table.querySelectorAll('tbody tr');
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            let showRow = true;
+            
+            // Verificar cada coluna (exceto a última que é ações)
+            for (let i = 0; i < filters.length; i++) {
+                if (filters[i]) {
+                    const cell = row.cells[i];
+                    if (cell) {
+                        const cellText = cell.textContent.toLowerCase().trim();
+                        if (!cellText.includes(filters[i])) {
+                            showRow = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (showRow) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+    
+    // Adicionar event listeners aos campos de filtro
+    filterInputs.forEach(input => {
+        input.addEventListener('input', filterTable);
+        input.addEventListener('keyup', filterTable);
+    });
+    
+    // Botão para limpar todos os filtros
+    const clearFiltersBtn = document.createElement('button');
+    clearFiltersBtn.type = 'button';
+    clearFiltersBtn.className = 'btn btn-sm btn-outline-secondary mt-2';
+    clearFiltersBtn.innerHTML = '<i class="fas fa-times me-1"></i>Limpar Filtros';
+    clearFiltersBtn.addEventListener('click', function() {
+        filterInputs.forEach(input => {
+            input.value = '';
+        });
+        filterTable();
+    });
+    
+    // Adicionar botão de limpar filtros após a tabela
+    const tableContainer = document.querySelector('.table-container');
+    if (tableContainer) {
+        const clearBtnContainer = document.createElement('div');
+        clearBtnContainer.className = 'p-2 border-top';
+        clearBtnContainer.appendChild(clearFiltersBtn);
+        tableContainer.parentElement.appendChild(clearBtnContainer);
+    }
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,794 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Visualizar Máquina {{ maquina.cd_maquina }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_maquinas' %}" class="text-white">Máquinas</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Visualizar Máquina {{ maquina.cd_maquina }}</li>
+                    </ol>
+                </nav>
+                <div class="mt-3">
+                    <h1 class="display-3 fw-bold mb-2">
+                        {% if maquina.descr_maquina %}
+                            {{ maquina.descr_maquina }}
+                        {% else %}
+                            Máquina {{ maquina.cd_maquina }}
+                        {% endif %}
+                    </h1>
+                    <p class="lead mb-1">
+                        <span class="badge bg-light text-dark fs-6 me-2">Código: {{ maquina.cd_maquina }}</span>
+                        {% if maquina.cs_tt_maquina %}
+                            <span class="badge bg-light text-dark fs-6 me-2">Total: {{ maquina.cs_tt_maquina }}</span>
+                        {% endif %}
+                        {% if maquina.cd_priomaqutv %}
+                            <span class="badge bg-warning text-dark fs-6">Prioridade: {{ maquina.cd_priomaqutv }}</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        <div class="row">
+            <div class="col-12">
+
+                <!-- Informações da Máquina -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Informações da Máquina
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <!-- Primeira linha: Códigos principais -->
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Código da Máquina</label>
+                                <p class="form-control-plaintext mb-0">{{ maquina.cd_maquina }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Código Total</label>
+                                <p class="form-control-plaintext mb-0">{{ maquina.cs_tt_maquina|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Prioridade</label>
+                                <p class="form-control-plaintext mb-0">
+                                    {% if maquina.cd_priomaqutv %}
+                                        <span class="badge bg-warning text-dark">{{ maquina.cd_priomaqutv }}</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Patrimônio</label>
+                                <p class="form-control-plaintext mb-0">{{ maquina.nro_patrimonio|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Código Modelo</label>
+                                <p class="form-control-plaintext mb-0">{{ maquina.cd_modelo|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-3 col-lg-2">
+                                <label class="form-label fw-bold small">Código Grupo</label>
+                                <p class="form-control-plaintext mb-0">{{ maquina.cd_grupo|default:"Não informado" }}</p>
+                            </div>
+                            
+                            <!-- Segunda linha: Descrição -->
+                            <div class="col-12">
+                                <label class="form-label fw-bold small">Descrição da Máquina</label>
+                                <p class="form-control-plaintext mb-0">{{ maquina.descr_maquina|default:"Não informado" }}</p>
+                            </div>
+                            
+                            <!-- Terceira linha: Outros campos -->
+                            <div class="col-md-6 col-lg-4">
+                                <label class="form-label fw-bold small">Código Tipo Centro Atividade</label>
+                                <p class="form-control-plaintext mb-0">{{ maquina.cd_tpcentativ|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-6 col-lg-8">
+                                <label class="form-label fw-bold small">Descrição Gerência</label>
+                                <p class="form-control-plaintext mb-0">{{ maquina.descr_gerenc|default:"Não informado" }}</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Máquina e Peças de Reposição -->
+                        <div class="mt-3 pt-3 border-top">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <p class="mb-1">
+                                        <strong class="small">Total de peças relacionadas:</strong> 
+                                        <span class="badge bg-success">{{ pecas_relacionadas.count }}</span>
+                                    </p>
+                                    {% if pecas_relacionadas %}
+                                        <p class="text-muted small mb-0">Gerencie as peças de reposição desta máquina</p>
+                                    {% else %}
+                                        <p class="text-muted small mb-0">Nenhuma peça relacionada ainda</p>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <a href="{% url 'maquinas_pecas' maquina.id %}" class="btn btn-success btn-sm">
+                                        <i class="fas fa-cog me-2"></i>Gerenciar Peças
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Planos Preventiva -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-calendar-check me-2"></i>Planos de Manutenção Preventiva
+                            {% if planos_preventiva %}
+                                <span class="badge bg-light text-dark ms-2">{{ planos_preventiva|length }}</span>
+                            {% endif %}
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if planos_preventiva %}
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Plano</th>
+                                            <th>Seq. Manutenção</th>
+                                            <th>Data Execução</th>
+                                            <th>Período (dias)</th>
+                                            <th>Seq. Tarefa</th>
+                                            <th>Descrição Tarefa</th>
+                                            <th>Funcionário</th>
+                                            <th>Setor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for plano in planos_preventiva %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ plano.numero_plano|default:"-" }}</strong>
+                                                {% if plano.descr_plano %}
+                                                    <br><small class="text-muted">{{ plano.descr_plano }}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ plano.sequencia_manutencao|default:"-" }}</td>
+                                            <td>
+                                                {% if plano.dt_execucao %}
+                                                    {{ plano.dt_execucao }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if plano.quantidade_periodo %}
+                                                    <span class="badge bg-info">{{ plano.quantidade_periodo }}</span>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ plano.sequencia_tarefa|default:"-" }}</td>
+                                            <td style="word-wrap: break-word; white-space: normal; max-width: 300px;">
+                                                {% if plano.descr_tarefa %}
+                                                    <small>{{ plano.descr_tarefa|truncatewords:15 }}</small>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if plano.nome_funcionario %}
+                                                    <strong>{{ plano.nome_funcionario }}</strong>
+                                                    {% if plano.cd_funcionario %}
+                                                        <br><small class="text-muted">Cód: {{ plano.cd_funcionario }}</small>
+                                                    {% endif %}
+                                                {% elif plano.cd_funcionario %}
+                                                    <small class="text-muted">Cód: {{ plano.cd_funcionario }}</small>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if plano.cd_setor %}
+                                                    <span class="badge bg-secondary">{{ plano.cd_setor }}</span>
+                                                    {% if plano.descr_setor %}
+                                                        <br><small class="text-muted">{{ plano.descr_setor|truncatewords:5 }}</small>
+                                                    {% endif %}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-3">
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Total de planos preventiva: <strong>{{ planos_preventiva|length }}</strong>
+                                </small>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                                <p class="text-muted">Nenhum plano de manutenção preventiva encontrado para esta máquina.</p>
+                                <a href="{% url 'importar_plano_preventiva' %}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-upload me-2"></i>Importar Planos Preventiva
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+
+                <!-- Relacionamentos Primária/Secundária -->
+                {% if relacionamentos_como_primaria or relacionamentos_como_secundaria %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-sitemap me-2"></i>Relacionamentos de Máquinas
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="accordion" id="accordionRelacionamentos">
+                            <!-- Máquina como Primária -->
+                            {% if relacionamentos_como_primaria %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingPrimaria">
+                                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePrimaria" aria-expanded="true" aria-controls="collapsePrimaria">
+                                        <i class="fas fa-star me-2 text-primary"></i>
+                                        <strong>Máquinas Secundárias Relacionadas</strong>
+                                        <span class="badge bg-primary ms-2">{{ relacionamentos_como_primaria.count }}</span>
+                                    </button>
+                                </h2>
+                                <div id="collapsePrimaria" class="accordion-collapse collapse show" aria-labelledby="headingPrimaria" data-bs-parent="#accordionRelacionamentos">
+                                    <div class="accordion-body">
+                                        <p class="text-muted small mb-3">
+                                            Esta máquina é <strong>primária</strong> e possui as seguintes máquinas secundárias relacionadas:
+                                        </p>
+                                        <div class="table-responsive">
+                                            <table class="table table-hover table-sm">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Código</th>
+                                                        <th>Descrição</th>
+                                                        <th>Setor</th>
+                                                        <th>Observações</th>
+                                                        <th class="text-center">Ações</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for rel in relacionamentos_como_primaria %}
+                                                    <tr>
+                                                        <td>
+                                                            <strong>
+                                                                <a href="{% url 'visualizar_maquina' rel.maquina_secundaria.id %}" class="text-decoration-none">
+                                                                    {{ rel.maquina_secundaria.cd_maquina }}
+                                                                </a>
+                                                            </strong>
+                                                        </td>
+                                                        <td style="word-wrap: break-word; white-space: normal;">{{ rel.maquina_secundaria.descr_maquina|default:"-" }}</td>
+                                                        <td>
+                                                            {% if rel.maquina_secundaria.cd_setormanut %}
+                                                                <span class="badge bg-secondary">{{ rel.maquina_secundaria.cd_setormanut }}</span>
+                                                            {% else %}
+                                                                -
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            <small class="text-muted">{{ rel.observacoes|truncatewords:10|default:"-" }}</small>
+                                                        </td>
+                                                        <td class="text-center">
+                                                            <a href="{% url 'visualizar_maquina' rel.maquina_secundaria.id %}" class="btn btn-sm btn-primary" title="Visualizar máquina secundária">
+                                                                <i class="fas fa-eye"></i>
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                Total de máquinas secundárias: <strong>{{ relacionamentos_como_primaria.count }}</strong>
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <!-- Máquina como Secundária -->
+                            {% if relacionamentos_como_secundaria %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingSecundaria">
+                                    <button class="accordion-button {% if not relacionamentos_como_primaria %}show{% else %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSecundaria" aria-expanded="{% if not relacionamentos_como_primaria %}true{% else %}false{% endif %}" aria-controls="collapseSecundaria">
+                                        <i class="fas fa-link me-2 text-warning"></i>
+                                        <strong>Máquina Primária Relacionada</strong>
+                                        <span class="badge bg-warning text-dark ms-2">{{ relacionamentos_como_secundaria.count }}</span>
+                                    </button>
+                                </h2>
+                                <div id="collapseSecundaria" class="accordion-collapse collapse {% if not relacionamentos_como_primaria %}show{% endif %}" aria-labelledby="headingSecundaria" data-bs-parent="#accordionRelacionamentos">
+                                    <div class="accordion-body">
+                                        <p class="text-muted small mb-3">
+                                            Esta máquina é <strong>secundária</strong> e está relacionada às seguintes máquinas primárias:
+                                        </p>
+                                        <div class="table-responsive">
+                                            <table class="table table-hover table-sm">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Código</th>
+                                                        <th>Descrição</th>
+                                                        <th>Setor</th>
+                                                        <th>Observações</th>
+                                                        <th class="text-center">Ações</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for rel in relacionamentos_como_secundaria %}
+                                                    <tr>
+                                                        <td>
+                                                            <strong>
+                                                                <a href="{% url 'visualizar_maquina' rel.maquina_primaria.id %}" class="text-decoration-none">
+                                                                    {{ rel.maquina_primaria.cd_maquina }}
+                                                                </a>
+                                                            </strong>
+                                                        </td>
+                                                        <td style="word-wrap: break-word; white-space: normal;">{{ rel.maquina_primaria.descr_maquina|default:"-" }}</td>
+                                                        <td>
+                                                            {% if rel.maquina_primaria.cd_setormanut %}
+                                                                <span class="badge bg-secondary">{{ rel.maquina_primaria.cd_setormanut }}</span>
+                                                            {% else %}
+                                                                -
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            <small class="text-muted">{{ rel.observacoes|truncatewords:10|default:"-" }}</small>
+                                                        </td>
+                                                        <td class="text-center">
+                                                            <a href="{% url 'visualizar_maquina' rel.maquina_primaria.id %}" class="btn btn-sm btn-primary" title="Visualizar máquina primária">
+                                                                <i class="fas fa-eye"></i>
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                Total de máquinas primárias: <strong>{{ relacionamentos_como_secundaria.count }}</strong>
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Link para gerenciar relacionamentos -->
+                        <div class="mt-4 pt-3 border-top">
+                            <a href="{% url 'maquina_primaria_secundaria' %}" class="btn btn-outline-info">
+                                <i class="fas fa-sitemap me-2"></i>Gerenciar Relacionamentos
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Arquivos e Imagens - Em uma linha -->
+                <div class="row mb-4">
+                    <!-- Foto da Máquina -->
+                    <div class="col-md-4 mb-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-camera me-2"></i>Foto da Máquina
+                                </h5>
+                            </div>
+                            <div class="card-body d-flex flex-column">
+                                {% if maquina.foto %}
+                                    <div class="text-center flex-grow-1 d-flex align-items-center justify-content-center">
+                                        <a href="#" data-bs-toggle="modal" data-bs-target="#modalFoto" style="cursor: pointer;">
+                                            <img src="{{ maquina.foto.url }}" alt="Foto da máquina {{ maquina.cd_maquina }}" class="img-fluid rounded shadow" style="max-width: 100%; max-height: 300px; object-fit: contain;">
+                                        </a>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center py-4">
+                                        <i class="fas fa-image fa-4x text-muted mb-3"></i>
+                                        <p class="text-muted mb-3">Nenhuma foto foi enviada para esta máquina.</p>
+                                        <a href="{% url 'editar_maquina' maquina.id %}" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-upload me-2"></i>Adicionar Foto
+                                        </a>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Placa de Identificação -->
+                    <div class="col-md-4 mb-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-id-card me-2"></i>Placa de Identificação
+                                </h5>
+                            </div>
+                            <div class="card-body d-flex flex-column">
+                                {% if maquina.placa_identificacao %}
+                                    <div class="text-center flex-grow-1 d-flex align-items-center justify-content-center">
+                                        <a href="#" data-bs-toggle="modal" data-bs-target="#modalPlaca" style="cursor: pointer;">
+                                            <img src="{{ maquina.placa_identificacao.url }}" alt="Placa de identificação da máquina {{ maquina.cd_maquina }}" class="img-fluid rounded shadow" style="max-width: 100%; max-height: 300px; object-fit: contain;">
+                                        </a>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center py-4">
+                                        <i class="fas fa-id-card fa-4x text-muted mb-3"></i>
+                                        <p class="text-muted mb-3">Nenhuma placa de identificação foi enviada para esta máquina.</p>
+                                        <a href="{% url 'editar_maquina' maquina.id %}" class="btn btn-info btn-sm">
+                                            <i class="fas fa-upload me-2"></i>Adicionar Placa
+                                        </a>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Arquivos PDF -->
+                    <div class="col-md-4 mb-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-danger text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-file-pdf me-2"></i>Arquivos PDF
+                                </h5>
+                            </div>
+                            <div class="card-body d-flex flex-column">
+                                <!-- Arquivo PDF -->
+                                <div class="mb-3">
+                                    {% if maquina.arquivo_pdf %}
+                                        <div class="d-flex align-items-center mb-2">
+                                            <i class="fas fa-file-pdf fa-lg text-danger me-2"></i>
+                                            <div class="flex-grow-1">
+                                                <small class="d-block fw-bold">Manual da Máquina</small>
+                                                <small class="text-muted d-block text-truncate" style="max-width: 150px;">{{ maquina.arquivo_pdf.name|default:"N/A" }}</small>
+                                            </div>
+                                            <a href="#" data-bs-toggle="modal" data-bs-target="#modalPDF" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </div>
+                                    {% else %}
+                                        <div class="d-flex align-items-center mb-2">
+                                            <i class="fas fa-file-pdf fa-lg text-muted me-2"></i>
+                                            <div class="flex-grow-1">
+                                                <small class="d-block text-muted">Manual da Máquina</small>
+                                                <small class="text-muted d-block">Nenhum arquivo</small>
+                                            </div>
+                                            <a href="{% url 'editar_maquina' maquina.id %}" class="btn btn-outline-secondary btn-sm">
+                                                <i class="fas fa-upload"></i>
+                                            </a>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Diagrama Elétrico -->
+                                <div class="mb-3">
+                                    {% if maquina.diagrama_eletrico %}
+                                        <div class="d-flex align-items-center mb-2">
+                                            <i class="fas fa-bolt fa-lg text-warning me-2"></i>
+                                            <div class="flex-grow-1">
+                                                <small class="d-block fw-bold">Diagrama Elétrico</small>
+                                                <small class="text-muted d-block text-truncate" style="max-width: 150px;">{{ maquina.diagrama_eletrico.name|default:"N/A" }}</small>
+                                            </div>
+                                            <a href="#" data-bs-toggle="modal" data-bs-target="#modalDiagrama" class="btn btn-warning btn-sm">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </div>
+                                    {% else %}
+                                        <div class="d-flex align-items-center mb-2">
+                                            <i class="fas fa-bolt fa-lg text-muted me-2"></i>
+                                            <div class="flex-grow-1">
+                                                <small class="d-block text-muted">Diagrama Elétrico</small>
+                                                <small class="text-muted d-block">Nenhum arquivo</small>
+                                            </div>
+                                            <a href="{% url 'editar_maquina' maquina.id %}" class="btn btn-outline-secondary btn-sm">
+                                                <i class="fas fa-upload"></i>
+                                            </a>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Peças de Reposição -->
+                                <div class="mb-0">
+                                    {% if maquina.pecas_reposicao %}
+                                        <div class="d-flex align-items-center mb-2">
+                                            <i class="fas fa-cog fa-lg text-success me-2"></i>
+                                            <div class="flex-grow-1">
+                                                <small class="d-block fw-bold">Peças de Reposição</small>
+                                                <small class="text-muted d-block text-truncate" style="max-width: 150px;">{{ maquina.pecas_reposicao.name|default:"N/A" }}</small>
+                                            </div>
+                                            <a href="#" data-bs-toggle="modal" data-bs-target="#modalPecas" class="btn btn-success btn-sm">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </div>
+                                    {% else %}
+                                        <div class="d-flex align-items-center mb-2">
+                                            <i class="fas fa-cog fa-lg text-muted me-2"></i>
+                                            <div class="flex-grow-1">
+                                                <small class="d-block text-muted">Peças de Reposição</small>
+                                                <small class="text-muted d-block">Nenhum arquivo</small>
+                                            </div>
+                                            <a href="{% url 'editar_maquina' maquina.id %}" class="btn btn-outline-secondary btn-sm">
+                                                <i class="fas fa-upload"></i>
+                                            </a>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modais para visualização em tamanho completo -->
+                <!-- Modal Foto -->
+                {% if maquina.foto %}
+                <div class="modal fade" id="modalFoto" tabindex="-1" aria-labelledby="modalFotoLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title" id="modalFotoLabel">
+                                    <i class="fas fa-camera me-2"></i>Foto da Máquina - {{ maquina.cd_maquina }}
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-center p-0">
+                                <img src="{{ maquina.foto.url }}" alt="Foto da máquina {{ maquina.cd_maquina }}" class="img-fluid" style="max-width: 100%; max-height: 80vh; object-fit: contain;">
+                            </div>
+                            <div class="modal-footer">
+                                <a href="{{ maquina.foto.url }}" target="_blank" class="btn btn-primary">
+                                    <i class="fas fa-external-link-alt me-2"></i>Abrir em Nova Aba
+                                </a>
+                                <a href="{{ maquina.foto.url }}" download class="btn btn-success">
+                                    <i class="fas fa-download me-2"></i>Download
+                                </a>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Modal Placa -->
+                {% if maquina.placa_identificacao %}
+                <div class="modal fade" id="modalPlaca" tabindex="-1" aria-labelledby="modalPlacaLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-info text-white">
+                                <h5 class="modal-title" id="modalPlacaLabel">
+                                    <i class="fas fa-id-card me-2"></i>Placa de Identificação - {{ maquina.cd_maquina }}
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-center p-0">
+                                <img src="{{ maquina.placa_identificacao.url }}" alt="Placa de identificação da máquina {{ maquina.cd_maquina }}" class="img-fluid" style="max-width: 100%; max-height: 80vh; object-fit: contain;">
+                            </div>
+                            <div class="modal-footer">
+                                <a href="{{ maquina.placa_identificacao.url }}" target="_blank" class="btn btn-info">
+                                    <i class="fas fa-external-link-alt me-2"></i>Abrir em Nova Aba
+                                </a>
+                                <a href="{{ maquina.placa_identificacao.url }}" download class="btn btn-success">
+                                    <i class="fas fa-download me-2"></i>Download
+                                </a>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Modal PDF -->
+                {% if maquina.arquivo_pdf %}
+                <div class="modal fade" id="modalPDF" tabindex="-1" aria-labelledby="modalPDFLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title" id="modalPDFLabel">
+                                    <i class="fas fa-file-pdf me-2"></i>Arquivo PDF - {{ maquina.cd_maquina }}
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-center py-5">
+                                <div class="mb-4">
+                                    <i class="fas fa-file-pdf fa-5x text-danger mb-3"></i>
+                                    <h4 class="mb-3">{{ maquina.arquivo_pdf.name|default:"Arquivo PDF" }}</h4>
+                                    <p class="text-muted">Clique nos botões abaixo para visualizar ou baixar o arquivo PDF</p>
+                                </div>
+                                <div class="d-flex justify-content-center gap-3 flex-wrap">
+                                    <a href="{{ maquina.arquivo_pdf.url }}" target="_blank" class="btn btn-danger btn-lg">
+                                        <i class="fas fa-external-link-alt me-2"></i>Visualizar em Nova Aba
+                                    </a>
+                                    <a href="{{ maquina.arquivo_pdf.url }}" download class="btn btn-success btn-lg">
+                                        <i class="fas fa-download me-2"></i>Download
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Modal Diagrama Elétrico -->
+                {% if maquina.diagrama_eletrico %}
+                <div class="modal fade" id="modalDiagrama" tabindex="-1" aria-labelledby="modalDiagramaLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-warning text-white">
+                                <h5 class="modal-title" id="modalDiagramaLabel">
+                                    <i class="fas fa-bolt me-2"></i>Diagrama Elétrico - {{ maquina.cd_maquina }}
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-center py-5">
+                                <div class="mb-4">
+                                    <i class="fas fa-bolt fa-5x text-warning mb-3"></i>
+                                    <h4 class="mb-3">{{ maquina.diagrama_eletrico.name|default:"Diagrama Elétrico" }}</h4>
+                                    <p class="text-muted">Clique nos botões abaixo para visualizar ou baixar o arquivo PDF</p>
+                                </div>
+                                <div class="d-flex justify-content-center gap-3 flex-wrap">
+                                    <a href="{{ maquina.diagrama_eletrico.url }}" target="_blank" class="btn btn-warning btn-lg">
+                                        <i class="fas fa-external-link-alt me-2"></i>Visualizar em Nova Aba
+                                    </a>
+                                    <a href="{{ maquina.diagrama_eletrico.url }}" download class="btn btn-success btn-lg">
+                                        <i class="fas fa-download me-2"></i>Download
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Modal Peças de Reposição -->
+                {% if maquina.pecas_reposicao %}
+                <div class="modal fade" id="modalPecas" tabindex="-1" aria-labelledby="modalPecasLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-success text-white">
+                                <h5 class="modal-title" id="modalPecasLabel">
+                                    <i class="fas fa-cog me-2"></i>Peças de Reposição - {{ maquina.cd_maquina }}
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-center py-5">
+                                <div class="mb-4">
+                                    <i class="fas fa-cog fa-5x text-success mb-3"></i>
+                                    <h4 class="mb-3">{{ maquina.pecas_reposicao.name|default:"Peças de Reposição" }}</h4>
+                                    <p class="text-muted">Clique nos botões abaixo para visualizar ou baixar o arquivo PDF</p>
+                                </div>
+                                <div class="d-flex justify-content-center gap-3 flex-wrap">
+                                    <a href="{{ maquina.pecas_reposicao.url }}" target="_blank" class="btn btn-success btn-lg">
+                                        <i class="fas fa-external-link-alt me-2"></i>Visualizar em Nova Aba
+                                    </a>
+                                    <a href="{{ maquina.pecas_reposicao.url }}" download class="btn btn-primary btn-lg">
+                                        <i class="fas fa-download me-2"></i>Download
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+
+                <!-- Setor de Manutenção -->
+                <div class="accordion mb-4" id="accordionSetorManutencao">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingSetor">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSetor" aria-expanded="false" aria-controls="collapseSetor">
+                                <i class="fas fa-tools me-2"></i><strong>Setor de Manutenção</strong>
+                            </button>
+                        </h2>
+                        <div id="collapseSetor" class="accordion-collapse collapse" aria-labelledby="headingSetor" data-bs-parent="#accordionSetorManutencao">
+                            <div class="accordion-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold">Código Setor Manutenção</label>
+                                        <p class="form-control-plaintext">
+                                            {% if maquina.cd_setormanut %}
+                                                <span class="badge bg-secondary">{{ maquina.cd_setormanut }}</span>
+                                            {% else %}
+                                                Não informado
+                                            {% endif %}
+                                        </p>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold">Descrição Setor Manutenção</label>
+                                        <p class="form-control-plaintext">{{ maquina.descr_setormanut|default:"Não informado" }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <!-- Informações do Sistema -->
+                <div class="accordion mb-4" id="accordionInformacoesSistema">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingSistema">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSistema" aria-expanded="false" aria-controls="collapseSistema">
+                                <i class="fas fa-database me-2"></i><strong>Informações do Sistema</strong>
+                            </button>
+                        </h2>
+                        <div id="collapseSistema" class="accordion-collapse collapse" aria-labelledby="headingSistema" data-bs-parent="#accordionInformacoesSistema">
+                            <div class="accordion-body">
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label fw-bold">ID do Registro</label>
+                                        <p class="form-control-plaintext">{{ maquina.id }}</p>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label fw-bold">Data de Criação</label>
+                                        <p class="form-control-plaintext">{{ maquina.created_at|date:"d/m/Y H:i:s" }}</p>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label fw-bold">Última Atualização</label>
+                                        <p class="form-control-plaintext">{{ maquina.updated_at|date:"d/m/Y H:i:s" }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botões de Ação -->
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{% url 'consultar_maquinas' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Voltar para Lista
+                    </a>
+                    <div>
+                        <a href="{% url 'editar_maquina' maquina.id %}" class="btn btn-warning me-2">
+                            <i class="fas fa-edit me-2"></i>Editar
+                        </a>
+                        <a href="{% url 'consultar_maquinas' %}?search={{ maquina.cd_maquina }}" class="btn btn-info">
+                            <i class="fas fa-search me-2"></i>Buscar Similar
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+

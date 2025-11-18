@@ -1,0 +1,111 @@
+from django.urls import path, include
+from . import views
+
+urlpatterns = [
+    path('', views.home, name="home"),
+    path('home/', views.home, name="home"),
+    path('about/', views.about, name="about"),
+    path('em-desenvolvimento/', views.em_desenvolvimento, name="em_desenvolvimento"),
+    path('analise/plano-preventiva/', views.analise_plano_preventiva, name="analise_plano_preventiva"),
+    path('planejamento/maquina-primaria-secundaria/', views.maquina_primaria_secundaria, name="maquina_primaria_secundaria"),
+    path('planejamento/analise-roteiro-plano-preventiva/', views.analise_roteiro_plano_preventiva, name="analise_roteiro_plano_preventiva"),
+    path('contact/', views.contact, name="contact"),
+    path('services/', views.services, name="services"),
+    path('centros-de-atividade/', views.centros_de_atividade, name="centros_de_atividade"),
+    path('centros-de-atividade/abate-area-suja/', views.abate_area_suja, name="abate_area_suja"),
+    path('centros-de-atividade/recepcao/', views.recepcao, name="recepcao"),
+    path('centros-de-atividade/area-limpa/', views.area_limpa, name="area_limpa"),
+    path('centros-de-atividade/camaras/', views.camaras, name="camaras"),
+    path('centros-de-atividade/bet/', views.bet, name="bet"),
+    path('centros-de-atividade/salga/', views.salga, name="salga"),
+    path('centros-de-atividade/min/', views.min, name="min"),
+    path('centros-de-atividade/mex/', views.mex, name="mex"),
+    path('centros-de-atividade/epj/', views.epj, name="epj"),
+    path('ca-maquinas/epj-maquinas/', views.epj_maquinas, name="epj_maquinas"),
+    path('centros-de-atividade/cms/', views.cms, name="cms"),
+    path('centros-de-atividade/lbm/', views.lbm, name="lbm"),
+    path('centros-de-atividade/dpe/', views.dpe, name="dpe"),
+    path('centros-de-atividade/secundaria/', views.secundaria, name="secundaria"),
+    path('centros-de-atividade/tca/', views.tca, name="tca"),
+    path('centros-de-atividade/tca-gea/', views.tca_gea, name="tca_gea"),
+    path('centros-de-atividade/expedicao/', views.expedicao, name="expedicao"),
+    path('centros-de-atividade/frescal/', views.frescal, name="frescal"),
+    path('centros-de-atividade/presunto/', views.presunto, name="presunto"),
+    path('centros-de-atividade/estufa/', views.estufa, name="estufa"),
+    path('centros-de-atividade/fatiados/', views.fatiados, name="fatiados"),
+    path('centros-de-atividade/condimentaria/', views.condimentaria, name="condimentaria"),
+    path('centros-de-atividade/defumados/', views.defumados, name="defumados"),
+    path('centros-de-atividade/marinados/', views.marinados, name="marinados"),
+    path('centros-de-atividade/cozidos/', views.cozidos, name="cozidos"),
+    path('centros-de-atividade/preparo-de-massa/', views.preparo_de_massa, name="preparo_de_massa"),
+    path('centros-de-atividade/curados/', views.curados, name="curados"),
+    path('centros-de-atividade/embalagem-industrializados/', views.embalagem_industrializados, name="embalagem_industrializados"),
+    path('importar/maquinas/', views.importar_maquinas, name="importar_maquinas"),
+    path('importar/manutentores/', views.importar_manutentores, name="importar_manutentores"),
+    path('importar/ordens-corretivas-e-outros/', views.importar_ordens_corretivas_e_outros, name="importar_ordens_corretivas_e_outros"),
+    path('importar/ordens-preventivas/', views.importar_ordens_preventivas, name="importar_ordens_preventivas"),
+    path('importar/plano-preventiva/', views.importar_plano_preventiva, name="importar_plano_preventiva"),
+    path('importar/roteiro-preventiva/', views.importar_roteiro_preventiva, name="importar_roteiro_preventiva"),
+    path('importar/locais-e-cas/', views.importar_locais_e_cas, name="importar_locais_e_cas"),
+    path('importar/estoque/', views.importar_estoque, name="importar_estoque"),
+    
+    # Estoque
+    path('estoque/consultar/', views.consultar_estoque, name="consultar_estoque"),
+    path('estoque/visualizar/<int:item_id>/', views.visualizar_item_estoque, name="visualizar_item_estoque"),
+    
+    # Manutenções Preventivas
+    path('manutencoes-preventivas/consultar/', views.consultar_manutencoes_preventivas, name="consultar_manutencoes_preventivas"),
+    path('manutencoes-preventivas/visualizar/<int:plano_id>/', views.visualizar_manutencao_preventiva, name="visualizar_manutencao_preventiva"),
+    path('roteiros-preventiva/consultar/', views.consultar_roteiro_preventiva, name="consultar_roteiro_preventiva"),
+    path('roteiros-preventiva/visualizar/<int:roteiro_id>/', views.visualizar_roteiro_preventiva, name="visualizar_roteiro_preventiva"),
+    path('analise/plano-roteiro/visualizar/<int:plano_id>/<int:roteiro_id>/', views.visualizar_analise_plano_roteiro, name="visualizar_analise_plano_roteiro"),
+    path('manutencoes-preventivas/<int:plano_id>/adicionar-documento/', views.adicionar_documento_plano_preventiva, name="adicionar_documento_plano_preventiva"),
+    path('manutencoes-preventivas/<int:plano_id>/remover-documento/<int:documento_id>/', views.remover_documento_plano_preventiva, name="remover_documento_plano_preventiva"),
+    path('estoque/<int:item_id>/atualizar-foto-item/', views.atualizar_foto_item, name="atualizar_foto_item"),
+    path('estoque/<int:item_id>/atualizar-documentacao-tecnica/', views.atualizar_documentacao_tecnica, name="atualizar_documentacao_tecnica"),
+    path('estoque/<int:item_id>/atualizar-foto-detalhada/', views.atualizar_foto_detalhada, name="atualizar_foto_detalhada"),
+    
+    # Locais e CAs
+    path('locais-e-cas/cadastrar/', views.cadastrar_local_e_cas, name="cadastrar_local_e_cas"),
+    path('locais-e-cas/consultar/', views.consultar_locais_e_cas, name="consultar_locais_e_cas"),
+    path('locais-e-cas/visualizar/<int:ca_id>/', views.visualizar_centro_de_atividade, name="visualizar_centro_de_atividade"),
+    path('locais-e-cas/editar/<int:ca_id>/', views.editar_ca_e_locais, name="editar_ca_e_locais"),
+    path('locais-e-cas/local/visualizar/<int:local_id>/', views.visualizar_local, name="visualizar_local"),
+    path('locais/consultar/', views.consultar_locais, name="consultar_locais"),
+    
+    # Máquinas
+    path('maquinas/analise/', views.analise_maquinas, name="analise_maquinas"),
+    path('maquinas/cadastrar/', views.cadastrar_maquina, name="cadastrar_maquina"),
+    path('maquinas/consultar/', views.consultar_maquinas, name="consultar_maquinas"),
+    path('maquinas/deletar/<int:maquina_id>/', views.deletar_maquina, name="deletar_maquina"),
+    path('maquinas/visualizar/<int:maquina_id>/', views.visualizar_maquina, name="visualizar_maquina"),
+    path('maquinas/editar/<int:maquina_id>/', views.editar_maquina, name="editar_maquina"),
+    path('maquinas/<int:maquina_id>/pecas/', views.maquinas_pecas, name="maquinas_pecas"),
+    path('maquinas/<int:maquina_id>/adicionar-peca/', views.adicionar_peca_maquina, name="adicionar_peca_maquina"),
+    path('maquinas/<int:maquina_id>/remover-peca/<int:peca_id>/', views.remover_peca_maquina, name="remover_peca_maquina"),
+    path('maquinas/<int:maquina_id>/atualizar-codigo-aurora/', views.atualizar_codigo_aurora, name="atualizar_codigo_aurora"),
+    path('maquinas/<int:maquina_id>/atualizar-codigo-fabricante/', views.atualizar_codigo_fabricante, name="atualizar_codigo_fabricante"),
+    path('maquinas/filtrar-locais/', views.filtrar_locais_por_setormanut, name="filtrar_locais_por_setormanut"),
+   
+    # Manutenção Corretiva
+    path('analise/corretiva-outros/', views.analise_corretiva_outros, name="analise_corretiva_outros"),
+    path('manutencao-corretiva/cadastrar/', views.cadastrar_corretiva_outros, name="cadastrar_corretiva_outros"),
+    path('manutencao-corretiva/consultar/', views.consultar_corretivas_outros, name="consultar_corretivas_outros"),
+    path('manutencao-corretiva/visualizar/<int:ordem_id>/', views.visualizar_corretiva_outros, name="visualizar_corretiva_outros"),
+   
+    # Manutentores
+    path('manutentor/cadastrar/', views.cadastrar_manutentor, name="cadastrar_manutentor"),
+    path('manutentor/consultar/', views.consultar_manutentores, name="consultar_manutentores"),
+    path('manutentor/visualizar/<str:cadastro>/', views.visualizar_manutentor, name="visualizar_manutentor"),
+    path('manutentor/editar/<str:cadastro>/', views.editar_manutentor, name="editar_manutentor"),
+    path('manutentor/<str:cadastro>/adicionar-maquina/', views.adicionar_maquina_manutentor, name="adicionar_maquina_manutentor"),
+    path('manutentor/<str:cadastro>/remover-maquina/<int:manutentor_maquina_id>/', views.remover_maquina_manutentor, name="remover_maquina_manutentor"),
+    
+    # Manutenção Terceiro
+    path('manutencao-terceiro/cadastrar/', views.cadastrar_manutencao_terceiro, name="cadastrar_manutencao_terceiro"),
+    path('manutencao-terceiro/consultar/', views.consultar_manutencao_terceiros, name="consultar_manutencao_terceiros"),
+    
+    # Administração
+    path('administrador/gerenciar/', views.gerenciar_projeto, name="gerenciar_projeto"),
+    path('administrador/limpar-tabela/', views.limpar_tabela, name="limpar_tabela"),
+]

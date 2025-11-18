@@ -1,0 +1,511 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Manutenção Corretiva - Análise{% endblock %}
+
+{% block extra_css %}
+<!-- Chart.js CSS -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 30px;
+    }
+    .chart-container-large {
+        position: relative;
+        height: 400px;
+        margin-bottom: 30px;
+    }
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .kpi-card {
+        border-left: 4px solid;
+    }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Manutenção Corretiva</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Análise de Manutenção Corretiva</h1>
+                <p class="lead">Dashboard com análises e estatísticas das ordens de serviço corretivas</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- KPI Cards -->
+        <div class="row mb-5">
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total de Ordens</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_count }}</h2>
+                            </div>
+                            <i class="fas fa-clipboard-list fa-3x text-primary opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Últimos 30 Dias</h6>
+                                <h2 class="mb-0 fw-bold">{{ ordens_recentes }}</h2>
+                            </div>
+                            <i class="fas fa-calendar-day fa-3x text-success opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Mês Atual</h6>
+                                <h2 class="mb-0 fw-bold">{{ ordens_mes_atual }}</h2>
+                            </div>
+                            <i class="fas fa-calendar-alt fa-3x text-warning opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Com Queixa</h6>
+                                <h2 class="mb-0 fw-bold">{{ ordens_com_queixa }}</h2>
+                                <small class="text-muted">{{ percentual_queixa }}% do total</small>
+                            </div>
+                            <i class="fas fa-exclamation-triangle fa-3x text-info opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 1 -->
+        <div class="row mb-5">
+            <!-- Gráfico de Pizza: Distribuição por Setor -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>Distribuição por Setor (Top 10)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="setoresChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráfico de Barras: Ordens por Unidade -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Ordens por Unidade (Top 10)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="unidadesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 2 -->
+        <div class="row mb-5">
+            <!-- Gráfico de Linha: Evolução Temporal -->
+            <div class="col-md-8 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Evolução Temporal (Últimos 12 Meses)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="temporalChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráfico de Pizza: Distribuição por Tipo -->
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-warning text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>Por Tipo de OS
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="tiposChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 3 -->
+        <div class="row mb-5">
+            <!-- Gráfico de Barras Horizontal: Top Máquinas -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-cogs me-2"></i>Top 10 Máquinas com Mais Ordens
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="maquinasChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráfico de Barras: Top Executores -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-users me-2"></i>Top 10 Executores
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="executoresChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Tables -->
+        <div class="row mb-5">
+            <!-- Tabela: Top Máquinas -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>Ranking de Máquinas
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Código</th>
+                                        <th>Descrição</th>
+                                        <th class="text-center">Qtd</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in top_maquinas %}
+                                    <tr>
+                                        <td><strong>{{ forloop.counter }}</strong></td>
+                                        <td><span class="badge bg-primary">{{ item.cd_maquina }}</span></td>
+                                        <td>{{ item.descr_maquina|truncatewords:8 }}</td>
+                                        <td class="text-center"><span class="badge bg-info">{{ item.total }}</span></td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">Nenhum dado disponível</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela: Top Executores -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>Ranking de Executores
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Executor</th>
+                                        <th class="text-center">Qtd Ordens</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in top_executores %}
+                                    <tr>
+                                        <td><strong>{{ forloop.counter }}</strong></td>
+                                        <td>{{ item.nm_func_exec_os }}</td>
+                                        <td class="text-center"><span class="badge bg-success">{{ item.total }}</span></td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted">Nenhum dado disponível</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Statistics -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Resumo Estatístico
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3 mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <h4 class="text-primary mb-1">{{ setores_count }}</h4>
+                                    <p class="text-muted mb-0">Setores Únicos</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <h4 class="text-info mb-1">{{ unidades_count }}</h4>
+                                    <p class="text-muted mb-0">Unidades Únicas</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <h4 class="text-success mb-1">{{ maquinas_count }}</h4>
+                                    <p class="text-muted mb-0">Máquinas Cadastradas</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <h4 class="text-warning mb-1">{{ percentual_queixa }}%</h4>
+                                    <p class="text-muted mb-0">Taxa de Queixas</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+// Gráfico de Pizza: Distribuição por Setor
+const setoresCtx = document.getElementById('setoresChart').getContext('2d');
+new Chart(setoresCtx, {
+    type: 'pie',
+    data: {
+        labels: {{ setores_labels|safe }},
+        datasets: [{
+            data: {{ setores_data|safe }},
+            backgroundColor: [
+                '#0d6efd', '#198754', '#ffc107', '#dc3545', '#0dcaf0',
+                '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// Gráfico de Barras: Ordens por Unidade
+const unidadesCtx = document.getElementById('unidadesChart').getContext('2d');
+new Chart(unidadesCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ unidades_labels|safe }},
+        datasets: [{
+            label: 'Ordens',
+            data: {{ unidades_data|safe }},
+            backgroundColor: '#0dcaf0'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Gráfico de Linha: Evolução Temporal
+const temporalCtx = document.getElementById('temporalChart').getContext('2d');
+new Chart(temporalCtx, {
+    type: 'line',
+    data: {
+        labels: {{ meses_labels|safe }},
+        datasets: [{
+            label: 'Ordens de Serviço',
+            data: {{ meses_data|safe }},
+            borderColor: '#198754',
+            backgroundColor: 'rgba(25, 135, 84, 0.1)',
+            tension: 0.4,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: true
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Gráfico de Barras Horizontal: Top Máquinas
+const maquinasCtx = document.getElementById('maquinasChart').getContext('2d');
+new Chart(maquinasCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ maquinas_labels|safe }},
+        datasets: [{
+            label: 'Ordens',
+            data: {{ maquinas_data|safe }},
+            backgroundColor: '#dc3545'
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            x: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Gráfico de Barras: Top Executores
+const executoresCtx = document.getElementById('executoresChart').getContext('2d');
+new Chart(executoresCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ executores_labels|safe }},
+        datasets: [{
+            label: 'Ordens Executadas',
+            data: {{ executores_data|safe }},
+            backgroundColor: '#6c757d'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Gráfico de Pizza: Distribuição por Tipo
+const tiposCtx = document.getElementById('tiposChart').getContext('2d');
+new Chart(tiposCtx, {
+    type: 'doughnut',
+    data: {
+        labels: {{ tipos_labels|safe }},
+        datasets: [{
+            data: {{ tipos_data|safe }},
+            backgroundColor: [
+                '#ffc107', '#0d6efd', '#198754', '#dc3545', '#0dcaf0',
+                '#6f42c1', '#fd7e14', '#20c997'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+</script>
+{% endblock %}
+

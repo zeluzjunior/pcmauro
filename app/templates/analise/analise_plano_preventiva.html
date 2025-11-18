@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Análise de Plano Preventiva{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise de Plano Preventiva</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Análise de Plano Preventiva</h1>
+                <p class="lead">Dashboard com análises e estatísticas dos planos preventivos</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-12 text-center">
+                <div class="py-5">
+                    <i class="fas fa-chart-line fa-5x text-primary mb-4"></i>
+                    <h2 class="display-5 fw-bold mb-3">Página em Desenvolvimento</h2>
+                    <p class="lead fs-4">Aguarde</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+

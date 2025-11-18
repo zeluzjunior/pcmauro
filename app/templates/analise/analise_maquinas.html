@@ -1,0 +1,954 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Análise de Máquinas{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 30px;
+    }
+    .chart-container-large {
+        position: relative;
+        height: 400px;
+        margin-bottom: 30px;
+    }
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .kpi-card {
+        border-left: 4px solid;
+    }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .kpi-purple { border-left-color: #6f42c1; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Máquinas</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Análise de Máquinas</h1>
+                <p class="lead">Dashboard com análises e estatísticas do cadastro de máquinas</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Centros de Atividade - INDÚSTRIA e FRIGORÍFICO -->
+        <div class="row mb-5">
+            <!-- INDÚSTRIA -->
+            <div class="col-md-6 mb-4">
+                <div class="accordion" id="accordionIndustriaMain">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingIndustria">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseIndustria" aria-expanded="true" aria-controls="collapseIndustria">
+                                <strong>
+                                    <i class="fas fa-industry me-2"></i>Centros de Atividade - INDÚSTRIA
+                                    <small class="ms-2">({{ centros_industria|length }} centros)</small>
+                                </strong>
+                            </button>
+                        </h2>
+                        <div id="collapseIndustria" class="accordion-collapse collapse" aria-labelledby="headingIndustria" data-bs-parent="#accordionIndustriaMain">
+                            <div class="accordion-body">
+                                {% if centros_industria %}
+                                    <div class="accordion accordion-flush" id="accordionIndustria">
+                                        {% for centro in centros_industria %}
+                                            <div class="accordion-item">
+                                                <h2 class="accordion-header" id="headingInd{{ centro.id }}">
+                                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseInd{{ centro.id }}" aria-expanded="false" aria-controls="collapseInd{{ centro.id }}">
+                                                        <strong>
+                                                            <i class="fas fa-industry me-2"></i>CA {{ centro.ca }}
+                                                            {% if centro.sigla %}
+                                                                - {{ centro.sigla }}
+                                                            {% endif %}
+                                                        </strong>
+                                                    </button>
+                                                </h2>
+                                                <div id="collapseInd{{ centro.id }}" class="accordion-collapse collapse" aria-labelledby="headingInd{{ centro.id }}" data-bs-parent="#accordionIndustria">
+                                                    <div class="accordion-body">
+                                                        <div class="mb-2">
+                                                            <strong><i class="fas fa-hashtag me-2"></i>CA:</strong>
+                                                            <span class="badge bg-primary">{{ centro.ca }}</span>
+                                                        </div>
+                                                        {% if centro.sigla %}
+                                                            <div class="mb-2">
+                                                                <strong><i class="fas fa-tag me-2"></i>Sigla:</strong>
+                                                                {{ centro.sigla }}
+                                                            </div>
+                                                        {% endif %}
+                                                        {% if centro.descricao %}
+                                                            <div class="mb-2">
+                                                                <strong><i class="fas fa-align-left me-2"></i>Descrição:</strong>
+                                                                <p class="mb-0">{{ centro.descricao }}</p>
+                                                            </div>
+                                                        {% endif %}
+                                                        {% if centro.indice %}
+                                                            <div class="mb-2">
+                                                                <strong><i class="fas fa-sort-numeric-up me-2"></i>Índice:</strong>
+                                                                <span class="badge bg-secondary">{{ centro.indice }}</span>
+                                                            </div>
+                                                        {% endif %}
+                                                        {% if centro.encarregado_responsavel %}
+                                                            <div class="mb-2">
+                                                                <strong><i class="fas fa-user-tie me-2"></i>Encarregado Responsável:</strong>
+                                                                {{ centro.encarregado_responsavel }}
+                                                            </div>
+                                                        {% endif %}
+                                                        {% if centro.local %}
+                                                            <div class="mb-2">
+                                                                <strong><i class="fas fa-map-marker-alt me-2"></i>Local:</strong>
+                                                                <span class="badge bg-primary">{{ centro.local }}</span>
+                                                            </div>
+                                                        {% endif %}
+                                                        <hr>
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <small class="text-muted">
+                                                                <i class="fas fa-calendar me-1"></i>
+                                                                Criado em: {{ centro.created_at|date:"d/m/Y H:i" }}
+                                                            </small>
+                                                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="btn btn-sm btn-outline-primary">
+                                                                <i class="fas fa-eye me-1"></i>Ver Detalhes
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-info text-center m-3 mb-0">
+                                        <i class="fas fa-info-circle me-2"></i>Nenhum Centro de Atividade com local "INDÚSTRIA" cadastrado.
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FRIGORÍFICO -->
+            <div class="col-md-6 mb-4">
+                <div class="accordion" id="accordionFrigorificoMain">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingFrigorifico">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFrigorifico" aria-expanded="false" aria-controls="collapseFrigorifico">
+                                <strong>
+                                    <i class="fas fa-snowflake me-2"></i>Centros de Atividade - FRIGORÍFICO
+                                    <small class="ms-2">({{ centros_frigorifico|length }} centros)</small>
+                                </strong>
+                            </button>
+                        </h2>
+                        <div id="collapseFrigorifico" class="accordion-collapse collapse" aria-labelledby="headingFrigorifico" data-bs-parent="#accordionFrigorificoMain">
+                            <div class="accordion-body">
+                                {% if centros_frigorifico %}
+                                    <div class="accordion accordion-flush" id="accordionFrigorifico">
+                                        {% for centro in centros_frigorifico %}
+                                            <div class="accordion-item">
+                                                <h2 class="accordion-header" id="headingFrig{{ centro.id }}">
+                                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFrig{{ centro.id }}" aria-expanded="false" aria-controls="collapseFrig{{ centro.id }}">
+                                                        <strong>
+                                                            <i class="fas fa-industry me-2"></i>CA {{ centro.ca }}
+                                                            {% if centro.sigla %}
+                                                                - {{ centro.sigla }}
+                                                            {% endif %}
+                                                        </strong>
+                                                    </button>
+                                                </h2>
+                                                <div id="collapseFrig{{ centro.id }}" class="accordion-collapse collapse" aria-labelledby="headingFrig{{ centro.id }}" data-bs-parent="#accordionFrigorifico">
+                                                    <div class="accordion-body">
+                                                        <div class="mb-2">
+                                                            <strong><i class="fas fa-hashtag me-2"></i>CA:</strong>
+                                                            <span class="badge bg-primary">{{ centro.ca }}</span>
+                                                        </div>
+                                                        {% if centro.sigla %}
+                                                            <div class="mb-2">
+                                                                <strong><i class="fas fa-tag me-2"></i>Sigla:</strong>
+                                                                {{ centro.sigla }}
+                                                            </div>
+                                                        {% endif %}
+                                                        {% if centro.descricao %}
+                                                            <div class="mb-2">
+                                                                <strong><i class="fas fa-align-left me-2"></i>Descrição:</strong>
+                                                                <p class="mb-0">{{ centro.descricao }}</p>
+                                                            </div>
+                                                        {% endif %}
+                                                        {% if centro.indice %}
+                                                            <div class="mb-2">
+                                                                <strong><i class="fas fa-sort-numeric-up me-2"></i>Índice:</strong>
+                                                                <span class="badge bg-secondary">{{ centro.indice }}</span>
+                                                            </div>
+                                                        {% endif %}
+                                                        {% if centro.encarregado_responsavel %}
+                                                            <div class="mb-2">
+                                                                <strong><i class="fas fa-user-tie me-2"></i>Encarregado Responsável:</strong>
+                                                                {{ centro.encarregado_responsavel }}
+                                                            </div>
+                                                        {% endif %}
+                                                        {% if centro.local %}
+                                                            <div class="mb-2">
+                                                                <strong><i class="fas fa-map-marker-alt me-2"></i>Local:</strong>
+                                                                <span class="badge bg-success">{{ centro.local }}</span>
+                                                            </div>
+                                                        {% endif %}
+                                                        <hr>
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <small class="text-muted">
+                                                                <i class="fas fa-calendar me-1"></i>
+                                                                Criado em: {{ centro.created_at|date:"d/m/Y H:i" }}
+                                                            </small>
+                                                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="btn btn-sm btn-outline-primary">
+                                                                <i class="fas fa-eye me-1"></i>Ver Detalhes
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-info text-center m-3 mb-0">
+                                        <i class="fas fa-info-circle me-2"></i>Nenhum Centro de Atividade com local "FRIGORÍFICO" cadastrado.
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="mb-5">
+            <div class="row mb-4">
+                <div class="col-md-3 mb-4">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Total de Máquinas</h6>
+                                    <h2 class="mb-0 fw-bold">{{ total_count }}</h2>
+                                </div>
+                                <i class="fas fa-cogs fa-3x text-primary opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-4">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Últimos 30 Dias</h6>
+                                    <h2 class="mb-0 fw-bold">{{ maquinas_recentes }}</h2>
+                                </div>
+                                <i class="fas fa-calendar-day fa-3x text-success opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-4">
+                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Mês Atual</h6>
+                                    <h2 class="mb-0 fw-bold">{{ maquinas_mes_atual }}</h2>
+                                </div>
+                                <i class="fas fa-calendar-alt fa-3x text-warning opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-4">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com Patrimônio</h6>
+                                    <h2 class="mb-0 fw-bold">{{ maquinas_com_patrimonio }}</h2>
+                                    <small class="text-muted">{{ percentual_patrimonio }}% do total</small>
+                                </div>
+                                <i class="fas fa-barcode fa-3x text-info opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-4">
+                    <div class="card stat-card kpi-card kpi-purple shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com Foto</h6>
+                                    <h2 class="mb-0 fw-bold">{{ maquinas_com_foto }}</h2>
+                                    <small class="text-muted">{{ percentual_foto }}% do total</small>
+                                </div>
+                                <i class="fas fa-camera fa-3x text-purple opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-4">
+                    <div class="card stat-card kpi-card kpi-danger shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com Placa</h6>
+                                    <h2 class="mb-0 fw-bold">{{ maquinas_com_placa }}</h2>
+                                    <small class="text-muted">{{ percentual_placa }}% do total</small>
+                                </div>
+                                <i class="fas fa-id-card fa-3x text-danger opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-4">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Setores Únicos</h6>
+                                    <h2 class="mb-0 fw-bold">{{ setores_count }}</h2>
+                                </div>
+                                <i class="fas fa-building fa-3x text-success opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 1 -->
+        <div class="row mb-5">
+            <!-- Gráfico de Pizza: Distribuição por Setor de Manutenção -->
+            <div class="col-md-12 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>Distribuição de Máquinas por Setor de Manutenção (cd_setormanut)
+                            <small class="ms-2" id="setoresCount">(carregando...)</small>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="setoresChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 2 -->
+        <div class="row mb-5">
+            <!-- Gráfico de Linha: Evolução Temporal -->
+            <div class="col-md-8 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Evolução Temporal (Últimos 12 Meses)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="temporalChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráfico de Doughnut: Distribuição por Prioridade -->
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-warning text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>Por Prioridade
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="prioridadesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 3 -->
+        <div class="row mb-5">
+            <!-- Gráfico de Barras Horizontal: Top Máquinas com OS -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-tools me-2"></i>Top 10 Máquinas com Mais Ordens de Serviço
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="maquinasOsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráfico de Barras: Distribuição por Grupo -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-layer-group me-2"></i>Distribuição por Grupo (Top 10)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="gruposChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 4 -->
+        <div class="row mb-5">
+            <!-- Gráfico de Barras: Distribuição por Gerência -->
+            <div class="col-md-12 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-purple text-white" style="background-color: #6f42c1 !important;">
+                        <h5 class="mb-0">
+                            <i class="fas fa-sitemap me-2"></i>Distribuição por Gerência (Top 10)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="gerenciasChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Tables -->
+        <div class="row mb-5">
+            <!-- Tabela: Top Máquinas com OS -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>Ranking de Máquinas com Mais OS
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Código</th>
+                                        <th>Descrição</th>
+                                        <th class="text-center">Qtd OS</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in top_maquinas_os %}
+                                    <tr>
+                                        <td><strong>{{ forloop.counter }}</strong></td>
+                                        <td><span class="badge bg-danger">{{ item.cd_maquina }}</span></td>
+                                        <td>{{ item.descr_maquina|truncatewords:8 }}</td>
+                                        <td class="text-center"><span class="badge bg-info">{{ item.total }}</span></td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">Nenhum dado disponível</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela: Top Setores -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>Ranking de Setores
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Setor</th>
+                                        <th class="text-center">Qtd Máquinas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in maquinas_por_setor %}
+                                    <tr>
+                                        <td><strong>{{ forloop.counter }}</strong></td>
+                                        <td>{{ item.descr_setormanut|truncatewords:10 }}</td>
+                                        <td class="text-center"><span class="badge bg-primary">{{ item.total }}</span></td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted">Nenhum dado disponível</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Máquinas Principais por Setor -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list me-2"></i>Máquinas Principais por Setor de Manutenção
+                            <small class="ms-2">(Gerência: MÁQUINAS PRINCIPAL)</small>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        {% if maquinas_principais_por_setor %}
+                            <div class="accordion accordion-flush" id="accordionMaquinasPrincipais">
+                                {% for setor_data in maquinas_principais_por_setor %}
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                                            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse{{ forloop.counter }}">
+                                                <strong>
+                                                    <i class="fas fa-building me-2"></i>Setor {{ setor_data.cd_setormanut }}
+                                                    {% if setor_data.descr_setormanut %}
+                                                        - {{ setor_data.descr_setormanut }}
+                                                    {% endif %}
+                                                </strong>
+                                                <span class="badge bg-success ms-2">{{ setor_data.maquinas|length }} máquina(s)</span>
+                                            </button>
+                                        </h2>
+                                        <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#accordionMaquinasPrincipais">
+                                            <div class="accordion-body p-0">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover table-sm mb-0">
+                                                        <thead class="table-light">
+                                                            <tr>
+                                                                <th style="width: 8%;">#</th>
+                                                                <th style="width: 12%;">Código</th>
+                                                                <th style="width: 40%;">Descrição</th>
+                                                                <th style="width: 20%;">Unidade</th>
+                                                                <th style="width: 15%;">Patrimônio</th>
+                                                                <th style="width: 5%;" class="text-center">Ações</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {% for maquina in setor_data.maquinas %}
+                                                                <tr>
+                                                                    <td><strong>{{ forloop.counter }}</strong></td>
+                                                                    <td>
+                                                                        <span class="badge bg-primary">{{ maquina.cd_maquina }}</span>
+                                                                    </td>
+                                                                    <td>{{ maquina.descr_maquina|truncatewords:15 }}</td>
+                                                                    <td><small>{{ maquina.nome_unid }}</small></td>
+                                                                    <td>
+                                                                        {% if maquina.nro_patrimonio != '-' %}
+                                                                            <span class="badge bg-info">{{ maquina.nro_patrimonio }}</span>
+                                                                        {% else %}
+                                                                            <span class="text-muted">-</span>
+                                                                        {% endif %}
+                                                                    </td>
+                                                                    <td class="text-center">
+                                                                        <a href="{% url 'visualizar_maquina' maquina.id %}" class="btn btn-sm btn-outline-primary" title="Visualizar máquina">
+                                                                            <i class="fas fa-eye"></i>
+                                                                        </a>
+                                                                    </td>
+                                                                </tr>
+                                                            {% endfor %}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info m-3 mb-0">
+                                <i class="fas fa-info-circle me-2"></i>Nenhuma máquina encontrada com gerência "MÁQUINAS PRINCIPAL".
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Summary Statistics -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Resumo Estatístico
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3 mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <h4 class="text-primary mb-1">{{ setores_count }}</h4>
+                                    <p class="text-muted mb-0">Setores Únicos</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <h4 class="text-info mb-1">{{ unidades_count }}</h4>
+                                    <p class="text-muted mb-0">Unidades Únicas</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <h4 class="text-success mb-1">{{ percentual_foto }}%</h4>
+                                    <p class="text-muted mb-0">Taxa de Fotos</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <h4 class="text-warning mb-1">{{ percentual_placa }}%</h4>
+                                    <p class="text-muted mb-0">Taxa de Placas</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// Gráfico de Pizza: Distribuição por Setor de Manutenção (cd_setormanut)
+// Mostra TODOS os setores com suas respectivas quantidades de máquinas
+document.addEventListener('DOMContentLoaded', function() {
+    const setoresCanvas = document.getElementById('setoresChart');
+    if (setoresCanvas) {
+        const setoresCtx = setoresCanvas.getContext('2d');
+        
+        // Gerar cores dinamicamente para todos os setores
+        const colors = [
+            '#0d6efd', '#198754', '#ffc107', '#dc3545', '#0dcaf0',
+            '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d',
+            '#17a2b8', '#28a745', '#ff6b6b', '#4ecdc4', '#95e1d3',
+            '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd',
+            '#00d2d3', '#ff6348', '#ffa502', '#2ed573', '#1e90ff',
+            '#ff3838', '#9b59b6', '#3498db', '#e74c3c', '#1abc9c'
+        ];
+
+        try {
+            // Parse dos dados JSON - os dados já vêm como JSON string do Django
+            const setoresLabels = {{ setores_labels|safe }};
+            const setoresData = {{ setores_data|safe }};
+
+            console.log('Setores Labels:', setoresLabels);
+            console.log('Setores Data:', setoresData);
+
+            // Atualizar contador de setores
+            const setoresCountEl = document.getElementById('setoresCount');
+            if (setoresCountEl) {
+                setoresCountEl.textContent = '(' + setoresLabels.length + ' setores)';
+            }
+
+            // Verificar se há dados
+            if (setoresLabels && Array.isArray(setoresLabels) && setoresLabels.length > 0 && 
+                setoresData && Array.isArray(setoresData) && setoresData.length > 0) {
+                
+                // Repetir cores se necessário
+                const backgroundColors = setoresLabels.map(function(_, index) {
+                    return colors[index % colors.length];
+                });
+
+                new Chart(setoresCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: setoresLabels,
+                        datasets: [{
+                            label: 'Quantidade de Máquinas',
+                            data: setoresData,
+                            backgroundColor: backgroundColors,
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    padding: 15,
+                                    font: {
+                                        size: 12
+                                    },
+                                    generateLabels: function(chart) {
+                                        const data = chart.data;
+                                        if (data.labels.length && data.datasets.length) {
+                                            return data.labels.map(function(label, i) {
+                                                const value = data.datasets[0].data[i];
+                                                const total = data.datasets[0].data.reduce(function(a, b) {
+                                                    return a + b;
+                                                }, 0);
+                                                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                                                return {
+                                                    text: 'Setor ' + label + ': ' + value + ' máquina(s) (' + percentage + '%)',
+                                                    fillStyle: data.datasets[0].backgroundColor[i],
+                                                    hidden: false,
+                                                    index: i
+                                                };
+                                            });
+                                        }
+                                        return [];
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.parsed || 0;
+                                        const total = context.dataset.data.reduce(function(a, b) {
+                                            return a + b;
+                                        }, 0);
+                                        const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                                        return 'Setor ' + label + ': ' + value + ' máquina(s) (' + percentage + '%)';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                console.warn('Nenhum dado de setores disponível para o gráfico');
+                console.log('Labels:', setoresLabels);
+                console.log('Data:', setoresData);
+                setoresCanvas.parentElement.innerHTML = '<div class="alert alert-info text-center m-3">Nenhum dado disponível para exibir o gráfico.</div>';
+                if (setoresCountEl) {
+                    setoresCountEl.textContent = '(0 setores)';
+                }
+            }
+        } catch (error) {
+            console.error('Erro ao processar dados do gráfico de setores:', error);
+            setoresCanvas.parentElement.innerHTML = '<div class="alert alert-danger text-center m-3">Erro ao carregar o gráfico. Verifique o console para mais detalhes.</div>';
+            const setoresCountEl = document.getElementById('setoresCount');
+            if (setoresCountEl) {
+                setoresCountEl.textContent = '(erro)';
+            }
+        }
+    } else {
+        console.error('Canvas setoresChart não encontrado!');
+    }
+});
+
+// Gráfico de Barras: Máquinas por Unidade
+const unidadesCtx = document.getElementById('unidadesChart').getContext('2d');
+new Chart(unidadesCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ unidades_labels|safe }},
+        datasets: [{
+            label: 'Máquinas',
+            data: {{ unidades_data|safe }},
+            backgroundColor: '#0dcaf0'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Gráfico de Linha: Evolução Temporal
+const temporalCtx = document.getElementById('temporalChart').getContext('2d');
+new Chart(temporalCtx, {
+    type: 'line',
+    data: {
+        labels: {{ meses_labels|safe }},
+        datasets: [{
+            label: 'Máquinas Cadastradas',
+            data: {{ meses_data|safe }},
+            borderColor: '#198754',
+            backgroundColor: 'rgba(25, 135, 84, 0.1)',
+            tension: 0.4,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: true
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Gráfico de Doughnut: Distribuição por Prioridade
+const prioridadesCtx = document.getElementById('prioridadesChart').getContext('2d');
+new Chart(prioridadesCtx, {
+    type: 'doughnut',
+    data: {
+        labels: {{ prioridades_labels|safe }},
+        datasets: [{
+            data: {{ prioridades_data|safe }},
+            backgroundColor: [
+                '#ffc107', '#0d6efd', '#198754', '#dc3545', '#0dcaf0',
+                '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// Gráfico de Barras Horizontal: Top Máquinas com OS
+const maquinasOsCtx = document.getElementById('maquinasOsChart').getContext('2d');
+new Chart(maquinasOsCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ maquinas_os_labels|safe }},
+        datasets: [{
+            label: 'Ordens de Serviço',
+            data: {{ maquinas_os_data|safe }},
+            backgroundColor: '#dc3545'
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            x: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Gráfico de Barras: Distribuição por Grupo
+const gruposCtx = document.getElementById('gruposChart').getContext('2d');
+new Chart(gruposCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ grupos_labels|safe }},
+        datasets: [{
+            label: 'Máquinas',
+            data: {{ grupos_data|safe }},
+            backgroundColor: '#6c757d'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Gráfico de Barras: Distribuição por Gerência
+const gerenciasCtx = document.getElementById('gerenciasChart').getContext('2d');
+new Chart(gerenciasCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ gerencias_labels|safe }},
+        datasets: [{
+            label: 'Máquinas',
+            data: {{ gerencias_data|safe }},
+            backgroundColor: '#6f42c1'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+</script>
+{% endblock %}
+

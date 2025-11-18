@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+
+{% block title %}Contato - Meu Projeto Django{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 bg-primary text-white">
+    <div class="container">
+        <div class="row">
+            <div class="col-12 text-center">
+                <h1 class="display-4 fw-bold">Entre em Contato</h1>
+                <p class="lead">Estamos aqui para ajudar! Envie sua mensagem e responderemos em breve.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Contact Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row">
+            <!-- Contact Form -->
+            <div class="col-lg-8 mb-5">
+                <div class="card shadow-custom">
+                    <div class="card-header">
+                        <h4 class="mb-0">
+                            <i class="fas fa-envelope me-2"></i>Envie sua Mensagem
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" class="needs-validation" novalidate>
+                            {% csrf_token %}
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="name" class="form-label">Nome Completo *</label>
+                                    <input type="text" class="form-control" id="name" name="name" required>
+                                    <div class="invalid-feedback">
+                                        Por favor, informe seu nome completo.
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="email" class="form-label">E-mail *</label>
+                                    <input type="email" class="form-control" id="email" name="email" required>
+                                    <div class="invalid-feedback">
+                                        Por favor, informe um e-mail válido.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="phone" class="form-label">Telefone</label>
+                                    <input type="tel" class="form-control" id="phone" name="phone">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="subject" class="form-label">Assunto *</label>
+                                    <select class="form-select" id="subject" name="subject" required>
+                                        <option value="">Selecione um assunto</option>
+                                        <option value="duvida">Dúvida</option>
+                                        <option value="sugestao">Sugestão</option>
+                                        <option value="problema">Problema Técnico</option>
+                                        <option value="parceria">Parceria</option>
+                                        <option value="outro">Outro</option>
+                                    </select>
+                                    <div class="invalid-feedback">
+                                        Por favor, selecione um assunto.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="message" class="form-label">Mensagem *</label>
+                                <textarea class="form-control" id="message" name="message" rows="5" required 
+                                    placeholder="Descreva sua mensagem aqui..."></textarea>
+                                <div class="invalid-feedback">
+                                    Por favor, escreva sua mensagem.
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="newsletter" name="newsletter">
+                                <label class="form-check-label" for="newsletter">
+                                    Quero receber novidades por e-mail
+                                </label>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-paper-plane me-2"></i>Enviar Mensagem
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Contact Information -->
+            <div class="col-lg-4">
+                <div class="card shadow-custom mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-map-marker-alt me-2"></i>Informações de Contato
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <h6 class="text-primary">
+                                <i class="fas fa-envelope me-2"></i>E-mail
+                            </h6>
+                            <p class="mb-0">contato@meuprojeto.com</p>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <h6 class="text-primary">
+                                <i class="fas fa-phone me-2"></i>Telefone
+                            </h6>
+                            <p class="mb-0">+55 (11) 99999-9999</p>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <h6 class="text-primary">
+                                <i class="fas fa-clock me-2"></i>Horário de Atendimento
+                            </h6>
+                            <p class="mb-0">Segunda a Sexta: 9h às 18h</p>
+                        </div>
+                        
+                        <div class="mb-0">
+                            <h6 class="text-primary">
+                                <i class="fas fa-map-marker-alt me-2"></i>Endereço
+                            </h6>
+                            <p class="mb-0">
+                                Rua das Flores, 123<br>
+                                São Paulo - SP<br>
+                                CEP: 01234-567
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Social Media -->
+                <div class="card shadow-custom">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-share-alt me-2"></i>Redes Sociais
+                        </h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="d-flex justify-content-center gap-3">
+                            <a href="#" class="btn btn-outline-primary btn-lg" data-bs-toggle="tooltip" title="Facebook">
+                                <i class="fab fa-facebook-f"></i>
+                            </a>
+                            <a href="#" class="btn btn-outline-info btn-lg" data-bs-toggle="tooltip" title="Twitter">
+                                <i class="fab fa-twitter"></i>
+                            </a>
+                            <a href="#" class="btn btn-outline-danger btn-lg" data-bs-toggle="tooltip" title="Instagram">
+                                <i class="fab fa-instagram"></i>
+                            </a>
+                            <a href="#" class="btn btn-outline-dark btn-lg" data-bs-toggle="tooltip" title="GitHub">
+                                <i class="fab fa-github"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Map Section -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row">
+            <div class="col-12 text-center mb-4">
+                <h3 class="fw-bold">Nossa Localização</h3>
+                <p class="lead">Venha nos visitar!</p>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body p-0">
+                        <div class="bg-secondary text-white text-center py-5">
+                            <i class="fas fa-map fa-3x mb-3"></i>
+                            <h5>Mapa Interativo</h5>
+                            <p class="mb-0">Aqui seria integrado um mapa do Google Maps ou similar</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
