@@ -14,6 +14,7 @@ from .models import (
     MaquinaPrimariaSecundaria,
     PlanoPreventiva,
     PlanoPreventivaDocumento,
+    MeuPlanoPreventiva,
     RoteiroPreventiva
 )
 
@@ -355,6 +356,45 @@ class PlanoPreventivaAdmin(admin.ModelAdmin):
         }),
         ('Funcionário', {
             'fields': ('cd_funcionario', 'nome_funcionario')
+        }),
+        ('Sistema', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(MeuPlanoPreventiva)
+class MeuPlanoPreventivaAdmin(admin.ModelAdmin):
+    """Admin configuration for MeuPlanoPreventiva model"""
+    list_display = ('cd_maquina', 'descr_maquina', 'numero_plano', 'sequencia_manutencao', 'dt_execucao', 'nome_funcionario', 'created_at')
+    list_filter = ('cd_unid', 'cd_setor', 'numero_plano', 'descr_plano', 'created_at')
+    search_fields = ('cd_maquina', 'descr_maquina', 'cd_setor', 'descr_setor', 'descr_tarefa', 'nome_funcionario', 'cd_funcionario', 'desc_detalhada_do_roteiro_preventiva')
+    readonly_fields = ('created_at', 'updated_at')
+    raw_id_fields = ('maquina', 'roteiro_preventiva')
+    list_per_page = 50
+    
+    fieldsets = (
+        ('Unidade e Setor', {
+            'fields': ('cd_unid', 'nome_unid', 'cd_setor', 'descr_setor', 'cd_atividade')
+        }),
+        ('Máquina', {
+            'fields': ('cd_maquina', 'descr_maquina', 'nro_patrimonio', 'maquina')
+        }),
+        ('Plano', {
+            'fields': ('numero_plano', 'descr_plano', 'sequencia_manutencao')
+        }),
+        ('Execução', {
+            'fields': ('dt_execucao', 'quantidade_periodo')
+        }),
+        ('Tarefa', {
+            'fields': ('sequencia_tarefa', 'descr_tarefa')
+        }),
+        ('Funcionário', {
+            'fields': ('cd_funcionario', 'nome_funcionario')
+        }),
+        ('Roteiro Preventiva', {
+            'fields': ('roteiro_preventiva', 'descr_seqplamanu', 'desc_detalhada_do_roteiro_preventiva')
         }),
         ('Sistema', {
             'fields': ('created_at', 'updated_at'),

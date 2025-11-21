@@ -479,6 +479,84 @@ class PlanoPreventiva(models.Model):
     def __str__(self):
         return f"Plano {self.numero_plano} - Máquina {self.cd_maquina} - Seq {self.sequencia_manutencao}"
 
+class MeuPlanoPreventiva(models.Model):
+    """Modelo para armazenar dados de plano de manutenção preventiva com descrição detalhada do roteiro"""
+    # Unidade
+    cd_unid = models.IntegerField('Código Unidade', blank=True, null=True)
+    nome_unid = models.CharField('Nome Unidade', max_length=255, blank=True, null=True)
+    
+    # Setor
+    cd_setor = models.CharField('Código Setor', max_length=50, blank=True, null=True)
+    descr_setor = models.CharField('Descrição Setor', max_length=255, blank=True, null=True)
+    
+    # Atividade
+    cd_atividade = models.IntegerField('Código Atividade', blank=True, null=True)
+    
+    # Máquina
+    cd_maquina = models.BigIntegerField('Código Máquina', blank=True, null=True, db_index=True)
+    descr_maquina = models.CharField('Descrição Máquina', max_length=500, blank=True, null=True)
+    nro_patrimonio = models.CharField('Número Patrimônio', max_length=100, blank=True, null=True)
+    
+    # Plano
+    numero_plano = models.IntegerField('Número do Plano', blank=True, null=True)
+    descr_plano = models.CharField('Descrição do Plano', max_length=255, blank=True, null=True)
+    sequencia_manutencao = models.IntegerField('Sequência Manutenção', blank=True, null=True)
+    
+    # Execução
+    dt_execucao = models.CharField('Data Execução', max_length=50, blank=True, null=True, help_text='Data no formato DD/MM/YYYY')
+    quantidade_periodo = models.IntegerField('Quantidade Período', blank=True, null=True, help_text='Período em dias')
+    
+    # Tarefa
+    sequencia_tarefa = models.IntegerField('Sequência Tarefa', blank=True, null=True)
+    descr_tarefa = models.TextField('Descrição Tarefa', blank=True, null=True)
+    
+    # Funcionário
+    cd_funcionario = models.CharField('Código Funcionário', max_length=100, blank=True, null=True)
+    nome_funcionario = models.CharField('Nome Funcionário', max_length=255, blank=True, null=True)
+    
+    # Descrição Sequência Plano Manutenção (vinculada do RoteiroPreventiva)
+    descr_seqplamanu = models.CharField('Descrição Sequência Plano Manutenção', max_length=255, blank=True, null=True, help_text='Descrição precisa da ação a ser realizada, vinculada do RoteiroPreventiva')
+    
+    # Descrição Detalhada do Roteiro Preventiva (campo adicional)
+    desc_detalhada_do_roteiro_preventiva = models.TextField('Descrição Detalhada do Roteiro Preventiva', blank=True, null=True, help_text='Descrição detalhada do roteiro de manutenção preventiva')
+    
+    # Relacionamento com máquina (opcional, para facilitar consultas)
+    maquina = models.ForeignKey(
+        Maquina,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        verbose_name='Máquina Relacionada',
+        related_name='meus_planos_preventiva',
+        help_text='Máquina relacionada baseada no código da máquina'
+    )
+    
+    # Relacionamento com RoteiroPreventiva (opcional, para vincular descrição precisa)
+    roteiro_preventiva = models.ForeignKey(
+        'RoteiroPreventiva',
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        verbose_name='Roteiro Preventiva Relacionado',
+        related_name='meus_planos_preventiva',
+        help_text='Roteiro preventiva relacionado que contém a descrição precisa (DESCR_SEQPLAMANU)'
+    )
+    
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Meu Plano Preventiva'
+        verbose_name_plural = 'Meus Planos Preventiva'
+        ordering = ['cd_maquina', 'numero_plano', 'sequencia_manutencao', 'sequencia_tarefa']
+        indexes = [
+            models.Index(fields=['cd_maquina']),
+            models.Index(fields=['cd_unid', 'cd_setor']),
+        ]
+
+    def __str__(self):
+        return f"Meu Plano {self.numero_plano} - Máquina {self.cd_maquina} - Seq {self.sequencia_manutencao}"
+
 class PlanoPreventivaDocumento(models.Model):
     """Modelo para armazenar documentos relacionados a planos de manutenção preventiva"""
     plano_preventiva = models.ForeignKey(

@@ -1,0 +1,310 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Comparação Roteiro e Plano Preventiva{% endblock %}
+
+{% block extra_css %}
+<style>
+    .comparison-card {
+        border-left: 4px solid;
+        transition: transform 0.2s;
+    }
+    .comparison-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .match-true {
+        border-left-color: #28a745;
+        background-color: #f0fff4;
+    }
+    .match-false {
+        border-left-color: #dc3545;
+        background-color: #fff5f5;
+    }
+    .match-partial {
+        border-left-color: #ffc107;
+        background-color: #fffbf0;
+    }
+    .value-box {
+        padding: 12px;
+        border-radius: 6px;
+        margin: 8px 0;
+        word-wrap: break-word;
+    }
+    .value-plano {
+        background-color: #e3f2fd;
+        border: 1px solid #90caf9;
+    }
+    .value-roteiro {
+        background-color: #f3e5f5;
+        border: 1px solid #ce93d8;
+    }
+    .match-badge {
+        font-size: 1.1rem;
+        padding: 8px 16px;
+    }
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'analise_roteiro_plano_preventiva' %}" class="text-white">Análise Roteiro/Plano</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Comparação Detalhada</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Comparação Detalhada</h1>
+                <p class="lead">Comparação lado a lado entre PlanoPreventiva e RoteiroPreventiva</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card shadow-sm bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Campos Comparados</h5>
+                        <p class="card-text display-6">{{ total_campos }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card shadow-sm bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Correspondências</h5>
+                        <p class="card-text display-6">{{ campos_match }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card shadow-sm {% if corresponde_completamente %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                    <div class="card-body">
+                        <h5 class="card-title">Percentual Match</h5>
+                        <p class="card-text display-6">{{ percentual_match|floatformat:1 }}%</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card shadow-sm {% if corresponde_completamente %}bg-success{% else %}bg-danger text-white{% endif %}">
+                    <div class="card-body">
+                        <h5 class="card-title">Status</h5>
+                        <p class="card-text">
+                            {% if corresponde_completamente %}
+                                <span class="badge bg-success match-badge">
+                                    <i class="fas fa-check-circle"></i> Correspondência Completa
+                                </span>
+                            {% else %}
+                                <span class="badge bg-danger match-badge">
+                                    <i class="fas fa-times-circle"></i> Correspondência Parcial
+                                </span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="btn-group" role="group">
+                            <a href="{% url 'visualizar_manutencao_preventiva' plano.id %}" class="btn btn-outline-primary">
+                                <i class="fas fa-eye me-2"></i>Ver Plano Preventiva
+                            </a>
+                            <a href="{% url 'visualizar_roteiro_preventiva' roteiro.id %}" class="btn btn-outline-success">
+                                <i class="fas fa-eye me-2"></i>Ver Roteiro Preventiva
+                            </a>
+                            <a href="{% url 'analise_roteiro_plano_preventiva' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Voltar para Análise
+                            </a>
+                            {% if corresponde_completamente and not ja_salvo %}
+                            <form method="post" action="{% url 'analise_roteiro_plano_preventiva' %}" style="display: inline;" onsubmit="return confirm('Deseja confirmar e salvar esta relação em MeuPlanoPreventiva?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="confirmar_relacao" value="1">
+                                <input type="hidden" name="plano_id" value="{{ plano.id }}">
+                                <input type="hidden" name="roteiro_id" value="{{ roteiro.id }}">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-check me-2"></i>Confirmar e Salvar
+                                </button>
+                            </form>
+                            {% elif ja_salvo %}
+                            <span class="badge bg-success" style="font-size: 1rem; padding: 10px 20px;">
+                                <i class="fas fa-check-circle me-2"></i>Já Salvo em MeuPlanoPreventiva
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison Details -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h3 class="mb-3">
+                    <i class="fas fa-balance-scale me-2"></i>Comparação de Campos
+                </h3>
+            </div>
+        </div>
+
+        <!-- Comparison Cards -->
+        {% for key, comp in comparacoes.items %}
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="card comparison-card shadow-sm {% if comp.match %}match-true{% else %}match-false{% endif %}">
+                    <div class="card-header {% if comp.match %}bg-success text-white{% else %}bg-danger text-white{% endif %}">
+                        <h5 class="mb-0">
+                            {% if comp.match %}
+                                <i class="fas fa-check-circle me-2"></i>
+                            {% else %}
+                                <i class="fas fa-times-circle me-2"></i>
+                            {% endif %}
+                            {{ comp.label }}
+                            <span class="badge bg-light {% if comp.match %}text-success{% else %}text-danger{% endif %} ms-2">
+                                {% if comp.match %}✓ Match{% else %}✗ Não Match{% endif %}
+                            </span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-5">
+                                <h6 class="text-primary">
+                                    <i class="fas fa-calendar-check me-2"></i>PlanoPreventiva
+                                    <small class="text-muted">({{ comp.campo_plano }})</small>
+                                </h6>
+                                <div class="value-box value-plano">
+                                    {% if comp.plano %}
+                                        <strong>{{ comp.plano }}</strong>
+                                    {% else %}
+                                        <span class="text-muted"><em>Vazio</em></span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-2 text-center align-self-center">
+                                <i class="fas fa-arrow-left-right fa-2x {% if comp.match %}text-success{% else %}text-danger{% endif %}"></i>
+                            </div>
+                            <div class="col-md-5">
+                                <h6 class="text-success">
+                                    <i class="fas fa-route me-2"></i>RoteiroPreventiva
+                                    <small class="text-muted">({{ comp.campo_roteiro }})</small>
+                                </h6>
+                                <div class="value-box value-roteiro">
+                                    {% if comp.roteiro %}
+                                        <strong>{{ comp.roteiro }}</strong>
+                                    {% else %}
+                                        <span class="text-muted"><em>Vazio</em></span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Descrição Sequência Plano Manutenção -->
+        {% if descr_seqplamanu %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-alt me-2"></i>Descrição Sequência Plano Manutenção (DESCR_SEQPLAMANU)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="lead mb-0">{{ descr_seqplamanu }}</p>
+                        <small class="text-muted">Este campo será salvo em <strong>DescDetalhadaRoteiroPreventiva</strong> na tabela MeuPlanoPreventiva</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Summary -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Resumo da Comparação
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Informações do Plano</h6>
+                                <ul class="list-unstyled">
+                                    <li><strong>ID:</strong> {{ plano.id }}</li>
+                                    <li><strong>Código Máquina:</strong> {{ plano.cd_maquina|default:"-" }}</li>
+                                    <li><strong>Número Plano:</strong> {{ plano.numero_plano|default:"-" }}</li>
+                                    <li><strong>Sequência Manutenção:</strong> {{ plano.sequencia_manutencao|default:"-" }}</li>
+                                    <li><strong>Sequência Tarefa:</strong> {{ plano.sequencia_tarefa|default:"-" }}</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Informações do Roteiro</h6>
+                                <ul class="list-unstyled">
+                                    <li><strong>ID:</strong> {{ roteiro.id }}</li>
+                                    <li><strong>Código Máquina:</strong> {{ roteiro.cd_maquina|default:"-" }}</li>
+                                    <li><strong>Código Plano:</strong> {{ roteiro.cd_planmanut|default:"-" }}</li>
+                                    <li><strong>Sequência Plano:</strong> {{ roteiro.seq_seqplamanu|default:"-" }}</li>
+                                    <li><strong>Código Tarefa:</strong> {{ roteiro.cd_tarefamanu|default:"-" }}</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="alert {% if corresponde_completamente %}alert-success{% else %}alert-warning{% endif %}">
+                            <h6 class="alert-heading">
+                                {% if corresponde_completamente %}
+                                    <i class="fas fa-check-circle me-2"></i>Correspondência Completa
+                                {% else %}
+                                    <i class="fas fa-exclamation-triangle me-2"></i>Correspondência Parcial
+                                {% endif %}
+                            </h6>
+                            <p class="mb-0">
+                                {% if corresponde_completamente %}
+                                    Todos os campos comparados correspondem exatamente. Esta relação pode ser confirmada e salva em MeuPlanoPreventiva.
+                                {% else %}
+                                    Nem todos os campos correspondem. Esta relação não pode ser confirmada automaticamente. Verifique os campos que não correspondem acima.
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
