@@ -1,0 +1,106 @@
+<!-- template.html -->
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/orgchart/3.16.1/css/jquery.orgchart.css"/>
+    <style>
+        /* Estilos similares ao exemplo acima */
+        .node.nivel-1 { background: #d32f2f; }
+        .node.nivel-2 { background: #1976d2; }
+        .node.nivel-3 { background: #4caf50; }
+        .node.nivel-4 { background: #ff9800; }
+        .node.nivel-5 { background: #9c27b0; }
+    </style>
+</head>
+<body>
+    <button onclick="expandAll()">Expandir Tudo</button>
+    <div id="chart-container"></div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/orgchart/3.16.1/js/jquery.orgchart.js"></script>
+
+    <script>
+        const dados = {{ dados_json|safe }};
+        
+        $(function() {
+            $('#chart-container').orgchart({
+                'data': dados,
+                'direction': 'l2r',
+                'visibleLevel': 4
+            });
+        });
+        
+        function expandAll() {
+            $('#chart-container').orgchart('expandAll');
+        }
+    </script>
+</body>
+</html>
+
+# views.py
+import json
+from django.shortcuts import render
+from .models import Setor, Maquina, MaquinaSecundaria, Manutencao
+
+def visualizar_maquinas_5niveis(request):
+    setores = Setor.objects.prefetch_related(
+        'maquinas_principais__maquinas_secundarias__manutencoes'
+    ).all()
+    
+    # Construir dados recursivamente
+    def construir_node_manutencao(manutencao):
+        return {
+            'id': f'manut_{manutencao.id}',
+            'name': f"📋 {manutencao.data_manutencao.strftime('%d/%m/%Y')}",
+            'title': 'Manutenção',
+            'className': 'nivel-5'
+        }
+    
+    def construir_node_secundaria(maq_sec):
+        return {
+            'id': f'sub_{maq_sec.id}',
+            'name': f'🔧 {maq_sec.nome}',
+            'title': 'Máquina Secundária',
+            'className': 'nivel-4',
+            'children': [
+                construir_node_manutencao(m) 
+                for m in maq_sec.manutencoes.all()[:5]  # Últimas 5
+            ]
+        }
+    
+    def construir_node_principal(maq_principal):
+        return {
+            'id': f'maq_{maq_principal.id}',
+            'name': f'⚙️ {maq_principal.nome}',
+            'title': 'Máquina Principal',
+            'className': 'nivel-3',
+            'children': [
+                construir_node_secundaria(s) 
+                for s in maq_principal.maquinas_secundarias.all()
+            ]
+        }
+    
+    def construir_node_setor(setor):
+        return {
+            'id': f'setor_{setor.id}',
+            'name': f'📍 {setor.nome}',
+            'title': 'Setor',
+            'className': 'nivel-2',
+            'children': [
+                construir_node_principal(m) 
+                for m in setor.maquinas_principais.all()
+            ]
+        }
+    
+    dados = {
+        'id': 'empresa',
+        'name': '🏢 Empresa',
+        'title': 'Empresa',
+        'className': 'nivel-1',
+        'children': [construir_node_setor(s) for s in setores]
+    }
+    
+    return render(request, 'maquinas/orgchart_5niveis.html', {
+        'dados_json': json.dumps(dados)
+    })

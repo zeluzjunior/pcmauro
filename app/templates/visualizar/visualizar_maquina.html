@@ -741,7 +741,82 @@
                     </div>
                 </div>
 
-
+                <!-- Documentos da Máquina -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-upload me-2"></i>Documentos da Máquina
+                            {% if documentos_maquina %}
+                                <span class="badge bg-light text-dark ms-2">{{ documentos_maquina|length }}</span>
+                            {% endif %}
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if documentos_maquina %}
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Arquivo</th>
+                                            <th>Comentário</th>
+                                            <th>Data de Upload</th>
+                                            <th class="text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for documento in documentos_maquina %}
+                                        <tr>
+                                            <td>
+                                                <i class="fas fa-file me-2"></i>
+                                                {% with nome_arquivo=documento.arquivo.name|slice:"20:" %}
+                                                    <strong>{{ nome_arquivo|truncatechars:50 }}</strong>
+                                                {% endwith %}
+                                                <br><small class="text-muted" title="{{ documento.arquivo.name }}">{{ documento.arquivo.name|truncatechars:60 }}</small>
+                                            </td>
+                                            <td>
+                                                {% if documento.comentario %}
+                                                    {{ documento.comentario|truncatewords:10 }}
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <small>{{ documento.created_at|date:"d/m/Y H:i" }}</small>
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="btn-group" role="group">
+                                                    <a href="{{ documento.arquivo.url }}" target="_blank" class="btn btn-sm btn-primary" title="Visualizar">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    <a href="{{ documento.arquivo.url }}" download class="btn btn-sm btn-success" title="Download">
+                                                        <i class="fas fa-download"></i>
+                                                    </a>
+                                                    <a href="{% url 'editar_maquina' maquina.id %}" class="btn btn-sm btn-info" title="Gerenciar Documentos">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-3">
+                                <a href="{% url 'editar_maquina' maquina.id %}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-plus me-2"></i>Adicionar Mais Documentos
+                                </a>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                                <p class="text-muted">Nenhum documento adicionado ainda.</p>
+                                <a href="{% url 'editar_maquina' maquina.id %}" class="btn btn-primary">
+                                    <i class="fas fa-upload me-2"></i>Adicionar Documentos
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
 
                 <!-- Informações do Sistema -->
                 <div class="accordion mb-4" id="accordionInformacoesSistema">

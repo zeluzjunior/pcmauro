@@ -146,6 +146,11 @@
                             <a href="{% url 'analise_roteiro_plano_preventiva' %}" class="btn btn-outline-secondary">
                                 <i class="fas fa-arrow-left me-2"></i>Voltar para Análise
                             </a>
+                            {% if not corresponde_completamente %}
+                            <a href="{% url 'erro_analise_plano_roteiro' plano.id roteiro.id %}" class="btn btn-outline-danger">
+                                <i class="fas fa-exclamation-triangle me-2"></i>Ver Análise de Erros
+                            </a>
+                            {% endif %}
                             {% if corresponde_completamente and not ja_salvo %}
                             <form method="post" action="{% url 'analise_roteiro_plano_preventiva' %}" style="display: inline;" onsubmit="return confirm('Deseja confirmar e salvar esta relação em MeuPlanoPreventiva?');">
                                 {% csrf_token %}

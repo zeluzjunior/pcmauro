@@ -91,6 +91,37 @@ class Maquina(models.Model):
     def __str__(self):
         return f"{self.cd_maquina} - {self.descr_maquina or 'Sem descrição'}"
 
+class MaquinaDocumento(models.Model):
+    """Modelo para armazenar documentos relacionados a máquinas"""
+    maquina = models.ForeignKey(
+        Maquina, 
+        on_delete=models.CASCADE, 
+        verbose_name='Máquina', 
+        related_name='documentos'
+    )
+    arquivo = models.FileField(
+        'Arquivo', 
+        upload_to='maquinas/documentos/', 
+        help_text='Upload de arquivo relacionado à máquina (PDF, imagens, etc.)'
+    )
+    comentario = models.TextField(
+        'Comentário', 
+        blank=True, 
+        null=True, 
+        help_text='Comentário sobre o documento'
+    )
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Documento da Máquina'
+        verbose_name_plural = 'Documentos da Máquina'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        nome_arquivo = self.arquivo.name.split('/')[-1] if self.arquivo else 'Sem arquivo'
+        return f"{self.maquina.cd_maquina} - {nome_arquivo}"
+
 class OrdemServicoCorretiva(models.Model):
     """Modelo para armazenar ordens de serviço corretivas e outros fechadas"""
     # Unidade
@@ -556,6 +587,42 @@ class MeuPlanoPreventiva(models.Model):
 
     def __str__(self):
         return f"Meu Plano {self.numero_plano} - Máquina {self.cd_maquina} - Seq {self.sequencia_manutencao}"
+
+
+class MeuPlanoPreventivaDocumento(models.Model):
+    """Modelo para associar documentos de máquinas (MaquinaDocumento) a MeuPlanoPreventiva"""
+    meu_plano_preventiva = models.ForeignKey(
+        MeuPlanoPreventiva,
+        on_delete=models.CASCADE,
+        verbose_name='Meu Plano Preventiva',
+        related_name='documentos_associados'
+    )
+    maquina_documento = models.ForeignKey(
+        'MaquinaDocumento',
+        on_delete=models.CASCADE,
+        verbose_name='Documento da Máquina',
+        related_name='meus_planos_preventiva_associados',
+        help_text='Documento da máquina associado a este plano'
+    )
+    comentario = models.TextField(
+        'Comentário Adicional',
+        blank=True,
+        null=True,
+        help_text='Comentário adicional sobre esta associação (opcional)'
+    )
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Documento Associado ao Plano PCM'
+        verbose_name_plural = 'Documentos Associados aos Planos PCM'
+        ordering = ['-created_at']
+        unique_together = ['meu_plano_preventiva', 'maquina_documento']  # Evitar duplicatas
+
+    def __str__(self):
+        nome_arquivo = self.maquina_documento.arquivo.name.split('/')[-1] if self.maquina_documento.arquivo else 'Sem arquivo'
+        return f"Plano {self.meu_plano_preventiva.numero_plano} - {nome_arquivo}"
+
 
 class PlanoPreventivaDocumento(models.Model):
     """Modelo para armazenar documentos relacionados a planos de manutenção preventiva"""

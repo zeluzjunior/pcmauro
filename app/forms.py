@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Maquina, OrdemServicoCorretiva, OrdemServicoCorretivaFicha, CentroAtividade, LocalCentroAtividade, Manutentor, ManutencaoTerceiro, PlanoPreventivaDocumento
+from .models import Maquina, MaquinaDocumento, OrdemServicoCorretiva, OrdemServicoCorretivaFicha, CentroAtividade, LocalCentroAtividade, Manutentor, ManutencaoTerceiro, PlanoPreventivaDocumento, MeuPlanoPreventiva
 
 
 class MaquinaForm(forms.ModelForm):
@@ -636,4 +636,167 @@ class PlanoPreventivaDocumentoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['arquivo'].required = True
         self.fields['comentario'].required = False
+
+
+class MeuPlanoPreventivaForm(forms.ModelForm):
+    """Formulário para edição de MeuPlanoPreventiva"""
+    
+    class Meta:
+        model = MeuPlanoPreventiva
+        fields = [
+            'cd_unid',
+            'nome_unid',
+            'cd_setor',
+            'descr_setor',
+            'cd_atividade',
+            'cd_maquina',
+            'descr_maquina',
+            'nro_patrimonio',
+            'numero_plano',
+            'descr_plano',
+            'sequencia_manutencao',
+            'dt_execucao',
+            'quantidade_periodo',
+            'sequencia_tarefa',
+            'descr_tarefa',
+            'cd_funcionario',
+            'nome_funcionario',
+            'descr_seqplamanu',
+            'desc_detalhada_do_roteiro_preventiva',
+            'maquina',
+            'roteiro_preventiva',
+        ]
+        widgets = {
+            'cd_unid': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Código Unidade'
+            }),
+            'nome_unid': forms.TextInput(attrs={
+                'class': 'form-control',
+                'maxlength': '255',
+                'placeholder': 'Nome Unidade'
+            }),
+            'cd_setor': forms.TextInput(attrs={
+                'class': 'form-control',
+                'maxlength': '50',
+                'placeholder': 'Código Setor'
+            }),
+            'descr_setor': forms.TextInput(attrs={
+                'class': 'form-control',
+                'maxlength': '255',
+                'placeholder': 'Descrição Setor'
+            }),
+            'cd_atividade': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Código Atividade'
+            }),
+            'cd_maquina': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Código Máquina'
+            }),
+            'descr_maquina': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'maxlength': '500',
+                'placeholder': 'Descrição da Máquina'
+            }),
+            'nro_patrimonio': forms.TextInput(attrs={
+                'class': 'form-control',
+                'maxlength': '100',
+                'placeholder': 'Número Patrimônio'
+            }),
+            'numero_plano': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Número do Plano'
+            }),
+            'descr_plano': forms.TextInput(attrs={
+                'class': 'form-control',
+                'maxlength': '255',
+                'placeholder': 'Descrição do Plano'
+            }),
+            'sequencia_manutencao': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Sequência Manutenção'
+            }),
+            'dt_execucao': forms.TextInput(attrs={
+                'class': 'form-control',
+                'maxlength': '50',
+                'placeholder': 'Data Execução (DD/MM/YYYY)'
+            }),
+            'quantidade_periodo': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Quantidade Período (dias)'
+            }),
+            'sequencia_tarefa': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Sequência Tarefa'
+            }),
+            'descr_tarefa': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 4,
+                'placeholder': 'Descrição da Tarefa'
+            }),
+            'cd_funcionario': forms.TextInput(attrs={
+                'class': 'form-control',
+                'maxlength': '100',
+                'placeholder': 'Código Funcionário'
+            }),
+            'nome_funcionario': forms.TextInput(attrs={
+                'class': 'form-control',
+                'maxlength': '255',
+                'placeholder': 'Nome Funcionário'
+            }),
+            'descr_seqplamanu': forms.TextInput(attrs={
+                'class': 'form-control',
+                'maxlength': '255',
+                'placeholder': 'Descrição Sequência Plano Manutenção'
+            }),
+            'desc_detalhada_do_roteiro_preventiva': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 6,
+                'placeholder': 'Descrição Detalhada do Roteiro Preventiva'
+            }),
+            'maquina': forms.Select(attrs={
+                'class': 'form-control',
+            }),
+            'roteiro_preventiva': forms.Select(attrs={
+                'class': 'form-control',
+            }),
+        }
+        labels = {
+            'cd_unid': 'Código Unidade',
+            'nome_unid': 'Nome Unidade',
+            'cd_setor': 'Código Setor',
+            'descr_setor': 'Descrição Setor',
+            'cd_atividade': 'Código Atividade',
+            'cd_maquina': 'Código Máquina',
+            'descr_maquina': 'Descrição da Máquina',
+            'nro_patrimonio': 'Número Patrimônio',
+            'numero_plano': 'Número do Plano',
+            'descr_plano': 'Descrição do Plano',
+            'sequencia_manutencao': 'Sequência Manutenção',
+            'dt_execucao': 'Data Execução',
+            'quantidade_periodo': 'Quantidade Período (dias)',
+            'sequencia_tarefa': 'Sequência Tarefa',
+            'descr_tarefa': 'Descrição da Tarefa',
+            'cd_funcionario': 'Código Funcionário',
+            'nome_funcionario': 'Nome Funcionário',
+            'descr_seqplamanu': 'Descrição Sequência Plano Manutenção',
+            'desc_detalhada_do_roteiro_preventiva': 'Descrição Detalhada do Roteiro Preventiva',
+            'maquina': 'Máquina Relacionada',
+            'roteiro_preventiva': 'Roteiro Preventiva Relacionado',
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Configurar querysets para os campos ForeignKey
+        from .models import Maquina, RoteiroPreventiva
+        
+        # Limitar querysets para melhor performance
+        self.fields['maquina'].queryset = Maquina.objects.all().order_by('cd_maquina')[:500]
+        self.fields['roteiro_preventiva'].queryset = RoteiroPreventiva.objects.all().order_by('cd_maquina', 'cd_planmanut')[:500]
+        
+        # Tornar campos opcionais
+        self.fields['maquina'].required = False
+        self.fields['roteiro_preventiva'].required = False
 

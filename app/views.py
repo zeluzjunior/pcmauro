@@ -113,6 +113,15 @@ def em_desenvolvimento(request):
     return render(request, 'em_desenvolvimento.html', context)
 
 
+def testes(request):
+    """Página de testes"""
+    context = {
+        'page_title': 'Testes',
+        'active_page': 'testes'
+    }
+    return render(request, 'testes/testes.html', context)
+
+
 def analise_plano_preventiva(request):
     """Análise de Plano Preventiva"""
     context = {
@@ -130,54 +139,216 @@ def analise_roteiro_plano_preventiva(request):
     from django.contrib import messages
     
     # Verificar se é uma ação de confirmação e salvamento
-    if request.method == 'POST' and 'confirmar_relacao' in request.POST:
-        plano_id = request.POST.get('plano_id')
-        roteiro_id = request.POST.get('roteiro_id')
+    if request.method == 'POST':
+        # Debug: imprimir dados recebidos
+        print(f"=== DEBUG CONFIRMAR RELAÇÃO ===")
+        print(f"POST data: {request.POST}")
+        print(f"POST keys: {list(request.POST.keys())}")
+        print(f"confirmar_relacao in POST: {'confirmar_relacao' in request.POST}")
         
-        try:
-            plano = PlanoPreventiva.objects.get(id=plano_id)
-            roteiro = RoteiroPreventiva.objects.get(id=roteiro_id)
+        if 'confirmar_todos' in request.POST:
+            print(f"=== DEBUG CONFIRMAR TODOS ===")
+            print(f"POST data: {request.POST}")
+            print(f"POST keys: {list(request.POST.keys())}")
+            # Bulk confirmation - confirm all pending relationships
+            relacionamentos_confirmados = 0
+            relacionamentos_erro = 0
             
-            # Verificar se já existe um MeuPlanoPreventiva para este plano
-            meu_plano, created = MeuPlanoPreventiva.objects.get_or_create(
-                cd_maquina=plano.cd_maquina,
-                sequencia_manutencao=plano.sequencia_manutencao,
-                sequencia_tarefa=plano.sequencia_tarefa,
-                defaults={
-                    'cd_unid': plano.cd_unid,
-                    'nome_unid': plano.nome_unid,
-                    'cd_setor': plano.cd_setor,
-                    'descr_setor': plano.descr_setor,
-                    'cd_atividade': plano.cd_atividade,
-                    'descr_maquina': plano.descr_maquina,
-                    'nro_patrimonio': plano.nro_patrimonio,
-                    'numero_plano': plano.numero_plano,
-                    'descr_plano': plano.descr_plano,
-                    'dt_execucao': plano.dt_execucao,
-                    'quantidade_periodo': plano.quantidade_periodo,
-                    'descr_tarefa': plano.descr_tarefa,
-                    'cd_funcionario': plano.cd_funcionario,
-                    'nome_funcionario': plano.nome_funcionario,
-                    'descr_seqplamanu': plano.descr_seqplamanu,
-                    'desc_detalhada_do_roteiro_preventiva': roteiro.descr_seqplamanu,
-                    'roteiro_preventiva': roteiro,
-                    'maquina': plano.maquina,
-                }
-            )
+            # Get all planos and roteiros
+            planos = PlanoPreventiva.objects.all()
+            roteiros = RoteiroPreventiva.objects.all()
             
-            # Se já existia, atualizar
-            if not created:
-                meu_plano.desc_detalhada_do_roteiro_preventiva = roteiro.descr_seqplamanu
-                meu_plano.roteiro_preventiva = roteiro
-                meu_plano.save()
+            # Helper function to check if fields match (same as campos_correspondem)
+            def campos_correspondem(plano, roteiro):
+                if not plano.cd_maquina or not roteiro.cd_maquina:
+                    return False
+                if plano.cd_maquina != roteiro.cd_maquina:
+                    return False
+                
+                descr_plano = (plano.descr_maquina or '').strip().upper()
+                descr_roteiro = (roteiro.descr_maquina or '').strip().upper()
+                if descr_plano and descr_roteiro:
+                    if descr_plano != descr_roteiro:
+                        return False
+                elif descr_plano or descr_roteiro:
+                    return False
+                
+                if not plano.sequencia_tarefa or not roteiro.cd_tarefamanu:
+                    return False
+                if plano.sequencia_tarefa != roteiro.cd_tarefamanu:
+                    return False
+                
+                descr_tarefa_plano = (plano.descr_tarefa or '').strip().upper()
+                descr_tarefa_roteiro = (roteiro.descr_tarefamanu or '').strip().upper()
+                if descr_tarefa_plano and descr_tarefa_roteiro:
+                    if descr_tarefa_plano != descr_tarefa_roteiro:
+                        return False
+                elif descr_tarefa_plano or descr_tarefa_roteiro:
+                    return False
+                
+                if not plano.sequencia_manutencao or not roteiro.seq_seqplamanu:
+                    return False
+                if plano.sequencia_manutencao != roteiro.seq_seqplamanu:
+                    return False
+                
+                return True
             
-            messages.success(request, f'Relação confirmada e salva! Plano {plano.id} vinculado ao Roteiro {roteiro.id} em MeuPlanoPreventiva.')
-        except PlanoPreventiva.DoesNotExist:
-            messages.error(request, 'Plano não encontrado.')
-        except RoteiroPreventiva.DoesNotExist:
-            messages.error(request, 'Roteiro não encontrado.')
-        except Exception as e:
-            messages.error(request, f'Erro ao salvar relação: {str(e)}')
+            # Process all relationships
+            with transaction.atomic():
+                for plano in planos:
+                    for roteiro in roteiros:
+                        if campos_correspondem(plano, roteiro):
+                            # Check if already saved
+                            ja_existe = MeuPlanoPreventiva.objects.filter(
+                                cd_maquina=plano.cd_maquina,
+                                numero_plano=plano.numero_plano,
+                                sequencia_manutencao=plano.sequencia_manutencao,
+                                sequencia_tarefa=plano.sequencia_tarefa
+                            ).exists()
+                            
+                            if not ja_existe:
+                                try:
+                                    meu_plano, created = MeuPlanoPreventiva.objects.get_or_create(
+                                        cd_maquina=plano.cd_maquina,
+                                        numero_plano=plano.numero_plano,
+                                        sequencia_manutencao=plano.sequencia_manutencao,
+                                        sequencia_tarefa=plano.sequencia_tarefa,
+                                        defaults={
+                                            'cd_unid': plano.cd_unid,
+                                            'nome_unid': plano.nome_unid,
+                                            'cd_setor': plano.cd_setor,
+                                            'descr_setor': plano.descr_setor,
+                                            'cd_atividade': plano.cd_atividade,
+                                            'descr_maquina': plano.descr_maquina,
+                                            'nro_patrimonio': plano.nro_patrimonio,
+                                            'descr_plano': plano.descr_plano,
+                                            'dt_execucao': plano.dt_execucao,
+                                            'quantidade_periodo': plano.quantidade_periodo,
+                                            'descr_tarefa': plano.descr_tarefa,
+                                            'cd_funcionario': plano.cd_funcionario,
+                                            'nome_funcionario': plano.nome_funcionario,
+                                            'descr_seqplamanu': roteiro.descr_seqplamanu,
+                                            'desc_detalhada_do_roteiro_preventiva': roteiro.descr_seqplamanu,
+                                            'roteiro_preventiva': roteiro,
+                                            'maquina': plano.maquina,
+                                        }
+                                    )
+                                    
+                                    if not created:
+                                        meu_plano.desc_detalhada_do_roteiro_preventiva = roteiro.descr_seqplamanu
+                                        meu_plano.descr_seqplamanu = roteiro.descr_seqplamanu
+                                        meu_plano.roteiro_preventiva = roteiro
+                                        meu_plano.cd_unid = plano.cd_unid
+                                        meu_plano.nome_unid = plano.nome_unid
+                                        meu_plano.cd_setor = plano.cd_setor
+                                        meu_plano.descr_setor = plano.descr_setor
+                                        meu_plano.cd_atividade = plano.cd_atividade
+                                        meu_plano.descr_maquina = plano.descr_maquina
+                                        meu_plano.nro_patrimonio = plano.nro_patrimonio
+                                        meu_plano.descr_plano = plano.descr_plano
+                                        meu_plano.dt_execucao = plano.dt_execucao
+                                        meu_plano.quantidade_periodo = plano.quantidade_periodo
+                                        meu_plano.descr_tarefa = plano.descr_tarefa
+                                        meu_plano.cd_funcionario = plano.cd_funcionario
+                                        meu_plano.nome_funcionario = plano.nome_funcionario
+                                        meu_plano.maquina = plano.maquina
+                                        meu_plano.save()
+                                    
+                                    relacionamentos_confirmados += 1
+                                except Exception as e:
+                                    relacionamentos_erro += 1
+                                    print(f"Erro ao confirmar relação Plano {plano.id} - Roteiro {roteiro.id}: {str(e)}")
+            
+            if relacionamentos_confirmados > 0:
+                messages.success(request, f'{relacionamentos_confirmados} relação(ões) confirmada(s) e salva(s) com sucesso!')
+            if relacionamentos_erro > 0:
+                messages.warning(request, f'{relacionamentos_erro} relação(ões) apresentaram erro ao salvar.')
+            if relacionamentos_confirmados == 0 and relacionamentos_erro == 0:
+                messages.info(request, 'Nenhuma relação pendente para confirmar.')
+            
+            return redirect('analise_roteiro_plano_preventiva')
+        
+        elif 'confirmar_relacao' in request.POST:
+            plano_id = request.POST.get('plano_id')
+            roteiro_id = request.POST.get('roteiro_id')
+            
+            print(f"plano_id: {plano_id}")
+            print(f"roteiro_id: {roteiro_id}")
+            
+            if not plano_id or not roteiro_id:
+                messages.error(request, 'Plano ID ou Roteiro ID não fornecido.')
+                return redirect('analise_roteiro_plano_preventiva')
+            
+            try:
+                plano = PlanoPreventiva.objects.get(id=plano_id)
+                roteiro = RoteiroPreventiva.objects.get(id=roteiro_id)
+                
+                # Usar transaction.atomic para garantir integridade dos dados
+                with transaction.atomic():
+                    # Verificar se já existe um MeuPlanoPreventiva para esta combinação específica
+                    # Usar uma combinação mais específica para evitar duplicatas
+                    meu_plano, created = MeuPlanoPreventiva.objects.get_or_create(
+                        cd_maquina=plano.cd_maquina,
+                        numero_plano=plano.numero_plano,
+                        sequencia_manutencao=plano.sequencia_manutencao,
+                        sequencia_tarefa=plano.sequencia_tarefa,
+                        defaults={
+                            'cd_unid': plano.cd_unid,
+                            'nome_unid': plano.nome_unid,
+                            'cd_setor': plano.cd_setor,
+                            'descr_setor': plano.descr_setor,
+                            'cd_atividade': plano.cd_atividade,
+                            'descr_maquina': plano.descr_maquina,
+                            'nro_patrimonio': plano.nro_patrimonio,
+                            'descr_plano': plano.descr_plano,
+                            'dt_execucao': plano.dt_execucao,
+                            'quantidade_periodo': plano.quantidade_periodo,
+                            'descr_tarefa': plano.descr_tarefa,
+                            'cd_funcionario': plano.cd_funcionario,
+                            'nome_funcionario': plano.nome_funcionario,
+                            'descr_seqplamanu': roteiro.descr_seqplamanu,
+                            'desc_detalhada_do_roteiro_preventiva': roteiro.descr_seqplamanu,
+                            'roteiro_preventiva': roteiro,
+                            'maquina': plano.maquina,
+                        }
+                    )
+                    
+                    # Se já existia, atualizar com os dados do roteiro
+                    if not created:
+                        meu_plano.desc_detalhada_do_roteiro_preventiva = roteiro.descr_seqplamanu
+                        meu_plano.descr_seqplamanu = roteiro.descr_seqplamanu
+                        meu_plano.roteiro_preventiva = roteiro
+                        # Atualizar outros campos que possam ter mudado
+                        meu_plano.cd_unid = plano.cd_unid
+                        meu_plano.nome_unid = plano.nome_unid
+                        meu_plano.cd_setor = plano.cd_setor
+                        meu_plano.descr_setor = plano.descr_setor
+                        meu_plano.cd_atividade = plano.cd_atividade
+                        meu_plano.descr_maquina = plano.descr_maquina
+                        meu_plano.nro_patrimonio = plano.nro_patrimonio
+                        meu_plano.descr_plano = plano.descr_plano
+                        meu_plano.dt_execucao = plano.dt_execucao
+                        meu_plano.quantidade_periodo = plano.quantidade_periodo
+                        meu_plano.descr_tarefa = plano.descr_tarefa
+                        meu_plano.cd_funcionario = plano.cd_funcionario
+                        meu_plano.nome_funcionario = plano.nome_funcionario
+                        meu_plano.maquina = plano.maquina
+                        meu_plano.save()
+                
+                messages.success(request, f'Relação confirmada e salva com sucesso! Plano {plano.id} vinculado ao Roteiro {roteiro.id} em MeuPlanoPreventiva.')
+                # Redirecionar para evitar reenvio do formulário
+                return redirect('analise_roteiro_plano_preventiva')
+            except PlanoPreventiva.DoesNotExist:
+                messages.error(request, 'Plano não encontrado.')
+                return redirect('analise_roteiro_plano_preventiva')
+            except RoteiroPreventiva.DoesNotExist:
+                messages.error(request, 'Roteiro não encontrado.')
+                return redirect('analise_roteiro_plano_preventiva')
+            except Exception as e:
+                messages.error(request, f'Erro ao salvar relação: {str(e)}')
+                import traceback
+                print(f"Erro ao salvar relação: {traceback.format_exc()}")
+                return redirect('analise_roteiro_plano_preventiva')
     
     # Buscar todos os registros
     planos = PlanoPreventiva.objects.all()
@@ -238,19 +409,67 @@ def analise_roteiro_plano_preventiva(request):
         
         return True
     
+    # Função para calcular score parcial de match
+    def calcular_score_parcial(plano, roteiro):
+        """Calcula um score de correspondência parcial (0-100)"""
+        score = 0
+        total = 0
+        
+        # cd_maquina (peso 20)
+        if plano.cd_maquina and roteiro.cd_maquina:
+            total += 20
+            if plano.cd_maquina == roteiro.cd_maquina:
+                score += 20
+        
+        # descr_maquina (peso 20)
+        descr_plano = (plano.descr_maquina or '').strip().upper()
+        descr_roteiro = (roteiro.descr_maquina or '').strip().upper()
+        if descr_plano and descr_roteiro:
+            total += 20
+            if descr_plano == descr_roteiro:
+                score += 20
+        
+        # sequencia_tarefa vs cd_tarefamanu (peso 20)
+        if plano.sequencia_tarefa and roteiro.cd_tarefamanu:
+            total += 20
+            if plano.sequencia_tarefa == roteiro.cd_tarefamanu:
+                score += 20
+        
+        # descr_tarefa vs descr_tarefamanu (peso 20)
+        descr_tarefa_plano = (plano.descr_tarefa or '').strip().upper()
+        descr_tarefa_roteiro = (roteiro.descr_tarefamanu or '').strip().upper()
+        if descr_tarefa_plano and descr_tarefa_roteiro:
+            total += 20
+            if descr_tarefa_plano == descr_tarefa_roteiro:
+                score += 20
+        
+        # sequencia_manutencao vs seq_seqplamanu (peso 20)
+        if plano.sequencia_manutencao and roteiro.seq_seqplamanu:
+            total += 20
+            if plano.sequencia_manutencao == roteiro.seq_seqplamanu:
+                score += 20
+        
+        if total == 0:
+            return 0
+        return (score / total * 100)
+    
     for plano in planos:
         melhor_match = None
+        melhor_score = 0
         
         # Buscar roteiros que correspondem exatamente
         for roteiro in roteiros:
             if campos_correspondem(plano, roteiro):
                 melhor_match = roteiro
+                melhor_score = 100
                 break
         
         if melhor_match:
             # Verificar se já foi salvo em MeuPlanoPreventiva
+            # Usar a mesma combinação de campos usada no get_or_create
             ja_salvo = MeuPlanoPreventiva.objects.filter(
                 cd_maquina=plano.cd_maquina,
+                numero_plano=plano.numero_plano,
                 sequencia_manutencao=plano.sequencia_manutencao,
                 sequencia_tarefa=plano.sequencia_tarefa
             ).exists()
@@ -264,76 +483,124 @@ def analise_roteiro_plano_preventiva(request):
             planos_processados.add(plano.id)
             roteiros_processados.add(melhor_match.id)
         else:
-            planos_sem_relacao.append(plano)
+            # Encontrar melhor match parcial para exibição (sempre encontrar o melhor, mesmo que score < 40%)
+            # Isso permite mostrar análise de erros mesmo quando não há match parcial bom
+            melhor_match_parcial = None
+            melhor_score_parcial = 0
+            for roteiro in roteiros:
+                if roteiro.id not in roteiros_processados:
+                    score = calcular_score_parcial(plano, roteiro)
+                    if score > melhor_score_parcial:  # Sempre encontrar o melhor, mesmo que baixo
+                        melhor_score_parcial = score
+                        melhor_match_parcial = roteiro
+            
+            planos_sem_relacao.append({
+                'plano': plano,
+                'melhor_match_parcial': melhor_match_parcial,
+                'score_parcial': melhor_score_parcial,
+            })
     
     # Encontrar roteiros sem plano correspondente
     for roteiro in roteiros:
         if roteiro.id not in roteiros_processados:
-            roteiros_sem_relacao.append(roteiro)
+            # Encontrar melhor match parcial para exibição (sempre encontrar o melhor, mesmo que score < 40%)
+            # Isso permite mostrar análise de erros mesmo quando não há match parcial bom
+            melhor_match_parcial = None
+            melhor_score_parcial = 0
+            for plano in planos:
+                if plano.id not in planos_processados:
+                    score = calcular_score_parcial(plano, roteiro)
+                    if score > melhor_score_parcial:  # Sempre encontrar o melhor, mesmo que baixo
+                        melhor_score_parcial = score
+                        melhor_match_parcial = plano
+            
+            roteiros_sem_relacao.append({
+                'roteiro': roteiro,
+                'melhor_match_parcial': melhor_match_parcial,
+                'score_parcial': melhor_score_parcial,
+            })
     
-    # Estatísticas de relacionamentos
-    total_relacionamentos = len(relacionamentos)
-    total_planos_sem_relacao = len(planos_sem_relacao)
-    total_roteiros_sem_relacao = len(roteiros_sem_relacao)
-    total_salvos = sum(1 for rel in relacionamentos if rel.get('ja_salvo', False))
-    
-    # Filtros
+    # Filtros - Obter valores ANTES de aplicar
     filter_maquina = request.GET.get('filter_maquina', '').strip()
     filter_descr_seqplamanu = request.GET.get('filter_descr_seqplamanu', '').strip()
     filter_tipo = request.GET.get('filter_tipo', 'all')  # all, matched, planos_sem, roteiros_sem, salvos
     filter_status = request.GET.get('filter_status', 'all')  # all, pendentes, salvos
     
     # Aplicar filtros
+    relacionamentos_filtrados = relacionamentos.copy()
+    planos_sem_relacao_filtrados = planos_sem_relacao.copy()
+    roteiros_sem_relacao_filtrados = roteiros_sem_relacao.copy()
+    
     if filter_maquina:
         try:
             maquina_num = int(float(filter_maquina))
-            relacionamentos = [r for r in relacionamentos if r['plano'].cd_maquina == maquina_num or r['roteiro'].cd_maquina == maquina_num]
-            planos_sem_relacao = [p for p in planos_sem_relacao if p.cd_maquina == maquina_num]
-            roteiros_sem_relacao = [r for r in roteiros_sem_relacao if r.cd_maquina == maquina_num]
+            relacionamentos_filtrados = [r for r in relacionamentos_filtrados if (r['plano'].cd_maquina and r['plano'].cd_maquina == maquina_num) or (r['roteiro'].cd_maquina and r['roteiro'].cd_maquina == maquina_num)]
+            planos_sem_relacao_filtrados = [p for p in planos_sem_relacao_filtrados if p['plano'].cd_maquina and p['plano'].cd_maquina == maquina_num]
+            roteiros_sem_relacao_filtrados = [r for r in roteiros_sem_relacao_filtrados if r['roteiro'].cd_maquina and r['roteiro'].cd_maquina == maquina_num]
         except (ValueError, TypeError):
-            relacionamentos = [r for r in relacionamentos if str(r['plano'].cd_maquina).find(filter_maquina) != -1 or str(r['roteiro'].cd_maquina).find(filter_maquina) != -1]
-            planos_sem_relacao = [p for p in planos_sem_relacao if str(p.cd_maquina).find(filter_maquina) != -1]
-            roteiros_sem_relacao = [r for r in roteiros_sem_relacao if str(r.cd_maquina).find(filter_maquina) != -1]
+            filter_maquina_str = str(filter_maquina).lower()
+            relacionamentos_filtrados = [r for r in relacionamentos_filtrados if 
+                (r['plano'].cd_maquina and filter_maquina_str in str(r['plano'].cd_maquina).lower()) or 
+                (r['roteiro'].cd_maquina and filter_maquina_str in str(r['roteiro'].cd_maquina).lower()) or
+                (r['plano'].descr_maquina and filter_maquina_str in str(r['plano'].descr_maquina).lower()) or
+                (r['roteiro'].descr_maquina and filter_maquina_str in str(r['roteiro'].descr_maquina).lower())]
+            planos_sem_relacao_filtrados = [p for p in planos_sem_relacao_filtrados if 
+                (p['plano'].cd_maquina and filter_maquina_str in str(p['plano'].cd_maquina).lower()) or
+                (p['plano'].descr_maquina and filter_maquina_str in str(p['plano'].descr_maquina).lower())]
+            roteiros_sem_relacao_filtrados = [r for r in roteiros_sem_relacao_filtrados if 
+                (r['roteiro'].cd_maquina and filter_maquina_str in str(r['roteiro'].cd_maquina).lower()) or
+                (r['roteiro'].descr_maquina and filter_maquina_str in str(r['roteiro'].descr_maquina).lower())]
     
     if filter_descr_seqplamanu:
-        relacionamentos = [r for r in relacionamentos if r['descr_seqplamanu'] and filter_descr_seqplamanu.lower() in r['descr_seqplamanu'].lower()]
+        filter_descr_str = filter_descr_seqplamanu.lower()
+        relacionamentos_filtrados = [r for r in relacionamentos_filtrados if r.get('descr_seqplamanu') and filter_descr_str in r['descr_seqplamanu'].lower()]
     
     if filter_status == 'pendentes':
-        relacionamentos = [r for r in relacionamentos if not r.get('ja_salvo', False)]
+        relacionamentos_filtrados = [r for r in relacionamentos_filtrados if not r.get('ja_salvo', False)]
     elif filter_status == 'salvos':
-        relacionamentos = [r for r in relacionamentos if r.get('ja_salvo', False)]
+        relacionamentos_filtrados = [r for r in relacionamentos_filtrados if r.get('ja_salvo', False)]
     
-    # Paginação para relacionamentos
+    # Estatísticas de relacionamentos APÓS filtros
+    total_relacionamentos = len(relacionamentos_filtrados)
+    total_planos_sem_relacao = len(planos_sem_relacao_filtrados)
+    total_roteiros_sem_relacao = len(roteiros_sem_relacao_filtrados)
+    total_salvos = sum(1 for rel in relacionamentos_filtrados if rel.get('ja_salvo', False))
+    total_pendentes = total_relacionamentos - total_salvos
+    
+    # Paginação para relacionamentos - usar listas filtradas
     if filter_tipo == 'matched':
-        items_to_paginate = relacionamentos
+        items_to_paginate = relacionamentos_filtrados
     elif filter_tipo == 'planos_sem':
-        items_to_paginate = planos_sem_relacao
+        items_to_paginate = planos_sem_relacao_filtrados
     elif filter_tipo == 'roteiros_sem':
-        items_to_paginate = roteiros_sem_relacao
+        items_to_paginate = roteiros_sem_relacao_filtrados
     else:
-        items_to_paginate = relacionamentos
+        items_to_paginate = relacionamentos_filtrados
     
     paginator = Paginator(items_to_paginate, 50)
     page_number = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_number)
+    try:
+        page_obj = paginator.get_page(page_number)
+    except:
+        page_obj = paginator.get_page(1)
     
-    # Preparar dados para o contexto baseado no tipo de filtro
+    # Preparar dados para o contexto baseado no tipo de filtro - usar listas filtradas
     if filter_tipo == 'matched':
         relacionamentos_display = list(page_obj)
-        planos_sem_display = planos_sem_relacao[:50]
-        roteiros_sem_display = roteiros_sem_relacao[:50]
+        planos_sem_display = planos_sem_relacao_filtrados[:50]
+        roteiros_sem_display = roteiros_sem_relacao_filtrados[:50]
     elif filter_tipo == 'planos_sem':
-        relacionamentos_display = relacionamentos[:50]
+        relacionamentos_display = relacionamentos_filtrados[:50]
         planos_sem_display = list(page_obj)
-        roteiros_sem_display = roteiros_sem_relacao[:50]
+        roteiros_sem_display = roteiros_sem_relacao_filtrados[:50]
     elif filter_tipo == 'roteiros_sem':
-        relacionamentos_display = relacionamentos[:50]
-        planos_sem_display = planos_sem_relacao[:50]
+        relacionamentos_display = relacionamentos_filtrados[:50]
+        planos_sem_display = planos_sem_relacao_filtrados[:50]
         roteiros_sem_display = list(page_obj)
     else:  # all
-        relacionamentos_display = relacionamentos[:100]
-        planos_sem_display = planos_sem_relacao[:100]
-        roteiros_sem_display = roteiros_sem_relacao[:100]
+        relacionamentos_display = relacionamentos_filtrados[:100]
+        planos_sem_display = planos_sem_relacao_filtrados[:100]
+        roteiros_sem_display = roteiros_sem_relacao_filtrados[:100]
     
     context = {
         'page_title': 'Análise de Roteiro e Plano de Preventiva',
@@ -347,6 +614,7 @@ def analise_roteiro_plano_preventiva(request):
         'total_planos_sem_relacao': total_planos_sem_relacao,
         'total_roteiros_sem_relacao': total_roteiros_sem_relacao,
         'total_salvos': total_salvos,
+        'total_pendentes': total_pendentes,
         'filter_maquina': filter_maquina,
         'filter_descr_seqplamanu': filter_descr_seqplamanu,
         'filter_tipo': filter_tipo,
@@ -2355,6 +2623,169 @@ def consultar_manutencoes_preventivas(request):
     return render(request, 'consultar/consultar_manutencoes_preventivas.html', context)
 
 
+def consultar_meu_plano(request):
+    """Consultar/listar Meus Planos Preventiva (MeuPlanoPreventiva)"""
+    from app.models import MeuPlanoPreventiva
+    
+    # Buscar todos os meus planos preventiva
+    planos_list = MeuPlanoPreventiva.objects.all().select_related('maquina', 'roteiro_preventiva')
+    
+    # Filtro de busca geral
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        # Criar lista de condições Q
+        search_conditions = Q()
+        
+        # Para campos numéricos, tentar converter e fazer busca exata
+        try:
+            search_num = int(float(search_query))
+            search_conditions |= Q(cd_maquina=search_num) | Q(numero_plano=search_num) | Q(sequencia_manutencao=search_num) | Q(sequencia_tarefa=search_num)
+        except (ValueError, TypeError):
+            pass
+        
+        # Para campos de texto, usar icontains
+        search_conditions |= (
+            Q(descr_maquina__icontains=search_query) |
+            Q(descr_tarefa__icontains=search_query) |
+            Q(nome_funcionario__icontains=search_query) |
+            Q(cd_funcionario__icontains=search_query) |
+            Q(cd_setor__icontains=search_query) |
+            Q(descr_setor__icontains=search_query) |
+            Q(nome_unid__icontains=search_query) |
+            Q(descr_plano__icontains=search_query) |
+            Q(desc_detalhada_do_roteiro_preventiva__icontains=search_query) |
+            Q(descr_seqplamanu__icontains=search_query)
+        )
+        
+        planos_list = planos_list.filter(search_conditions)
+    
+    # Filtros por coluna individual
+    filter_maquina = request.GET.get('filter_maquina', '').strip()
+    if filter_maquina:
+        try:
+            maquina_num = int(float(filter_maquina))
+            planos_list = planos_list.filter(cd_maquina=maquina_num)
+        except (ValueError, TypeError):
+            planos_list = planos_list.filter(
+                Q(cd_maquina__icontains=filter_maquina) |
+                Q(descr_maquina__icontains=filter_maquina)
+            )
+    
+    filter_plano = request.GET.get('filter_plano', '').strip()
+    if filter_plano:
+        try:
+            plano_num = int(float(filter_plano))
+            planos_list = planos_list.filter(numero_plano=plano_num)
+        except (ValueError, TypeError):
+            planos_list = planos_list.filter(
+                Q(numero_plano__icontains=filter_plano) |
+                Q(descr_plano__icontains=filter_plano)
+            )
+    
+    filter_seq_manutencao = request.GET.get('filter_seq_manutencao', '').strip()
+    if filter_seq_manutencao:
+        try:
+            seq_num = int(float(filter_seq_manutencao))
+            planos_list = planos_list.filter(sequencia_manutencao=seq_num)
+        except (ValueError, TypeError):
+            planos_list = planos_list.filter(sequencia_manutencao__icontains=filter_seq_manutencao)
+    
+    filter_data = request.GET.get('filter_data', '').strip()
+    if filter_data:
+        planos_list = planos_list.filter(dt_execucao__icontains=filter_data)
+    
+    filter_periodo = request.GET.get('filter_periodo', '').strip()
+    if filter_periodo:
+        try:
+            periodo_num = int(float(filter_periodo))
+            planos_list = planos_list.filter(quantidade_periodo=periodo_num)
+        except (ValueError, TypeError):
+            planos_list = planos_list.filter(quantidade_periodo__icontains=filter_periodo)
+    
+    filter_seq_tarefa = request.GET.get('filter_seq_tarefa', '').strip()
+    if filter_seq_tarefa:
+        try:
+            seq_tarefa_num = int(float(filter_seq_tarefa))
+            planos_list = planos_list.filter(sequencia_tarefa=seq_tarefa_num)
+        except (ValueError, TypeError):
+            planos_list = planos_list.filter(sequencia_tarefa__icontains=filter_seq_tarefa)
+    
+    filter_tarefa = request.GET.get('filter_tarefa', '').strip()
+    if filter_tarefa:
+        planos_list = planos_list.filter(descr_tarefa__icontains=filter_tarefa)
+    
+    filter_desc_detalhada = request.GET.get('filter_desc_detalhada', '').strip()
+    if filter_desc_detalhada:
+        planos_list = planos_list.filter(desc_detalhada_do_roteiro_preventiva__icontains=filter_desc_detalhada)
+    
+    filter_descr_seqplamanu = request.GET.get('filter_descr_seqplamanu', '').strip()
+    if filter_descr_seqplamanu:
+        planos_list = planos_list.filter(descr_seqplamanu__icontains=filter_descr_seqplamanu)
+    
+    filter_funcionario = request.GET.get('filter_funcionario', '').strip()
+    if filter_funcionario:
+        planos_list = planos_list.filter(
+            Q(nome_funcionario__icontains=filter_funcionario) |
+            Q(cd_funcionario__icontains=filter_funcionario)
+        )
+    
+    filter_setor = request.GET.get('filter_setor', '').strip()
+    if filter_setor:
+        planos_list = planos_list.filter(
+            Q(cd_setor__icontains=filter_setor) |
+            Q(descr_setor__icontains=filter_setor)
+        )
+    
+    filter_unidade = request.GET.get('filter_unidade', '').strip()
+    if filter_unidade:
+        try:
+            unidade_num = int(float(filter_unidade))
+            planos_list = planos_list.filter(cd_unid=unidade_num)
+        except (ValueError, TypeError):
+            planos_list = planos_list.filter(
+                Q(nome_unid__icontains=filter_unidade)
+            )
+    
+    # Ordenar por máquina, plano, sequência manutenção e sequência tarefa
+    planos_list = planos_list.order_by('cd_maquina', 'numero_plano', 'sequencia_manutencao', 'sequencia_tarefa')
+    
+    # Paginação
+    paginator = Paginator(planos_list, 100)  # 100 itens por página
+    page_number = request.GET.get('page', 1)
+    planos = paginator.get_page(page_number)
+    
+    # Estatísticas
+    total_count = MeuPlanoPreventiva.objects.count()
+    maquinas_count = MeuPlanoPreventiva.objects.exclude(cd_maquina__isnull=True).values('cd_maquina').distinct().count()
+    setores_count = MeuPlanoPreventiva.objects.exclude(cd_setor__isnull=True).exclude(cd_setor='').values('cd_setor').distinct().count()
+    planos_com_roteiro = MeuPlanoPreventiva.objects.exclude(roteiro_preventiva__isnull=True).count()
+    
+    context = {
+        'page_title': 'Consultar Meus Planos Preventiva',
+        'active_page': 'consultar_meu_plano',
+        'planos': planos,
+        'total_count': total_count,
+        'maquinas_count': maquinas_count,
+        'setores_count': setores_count,
+        'planos_com_roteiro': planos_com_roteiro,
+        # Preservar filtros no contexto
+        'search_query': search_query,
+        'filter_maquina': filter_maquina,
+        'filter_plano': filter_plano,
+        'filter_seq_manutencao': filter_seq_manutencao,
+        'filter_data': filter_data,
+        'filter_periodo': filter_periodo,
+        'filter_seq_tarefa': filter_seq_tarefa,
+        'filter_tarefa': filter_tarefa,
+        'filter_desc_detalhada': filter_desc_detalhada,
+        'filter_descr_seqplamanu': filter_descr_seqplamanu,
+        'filter_funcionario': filter_funcionario,
+        'filter_setor': filter_setor,
+        'filter_unidade': filter_unidade,
+    }
+    return render(request, 'consultar/consultar_meu_plano.html', context)
+
+
 def consultar_roteiro_preventiva(request):
     """Consultar/listar roteiros de manutenção preventiva"""
     from app.models import RoteiroPreventiva
@@ -2541,6 +2972,513 @@ def visualizar_analise_plano_roteiro(request, plano_id, roteiro_id):
     return redirect('analise_roteiro_plano_preventiva')
 
 
+def erro_analise_plano_roteiro(request, plano_id=None, roteiro_id=None):
+    """Visualizar análise de erros - o que está faltando para encontrar match entre PlanoPreventiva e RoteiroPreventiva"""
+    from app.models import PlanoPreventiva, RoteiroPreventiva
+    from django.shortcuts import redirect
+    from django.contrib import messages
+    
+    # Se não há IDs, mostrar visão geral de todos os registros sem match
+    if plano_id is None or roteiro_id is None:
+        return erro_analise_plano_roteiro_geral(request)
+    
+    try:
+        plano = PlanoPreventiva.objects.select_related('maquina', 'roteiro_preventiva').get(id=plano_id)
+    except PlanoPreventiva.DoesNotExist:
+        messages.error(request, 'Plano de manutenção preventiva não encontrado.')
+        return redirect('analise_roteiro_plano_preventiva')
+    
+    try:
+        roteiro = RoteiroPreventiva.objects.select_related('maquina').get(id=roteiro_id)
+    except RoteiroPreventiva.DoesNotExist:
+        messages.error(request, 'Roteiro de manutenção preventiva não encontrado.')
+        return redirect('analise_roteiro_plano_preventiva')
+    
+    # Analisar o que está faltando para ter match
+    erros = []
+    problemas = []
+    campos_comparados = []  # Lista de todos os campos para exibição completa
+    
+    # Verificar cd_maquina
+    if not plano.cd_maquina or not roteiro.cd_maquina:
+        erros.append({
+            'campo': 'cd_maquina',
+            'label': 'Código da Máquina',
+            'problema': 'Um ou ambos os campos estão vazios',
+            'plano_valor': plano.cd_maquina,
+            'roteiro_valor': roteiro.cd_maquina,
+            'solucao': 'Ambos os registros precisam ter o código da máquina preenchido e devem ser iguais',
+            'tipo': 'vazio'
+        })
+    elif plano.cd_maquina != roteiro.cd_maquina:
+        erros.append({
+            'campo': 'cd_maquina',
+            'label': 'Código da Máquina',
+            'problema': 'Os valores são diferentes',
+            'plano_valor': plano.cd_maquina,
+            'roteiro_valor': roteiro.cd_maquina,
+            'solucao': f'O código da máquina no Plano ({plano.cd_maquina}) deve ser igual ao do Roteiro ({roteiro.cd_maquina})',
+            'tipo': 'diferente'
+        })
+    
+    # Verificar descr_maquina
+    descr_plano = (plano.descr_maquina or '').strip().upper()
+    descr_roteiro = (roteiro.descr_maquina or '').strip().upper()
+    campo_match = True
+    if not descr_plano or not descr_roteiro:
+        campo_match = False
+        erros.append({
+            'campo': 'descr_maquina',
+            'label': 'Descrição da Máquina',
+            'problema': 'Um ou ambos os campos estão vazios',
+            'plano_valor': plano.descr_maquina,
+            'roteiro_valor': roteiro.descr_maquina,
+            'solucao': 'Ambos os registros precisam ter a descrição da máquina preenchida e devem ser iguais',
+            'tipo': 'vazio'
+        })
+    elif descr_plano != descr_roteiro:
+        campo_match = False
+        erros.append({
+            'campo': 'descr_maquina',
+            'label': 'Descrição da Máquina',
+            'problema': 'Os valores são diferentes',
+            'plano_valor': plano.descr_maquina,
+            'roteiro_valor': roteiro.descr_maquina,
+            'solucao': 'As descrições da máquina devem ser idênticas (ignorando maiúsculas/minúsculas)',
+            'tipo': 'diferente'
+        })
+    campos_comparados.append({
+        'campo': 'descr_maquina',
+        'label': 'Descrição da Máquina',
+        'plano_valor': plano.descr_maquina,
+        'roteiro_valor': roteiro.descr_maquina,
+        'match': campo_match
+    })
+    
+    # Verificar sequencia_tarefa vs cd_tarefamanu
+    campo_match = True
+    if not plano.sequencia_tarefa or not roteiro.cd_tarefamanu:
+        campo_match = False
+        erros.append({
+            'campo': 'sequencia_tarefa',
+            'label': 'Sequência Tarefa (Plano) / Código Tarefa (Roteiro)',
+            'problema': 'Um ou ambos os campos estão vazios',
+            'plano_valor': plano.sequencia_tarefa,
+            'roteiro_valor': roteiro.cd_tarefamanu,
+            'solucao': 'O campo "Sequência Tarefa" do Plano deve ser igual ao campo "Código Tarefa" do Roteiro',
+            'tipo': 'vazio'
+        })
+    elif plano.sequencia_tarefa != roteiro.cd_tarefamanu:
+        campo_match = False
+        erros.append({
+            'campo': 'sequencia_tarefa',
+            'label': 'Sequência Tarefa (Plano) / Código Tarefa (Roteiro)',
+            'problema': 'Os valores são diferentes',
+            'plano_valor': plano.sequencia_tarefa,
+            'roteiro_valor': roteiro.cd_tarefamanu,
+            'solucao': f'O campo "Sequência Tarefa" do Plano ({plano.sequencia_tarefa}) deve ser igual ao campo "Código Tarefa" do Roteiro ({roteiro.cd_tarefamanu})',
+            'tipo': 'diferente'
+        })
+    campos_comparados.append({
+        'campo': 'sequencia_tarefa',
+        'label': 'Sequência Tarefa (Plano) / Código Tarefa (Roteiro)',
+        'plano_valor': plano.sequencia_tarefa,
+        'roteiro_valor': roteiro.cd_tarefamanu,
+        'match': campo_match
+    })
+    
+    # Verificar descr_tarefa vs descr_tarefamanu
+    descr_tarefa_plano = (plano.descr_tarefa or '').strip().upper()
+    descr_tarefa_roteiro = (roteiro.descr_tarefamanu or '').strip().upper()
+    campo_match = True
+    if not descr_tarefa_plano or not descr_tarefa_roteiro:
+        campo_match = False
+        erros.append({
+            'campo': 'descr_tarefa',
+            'label': 'Descrição Tarefa (Plano) / Descrição Tarefa (Roteiro)',
+            'problema': 'Um ou ambos os campos estão vazios',
+            'plano_valor': plano.descr_tarefa,
+            'roteiro_valor': roteiro.descr_tarefamanu,
+            'solucao': 'O campo "Descrição Tarefa" do Plano deve ser igual ao campo "Descrição Tarefa" do Roteiro',
+            'tipo': 'vazio'
+        })
+    elif descr_tarefa_plano != descr_tarefa_roteiro:
+        campo_match = False
+        erros.append({
+            'campo': 'descr_tarefa',
+            'label': 'Descrição Tarefa (Plano) / Descrição Tarefa (Roteiro)',
+            'problema': 'Os valores são diferentes',
+            'plano_valor': plano.descr_tarefa,
+            'roteiro_valor': roteiro.descr_tarefamanu,
+            'solucao': 'As descrições da tarefa devem ser idênticas (ignorando maiúsculas/minúsculas)',
+            'tipo': 'diferente'
+        })
+    campos_comparados.append({
+        'campo': 'descr_tarefa',
+        'label': 'Descrição Tarefa (Plano) / Descrição Tarefa (Roteiro)',
+        'plano_valor': plano.descr_tarefa,
+        'roteiro_valor': roteiro.descr_tarefamanu,
+        'match': campo_match
+    })
+    
+    # Verificar sequencia_manutencao vs seq_seqplamanu
+    campo_match = True
+    if not plano.sequencia_manutencao or not roteiro.seq_seqplamanu:
+        campo_match = False
+        erros.append({
+            'campo': 'sequencia_manutencao',
+            'label': 'Sequência Manutenção (Plano) / Sequência Plano (Roteiro)',
+            'problema': 'Um ou ambos os campos estão vazios',
+            'plano_valor': plano.sequencia_manutencao,
+            'roteiro_valor': roteiro.seq_seqplamanu,
+            'solucao': 'O campo "Sequência Manutenção" do Plano deve ser igual ao campo "Sequência Plano" do Roteiro',
+            'tipo': 'vazio'
+        })
+    elif plano.sequencia_manutencao != roteiro.seq_seqplamanu:
+        campo_match = False
+        erros.append({
+            'campo': 'sequencia_manutencao',
+            'label': 'Sequência Manutenção (Plano) / Sequência Plano (Roteiro)',
+            'problema': 'Os valores são diferentes',
+            'plano_valor': plano.sequencia_manutencao,
+            'roteiro_valor': roteiro.seq_seqplamanu,
+            'solucao': f'O campo "Sequência Manutenção" do Plano ({plano.sequencia_manutencao}) deve ser igual ao campo "Sequência Plano" do Roteiro ({roteiro.seq_seqplamanu})',
+            'tipo': 'diferente'
+        })
+    campos_comparados.append({
+        'campo': 'sequencia_manutencao',
+        'label': 'Sequência Manutenção (Plano) / Sequência Plano (Roteiro)',
+        'plano_valor': plano.sequencia_manutencao,
+        'roteiro_valor': roteiro.seq_seqplamanu,
+        'match': campo_match
+    })
+    
+    # Resumo dos problemas
+    total_erros = len(erros)
+    campos_vazios = sum(1 for e in erros if e.get('tipo') == 'vazio')
+    campos_diferentes = sum(1 for e in erros if e.get('tipo') == 'diferente')
+    total_campos = 5  # Total de campos comparados
+    campos_match = total_campos - total_erros
+    percentual_match = (campos_match / total_campos * 100) if total_campos > 0 else 0
+    
+    context = {
+        'page_title': f'Análise de Erros: Plano {plano.numero_plano} ↔ Roteiro {roteiro.cd_planmanut}',
+        'active_page': 'analise_roteiro_plano_preventiva',
+        'plano': plano,
+        'roteiro': roteiro,
+        'erros': erros,
+        'total_erros': total_erros,
+        'campos_vazios': campos_vazios,
+        'campos_diferentes': campos_diferentes,
+        'total_campos': total_campos,
+        'campos_match': campos_match,
+        'percentual_match': percentual_match,
+        'campos_comparados': campos_comparados,
+    }
+    return render(request, 'planejamento/erro_analise_plano_roteiro.html', context)
+
+
+def erro_analise_plano_roteiro_geral(request):
+    """Visão geral de análise de erros - todos os registros sem match e o que está faltando"""
+    from app.models import PlanoPreventiva, RoteiroPreventiva
+    from django.core.paginator import Paginator
+    
+    # Buscar todos os registros
+    planos = PlanoPreventiva.objects.all()
+    roteiros = RoteiroPreventiva.objects.all()
+    
+    # Função para verificar se campos correspondem (mesma lógica da análise principal)
+    def campos_correspondem(plano, roteiro):
+        if not plano.cd_maquina or not roteiro.cd_maquina:
+            return False
+        if plano.cd_maquina != roteiro.cd_maquina:
+            return False
+        
+        descr_plano = (plano.descr_maquina or '').strip().upper()
+        descr_roteiro = (roteiro.descr_maquina or '').strip().upper()
+        if descr_plano and descr_roteiro:
+            if descr_plano != descr_roteiro:
+                return False
+        elif descr_plano or descr_roteiro:
+            return False
+        
+        if not plano.sequencia_tarefa or not roteiro.cd_tarefamanu:
+            return False
+        if plano.sequencia_tarefa != roteiro.cd_tarefamanu:
+            return False
+        
+        descr_tarefa_plano = (plano.descr_tarefa or '').strip().upper()
+        descr_tarefa_roteiro = (roteiro.descr_tarefamanu or '').strip().upper()
+        if descr_tarefa_plano and descr_tarefa_roteiro:
+            if descr_tarefa_plano != descr_tarefa_roteiro:
+                return False
+        elif descr_tarefa_plano or descr_tarefa_roteiro:
+            return False
+        
+        if not plano.sequencia_manutencao or not roteiro.seq_seqplamanu:
+            return False
+        if plano.sequencia_manutencao != roteiro.seq_seqplamanu:
+            return False
+        
+        return True
+    
+    # Função para analisar erros de um par plano-roteiro
+    def analisar_erros(plano, roteiro):
+        erros = []
+        
+        # Verificar cd_maquina
+        if not plano.cd_maquina or not roteiro.cd_maquina:
+            erros.append('cd_maquina')
+        elif plano.cd_maquina != roteiro.cd_maquina:
+            erros.append('cd_maquina')
+        
+        # Verificar descr_maquina
+        descr_plano = (plano.descr_maquina or '').strip().upper()
+        descr_roteiro = (roteiro.descr_maquina or '').strip().upper()
+        if not descr_plano or not descr_roteiro:
+            erros.append('descr_maquina')
+        elif descr_plano != descr_roteiro:
+            erros.append('descr_maquina')
+        
+        # Verificar sequencia_tarefa vs cd_tarefamanu
+        if not plano.sequencia_tarefa or not roteiro.cd_tarefamanu:
+            erros.append('sequencia_tarefa')
+        elif plano.sequencia_tarefa != roteiro.cd_tarefamanu:
+            erros.append('sequencia_tarefa')
+        
+        # Verificar descr_tarefa vs descr_tarefamanu
+        descr_tarefa_plano = (plano.descr_tarefa or '').strip().upper()
+        descr_tarefa_roteiro = (roteiro.descr_tarefamanu or '').strip().upper()
+        if not descr_tarefa_plano or not descr_tarefa_roteiro:
+            erros.append('descr_tarefa')
+        elif descr_tarefa_plano != descr_tarefa_roteiro:
+            erros.append('descr_tarefa')
+        
+        # Verificar sequencia_manutencao vs seq_seqplamanu
+        if not plano.sequencia_manutencao or not roteiro.seq_seqplamanu:
+            erros.append('sequencia_manutencao')
+        elif plano.sequencia_manutencao != roteiro.seq_seqplamanu:
+            erros.append('sequencia_manutencao')
+        
+        return erros
+    
+    # Encontrar planos sem match
+    planos_sem_match = []
+    planos_processados = set()
+    roteiros_processados = set()
+    
+    for plano in planos:
+        tem_match = False
+        melhor_match = None
+        melhor_erros = []
+        
+        for roteiro in roteiros:
+            if campos_correspondem(plano, roteiro):
+                tem_match = True
+                planos_processados.add(plano.id)
+                roteiros_processados.add(roteiro.id)
+                break
+            else:
+                # Analisar erros para encontrar o melhor match parcial
+                erros = analisar_erros(plano, roteiro)
+                if not melhor_match or len(erros) < len(melhor_erros):
+                    melhor_match = roteiro
+                    melhor_erros = erros
+        
+        if not tem_match:
+            planos_sem_match.append({
+                'plano': plano,
+                'melhor_match': melhor_match,
+                'erros': melhor_erros,
+                'total_erros': len(melhor_erros) if melhor_erros else 5,
+            })
+    
+    # Encontrar roteiros sem match
+    roteiros_sem_match = []
+    for roteiro in roteiros:
+        if roteiro.id not in roteiros_processados:
+            melhor_match = None
+            melhor_erros = []
+            
+            for plano in planos:
+                if plano.id not in planos_processados:
+                    erros = analisar_erros(plano, roteiro)
+                    if not melhor_match or len(erros) < len(melhor_erros):
+                        melhor_match = plano
+                        melhor_erros = erros
+            
+            roteiros_sem_match.append({
+                'roteiro': roteiro,
+                'melhor_match': melhor_match,
+                'erros': melhor_erros,
+                'total_erros': len(melhor_erros) if melhor_erros else 5,
+            })
+    
+    # Estatísticas gerais
+    total_planos_sem_match = len(planos_sem_match)
+    total_roteiros_sem_match = len(roteiros_sem_match)
+    
+    # Contar tipos de erros mais comuns
+    erros_comuns = {}
+    for item in planos_sem_match + roteiros_sem_match:
+        for erro in item['erros']:
+            erros_comuns[erro] = erros_comuns.get(erro, 0) + 1
+    
+    context = {
+        'page_title': 'Análise Geral de Erros - Correspondências não encontradas',
+        'active_page': 'analise_roteiro_plano_preventiva',
+        'planos_sem_match': planos_sem_match[:50],  # Limitar para performance
+        'roteiros_sem_match': roteiros_sem_match[:50],
+        'total_planos_sem_match': total_planos_sem_match,
+        'total_roteiros_sem_match': total_roteiros_sem_match,
+        'erros_comuns': sorted(erros_comuns.items(), key=lambda x: x[1], reverse=True),
+        'is_geral': True,
+    }
+    return render(request, 'planejamento/erro_analise_plano_roteiro.html', context)
+
+
+def relacionar_roteiro_plano(request):
+    """Página para relacionar manualmente Roteiros e Planos que não têm match"""
+    from app.models import PlanoPreventiva, RoteiroPreventiva, MeuPlanoPreventiva
+    from django.contrib import messages
+    from django.db import transaction
+    from django.core.paginator import Paginator
+    
+    # Processar criação de relacionamento manual
+    if request.method == 'POST' and 'criar_relacionamento' in request.POST:
+        plano_id = request.POST.get('plano_id')
+        roteiro_id = request.POST.get('roteiro_id')
+        tipo = request.POST.get('tipo')  # 'roteiro_sem' ou 'plano_sem'
+        
+        if not plano_id or not roteiro_id:
+            messages.error(request, 'Por favor, selecione tanto um Plano quanto um Roteiro.')
+        else:
+            try:
+                plano = PlanoPreventiva.objects.get(id=plano_id)
+                roteiro = RoteiroPreventiva.objects.get(id=roteiro_id)
+                
+                # Verificar se já existe um MeuPlanoPreventiva para este plano
+                meu_plano, created = MeuPlanoPreventiva.objects.get_or_create(
+                    cd_maquina=plano.cd_maquina,
+                    sequencia_manutencao=plano.sequencia_manutencao,
+                    sequencia_tarefa=plano.sequencia_tarefa,
+                    defaults={
+                        'cd_unid': plano.cd_unid,
+                        'nome_unid': plano.nome_unid,
+                        'cd_setor': plano.cd_setor,
+                        'descr_setor': plano.descr_setor,
+                        'cd_atividade': plano.cd_atividade,
+                        'descr_maquina': plano.descr_maquina,
+                        'nro_patrimonio': plano.nro_patrimonio,
+                        'numero_plano': plano.numero_plano,
+                        'descr_plano': plano.descr_plano,
+                        'dt_execucao': plano.dt_execucao,
+                        'quantidade_periodo': plano.quantidade_periodo,
+                        'descr_tarefa': plano.descr_tarefa,
+                        'cd_funcionario': plano.cd_funcionario,
+                        'nome_funcionario': plano.nome_funcionario,
+                        'descr_seqplamanu': plano.descr_seqplamanu,
+                        'desc_detalhada_do_roteiro_preventiva': roteiro.descr_seqplamanu,
+                        'roteiro_preventiva': roteiro,
+                        'maquina': plano.maquina,
+                    }
+                )
+                
+                # Se já existia, atualizar
+                if not created:
+                    meu_plano.desc_detalhada_do_roteiro_preventiva = roteiro.descr_seqplamanu
+                    meu_plano.roteiro_preventiva = roteiro
+                    meu_plano.save()
+                
+                messages.success(request, f'Relacionamento criado com sucesso! Plano {plano.id} vinculado ao Roteiro {roteiro.id} em MeuPlanoPreventiva.')
+            except PlanoPreventiva.DoesNotExist:
+                messages.error(request, 'Plano não encontrado.')
+            except RoteiroPreventiva.DoesNotExist:
+                messages.error(request, 'Roteiro não encontrado.')
+            except Exception as e:
+                messages.error(request, f'Erro ao criar relacionamento: {str(e)}')
+    
+    # Buscar todos os registros
+    planos = PlanoPreventiva.objects.all()
+    roteiros = RoteiroPreventiva.objects.all()
+    
+    # Função para verificar se campos correspondem
+    def campos_correspondem(plano, roteiro):
+        if not plano.cd_maquina or not roteiro.cd_maquina:
+            return False
+        if plano.cd_maquina != roteiro.cd_maquina:
+            return False
+        
+        descr_plano = (plano.descr_maquina or '').strip().upper()
+        descr_roteiro = (roteiro.descr_maquina or '').strip().upper()
+        if descr_plano and descr_roteiro:
+            if descr_plano != descr_roteiro:
+                return False
+        elif descr_plano or descr_roteiro:
+            return False
+        
+        if not plano.sequencia_tarefa or not roteiro.cd_tarefamanu:
+            return False
+        if plano.sequencia_tarefa != roteiro.cd_tarefamanu:
+            return False
+        
+        descr_tarefa_plano = (plano.descr_tarefa or '').strip().upper()
+        descr_tarefa_roteiro = (roteiro.descr_tarefamanu or '').strip().upper()
+        if descr_tarefa_plano and descr_tarefa_roteiro:
+            if descr_tarefa_plano != descr_tarefa_roteiro:
+                return False
+        elif descr_tarefa_plano or descr_tarefa_roteiro:
+            return False
+        
+        if not plano.sequencia_manutencao or not roteiro.seq_seqplamanu:
+            return False
+        if plano.sequencia_manutencao != roteiro.seq_seqplamanu:
+            return False
+        
+        return True
+    
+    # Encontrar relacionamentos existentes
+    relacionamentos = []
+    planos_processados = set()
+    roteiros_processados = set()
+    
+    for plano in planos:
+        for roteiro in roteiros:
+            if campos_correspondem(plano, roteiro):
+                relacionamentos.append((plano.id, roteiro.id))
+                planos_processados.add(plano.id)
+                roteiros_processados.add(roteiro.id)
+                break
+    
+    # Encontrar planos sem match
+    planos_sem_match = [p for p in planos if p.id not in planos_processados]
+    
+    # Encontrar roteiros sem match
+    roteiros_sem_match = [r for r in roteiros if r.id not in roteiros_processados]
+    
+    # Paginação
+    page_planos = request.GET.get('page_planos', 1)
+    page_roteiros = request.GET.get('page_roteiros', 1)
+    
+    paginator_planos = Paginator(planos_sem_match, 20)
+    paginator_roteiros = Paginator(roteiros_sem_match, 20)
+    
+    planos_paginated = paginator_planos.get_page(page_planos)
+    roteiros_paginated = paginator_roteiros.get_page(page_roteiros)
+    
+    context = {
+        'page_title': 'Relacionar Roteiro e Plano Manualmente',
+        'active_page': 'relacionar_roteiro_plano',
+        'planos_sem_match': planos_paginated,
+        'roteiros_sem_match': roteiros_paginated,
+        'total_planos_sem_match': len(planos_sem_match),
+        'total_roteiros_sem_match': len(roteiros_sem_match),
+        'todos_planos': list(planos.values('id', 'numero_plano', 'cd_maquina', 'descr_maquina', 'sequencia_manutencao', 'sequencia_tarefa')),
+        'todos_roteiros': list(roteiros.values('id', 'cd_planmanut', 'cd_maquina', 'descr_maquina', 'seq_seqplamanu', 'cd_tarefamanu')),
+    }
+    return render(request, 'planejamento/relacionar_roteiro_plano.html', context)
+
+
 def visualizar_comparacao_roteiro_plano(request, plano_id, roteiro_id):
     """Visualizar comparação detalhada entre um PlanoPreventiva e um RoteiroPreventiva"""
     from app.models import PlanoPreventiva, RoteiroPreventiva, MeuPlanoPreventiva
@@ -2673,7 +3611,511 @@ def visualizar_manutencao_preventiva(request, plano_id):
         'plano': plano,
         'documentos': documentos,
     }
-    return render(request, 'visualizar/visualizar_manutencao_preventiva.html', context)
+    return render(request, 'visualizar/visualizar_plano_preventiva.html', context)
+
+
+def visualizar_plano_pcm(request, plano_id):
+    """Visualizar detalhes de um MeuPlanoPreventiva específico"""
+    from app.models import MeuPlanoPreventiva, MeuPlanoPreventivaDocumento
+    from django.shortcuts import redirect
+    from django.contrib import messages
+    
+    try:
+        plano = MeuPlanoPreventiva.objects.select_related('maquina', 'roteiro_preventiva').get(id=plano_id)
+    except MeuPlanoPreventiva.DoesNotExist:
+        messages.error(request, 'Plano PCM não encontrado.')
+        return redirect('consultar_meu_plano')
+    
+    # Buscar documentos associados
+    documentos_associados = MeuPlanoPreventivaDocumento.objects.filter(
+        meu_plano_preventiva=plano
+    ).select_related('maquina_documento').order_by('-created_at')
+    
+    context = {
+        'page_title': f'Visualizar Plano PCM - Plano {plano.numero_plano}',
+        'active_page': 'consultar_meu_plano',
+        'plano': plano,
+        'documentos_associados': documentos_associados,
+    }
+    return render(request, 'visualizar/visualizar_plano_pcm.html', context)
+
+
+def gerar_pdf_plano_pcm(request, plano_id):
+    """Gerar PDF com informações do MeuPlanoPreventiva e documentos associados"""
+    from app.models import MeuPlanoPreventiva, MeuPlanoPreventivaDocumento
+    from django.http import HttpResponse
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import cm
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
+    from reportlab.pdfgen import canvas
+    from io import BytesIO
+    import os
+    from django.conf import settings
+    
+    try:
+        plano = MeuPlanoPreventiva.objects.select_related('maquina', 'roteiro_preventiva').get(id=plano_id)
+    except MeuPlanoPreventiva.DoesNotExist:
+        from django.contrib import messages
+        messages.error(request, 'Plano PCM não encontrado.')
+        from django.shortcuts import redirect
+        return redirect('consultar_meu_plano')
+    
+    # Buscar documentos associados
+    documentos_associados = MeuPlanoPreventivaDocumento.objects.filter(
+        meu_plano_preventiva=plano
+    ).select_related('maquina_documento').order_by('-created_at')
+    
+    # Criar buffer para o PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+    
+    # Container para os elementos do PDF
+    elements = []
+    
+    # Estilos
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=colors.HexColor('#FF9800'),
+        spaceAfter=30,
+        alignment=TA_CENTER,
+        fontName='Helvetica-Bold'
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.HexColor('#1976D2'),
+        spaceAfter=12,
+        spaceBefore=12,
+        fontName='Helvetica-Bold'
+    )
+    
+    subheading_style = ParagraphStyle(
+        'CustomSubHeading',
+        parent=styles['Heading3'],
+        fontSize=12,
+        textColor=colors.HexColor('#424242'),
+        spaceAfter=8,
+        spaceBefore=8,
+        fontName='Helvetica-Bold'
+    )
+    
+    normal_style = styles['Normal']
+    normal_style.fontSize = 10
+    normal_style.leading = 14
+    
+    # Título
+    elements.append(Paragraph("PLANO PCM - MANUTENÇÃO PREVENTIVA", title_style))
+    elements.append(Spacer(1, 0.5*cm))
+    
+    # Informações do Plano
+    elements.append(Paragraph("INFORMAÇÕES DO PLANO", heading_style))
+    
+    plano_data = [
+        ['<b>Número do Plano:</b>', str(plano.numero_plano) if plano.numero_plano else 'Não informado'],
+        ['<b>Descrição do Plano:</b>', plano.descr_plano or 'Não informado'],
+        ['<b>Sequência Manutenção:</b>', str(plano.sequencia_manutencao) if plano.sequencia_manutencao else 'Não informado'],
+        ['<b>Sequência Tarefa:</b>', str(plano.sequencia_tarefa) if plano.sequencia_tarefa else 'Não informado'],
+        ['<b>Data Execução:</b>', plano.dt_execucao or 'Não informado'],
+        ['<b>Período (dias):</b>', str(plano.quantidade_periodo) if plano.quantidade_periodo else 'Não informado'],
+    ]
+    
+    plano_table = Table(plano_data, colWidths=[6*cm, 10*cm])
+    plano_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E3F2FD')),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#1976D2')),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    elements.append(plano_table)
+    elements.append(Spacer(1, 0.3*cm))
+    
+    # Descrição da Tarefa
+    if plano.descr_tarefa:
+        elements.append(Paragraph("<b>Descrição da Tarefa:</b>", subheading_style))
+        elements.append(Paragraph(plano.descr_tarefa, normal_style))
+        elements.append(Spacer(1, 0.3*cm))
+    
+    # DESCR_SEQPLAMANU
+    if plano.descr_seqplamanu:
+        elements.append(Paragraph("<b>Descrição Sequência Plano Manutenção (DESCR_SEQPLAMANU):</b>", subheading_style))
+        elements.append(Paragraph(plano.descr_seqplamanu, normal_style))
+        elements.append(Spacer(1, 0.3*cm))
+    
+    # Descrição Detalhada do Roteiro
+    if plano.desc_detalhada_do_roteiro_preventiva:
+        elements.append(Paragraph("<b>Descrição Detalhada do Roteiro Preventiva:</b>", subheading_style))
+        elements.append(Paragraph(plano.desc_detalhada_do_roteiro_preventiva, normal_style))
+        elements.append(Spacer(1, 0.3*cm))
+    
+    elements.append(Spacer(1, 0.5*cm))
+    
+    # Informações da Máquina
+    elements.append(Paragraph("INFORMAÇÕES DA MÁQUINA", heading_style))
+    
+    maquina_data = [
+        ['<b>Código da Máquina:</b>', str(plano.cd_maquina) if plano.cd_maquina else 'Não informado'],
+        ['<b>Descrição da Máquina:</b>', plano.descr_maquina or 'Não informado'],
+        ['<b>Nº Patrimônio:</b>', plano.nro_patrimonio or 'Não informado'],
+    ]
+    
+    maquina_table = Table(maquina_data, colWidths=[6*cm, 10*cm])
+    maquina_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E3F2FD')),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#1976D2')),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    elements.append(maquina_table)
+    elements.append(Spacer(1, 0.5*cm))
+    
+    # Informações do Funcionário
+    elements.append(Paragraph("FUNCIONÁRIO RESPONSÁVEL", heading_style))
+    
+    funcionario_data = [
+        ['<b>Código Funcionário:</b>', plano.cd_funcionario or 'Não informado'],
+        ['<b>Nome Funcionário:</b>', plano.nome_funcionario or 'Não informado'],
+    ]
+    
+    funcionario_table = Table(funcionario_data, colWidths=[6*cm, 10*cm])
+    funcionario_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E3F2FD')),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#1976D2')),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    elements.append(funcionario_table)
+    elements.append(Spacer(1, 0.5*cm))
+    
+    # Informações de Unidade e Setor
+    elements.append(Paragraph("UNIDADE E SETOR", heading_style))
+    
+    unidade_data = [
+        ['<b>Código Unidade:</b>', str(plano.cd_unid) if plano.cd_unid else 'Não informado'],
+        ['<b>Nome Unidade:</b>', plano.nome_unid or 'Não informado'],
+        ['<b>Código Setor:</b>', plano.cd_setor or 'Não informado'],
+        ['<b>Descrição Setor:</b>', plano.descr_setor or 'Não informado'],
+        ['<b>Código Atividade:</b>', str(plano.cd_atividade) if plano.cd_atividade else 'Não informado'],
+    ]
+    
+    unidade_table = Table(unidade_data, colWidths=[6*cm, 10*cm])
+    unidade_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E3F2FD')),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#1976D2')),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    elements.append(unidade_table)
+    elements.append(Spacer(1, 0.5*cm))
+    
+    # Documentos Associados
+    elements.append(Paragraph("DOCUMENTOS ASSOCIADOS", heading_style))
+    
+    if documentos_associados:
+        elements.append(Paragraph(f"Total de documentos associados: <b>{documentos_associados.count()}</b>", normal_style))
+        elements.append(Spacer(1, 0.3*cm))
+        
+        # Cabeçalho da tabela de documentos
+        doc_header = [['<b>#</b>', '<b>Nome do Arquivo</b>', '<b>Comentário Original</b>', '<b>Comentário Adicional</b>', '<b>Data Associação</b>']]
+        
+        doc_data = doc_header.copy()
+        for idx, associacao in enumerate(documentos_associados, 1):
+            nome_arquivo = os.path.basename(associacao.maquina_documento.arquivo.name) if associacao.maquina_documento.arquivo else 'N/A'
+            comentario_original = associacao.maquina_documento.comentario or '-'
+            comentario_adicional = associacao.comentario or '-'
+            data_associacao = associacao.created_at.strftime('%d/%m/%Y %H:%M') if associacao.created_at else '-'
+            
+            doc_data.append([
+                str(idx),
+                nome_arquivo[:50] + '...' if len(nome_arquivo) > 50 else nome_arquivo,
+                comentario_original[:40] + '...' if len(comentario_original) > 40 else comentario_original,
+                comentario_adicional[:40] + '...' if len(comentario_adicional) > 40 else comentario_adicional,
+                data_associacao
+            ])
+        
+        doc_table = Table(doc_data, colWidths=[1*cm, 5*cm, 4*cm, 4*cm, 2*cm])
+        doc_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1976D2')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F5F5F5')]),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        elements.append(doc_table)
+    else:
+        elements.append(Paragraph("<i>Nenhum documento associado a este plano PCM.</i>", normal_style))
+    
+    elements.append(Spacer(1, 0.5*cm))
+    
+    # Informações do Sistema
+    elements.append(Paragraph("INFORMAÇÕES DO SISTEMA", heading_style))
+    
+    sistema_data = [
+        ['<b>ID do Registro:</b>', str(plano.id)],
+        ['<b>Data de Criação:</b>', plano.created_at.strftime('%d/%m/%Y %H:%M:%S') if plano.created_at else 'N/A'],
+        ['<b>Última Atualização:</b>', plano.updated_at.strftime('%d/%m/%Y %H:%M:%S') if plano.updated_at else 'N/A'],
+    ]
+    
+    sistema_table = Table(sistema_data, colWidths=[6*cm, 10*cm])
+    sistema_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E3F2FD')),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#1976D2')),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    elements.append(sistema_table)
+    
+    # Construir PDF principal
+    doc.build(elements)
+    
+    # Obter o PDF principal
+    buffer.seek(0)
+    pdf_principal = buffer.getvalue()
+    
+    # Mesclar PDFs dos documentos associados
+    try:
+        from PyPDF2 import PdfReader, PdfWriter
+        import tempfile
+        
+        # Criar um writer para o PDF final
+        pdf_writer = PdfWriter()
+        
+        # Adicionar o PDF principal
+        pdf_principal_reader = PdfReader(BytesIO(pdf_principal))
+        for page in pdf_principal_reader.pages:
+            pdf_writer.add_page(page)
+        
+        # Processar documentos associados
+        pdfs_mesclados = 0
+        pdfs_nao_mesclados = []
+        
+        for associacao in documentos_associados:
+            if associacao.maquina_documento and associacao.maquina_documento.arquivo:
+                arquivo_path = associacao.maquina_documento.arquivo.path
+                nome_arquivo = os.path.basename(arquivo_path)
+                extensao = os.path.splitext(nome_arquivo)[1].lower()
+                
+                # Verificar se é PDF
+                if extensao == '.pdf' and os.path.exists(arquivo_path):
+                    try:
+                        # Ler o PDF do documento
+                        with open(arquivo_path, 'rb') as pdf_file:
+                            pdf_reader = PdfReader(pdf_file)
+                            
+                            # Adicionar diretamente todas as páginas do PDF do documento
+                            for page in pdf_reader.pages:
+                                pdf_writer.add_page(page)
+                            
+                            pdfs_mesclados += 1
+                    except Exception as e:
+                        # Se houver erro ao processar o PDF, apenas registrar e continuar
+                        pdfs_nao_mesclados.append(nome_arquivo)
+                        print(f"Erro ao mesclar PDF {nome_arquivo}: {str(e)}")
+                else:
+                    # Não é PDF ou arquivo não existe - criar página informativa
+                    try:
+                        info_buffer = BytesIO()
+                        info_doc = SimpleDocTemplate(info_buffer, pagesize=A4)
+                        info_elements = []
+                        
+                        info_elements.append(Spacer(1, 8*cm))
+                        info_elements.append(Paragraph(f"<b>DOCUMENTO ANEXO:</b> {nome_arquivo}", heading_style))
+                        info_elements.append(Spacer(1, 0.3*cm))
+                        info_elements.append(Paragraph(f"<i>Este arquivo não é um PDF e não pode ser incluído diretamente no documento.</i>", normal_style))
+                        info_elements.append(Spacer(1, 0.2*cm))
+                        info_elements.append(Paragraph(f"<b>Tipo de arquivo:</b> {extensao or 'Desconhecido'}", normal_style))
+                        if associacao.maquina_documento.comentario:
+                            info_elements.append(Paragraph(f"<b>Comentário:</b> {associacao.maquina_documento.comentario}", normal_style))
+                        if associacao.comentario:
+                            info_elements.append(Paragraph(f"<b>Comentário Adicional:</b> {associacao.comentario}", normal_style))
+                        
+                        info_doc.build(info_elements)
+                        info_buffer.seek(0)
+                        info_reader = PdfReader(info_buffer)
+                        if info_reader.pages:
+                            pdf_writer.add_page(info_reader.pages[0])
+                    except Exception as e:
+                        print(f"Erro ao criar página informativa para {nome_arquivo}: {str(e)}")
+                    pdfs_nao_mesclados.append(nome_arquivo)
+        
+        # Criar buffer final com o PDF mesclado
+        buffer_final = BytesIO()
+        pdf_writer.write(buffer_final)
+        buffer_final.seek(0)
+        pdf_final = buffer_final.getvalue()
+        
+    except ImportError:
+        # Se PyPDF2 não estiver instalado, usar apenas o PDF principal
+        pdf_final = pdf_principal
+    except Exception as e:
+        # Em caso de erro na mesclagem, usar apenas o PDF principal
+        print(f"Erro ao mesclar PDFs: {str(e)}")
+        pdf_final = pdf_principal
+    
+    # Criar resposta HTTP
+    response = HttpResponse(pdf_final, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="Plano_PCM_{plano.numero_plano}_{plano.cd_maquina}.pdf"'
+    
+    return response
+
+
+def editar_plano_pcm(request, plano_id):
+    """Editar um MeuPlanoPreventiva existente"""
+    from app.forms import MeuPlanoPreventivaForm
+    from app.models import MeuPlanoPreventiva, Maquina, RoteiroPreventiva, MaquinaDocumento, MeuPlanoPreventivaDocumento
+    
+    try:
+        plano = MeuPlanoPreventiva.objects.get(id=plano_id)
+    except MeuPlanoPreventiva.DoesNotExist:
+        messages.error(request, 'Plano PCM não encontrado.')
+        return redirect('consultar_meu_plano')
+    
+    if request.method == 'POST':
+        form = MeuPlanoPreventivaForm(request.POST, instance=plano)
+        
+        if form.is_valid():
+            try:
+                plano = form.save()
+                messages.success(request, f'Plano PCM {plano.numero_plano} atualizado com sucesso!')
+                return redirect('visualizar_plano_pcm', plano_id=plano.id)
+            except Exception as e:
+                messages.error(request, f'Erro ao atualizar plano PCM: {str(e)}')
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
+    else:
+        form = MeuPlanoPreventivaForm(instance=plano)
+    
+    # Buscar máquinas e roteiros para os selects
+    maquinas = Maquina.objects.all().order_by('cd_maquina')[:100]  # Limitar para performance
+    roteiros = RoteiroPreventiva.objects.all().order_by('cd_maquina', 'cd_planmanut')[:100]  # Limitar para performance
+    
+    # Buscar documentos da máquina associada (se houver)
+    documentos_maquina = []
+    documentos_associados = []
+    associacoes = []
+    documentos_associados_ids = []
+    associacoes_dict = {}  # Dicionário para mapear documento_id -> associacao_id
+    if plano.maquina:
+        documentos_maquina = MaquinaDocumento.objects.filter(maquina=plano.maquina).order_by('-created_at')
+        # Buscar associações existentes
+        associacoes = MeuPlanoPreventivaDocumento.objects.filter(
+            meu_plano_preventiva=plano
+        ).select_related('maquina_documento').order_by('-created_at')
+        documentos_associados_ids = list(associacoes.values_list('maquina_documento_id', flat=True))
+        documentos_associados = MaquinaDocumento.objects.filter(id__in=documentos_associados_ids).order_by('-created_at')
+        # Criar dicionário para facilitar busca no template
+        for associacao in associacoes:
+            associacoes_dict[associacao.maquina_documento.id] = associacao.id
+    
+    context = {
+        'page_title': f'Editar Plano PCM - Plano {plano.numero_plano}',
+        'active_page': 'consultar_meu_plano',
+        'form': form,
+        'plano': plano,
+        'maquinas': maquinas,
+        'roteiros': roteiros,
+        'documentos_maquina': documentos_maquina,
+        'documentos_associados': documentos_associados,
+        'associacoes': associacoes,
+        'documentos_associados_ids': documentos_associados_ids,
+        'associacoes_dict': associacoes_dict,
+    }
+    return render(request, 'editar/editar_plano_pcm.html', context)
+
+
+def associar_documento_plano_pcm(request, plano_id, documento_id):
+    """Associar um documento de máquina a um MeuPlanoPreventiva"""
+    from app.models import MeuPlanoPreventiva, MaquinaDocumento, MeuPlanoPreventivaDocumento
+    
+    if request.method != 'POST':
+        # Permitir GET também para facilitar links diretos
+        pass
+    
+    try:
+        plano = MeuPlanoPreventiva.objects.get(id=plano_id)
+    except MeuPlanoPreventiva.DoesNotExist:
+        messages.error(request, 'Plano PCM não encontrado.')
+        return redirect('editar_plano_pcm', plano_id=plano_id)
+    
+    try:
+        documento = MaquinaDocumento.objects.get(id=documento_id)
+    except MaquinaDocumento.DoesNotExist:
+        messages.error(request, 'Documento não encontrado.')
+        return redirect('editar_plano_pcm', plano_id=plano_id)
+    
+    # Verificar se já está associado
+    if MeuPlanoPreventivaDocumento.objects.filter(meu_plano_preventiva=plano, maquina_documento=documento).exists():
+        messages.warning(request, 'Este documento já está associado a este plano.')
+        return redirect('editar_plano_pcm', plano_id=plano_id)
+    
+    # Criar associação
+    comentario = request.POST.get('comentario', '').strip() if request.method == 'POST' else ''
+    associacao = MeuPlanoPreventivaDocumento.objects.create(
+        meu_plano_preventiva=plano,
+        maquina_documento=documento,
+        comentario=comentario if comentario else None
+    )
+    messages.success(request, 'Documento associado com sucesso!')
+    return redirect('editar_plano_pcm', plano_id=plano_id)
+
+
+def remover_documento_plano_pcm(request, plano_id, associacao_id):
+    """Remover associação de documento de um MeuPlanoPreventiva"""
+    from app.models import MeuPlanoPreventiva, MeuPlanoPreventivaDocumento
+    
+    try:
+        plano = MeuPlanoPreventiva.objects.get(id=plano_id)
+    except MeuPlanoPreventiva.DoesNotExist:
+        messages.error(request, 'Plano PCM não encontrado.')
+        return redirect('editar_plano_pcm', plano_id=plano_id)
+    
+    try:
+        associacao = MeuPlanoPreventivaDocumento.objects.get(id=associacao_id, meu_plano_preventiva=plano)
+        associacao.delete()
+        messages.success(request, 'Associação de documento removida com sucesso!')
+    except MeuPlanoPreventivaDocumento.DoesNotExist:
+        messages.error(request, 'Associação não encontrada.')
+    
+    return redirect('editar_plano_pcm', plano_id=plano_id)
 
 
 def adicionar_documento_plano_preventiva(request, plano_id):
@@ -2754,9 +4196,89 @@ def remover_documento_plano_preventiva(request, plano_id, documento_id):
     return redirect('visualizar_manutencao_preventiva', plano_id=plano_id)
 
 
+def adicionar_documento_maquina(request, maquina_id):
+    """Adicionar documento a uma máquina"""
+    from app.models import Maquina, MaquinaDocumento
+    import os
+    
+    print(f"DEBUG - adicionar_documento_maquina chamado. Método: {request.method}, maquina_id: {maquina_id}")
+    
+    try:
+        maquina = Maquina.objects.get(id=maquina_id)
+    except Maquina.DoesNotExist:
+        print(f"DEBUG - Máquina {maquina_id} não encontrada")
+        messages.error(request, 'Máquina não encontrada.')
+        return redirect('consultar_maquinas')
+    
+    if request.method == 'POST':
+        print(f"DEBUG - Método POST recebido")
+        print(f"DEBUG - request.FILES: {list(request.FILES.keys())}")
+        print(f"DEBUG - request.POST: {dict(request.POST)}")
+        
+        # Verificar se arquivo foi enviado
+        if 'arquivo' not in request.FILES:
+            print("DEBUG - Arquivo não encontrado em request.FILES")
+            messages.error(request, 'Por favor, selecione um arquivo para upload.')
+            return redirect('editar_maquina', maquina_id=maquina_id)
+        
+        arquivo = request.FILES['arquivo']
+        comentario = request.POST.get('comentario', '').strip()
+        
+        print(f"DEBUG - Arquivo recebido: {arquivo.name}, Tamanho: {arquivo.size}, Content-Type: {arquivo.content_type}")
+        print(f"DEBUG - Comentário: {comentario}")
+        print(f"DEBUG - Máquina ID: {maquina.id}, Máquina: {maquina}")
+        
+        # Criar documento diretamente
+        try:
+            documento = MaquinaDocumento(
+                maquina=maquina,
+                arquivo=arquivo,
+                comentario=comentario if comentario else None
+            )
+            documento.full_clean()  # Validar antes de salvar
+            documento.save()
+            print(f"DEBUG - Documento criado com sucesso! ID: {documento.id}, Arquivo: {documento.arquivo.name}")
+            messages.success(request, 'Documento adicionado com sucesso!')
+        except Exception as e:
+            print(f"DEBUG - Erro ao criar documento: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            messages.error(request, f'Erro ao adicionar documento: {str(e)}')
+    else:
+        print(f"DEBUG - Método não é POST: {request.method}")
+        messages.error(request, 'Método não permitido.')
+    
+    return redirect('editar_maquina', maquina_id=maquina_id)
+
+
+def remover_documento_maquina(request, maquina_id, documento_id):
+    """Remover documento de uma máquina"""
+    from app.models import Maquina, MaquinaDocumento
+    import os
+    
+    try:
+        maquina = Maquina.objects.get(id=maquina_id)
+    except Maquina.DoesNotExist:
+        messages.error(request, 'Máquina não encontrada.')
+        return redirect('consultar_maquinas')
+    
+    try:
+        documento = MaquinaDocumento.objects.get(id=documento_id, maquina=maquina)
+        # Deletar arquivo físico se existir
+        if documento.arquivo:
+            if os.path.isfile(documento.arquivo.path):
+                os.remove(documento.arquivo.path)
+        documento.delete()
+        messages.success(request, 'Documento removido com sucesso!')
+    except MaquinaDocumento.DoesNotExist:
+        messages.error(request, 'Documento não encontrado.')
+    
+    return redirect('editar_maquina', maquina_id=maquina_id)
+
+
 def visualizar_maquina(request, maquina_id):
     """Visualizar detalhes de uma máquina específica"""
-    from app.models import Maquina, ItemEstoque, MaquinaPeca, MaquinaPrimariaSecundaria, PlanoPreventiva
+    from app.models import Maquina, ItemEstoque, MaquinaPeca, MaquinaPrimariaSecundaria, PlanoPreventiva, MaquinaDocumento
     
     try:
         maquina = Maquina.objects.get(id=maquina_id)
@@ -2787,6 +4309,9 @@ def visualizar_maquina(request, maquina_id):
         Q(maquina=maquina) | Q(cd_maquina=maquina.cd_maquina)
     ).order_by('numero_plano', 'sequencia_manutencao', 'sequencia_tarefa')
     
+    # Buscar documentos relacionados a esta máquina
+    documentos_maquina = MaquinaDocumento.objects.filter(maquina=maquina).order_by('-created_at')
+    
     context = {
         'page_title': f'Visualizar Máquina {maquina.cd_maquina}',
         'active_page': 'consultar_maquinas',
@@ -2796,6 +4321,7 @@ def visualizar_maquina(request, maquina_id):
         'relacionamentos_como_primaria': relacionamentos_como_primaria,
         'relacionamentos_como_secundaria': relacionamentos_como_secundaria,
         'planos_preventiva': planos_preventiva,
+        'documentos_maquina': documentos_maquina,
     }
     return render(request, 'visualizar/visualizar_maquina.html', context)
 
@@ -2843,11 +4369,16 @@ def editar_maquina(request, maquina_id):
     else:
         form = MaquinaForm(instance=maquina)
     
+    # Buscar documentos relacionados à máquina
+    from app.models import MaquinaDocumento
+    documentos = MaquinaDocumento.objects.filter(maquina=maquina).order_by('-created_at')
+    
     context = {
         'page_title': f'Editar Máquina {maquina.cd_maquina}',
         'active_page': 'consultar_maquinas',
         'form': form,
         'maquina': maquina,
+        'documentos': documentos,
     }
     return render(request, 'editar/editar_maquina.html', context)
 

@@ -1,6 +1,7 @@
 from django.contrib import admin
 from .models import (
     Maquina, 
+    MaquinaDocumento,
     OrdemServicoCorretiva, 
     OrdemServicoCorretivaFicha,
     CentroAtividade, 
@@ -15,6 +16,7 @@ from .models import (
     PlanoPreventiva,
     PlanoPreventivaDocumento,
     MeuPlanoPreventiva,
+    MeuPlanoPreventivaDocumento,
     RoteiroPreventiva
 )
 
@@ -403,6 +405,30 @@ class MeuPlanoPreventivaAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(MeuPlanoPreventivaDocumento)
+class MeuPlanoPreventivaDocumentoAdmin(admin.ModelAdmin):
+    """Admin configuration for MeuPlanoPreventivaDocumento model"""
+    list_display = ('meu_plano_preventiva', 'maquina_documento', 'comentario', 'created_at')
+    list_filter = ('meu_plano_preventiva', 'created_at')
+    search_fields = ('meu_plano_preventiva__numero_plano', 'maquina_documento__arquivo', 'comentario')
+    readonly_fields = ('created_at', 'updated_at')
+    raw_id_fields = ('meu_plano_preventiva', 'maquina_documento')
+    list_per_page = 50
+
+    fieldsets = (
+        ('Associação', {
+            'fields': ('meu_plano_preventiva', 'maquina_documento')
+        }),
+        ('Informações', {
+            'fields': ('comentario',)
+        }),
+        ('Sistema', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
 @admin.register(RoteiroPreventiva)
 class RoteiroPreventivaAdmin(admin.ModelAdmin):
     """Admin configuration for RoteiroPreventiva model"""
@@ -465,6 +491,30 @@ class PlanoPreventivaDocumentoAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Plano Preventiva', {
             'fields': ('plano_preventiva',)
+        }),
+        ('Documento', {
+            'fields': ('arquivo', 'comentario')
+        }),
+        ('Sistema', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(MaquinaDocumento)
+class MaquinaDocumentoAdmin(admin.ModelAdmin):
+    """Admin configuration for MaquinaDocumento model"""
+    list_display = ('maquina', 'arquivo', 'comentario', 'created_at')
+    list_filter = ('maquina', 'created_at')
+    search_fields = ('maquina__cd_maquina', 'maquina__descr_maquina', 'comentario', 'arquivo')
+    readonly_fields = ('created_at', 'updated_at')
+    raw_id_fields = ('maquina',)
+    list_per_page = 50
+    
+    fieldsets = (
+        ('Máquina', {
+            'fields': ('maquina',)
         }),
         ('Documento', {
             'fields': ('arquivo', 'comentario')

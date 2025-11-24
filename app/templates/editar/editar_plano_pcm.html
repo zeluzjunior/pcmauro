@@ -1,0 +1,707 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Editar Plano PCM {{ plano.numero_plano }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_meu_plano' %}" class="text-white">Meus Planos Preventiva</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Editar Plano PCM {{ plano.numero_plano }}</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Editar Plano PCM</h1>
+                <p class="lead">Atualize os dados do plano {{ plano.numero_plano }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-edit me-2"></i>Editar Dados do Plano PCM
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" id="editarPlanoPCMForm">
+                            {% csrf_token %}
+                            
+                            <!-- Unidade e Setor -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-building me-2"></i>Unidade e Setor
+                                    </h6>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.cd_unid.id_for_label }}" class="form-label">
+                                        {{ form.cd_unid.label }}
+                                    </label>
+                                    {{ form.cd_unid }}
+                                    {% if form.cd_unid.errors %}
+                                        <div class="text-danger small">{{ form.cd_unid.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-9 mb-3">
+                                    <label for="{{ form.nome_unid.id_for_label }}" class="form-label">
+                                        {{ form.nome_unid.label }}
+                                    </label>
+                                    {{ form.nome_unid }}
+                                    {% if form.nome_unid.errors %}
+                                        <div class="text-danger small">{{ form.nome_unid.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.cd_setor.id_for_label }}" class="form-label">
+                                        {{ form.cd_setor.label }}
+                                    </label>
+                                    {{ form.cd_setor }}
+                                    {% if form.cd_setor.errors %}
+                                        <div class="text-danger small">{{ form.cd_setor.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-9 mb-3">
+                                    <label for="{{ form.descr_setor.id_for_label }}" class="form-label">
+                                        {{ form.descr_setor.label }}
+                                    </label>
+                                    {{ form.descr_setor }}
+                                    {% if form.descr_setor.errors %}
+                                        <div class="text-danger small">{{ form.descr_setor.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.cd_atividade.id_for_label }}" class="form-label">
+                                        {{ form.cd_atividade.label }}
+                                    </label>
+                                    {{ form.cd_atividade }}
+                                    {% if form.cd_atividade.errors %}
+                                        <div class="text-danger small">{{ form.cd_atividade.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Máquina -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-industry me-2"></i>Máquina
+                                    </h6>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.cd_maquina.id_for_label }}" class="form-label">
+                                        {{ form.cd_maquina.label }}
+                                    </label>
+                                    {{ form.cd_maquina }}
+                                    {% if form.cd_maquina.errors %}
+                                        <div class="text-danger small">{{ form.cd_maquina.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-9 mb-3">
+                                    <label for="{{ form.descr_maquina.id_for_label }}" class="form-label">
+                                        {{ form.descr_maquina.label }}
+                                    </label>
+                                    {{ form.descr_maquina }}
+                                    {% if form.descr_maquina.errors %}
+                                        <div class="text-danger small">{{ form.descr_maquina.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.nro_patrimonio.id_for_label }}" class="form-label">
+                                        {{ form.nro_patrimonio.label }}
+                                    </label>
+                                    {{ form.nro_patrimonio }}
+                                    {% if form.nro_patrimonio.errors %}
+                                        <div class="text-danger small">{{ form.nro_patrimonio.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.maquina.id_for_label }}" class="form-label">
+                                        {{ form.maquina.label }}
+                                    </label>
+                                    {{ form.maquina }}
+                                    {% if form.maquina.errors %}
+                                        <div class="text-danger small">{{ form.maquina.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Selecione a máquina relacionada (opcional)</div>
+                                </div>
+                            </div>
+
+                            <!-- Plano -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-calendar-check me-2"></i>Plano
+                                    </h6>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.numero_plano.id_for_label }}" class="form-label">
+                                        {{ form.numero_plano.label }}
+                                    </label>
+                                    {{ form.numero_plano }}
+                                    {% if form.numero_plano.errors %}
+                                        <div class="text-danger small">{{ form.numero_plano.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-9 mb-3">
+                                    <label for="{{ form.descr_plano.id_for_label }}" class="form-label">
+                                        {{ form.descr_plano.label }}
+                                    </label>
+                                    {{ form.descr_plano }}
+                                    {% if form.descr_plano.errors %}
+                                        <div class="text-danger small">{{ form.descr_plano.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.sequencia_manutencao.id_for_label }}" class="form-label">
+                                        {{ form.sequencia_manutencao.label }}
+                                    </label>
+                                    {{ form.sequencia_manutencao }}
+                                    {% if form.sequencia_manutencao.errors %}
+                                        <div class="text-danger small">{{ form.sequencia_manutencao.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Execução -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-calendar-alt me-2"></i>Execução
+                                    </h6>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.dt_execucao.id_for_label }}" class="form-label">
+                                        {{ form.dt_execucao.label }}
+                                    </label>
+                                    {{ form.dt_execucao }}
+                                    {% if form.dt_execucao.errors %}
+                                        <div class="text-danger small">{{ form.dt_execucao.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Formato: DD/MM/YYYY</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.quantidade_periodo.id_for_label }}" class="form-label">
+                                        {{ form.quantidade_periodo.label }}
+                                    </label>
+                                    {{ form.quantidade_periodo }}
+                                    {% if form.quantidade_periodo.errors %}
+                                        <div class="text-danger small">{{ form.quantidade_periodo.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Período em dias</div>
+                                </div>
+                            </div>
+
+                            <!-- Tarefa -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-tasks me-2"></i>Tarefa
+                                    </h6>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.sequencia_tarefa.id_for_label }}" class="form-label">
+                                        {{ form.sequencia_tarefa.label }}
+                                    </label>
+                                    {{ form.sequencia_tarefa }}
+                                    {% if form.sequencia_tarefa.errors %}
+                                        <div class="text-danger small">{{ form.sequencia_tarefa.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-9 mb-3">
+                                    <label for="{{ form.descr_tarefa.id_for_label }}" class="form-label">
+                                        {{ form.descr_tarefa.label }}
+                                    </label>
+                                    {{ form.descr_tarefa }}
+                                    {% if form.descr_tarefa.errors %}
+                                        <div class="text-danger small">{{ form.descr_tarefa.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Funcionário -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-user-tie me-2"></i>Funcionário
+                                    </h6>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.cd_funcionario.id_for_label }}" class="form-label">
+                                        {{ form.cd_funcionario.label }}
+                                    </label>
+                                    {{ form.cd_funcionario }}
+                                    {% if form.cd_funcionario.errors %}
+                                        <div class="text-danger small">{{ form.cd_funcionario.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-9 mb-3">
+                                    <label for="{{ form.nome_funcionario.id_for_label }}" class="form-label">
+                                        {{ form.nome_funcionario.label }}
+                                    </label>
+                                    {{ form.nome_funcionario }}
+                                    {% if form.nome_funcionario.errors %}
+                                        <div class="text-danger small">{{ form.nome_funcionario.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Roteiro Preventiva -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-route me-2"></i>Roteiro Preventiva
+                                    </h6>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.roteiro_preventiva.id_for_label }}" class="form-label">
+                                        {{ form.roteiro_preventiva.label }}
+                                    </label>
+                                    {{ form.roteiro_preventiva }}
+                                    {% if form.roteiro_preventiva.errors %}
+                                        <div class="text-danger small">{{ form.roteiro_preventiva.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Selecione o roteiro preventiva relacionado (opcional)</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.descr_seqplamanu.id_for_label }}" class="form-label">
+                                        {{ form.descr_seqplamanu.label }}
+                                    </label>
+                                    {{ form.descr_seqplamanu }}
+                                    {% if form.descr_seqplamanu.errors %}
+                                        <div class="text-danger small">{{ form.descr_seqplamanu.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Descrição precisa da ação a ser realizada</div>
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label for="{{ form.desc_detalhada_do_roteiro_preventiva.id_for_label }}" class="form-label">
+                                        {{ form.desc_detalhada_do_roteiro_preventiva.label }}
+                                    </label>
+                                    {{ form.desc_detalhada_do_roteiro_preventiva }}
+                                    {% if form.desc_detalhada_do_roteiro_preventiva.errors %}
+                                        <div class="text-danger small">{{ form.desc_detalhada_do_roteiro_preventiva.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Descrição detalhada do roteiro de manutenção preventiva</div>
+                                </div>
+                            </div>
+
+                            <!-- Botões do Formulário -->
+                            <div class="d-flex justify-content-between mt-4">
+                                <a href="{% url 'consultar_meu_plano' %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>Cancelar
+                                </a>
+                                <div>
+                                    <a href="{% url 'visualizar_plano_pcm' plano.id %}" class="btn btn-info me-2">
+                                        <i class="fas fa-eye me-2"></i>Visualizar
+                                    </a>
+                                    <button type="submit" id="submitBtn" class="btn btn-warning">
+                                        <i class="fas fa-save me-2"></i>Atualizar Plano PCM
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Documentos da Máquina -->
+        {% if plano.maquina %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-upload me-2"></i>Documentos da Máquina
+                            {% if documentos_maquina %}
+                                <span class="badge bg-light text-dark ms-2">{{ documentos_maquina|length }}</span>
+                            {% endif %}
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if documentos_maquina %}
+                            <div class="mb-4">
+                                <h6 class="fw-bold mb-3">Documentos Disponíveis da Máquina {{ plano.maquina.cd_maquina }}</h6>
+                                <p class="text-muted small mb-3">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Selecione os documentos da máquina que deseja associar a este plano PCM.
+                                </p>
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-sm">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 30px;">
+                                                    <input type="checkbox" id="selectAllDocs" title="Selecionar todos">
+                                                </th>
+                                                <th>Arquivo</th>
+                                                <th>Comentário Original</th>
+                                                <th>Data de Upload</th>
+                                                <th>Status</th>
+                                                <th class="text-center">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for documento in documentos_maquina %}
+                                            {% if documento.id in documentos_associados_ids %}
+                                                {% with associacao_id=associacoes_dict|get_item:documento.id %}
+                                            <tr class="table-success">
+                                                <td>
+                                                    <i class="fas fa-check-circle text-success"></i>
+                                                </td>
+                                                <td>
+                                                    <i class="fas fa-file me-2"></i>
+                                                    {% with nome_arquivo=documento.arquivo.name|slice:"20:" %}
+                                                        <strong>{{ nome_arquivo|truncatechars:50 }}</strong>
+                                                    {% endwith %}
+                                                    <br><small class="text-muted" title="{{ documento.arquivo.name }}">{{ documento.arquivo.name|truncatechars:60 }}</small>
+                                                </td>
+                                                <td>
+                                                    {% if documento.comentario %}
+                                                        {{ documento.comentario|truncatewords:10 }}
+                                                    {% else %}
+                                                        <span class="text-muted">-</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <small>{{ documento.created_at|date:"d/m/Y H:i" }}</small>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-success">Associado</span>
+                                                </td>
+                                                <td class="text-center">
+                                                    <div class="btn-group" role="group">
+                                                        <a href="{{ documento.arquivo.url }}" target="_blank" class="btn btn-sm btn-primary" title="Visualizar">
+                                                            <i class="fas fa-eye"></i>
+                                                        </a>
+                                                        <a href="{{ documento.arquivo.url }}" download class="btn btn-sm btn-success" title="Download">
+                                                            <i class="fas fa-download"></i>
+                                                        </a>
+                                                        {% if associacao_id %}
+                                                        <a href="{% url 'remover_documento_plano_pcm' plano.id associacao_id %}" 
+                                                           class="btn btn-sm btn-danger" 
+                                                           title="Remover Associação"
+                                                           onclick="return confirm('Tem certeza que deseja remover a associação deste documento?');">
+                                                            <i class="fas fa-unlink"></i>
+                                                        </a>
+                                                        {% endif %}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                                {% endwith %}
+                                            {% else %}
+                                            <tr>
+                                                <td>
+                                                    <input type="checkbox" class="doc-checkbox" value="{{ documento.id }}" data-doc-id="{{ documento.id }}">
+                                                </td>
+                                                <td>
+                                                    <i class="fas fa-file me-2"></i>
+                                                    {% with nome_arquivo=documento.arquivo.name|slice:"20:" %}
+                                                        <strong>{{ nome_arquivo|truncatechars:50 }}</strong>
+                                                    {% endwith %}
+                                                    <br><small class="text-muted" title="{{ documento.arquivo.name }}">{{ documento.arquivo.name|truncatechars:60 }}</small>
+                                                </td>
+                                                <td>
+                                                    {% if documento.comentario %}
+                                                        {{ documento.comentario|truncatewords:10 }}
+                                                    {% else %}
+                                                        <span class="text-muted">-</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <small>{{ documento.created_at|date:"d/m/Y H:i" }}</small>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-secondary">Disponível</span>
+                                                </td>
+                                                <td class="text-center">
+                                                    <div class="btn-group" role="group">
+                                                        <a href="{{ documento.arquivo.url }}" target="_blank" class="btn btn-sm btn-primary" title="Visualizar">
+                                                            <i class="fas fa-eye"></i>
+                                                        </a>
+                                                        <a href="{{ documento.arquivo.url }}" download class="btn btn-sm btn-success" title="Download">
+                                                            <i class="fas fa-download"></i>
+                                                        </a>
+                                                        <a href="{% url 'associar_documento_plano_pcm' plano.id documento.id %}" 
+                                                           class="btn btn-sm btn-info" 
+                                                           title="Associar ao Plano PCM"
+                                                           onclick="return confirm('Deseja associar este documento ao plano PCM?');">
+                                                            <i class="fas fa-link"></i>
+                                                        </a>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="mt-3">
+                                    <button type="button" class="btn btn-info btn-sm" id="btnAssociarSelecionados" disabled>
+                                        <i class="fas fa-link me-2"></i>Associar Documentos Selecionados
+                                    </button>
+                                    <small class="text-muted ms-3">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Selecione os documentos que deseja associar e clique no botão acima.
+                                    </small>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                                <p class="text-muted">A máquina associada não possui documentos cadastrados.</p>
+                                <a href="{% url 'editar_maquina' plano.maquina.id %}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-upload me-2"></i>Adicionar Documentos à Máquina
+                                </a>
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Documentos Já Associados -->
+                        {% if associacoes %}
+                        <div class="mt-4 pt-4 border-top">
+                            <h6 class="fw-bold mb-3">Documentos Associados a Este Plano</h6>
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Arquivo</th>
+                                            <th>Comentário Original</th>
+                                            <th>Comentário Adicional</th>
+                                            <th>Data de Associação</th>
+                                            <th class="text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for associacao in associacoes %}
+                                        <tr>
+                                            <td>
+                                                <i class="fas fa-file me-2"></i>
+                                                {% with nome_arquivo=associacao.maquina_documento.arquivo.name|slice:"20:" %}
+                                                    <strong>{{ nome_arquivo|truncatechars:50 }}</strong>
+                                                {% endwith %}
+                                                <br><small class="text-muted" title="{{ associacao.maquina_documento.arquivo.name }}">{{ associacao.maquina_documento.arquivo.name|truncatechars:60 }}</small>
+                                            </td>
+                                            <td>
+                                                {% if associacao.maquina_documento.comentario %}
+                                                    {{ associacao.maquina_documento.comentario|truncatewords:10 }}
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if associacao.comentario %}
+                                                    {{ associacao.comentario|truncatewords:10 }}
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <small>{{ associacao.created_at|date:"d/m/Y H:i" }}</small>
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="btn-group" role="group">
+                                                    <a href="{{ associacao.maquina_documento.arquivo.url }}" target="_blank" class="btn btn-sm btn-primary" title="Visualizar">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    <a href="{{ associacao.maquina_documento.arquivo.url }}" download class="btn btn-sm btn-success" title="Download">
+                                                        <i class="fas fa-download"></i>
+                                                    </a>
+                                                    <a href="{% url 'remover_documento_plano_pcm' plano.id associacao.id %}" 
+                                                       class="btn btn-sm btn-danger" 
+                                                       title="Remover Associação"
+                                                       onclick="return confirm('Tem certeza que deseja remover a associação deste documento?');">
+                                                        <i class="fas fa-unlink"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Atenção:</strong> Para associar documentos, é necessário primeiro associar uma máquina a este plano PCM.
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Botões de Ação -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'consultar_meu_plano' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Voltar para Lista
+                    </a>
+                    <div>
+                        <a href="{% url 'visualizar_plano_pcm' plano.id %}" class="btn btn-info me-2">
+                            <i class="fas fa-eye me-2"></i>Visualizar
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('editarPlanoPCMForm');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    if (form && submitBtn) {
+        submitBtn.addEventListener('click', function(e) {
+            // Desabilitar botão e mostrar loading
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
+            
+            // Permitir o envio do formulário
+            form.submit();
+        });
+        
+        form.addEventListener('submit', function(e) {
+            // Desabilitar botão e mostrar loading
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
+        });
+    }
+    
+    // Funcionalidade de seleção de documentos
+    const selectAllDocs = document.getElementById('selectAllDocs');
+    const docCheckboxes = document.querySelectorAll('.doc-checkbox');
+    const btnAssociarSelecionados = document.getElementById('btnAssociarSelecionados');
+    
+    if (selectAllDocs && docCheckboxes.length > 0) {
+        selectAllDocs.addEventListener('change', function() {
+            docCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updateAssociarButton();
+        });
+    }
+    
+    if (docCheckboxes.length > 0) {
+        docCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                updateAssociarButton();
+                // Desmarcar "selecionar todos" se algum checkbox for desmarcado
+                if (selectAllDocs && !this.checked) {
+                    selectAllDocs.checked = false;
+                }
+            });
+        });
+    }
+    
+    function updateAssociarButton() {
+        const checked = document.querySelectorAll('.doc-checkbox:checked');
+        if (btnAssociarSelecionados) {
+            btnAssociarSelecionados.disabled = checked.length === 0;
+            if (checked.length > 0) {
+                btnAssociarSelecionados.textContent = `Associar ${checked.length} Documento(s) Selecionado(s)`;
+            } else {
+                btnAssociarSelecionados.innerHTML = '<i class="fas fa-link me-2"></i>Associar Documentos Selecionados';
+            }
+        }
+    }
+    
+    if (btnAssociarSelecionados) {
+        btnAssociarSelecionados.addEventListener('click', function() {
+            const checked = document.querySelectorAll('.doc-checkbox:checked');
+            if (checked.length === 0) {
+                alert('Por favor, selecione pelo menos um documento para associar.');
+                return;
+            }
+            
+            if (!confirm(`Deseja associar ${checked.length} documento(s) ao plano PCM?`)) {
+                return;
+            }
+            
+            // Desabilitar botão e mostrar loading
+            btnAssociarSelecionados.disabled = true;
+            btnAssociarSelecionados.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Associando...';
+            
+            // Associar documentos um por um
+            let associados = 0;
+            let erros = 0;
+            const promises = [];
+            
+            checked.forEach(checkbox => {
+                const docId = checkbox.value;
+                const url = '{% url "associar_documento_plano_pcm" plano.id 0 %}'.replace('0', docId);
+                
+                // Criar form data para POST
+                const formData = new FormData();
+                formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+                
+                promises.push(
+                    fetch(url, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        },
+                        credentials: 'same-origin'
+                    })
+                    .then(response => {
+                        if (response.ok || response.redirected) {
+                            associados++;
+                        } else {
+                            erros++;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro ao associar documento:', error);
+                        erros++;
+                    })
+                );
+            });
+            
+            Promise.all(promises).then(() => {
+                if (associados > 0) {
+                    // Recarregar página para mostrar documentos associados
+                    window.location.reload();
+                } else {
+                    alert('Erro ao associar documentos. Por favor, tente novamente.');
+                    btnAssociarSelecionados.disabled = false;
+                    btnAssociarSelecionados.innerHTML = '<i class="fas fa-link me-2"></i>Associar Documentos Selecionados';
+                }
+            });
+        });
+    }
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,494 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Relacionar Roteiro e Plano Manualmente{% endblock %}
+
+{% block extra_css %}
+<style>
+    .selection-card {
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 10px 0;
+        transition: all 0.3s;
+    }
+    .selection-card:hover {
+        border-color: #0d6efd;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .selection-card.selected {
+        border-color: #0d6efd;
+        background-color: #e7f3ff;
+    }
+    .link-form {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        padding: 20px;
+        color: white;
+        margin: 20px 0;
+    }
+    .record-table {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .record-item {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    .record-item:hover {
+        background-color: #f8f9fa;
+    }
+    .record-item.selected {
+        background-color: #e7f3ff;
+        border-left: 4px solid #0d6efd;
+    }
+    .description-cell {
+        max-width: 300px;
+        word-wrap: break-word;
+        white-space: normal;
+        line-height: 1.4;
+    }
+    .description-cell small {
+        display: block;
+        margin-top: 4px;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'analise_roteiro_plano_preventiva' %}" class="text-white">Análise Roteiro/Plano</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Relacionar Manualmente</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Relacionar Roteiro e Plano Manualmente</h1>
+                <p class="lead">Crie relacionamentos manuais entre Roteiros e Planos que não têm correspondência automática</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card shadow-sm bg-warning text-dark">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Planos sem Roteiro
+                        </h5>
+                        <p class="card-text display-6">{{ total_planos_sem_match }}</p>
+                        <small>Planos aguardando relacionamento</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm bg-danger text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-exclamation-circle me-2"></i>Roteiros sem Plano
+                        </h5>
+                        <p class="card-text display-6">{{ total_roteiros_sem_match }}</p>
+                        <small>Roteiros aguardando relacionamento</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 1: Roteiros sem Plano -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-route me-2"></i>Roteiros sem Plano Correspondente
+                            <span class="badge bg-light text-dark ms-2">{{ total_roteiros_sem_match }}</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Selecione um Roteiro e um Plano abaixo para criar um relacionamento manual.
+                        </p>
+                        
+                        <!-- Form to Link Roteiro with Plano -->
+                        <div class="link-form">
+                            <h5 class="mb-3 text-white">
+                                <i class="fas fa-link me-2"></i>Criar Relacionamento Manual
+                            </h5>
+                            <form method="post" id="formRoteiroSem">
+                                {% csrf_token %}
+                                <input type="hidden" name="criar_relacionamento" value="1">
+                                <input type="hidden" name="tipo" value="roteiro_sem">
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="roteiro_select_1" class="form-label text-white">
+                                            <i class="fas fa-route me-2"></i>Selecione o Roteiro:
+                                        </label>
+                                        <select class="form-select" id="roteiro_select_1" name="roteiro_id" required>
+                                            <option value="">-- Selecione um Roteiro --</option>
+                                            {% for roteiro in roteiros_sem_match %}
+                                            <option value="{{ roteiro.id }}">
+                                                ID: {{ roteiro.id }} | Máquina: {{ roteiro.cd_maquina|default:"-" }} | 
+                                                Plano: {{ roteiro.cd_planmanut|default:"-" }} | 
+                                                Seq: {{ roteiro.seq_seqplamanu|default:"-" }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="plano_select_1" class="form-label text-white">
+                                            <i class="fas fa-calendar-check me-2"></i>Selecione o Plano:
+                                        </label>
+                                        <select class="form-select" id="plano_select_1" name="plano_id" required>
+                                            <option value="">-- Selecione um Plano --</option>
+                                            {% for plano in todos_planos %}
+                                            <option value="{{ plano.id }}">
+                                                ID: {{ plano.id }} | Máquina: {{ plano.cd_maquina|default:"-" }} | 
+                                                Plano: {{ plano.numero_plano|default:"-" }} | 
+                                                Seq Manut: {{ plano.sequencia_manutencao|default:"-" }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="text-center">
+                                    <button type="submit" class="btn btn-light btn-lg">
+                                        <i class="fas fa-link me-2"></i>Criar Relacionamento
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Table of Roteiros without Plano -->
+                        <div class="mt-4">
+                            <h6 class="mb-3">
+                                <i class="fas fa-list me-2"></i>Lista de Roteiros sem Plano
+                            </h6>
+                            <div class="table-responsive record-table">
+                                <table class="table table-hover table-striped">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Código Máquina</th>
+                                            <th>Descrição Máquina</th>
+                                            <th>Código Plano</th>
+                                            <th>Seq. Plano</th>
+                                            <th>Código Tarefa</th>
+                                            <th>Descrição Tarefa</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for roteiro in roteiros_sem_match %}
+                                        <tr class="record-item" onclick="selectRoteiro({{ roteiro.id }}, '{{ roteiro.cd_maquina|default:"-" }}', '{{ roteiro.cd_planmanut|default:"-" }}')">
+                                            <td><strong>{{ roteiro.id }}</strong></td>
+                                            <td>{{ roteiro.cd_maquina|default:"-" }}</td>
+                                            <td class="description-cell">
+                                                {% if roteiro.descr_maquina %}
+                                                    {{ roteiro.descr_maquina }}
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ roteiro.cd_planmanut|default:"-" }}</td>
+                                            <td>{{ roteiro.seq_seqplamanu|default:"-" }}</td>
+                                            <td>{{ roteiro.cd_tarefamanu|default:"-" }}</td>
+                                            <td class="description-cell">
+                                                {% if roteiro.descr_tarefamanu %}
+                                                    {{ roteiro.descr_tarefamanu }}
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{% url 'visualizar_roteiro_preventiva' roteiro.id %}" class="btn btn-sm btn-outline-success" onclick="event.stopPropagation();">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="8" class="text-center py-4">
+                                                <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                                                <p class="text-muted mb-0">Todos os roteiros têm planos correspondentes!</p>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Pagination for Roteiros -->
+                            {% if roteiros_sem_match.has_other_pages %}
+                            <nav aria-label="Paginação de Roteiros">
+                                <ul class="pagination justify-content-center mt-3">
+                                    {% if roteiros_sem_match.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page_roteiros={{ roteiros_sem_match.previous_page_number }}&page_planos={{ planos_sem_match.number }}">Anterior</a>
+                                    </li>
+                                    {% endif %}
+                                    <li class="page-item active">
+                                        <span class="page-link">Página {{ roteiros_sem_match.number }} de {{ roteiros_sem_match.paginator.num_pages }}</span>
+                                    </li>
+                                    {% if roteiros_sem_match.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page_roteiros={{ roteiros_sem_match.next_page_number }}&page_planos={{ planos_sem_match.number }}">Próxima</a>
+                                    </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 2: Planos sem Roteiro -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-calendar-check me-2"></i>Planos sem Roteiro Correspondente
+                            <span class="badge bg-dark text-white ms-2">{{ total_planos_sem_match }}</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Selecione um Plano e um Roteiro abaixo para criar um relacionamento manual.
+                        </p>
+                        
+                        <!-- Form to Link Plano with Roteiro -->
+                        <div class="link-form" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                            <h5 class="mb-3 text-white">
+                                <i class="fas fa-link me-2"></i>Criar Relacionamento Manual
+                            </h5>
+                            <form method="post" id="formPlanoSem">
+                                {% csrf_token %}
+                                <input type="hidden" name="criar_relacionamento" value="1">
+                                <input type="hidden" name="tipo" value="plano_sem">
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="plano_select_2" class="form-label text-white">
+                                            <i class="fas fa-calendar-check me-2"></i>Selecione o Plano:
+                                        </label>
+                                        <select class="form-select" id="plano_select_2" name="plano_id" required>
+                                            <option value="">-- Selecione um Plano --</option>
+                                            {% for plano in planos_sem_match %}
+                                            <option value="{{ plano.id }}">
+                                                ID: {{ plano.id }} | Máquina: {{ plano.cd_maquina|default:"-" }} | 
+                                                Plano: {{ plano.numero_plano|default:"-" }} | 
+                                                Seq Manut: {{ plano.sequencia_manutencao|default:"-" }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="roteiro_select_2" class="form-label text-white">
+                                            <i class="fas fa-route me-2"></i>Selecione o Roteiro:
+                                        </label>
+                                        <select class="form-select" id="roteiro_select_2" name="roteiro_id" required>
+                                            <option value="">-- Selecione um Roteiro --</option>
+                                            {% for roteiro in todos_roteiros %}
+                                            <option value="{{ roteiro.id }}">
+                                                ID: {{ roteiro.id }} | Máquina: {{ roteiro.cd_maquina|default:"-" }} | 
+                                                Plano: {{ roteiro.cd_planmanut|default:"-" }} | 
+                                                Seq: {{ roteiro.seq_seqplamanu|default:"-" }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="text-center">
+                                    <button type="submit" class="btn btn-light btn-lg">
+                                        <i class="fas fa-link me-2"></i>Criar Relacionamento
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Table of Planos without Roteiro -->
+                        <div class="mt-4">
+                            <h6 class="mb-3">
+                                <i class="fas fa-list me-2"></i>Lista de Planos sem Roteiro
+                            </h6>
+                            <div class="table-responsive record-table">
+                                <table class="table table-hover table-striped">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Código Máquina</th>
+                                            <th>Descrição Máquina</th>
+                                            <th>Número Plano</th>
+                                            <th>Seq. Manutenção</th>
+                                            <th>Seq. Tarefa</th>
+                                            <th>Descrição Tarefa</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for plano in planos_sem_match %}
+                                        <tr class="record-item" onclick="selectPlano({{ plano.id }}, '{{ plano.cd_maquina|default:"-" }}', '{{ plano.numero_plano|default:"-" }}')">
+                                            <td><strong>{{ plano.id }}</strong></td>
+                                            <td>{{ plano.cd_maquina|default:"-" }}</td>
+                                            <td class="description-cell">
+                                                {% if plano.descr_maquina %}
+                                                    {{ plano.descr_maquina }}
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ plano.numero_plano|default:"-" }}</td>
+                                            <td>{{ plano.sequencia_manutencao|default:"-" }}</td>
+                                            <td>{{ plano.sequencia_tarefa|default:"-" }}</td>
+                                            <td class="description-cell">
+                                                {% if plano.descr_tarefa %}
+                                                    {{ plano.descr_tarefa }}
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{% url 'visualizar_manutencao_preventiva' plano.id %}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="8" class="text-center py-4">
+                                                <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                                                <p class="text-muted mb-0">Todos os planos têm roteiros correspondentes!</p>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Pagination for Planos -->
+                            {% if planos_sem_match.has_other_pages %}
+                            <nav aria-label="Paginação de Planos">
+                                <ul class="pagination justify-content-center mt-3">
+                                    {% if planos_sem_match.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page_planos={{ planos_sem_match.previous_page_number }}&page_roteiros={{ roteiros_sem_match.number }}">Anterior</a>
+                                    </li>
+                                    {% endif %}
+                                    <li class="page-item active">
+                                        <span class="page-link">Página {{ planos_sem_match.number }} de {{ planos_sem_match.paginator.num_pages }}</span>
+                                    </li>
+                                    {% if planos_sem_match.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page_planos={{ planos_sem_match.next_page_number }}&page_roteiros={{ roteiros_sem_match.number }}">Próxima</a>
+                                    </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <a href="{% url 'analise_roteiro_plano_preventiva' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Voltar para Análise
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function selectRoteiro(roteiroId, maquina, plano) {
+        // Selecionar o roteiro no dropdown
+        document.getElementById('roteiro_select_1').value = roteiroId;
+        
+        // Destacar a linha selecionada
+        document.querySelectorAll('.record-item').forEach(item => {
+            item.classList.remove('selected');
+        });
+        event.currentTarget.classList.add('selected');
+    }
+    
+    function selectPlano(planoId, maquina, numeroPlano) {
+        // Selecionar o plano no dropdown
+        document.getElementById('plano_select_2').value = planoId;
+        
+        // Destacar a linha selecionada
+        document.querySelectorAll('.record-item').forEach(item => {
+            item.classList.remove('selected');
+        });
+        event.currentTarget.classList.add('selected');
+    }
+    
+    // Adicionar confirmação antes de criar relacionamento
+    document.getElementById('formRoteiroSem').addEventListener('submit', function(e) {
+        const roteiroId = document.getElementById('roteiro_select_1').value;
+        const planoId = document.getElementById('plano_select_1').value;
+        
+        if (!roteiroId || !planoId) {
+            e.preventDefault();
+            alert('Por favor, selecione tanto um Roteiro quanto um Plano.');
+            return false;
+        }
+        
+        if (!confirm('Deseja criar o relacionamento entre o Roteiro selecionado e o Plano selecionado?')) {
+            e.preventDefault();
+            return false;
+        }
+    });
+    
+    document.getElementById('formPlanoSem').addEventListener('submit', function(e) {
+        const planoId = document.getElementById('plano_select_2').value;
+        const roteiroId = document.getElementById('roteiro_select_2').value;
+        
+        if (!planoId || !roteiroId) {
+            e.preventDefault();
+            alert('Por favor, selecione tanto um Plano quanto um Roteiro.');
+            return false;
+        }
+        
+        if (!confirm('Deseja criar o relacionamento entre o Plano selecionado e o Roteiro selecionado?')) {
+            e.preventDefault();
+            return false;
+        }
+    });
+</script>
+{% endblock %}
+

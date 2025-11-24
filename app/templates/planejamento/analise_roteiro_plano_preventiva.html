@@ -47,6 +47,9 @@
 <!-- Main Content -->
 <section class="py-5">
     <div class="container">
+        <!-- Hidden CSRF token for JavaScript -->
+        {% csrf_token %}
+        
         <!-- Messages -->
         {% if messages %}
             {% for message in messages %}
@@ -164,11 +167,16 @@
         <!-- Relacionamentos Encontrados -->
         {% if filter_tipo == 'all' or filter_tipo == 'matched' %}
         <div class="card shadow-sm mb-4">
-            <div class="card-header bg-success text-white">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
                     <i class="fas fa-link me-2"></i>Relacionamentos Encontrados
                     <span class="badge bg-light text-dark ms-2">{{ total_relacionamentos }}</span>
                 </h5>
+                {% if total_pendentes > 0 %}
+                <button type="button" class="btn btn-light btn-sm" onclick="confirmarTodosRelacionamentos()" id="btnConfirmarTodos">
+                    <i class="fas fa-check-double me-2"></i>Confirmar Todos ({{ total_pendentes }} pendentes)
+                </button>
+                {% endif %}
             </div>
             <div class="card-body p-0">
                 <div class="table-container">
@@ -244,15 +252,13 @@
                                                 <i class="fas fa-eye"></i>
                                             </a>
                                             {% if not rel.ja_salvo %}
-                                            <form method="post" action="{% url 'analise_roteiro_plano_preventiva' %}" style="display: inline;" onsubmit="return confirm('Deseja confirmar e salvar esta relação em MeuPlanoPreventiva?');">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="confirmar_relacao" value="1">
-                                                <input type="hidden" name="plano_id" value="{{ rel.plano.id }}">
-                                                <input type="hidden" name="roteiro_id" value="{{ rel.roteiro.id }}">
-                                                <button type="submit" class="btn btn-sm btn-success" title="Confirmar e Salvar">
-                                                    <i class="fas fa-check"></i> Confirmar
-                                                </button>
-                                            </form>
+                                            <button type="button" class="btn btn-sm btn-success btn-confirmar-relacao" 
+                                                    title="Confirmar e Salvar" 
+                                                    data-plano-id="{{ rel.plano.id }}" 
+                                                    data-roteiro-id="{{ rel.roteiro.id }}"
+                                                    onclick="confirmarRelacao({{ rel.plano.id }}, {{ rel.roteiro.id }}, this)">
+                                                <i class="fas fa-check"></i> Confirmar
+                                            </button>
                                             {% else %}
                                             <span class="badge bg-success">Já Salvo</span>
                                             {% endif %}
@@ -275,9 +281,58 @@
         </div>
         {% endif %}
 
+        <!-- Análise de Correspondência não encontrada -->
+        <div class="card shadow-sm mb-4 border-info">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-search me-2"></i>Análise de Correspondência não encontrada
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h6 class="mb-3">
+                            <i class="fas fa-info-circle me-2"></i>Entenda por que alguns registros não têm correspondência
+                        </h6>
+                        <p class="mb-3">
+                            Quando um <strong>PlanoPreventiva</strong> e um <strong>RoteiroPreventiva</strong> não são encontrados como correspondentes, 
+                            é importante entender quais campos estão faltando ou são diferentes. A página de análise de erros fornece uma visão detalhada 
+                            de cada campo que não corresponde e sugere soluções para corrigir os problemas.
+                        </p>
+                        <ul class="mb-3">
+                            <li><strong>Campos vazios:</strong> Identifica quais campos estão faltando em um ou ambos os registros</li>
+                            <li><strong>Campos diferentes:</strong> Mostra quando os valores existem mas não correspondem</li>
+                            <li><strong>Soluções sugeridas:</strong> Fornece orientações sobre como corrigir cada problema</li>
+                        </ul>
+                        <p class="mb-0 text-muted">
+                            <small>
+                                <i class="fas fa-lightbulb me-1"></i>
+                                <strong>Dica:</strong> Use a análise de erros para entender exatamente o que está faltando para encontrar uma correspondência completa.
+                            </small>
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-center align-self-center">
+                        <a href="{% url 'erro_analise_plano_roteiro_geral' %}" class="btn btn-info btn-lg mb-2 d-block">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Ver Análise de Erros - Planos sem Roteiro
+                        </a>
+                        <a href="{% url 'erro_analise_plano_roteiro_geral' %}" class="btn btn-danger btn-lg d-block">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            Ver Análise de Erros - Roteiros sem Plano
+                        </a>
+                        <p class="text-muted mt-3 mb-0">
+                            <small>
+                                Clique nos botões de "Análise de Erros" nas tabelas abaixo para ver detalhes específicos de cada registro
+                            </small>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Planos sem Roteiro -->
         {% if filter_tipo == 'all' or filter_tipo == 'planos_sem' %}
-        <div class="card shadow-sm mb-4">
+        <div id="planos_sem_roteiro" class="card shadow-sm mb-4">
             <div class="card-header bg-warning text-dark">
                 <h5 class="mb-0">
                     <i class="fas fa-exclamation-triangle me-2"></i>Planos sem Roteiro Correspondente
@@ -300,7 +355,8 @@
                         </thead>
                         <tbody>
                             {% if planos_sem_relacao %}
-                                {% for plano in planos_sem_relacao %}
+                                {% for item in planos_sem_relacao %}
+                                {% with plano=item.plano melhor_match=item.melhor_match_parcial score=item.score_parcial %}
                                 <tr>
                                     <td>
                                         <strong>{{ plano.cd_maquina|default:"-" }}</strong>
@@ -325,11 +381,27 @@
                                     </td>
                                     <td>{{ plano.id }}</td>
                                     <td>
-                                        <a href="{% url 'visualizar_manutencao_preventiva' plano.id %}" class="btn btn-sm btn-primary" title="Ver Plano">
-                                            <i class="fas fa-eye"></i> Ver
-                                        </a>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'visualizar_manutencao_preventiva' plano.id %}" class="btn btn-sm btn-primary" title="Ver Plano">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if melhor_match %}
+                                            <a href="{% url 'visualizar_comparacao_roteiro_plano' plano.id melhor_match.id %}" class="btn btn-sm btn-outline-info" title="Comparar com Melhor Match Parcial ({{ score|floatformat:0 }}%)">
+                                                <i class="fas fa-balance-scale"></i>
+                                            </a>
+                                            <a href="{% url 'erro_analise_plano_roteiro' plano.id melhor_match.id %}" class="btn btn-sm btn-outline-danger" title="Ver Análise de Erros - O que está faltando">
+                                                <i class="fas fa-exclamation-triangle"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                        {% if melhor_match %}
+                                        <br><small class="text-muted mt-1 d-block">
+                                            <i class="fas fa-info-circle"></i> Melhor match: {{ score|floatformat:0 }}%
+                                        </small>
+                                        {% endif %}
                                     </td>
                                 </tr>
+                                {% endwith %}
                                 {% endfor %}
                             {% else %}
                                 <tr>
@@ -348,7 +420,7 @@
 
         <!-- Roteiros sem Plano -->
         {% if filter_tipo == 'all' or filter_tipo == 'roteiros_sem' %}
-        <div class="card shadow-sm mb-4">
+        <div id="roteiros_sem_plano" class="card shadow-sm mb-4">
             <div class="card-header bg-danger text-white">
                 <h5 class="mb-0">
                     <i class="fas fa-exclamation-circle me-2"></i>Roteiros sem Plano Correspondente
@@ -371,7 +443,8 @@
                         </thead>
                         <tbody>
                             {% if roteiros_sem_relacao %}
-                                {% for roteiro in roteiros_sem_relacao %}
+                                {% for item in roteiros_sem_relacao %}
+                                {% with roteiro=item.roteiro melhor_match=item.melhor_match_parcial score=item.score_parcial %}
                                 <tr>
                                     <td>
                                         <strong>{{ roteiro.cd_maquina|default:"-" }}</strong>
@@ -396,11 +469,27 @@
                                     </td>
                                     <td>{{ roteiro.id }}</td>
                                     <td>
-                                        <a href="{% url 'visualizar_roteiro_preventiva' roteiro.id %}" class="btn btn-sm btn-success" title="Ver Roteiro">
-                                            <i class="fas fa-eye"></i> Ver
-                                        </a>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'visualizar_roteiro_preventiva' roteiro.id %}" class="btn btn-sm btn-success" title="Ver Roteiro">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if melhor_match %}
+                                            <a href="{% url 'visualizar_comparacao_roteiro_plano' melhor_match.id roteiro.id %}" class="btn btn-sm btn-outline-info" title="Comparar com Melhor Match Parcial ({{ score|floatformat:0 }}%)">
+                                                <i class="fas fa-balance-scale"></i>
+                                            </a>
+                                            <a href="{% url 'erro_analise_plano_roteiro' melhor_match.id roteiro.id %}" class="btn btn-sm btn-outline-danger" title="Ver Análise de Erros - O que está faltando">
+                                                <i class="fas fa-exclamation-triangle"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                        {% if melhor_match %}
+                                        <br><small class="text-muted mt-1 d-block">
+                                            <i class="fas fa-info-circle"></i> Melhor match: {{ score|floatformat:0 }}%
+                                        </small>
+                                        {% endif %}
                                     </td>
                                 </tr>
+                                {% endwith %}
                                 {% endfor %}
                             {% else %}
                                 <tr>
@@ -425,10 +514,10 @@
                     <ul class="pagination justify-content-center">
                         {% if page_obj.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_tipo %}filter_tipo={{ filter_tipo }}&{% endif %}{% if filter_status %}filter_status={{ filter_status }}&{% endif %}page=1">Primeira</a>
+                                <a class="page-link" href="?{% if filter_maquina %}filter_maquina={{ filter_maquina|urlencode }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu|urlencode }}&{% endif %}{% if filter_tipo %}filter_tipo={{ filter_tipo|urlencode }}&{% endif %}{% if filter_status %}filter_status={{ filter_status|urlencode }}&{% endif %}page=1">Primeira</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_tipo %}filter_tipo={{ filter_tipo }}&{% endif %}{% if filter_status %}filter_status={{ filter_status }}&{% endif %}page={{ page_obj.previous_page_number }}">Anterior</a>
+                                <a class="page-link" href="?{% if filter_maquina %}filter_maquina={{ filter_maquina|urlencode }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu|urlencode }}&{% endif %}{% if filter_tipo %}filter_tipo={{ filter_tipo|urlencode }}&{% endif %}{% if filter_status %}filter_status={{ filter_status|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}">Anterior</a>
                             </li>
                         {% endif %}
                         
@@ -440,10 +529,10 @@
                         
                         {% if page_obj.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_tipo %}filter_tipo={{ filter_tipo }}&{% endif %}{% if filter_status %}filter_status={{ filter_status }}&{% endif %}page={{ page_obj.next_page_number }}">Próxima</a>
+                                <a class="page-link" href="?{% if filter_maquina %}filter_maquina={{ filter_maquina|urlencode }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu|urlencode }}&{% endif %}{% if filter_tipo %}filter_tipo={{ filter_tipo|urlencode }}&{% endif %}{% if filter_status %}filter_status={{ filter_status|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}">Próxima</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_tipo %}filter_tipo={{ filter_tipo }}&{% endif %}{% if filter_status %}filter_status={{ filter_status }}&{% endif %}page={{ page_obj.paginator.num_pages }}">Última</a>
+                                <a class="page-link" href="?{% if filter_maquina %}filter_maquina={{ filter_maquina|urlencode }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu|urlencode }}&{% endif %}{% if filter_tipo %}filter_tipo={{ filter_tipo|urlencode }}&{% endif %}{% if filter_status %}filter_status={{ filter_status|urlencode }}&{% endif %}page={{ page_obj.paginator.num_pages }}">Última</a>
                             </li>
                         {% endif %}
                     </ul>
@@ -480,4 +569,149 @@
         </div>
     </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmarRelacao(planoId, roteiroId, button) {
+    if (!confirm('Deseja confirmar e salvar esta relação em MeuPlanoPreventiva?')) {
+        return;
+    }
+    
+    // Disable button and show loading
+    const originalHtml = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+    
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    const token = csrfToken ? csrfToken.value : '';
+    
+    // Create form data
+    const formData = new FormData();
+    formData.append('confirmar_relacao', '1');
+    formData.append('plano_id', planoId);
+    formData.append('roteiro_id', roteiroId);
+    formData.append('csrfmiddlewaretoken', token);
+    
+    // Submit using fetch
+    fetch('{% url "analise_roteiro_plano_preventiva" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': token
+        }
+    })
+    .then(response => {
+        if (response.redirected) {
+            window.location.href = response.url;
+        } else if (response.ok) {
+            // Reload the page to show updated status
+            window.location.reload();
+        } else {
+            throw new Error('Erro na resposta do servidor');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Erro ao salvar relação. Por favor, tente novamente.');
+        button.disabled = false;
+        button.innerHTML = originalHtml;
+    });
+}
+
+function confirmarTodosRelacionamentos() {
+    const totalPendentes = {{ total_pendentes|default:0 }};
+    
+    if (totalPendentes <= 0) {
+        alert('Não há relacionamentos pendentes para confirmar.');
+        return;
+    }
+    
+    if (!confirm(`Deseja confirmar e salvar TODOS os ${totalPendentes} relacionamentos pendentes em MeuPlanoPreventiva?\n\nEsta ação não pode ser desfeita.`)) {
+        return;
+    }
+    
+    // Disable button and show loading
+    const btnConfirmarTodos = document.getElementById('btnConfirmarTodos');
+    const originalHtml = btnConfirmarTodos ? btnConfirmarTodos.innerHTML : '';
+    if (btnConfirmarTodos) {
+        btnConfirmarTodos.disabled = true;
+        btnConfirmarTodos.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Confirmando todos...';
+    }
+    
+    // Get CSRF token - try multiple methods
+    let token = '';
+    const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrfInput) {
+        token = csrfInput.value;
+    } else {
+        // Try to get from cookie
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'csrftoken') {
+                token = value;
+                break;
+            }
+        }
+    }
+    
+    if (!token) {
+        alert('Erro: Token CSRF não encontrado. Por favor, recarregue a página e tente novamente.');
+        if (btnConfirmarTodos) {
+            btnConfirmarTodos.disabled = false;
+            btnConfirmarTodos.innerHTML = originalHtml;
+        }
+        return;
+    }
+    
+    console.log('CSRF Token encontrado:', token ? 'Sim' : 'Não');
+    console.log('Enviando requisição para confirmar todos...');
+    
+    // Create form data
+    const formData = new FormData();
+    formData.append('confirmar_todos', '1');
+    formData.append('csrfmiddlewaretoken', token);
+    
+    // Submit using fetch
+    fetch('{% url "analise_roteiro_plano_preventiva" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': token,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        console.log('Response redirected:', response.redirected);
+        console.log('Response ok:', response.ok);
+        
+        if (response.redirected) {
+            console.log('Redirecting to:', response.url);
+            window.location.href = response.url;
+        } else if (response.ok) {
+            console.log('Request successful, reloading page...');
+            // Reload the page to show updated status
+            window.location.reload();
+        } else {
+            // Try to get error message from response
+            return response.text().then(text => {
+                console.error('Error response:', text);
+                throw new Error(`Erro na resposta do servidor (${response.status}): ${text.substring(0, 200)}`);
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Error details:', error);
+        alert('Erro ao confirmar relacionamentos: ' + error.message + '\n\nPor favor, verifique o console para mais detalhes.');
+        if (btnConfirmarTodos) {
+            btnConfirmarTodos.disabled = false;
+            btnConfirmarTodos.innerHTML = originalHtml;
+        }
+    });
+}
+</script>
 {% endblock %}

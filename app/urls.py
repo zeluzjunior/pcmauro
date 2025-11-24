@@ -6,6 +6,7 @@ urlpatterns = [
     path('home/', views.home, name="home"),
     path('about/', views.about, name="about"),
     path('em-desenvolvimento/', views.em_desenvolvimento, name="em_desenvolvimento"),
+    path('testes/', views.testes, name="testes"),
     path('analise/plano-preventiva/', views.analise_plano_preventiva, name="analise_plano_preventiva"),
     path('planejamento/maquina-primaria-secundaria/', views.maquina_primaria_secundaria, name="maquina_primaria_secundaria"),
     path('planejamento/analise-roteiro-plano-preventiva/', views.analise_roteiro_plano_preventiva, name="analise_roteiro_plano_preventiva"),  # Função limpa - recriar do zero
@@ -55,11 +56,20 @@ urlpatterns = [
     
     # Manutenções Preventivas
     path('manutencoes-preventivas/consultar/', views.consultar_manutencoes_preventivas, name="consultar_manutencoes_preventivas"),
-    path('manutencoes-preventivas/visualizar/<int:plano_id>/', views.visualizar_manutencao_preventiva, name="visualizar_manutencao_preventiva"),
+    path('meus-planos-preventiva/consultar/', views.consultar_meu_plano, name="consultar_meu_plano"),
+    path('plano-pcm/visualizar/<int:plano_id>/', views.visualizar_plano_pcm, name="visualizar_plano_pcm"),
+    path('plano-pcm/editar/<int:plano_id>/', views.editar_plano_pcm, name="editar_plano_pcm"),
+    path('plano-pcm/<int:plano_id>/gerar-pdf/', views.gerar_pdf_plano_pcm, name="gerar_pdf_plano_pcm"),
+    path('plano-pcm/<int:plano_id>/associar-documento/<int:documento_id>/', views.associar_documento_plano_pcm, name="associar_documento_plano_pcm"),
+    path('plano-pcm/<int:plano_id>/remover-documento/<int:associacao_id>/', views.remover_documento_plano_pcm, name="remover_documento_plano_pcm"),
+    path('plano-preventiva/visualizar/<int:plano_id>/', views.visualizar_manutencao_preventiva, name="visualizar_manutencao_preventiva"),
     path('roteiros-preventiva/consultar/', views.consultar_roteiro_preventiva, name="consultar_roteiro_preventiva"),
     path('roteiros-preventiva/visualizar/<int:roteiro_id>/', views.visualizar_roteiro_preventiva, name="visualizar_roteiro_preventiva"),
     path('analise/plano-roteiro/visualizar/<int:plano_id>/<int:roteiro_id>/', views.visualizar_analise_plano_roteiro, name="visualizar_analise_plano_roteiro"),  # Função limpa - recriar do zero
     path('analise/comparacao-roteiro-plano/<int:plano_id>/<int:roteiro_id>/', views.visualizar_comparacao_roteiro_plano, name="visualizar_comparacao_roteiro_plano"),
+    path('analise/erro-plano-roteiro/', views.erro_analise_plano_roteiro, name="erro_analise_plano_roteiro_geral"),
+    path('analise/erro-plano-roteiro/<int:plano_id>/<int:roteiro_id>/', views.erro_analise_plano_roteiro, name="erro_analise_plano_roteiro"),
+    path('planejamento/relacionar-roteiro-plano/', views.relacionar_roteiro_plano, name="relacionar_roteiro_plano"),
     path('manutencoes-preventivas/<int:plano_id>/adicionar-documento/', views.adicionar_documento_plano_preventiva, name="adicionar_documento_plano_preventiva"),
     path('manutencoes-preventivas/<int:plano_id>/remover-documento/<int:documento_id>/', views.remover_documento_plano_preventiva, name="remover_documento_plano_preventiva"),
     path('estoque/<int:item_id>/atualizar-foto-item/', views.atualizar_foto_item, name="atualizar_foto_item"),
@@ -86,6 +96,8 @@ urlpatterns = [
     path('maquinas/<int:maquina_id>/remover-peca/<int:peca_id>/', views.remover_peca_maquina, name="remover_peca_maquina"),
     path('maquinas/<int:maquina_id>/atualizar-codigo-aurora/', views.atualizar_codigo_aurora, name="atualizar_codigo_aurora"),
     path('maquinas/<int:maquina_id>/atualizar-codigo-fabricante/', views.atualizar_codigo_fabricante, name="atualizar_codigo_fabricante"),
+    path('maquinas/<int:maquina_id>/adicionar-documento/', views.adicionar_documento_maquina, name="adicionar_documento_maquina"),
+    path('maquinas/<int:maquina_id>/remover-documento/<int:documento_id>/', views.remover_documento_maquina, name="remover_documento_maquina"),
     path('maquinas/filtrar-locais/', views.filtrar_locais_por_setormanut, name="filtrar_locais_por_setormanut"),
    
     # Manutenção Corretiva
