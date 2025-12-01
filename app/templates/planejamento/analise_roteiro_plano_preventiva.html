@@ -230,7 +230,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <small>
+                                            <small>
                                             <div class="match-indicator">
                                                 <span class="badge bg-success">✓ cd_maquina</span>
                                                 <span class="badge bg-success">✓ descr_maquina</span>
@@ -238,7 +238,7 @@
                                                 <span class="badge bg-success">✓ descr_tarefa</span>
                                                 <span class="badge bg-success">✓ sequencia_manutencao</span>
                                             </div>
-                                        </small>
+                                            </small>
                                     </td>
                                     <td>
                                         <div class="btn-group" role="group">
@@ -258,7 +258,7 @@
                                                     data-roteiro-id="{{ rel.roteiro.id }}"
                                                     onclick="confirmarRelacao({{ rel.plano.id }}, {{ rel.roteiro.id }}, this)">
                                                 <i class="fas fa-check"></i> Confirmar
-                                            </button>
+                                                </button>
                                             {% else %}
                                             <span class="badge bg-success">Já Salvo</span>
                                             {% endif %}
@@ -329,7 +329,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Planos sem Roteiro -->
         {% if filter_tipo == 'all' or filter_tipo == 'planos_sem' %}
         <div id="planos_sem_roteiro" class="card shadow-sm mb-4">
@@ -382,7 +382,7 @@
                                     <td>{{ plano.id }}</td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <a href="{% url 'visualizar_manutencao_preventiva' plano.id %}" class="btn btn-sm btn-primary" title="Ver Plano">
+                                        <a href="{% url 'visualizar_manutencao_preventiva' plano.id %}" class="btn btn-sm btn-primary" title="Ver Plano">
                                                 <i class="fas fa-eye"></i>
                                             </a>
                                             {% if melhor_match %}
@@ -470,7 +470,7 @@
                                     <td>{{ roteiro.id }}</td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <a href="{% url 'visualizar_roteiro_preventiva' roteiro.id %}" class="btn btn-sm btn-success" title="Ver Roteiro">
+                                        <a href="{% url 'visualizar_roteiro_preventiva' roteiro.id %}" class="btn btn-sm btn-success" title="Ver Roteiro">
                                                 <i class="fas fa-eye"></i>
                                             </a>
                                             {% if melhor_match %}

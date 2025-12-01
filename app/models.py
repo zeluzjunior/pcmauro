@@ -276,6 +276,22 @@ class LocalCentroAtividade(models.Model):
     def __str__(self):
         return f"{self.centro_atividade.ca} - {self.local}"
 
+class Semana52(models.Model):
+    """Modelo para armazenar informações das 52 semanas do ano"""
+    semana = models.CharField('Semana', max_length=100, unique=True, db_index=True)
+    inicio = models.DateField('Data Início', blank=True, null=True)
+    fim = models.DateField('Data Fim', blank=True, null=True)
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Semana 52'
+        verbose_name_plural = 'Semanas 52'
+        ordering = ['inicio']
+
+    def __str__(self):
+        return f"{self.semana} - {self.inicio} a {self.fim}"
+
 class Manutentor(models.Model):
     """Modelo para armazenar informações de manutentores"""
     Cadastro = models.CharField('Cadastro', max_length=1000, primary_key=True)

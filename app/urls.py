@@ -47,6 +47,7 @@ urlpatterns = [
     path('importar/ordens-preventivas/', views.importar_ordens_preventivas, name="importar_ordens_preventivas"),
     path('importar/plano-preventiva/', views.importar_plano_preventiva, name="importar_plano_preventiva"),
     path('importar/roteiro-preventiva/', views.importar_roteiro_preventiva, name="importar_roteiro_preventiva"),
+    path('importar/52-semanas/', views.importar_52_semanas, name="importar_52_semanas"),
     path('importar/locais-e-cas/', views.importar_locais_e_cas, name="importar_locais_e_cas"),
     path('importar/estoque/', views.importar_estoque, name="importar_estoque"),
     
@@ -57,11 +58,16 @@ urlpatterns = [
     # Manutenções Preventivas
     path('manutencoes-preventivas/consultar/', views.consultar_manutencoes_preventivas, name="consultar_manutencoes_preventivas"),
     path('meus-planos-preventiva/consultar/', views.consultar_meu_plano, name="consultar_meu_plano"),
+    path('consultar/52-semanas/', views.consultar_52_semanas, name="consultar_52_semanas"),
     path('plano-pcm/visualizar/<int:plano_id>/', views.visualizar_plano_pcm, name="visualizar_plano_pcm"),
     path('plano-pcm/editar/<int:plano_id>/', views.editar_plano_pcm, name="editar_plano_pcm"),
     path('plano-pcm/<int:plano_id>/gerar-pdf/', views.gerar_pdf_plano_pcm, name="gerar_pdf_plano_pcm"),
     path('plano-pcm/<int:plano_id>/associar-documento/<int:documento_id>/', views.associar_documento_plano_pcm, name="associar_documento_plano_pcm"),
     path('plano-pcm/<int:plano_id>/remover-documento/<int:associacao_id>/', views.remover_documento_plano_pcm, name="remover_documento_plano_pcm"),
+    path('planejamento/analise-geral-pcm/', views.analise_geral_plano_preventiva_pcm, name="analise_geral_plano_preventiva_pcm"),
+    path('planejamento/agrupar-acoes-plano-por-data/', views.agrupar_acoes_do_plano_por_data, name="agrupar_acoes_do_plano_por_data"),
+    path('planejamento/agrupar-preventiva-por-data/', views.agrupar_preventiva_por_data, name="agrupar_preventiva_por_data"),
+    path('planejamento/criar-cronograma-planejado-preventiva/', views.criar_cronograma_planejado_preventiva, name="criar_cronograma_planejado_preventiva"),
     path('plano-preventiva/visualizar/<int:plano_id>/', views.visualizar_manutencao_preventiva, name="visualizar_manutencao_preventiva"),
     path('roteiros-preventiva/consultar/', views.consultar_roteiro_preventiva, name="consultar_roteiro_preventiva"),
     path('roteiros-preventiva/visualizar/<int:roteiro_id>/', views.visualizar_roteiro_preventiva, name="visualizar_roteiro_preventiva"),
@@ -86,10 +92,13 @@ urlpatterns = [
     
     # Máquinas
     path('maquinas/analise/', views.analise_maquinas, name="analise_maquinas"),
+    path('maquinas/analise-importadas/', views.analise_maquinas_importadas, name="analise_maquinas_importadas"),
     path('maquinas/cadastrar/', views.cadastrar_maquina, name="cadastrar_maquina"),
     path('maquinas/consultar/', views.consultar_maquinas, name="consultar_maquinas"),
     path('maquinas/deletar/<int:maquina_id>/', views.deletar_maquina, name="deletar_maquina"),
     path('maquinas/visualizar/<int:maquina_id>/', views.visualizar_maquina, name="visualizar_maquina"),
+    path('maquinas/<int:maquina_id>/calendario-planos/', views.calendario_planos_maquina, name="calendario_planos_maquina"),
+    path('maquinas/<int:maquina_id>/calendario-planos-secundarias/', views.calendario_planos_secundarias, name="calendario_planos_secundarias"),
     path('maquinas/editar/<int:maquina_id>/', views.editar_maquina, name="editar_maquina"),
     path('maquinas/<int:maquina_id>/pecas/', views.maquinas_pecas, name="maquinas_pecas"),
     path('maquinas/<int:maquina_id>/adicionar-peca/', views.adicionar_peca_maquina, name="adicionar_peca_maquina"),
@@ -102,6 +111,8 @@ urlpatterns = [
    
     # Manutenção Corretiva
     path('analise/corretiva-outros/', views.analise_corretiva_outros, name="analise_corretiva_outros"),
+    path('ordens-de-servico/analise/', views.analise_ordens_de_servico, name="analise_ordens_de_servico"),
+    path('ordens-de-servico/config-analise/', views.config_analise_ordens, name="config_analise_ordens"),
     path('manutencao-corretiva/cadastrar/', views.cadastrar_corretiva_outros, name="cadastrar_corretiva_outros"),
     path('manutencao-corretiva/consultar/', views.consultar_corretivas_outros, name="consultar_corretivas_outros"),
     path('manutencao-corretiva/visualizar/<int:ordem_id>/', views.visualizar_corretiva_outros, name="visualizar_corretiva_outros"),

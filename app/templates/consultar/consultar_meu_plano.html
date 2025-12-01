@@ -271,7 +271,6 @@
                                     <th class="col-descricao-detalhada">Descrição Detalhada Roteiro</th>
                                     <th class="col-funcionario">Funcionário</th>
                                     <th class="col-setor">Setor</th>
-                                    <th class="col-unidade">Unidade</th>
                                     <th class="col-acoes">Ações</th>
                                 </tr>
                                 <tr class="filter-row">
@@ -304,9 +303,6 @@
                                     </th>
                                     <th class="filter-header">
                                         <input type="text" name="filter_setor" class="filter-input" placeholder="Filtrar Setor..." value="{{ filter_setor|default:'' }}">
-                                    </th>
-                                    <th class="filter-header">
-                                        <input type="text" name="filter_unidade" class="filter-input" placeholder="Filtrar Unidade..." value="{{ filter_unidade|default:'' }}">
                                     </th>
                                     <th class="filter-header">
                                         <!-- Sem filtro na coluna de ações -->
@@ -396,16 +392,6 @@
                                                 <span class="text-muted">-</span>
                                             {% endif %}
                                         </td>
-                                        <td class="col-unidade">
-                                            {% if plano.nome_unid %}
-                                                <span style="display: block;">{{ plano.nome_unid|truncatewords:2 }}</span>
-                                                {% if plano.cd_unid %}
-                                                    <small class="text-muted" style="display: block; margin-top: 2px;">({{ plano.cd_unid }})</small>
-                                                {% endif %}
-                                            {% else %}
-                                                <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
                                         <td class="col-acoes">
                                             <div class="btn-group-vertical">
                                                 <a href="{% url 'visualizar_plano_pcm' plano.id %}" class="btn btn-sm btn-primary" title="Visualizar Plano PCM" style="font-size: 0.75rem; padding: 4px 8px;">
@@ -430,7 +416,7 @@
                                     {% endfor %}
                                 {% else %}
                                     <tr>
-                                        <td colspan="12" class="text-center py-5">
+                                        <td colspan="11" class="text-center py-5">
                                             <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
                                             <p class="text-muted">Nenhum plano preventiva encontrado.</p>
                                             <a href="{% url 'analise_roteiro_plano_preventiva' %}" class="btn btn-primary">
@@ -454,10 +440,10 @@
                     <ul class="pagination justify-content-center">
                         {% if planos.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_plano %}filter_plano={{ filter_plano }}&{% endif %}{% if filter_seq_manutencao %}filter_seq_manutencao={{ filter_seq_manutencao }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_periodo %}filter_periodo={{ filter_periodo }}&{% endif %}{% if filter_seq_tarefa %}filter_seq_tarefa={{ filter_seq_tarefa }}&{% endif %}{% if filter_tarefa %}filter_tarefa={{ filter_tarefa }}&{% endif %}{% if filter_desc_detalhada %}filter_desc_detalhada={{ filter_desc_detalhada }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_funcionario %}filter_funcionario={{ filter_funcionario }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor }}&{% endif %}{% if filter_unidade %}filter_unidade={{ filter_unidade }}&{% endif %}page=1">Primeira</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_plano %}filter_plano={{ filter_plano }}&{% endif %}{% if filter_seq_manutencao %}filter_seq_manutencao={{ filter_seq_manutencao }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_periodo %}filter_periodo={{ filter_periodo }}&{% endif %}{% if filter_seq_tarefa %}filter_seq_tarefa={{ filter_seq_tarefa }}&{% endif %}{% if filter_tarefa %}filter_tarefa={{ filter_tarefa }}&{% endif %}{% if filter_desc_detalhada %}filter_desc_detalhada={{ filter_desc_detalhada }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_funcionario %}filter_funcionario={{ filter_funcionario }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor }}&{% endif %}page=1">Primeira</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_plano %}filter_plano={{ filter_plano }}&{% endif %}{% if filter_seq_manutencao %}filter_seq_manutencao={{ filter_seq_manutencao }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_periodo %}filter_periodo={{ filter_periodo }}&{% endif %}{% if filter_seq_tarefa %}filter_seq_tarefa={{ filter_seq_tarefa }}&{% endif %}{% if filter_tarefa %}filter_tarefa={{ filter_tarefa }}&{% endif %}{% if filter_desc_detalhada %}filter_desc_detalhada={{ filter_desc_detalhada }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_funcionario %}filter_funcionario={{ filter_funcionario }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor }}&{% endif %}{% if filter_unidade %}filter_unidade={{ filter_unidade }}&{% endif %}page={{ planos.previous_page_number }}">Anterior</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_plano %}filter_plano={{ filter_plano }}&{% endif %}{% if filter_seq_manutencao %}filter_seq_manutencao={{ filter_seq_manutencao }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_periodo %}filter_periodo={{ filter_periodo }}&{% endif %}{% if filter_seq_tarefa %}filter_seq_tarefa={{ filter_seq_tarefa }}&{% endif %}{% if filter_tarefa %}filter_tarefa={{ filter_tarefa }}&{% endif %}{% if filter_desc_detalhada %}filter_desc_detalhada={{ filter_desc_detalhada }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_funcionario %}filter_funcionario={{ filter_funcionario }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor }}&{% endif %}page={{ planos.previous_page_number }}">Anterior</a>
                             </li>
                         {% endif %}
                         
@@ -469,10 +455,10 @@
                         
                         {% if planos.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_plano %}filter_plano={{ filter_plano }}&{% endif %}{% if filter_seq_manutencao %}filter_seq_manutencao={{ filter_seq_manutencao }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_periodo %}filter_periodo={{ filter_periodo }}&{% endif %}{% if filter_seq_tarefa %}filter_seq_tarefa={{ filter_seq_tarefa }}&{% endif %}{% if filter_tarefa %}filter_tarefa={{ filter_tarefa }}&{% endif %}{% if filter_desc_detalhada %}filter_desc_detalhada={{ filter_desc_detalhada }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_funcionario %}filter_funcionario={{ filter_funcionario }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor }}&{% endif %}{% if filter_unidade %}filter_unidade={{ filter_unidade }}&{% endif %}page={{ planos.next_page_number }}">Próxima</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_plano %}filter_plano={{ filter_plano }}&{% endif %}{% if filter_seq_manutencao %}filter_seq_manutencao={{ filter_seq_manutencao }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_periodo %}filter_periodo={{ filter_periodo }}&{% endif %}{% if filter_seq_tarefa %}filter_seq_tarefa={{ filter_seq_tarefa }}&{% endif %}{% if filter_tarefa %}filter_tarefa={{ filter_tarefa }}&{% endif %}{% if filter_desc_detalhada %}filter_desc_detalhada={{ filter_desc_detalhada }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_funcionario %}filter_funcionario={{ filter_funcionario }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor }}&{% endif %}page={{ planos.next_page_number }}">Próxima</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_plano %}filter_plano={{ filter_plano }}&{% endif %}{% if filter_seq_manutencao %}filter_seq_manutencao={{ filter_seq_manutencao }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_periodo %}filter_periodo={{ filter_periodo }}&{% endif %}{% if filter_seq_tarefa %}filter_seq_tarefa={{ filter_seq_tarefa }}&{% endif %}{% if filter_tarefa %}filter_tarefa={{ filter_tarefa }}&{% endif %}{% if filter_desc_detalhada %}filter_desc_detalhada={{ filter_desc_detalhada }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_funcionario %}filter_funcionario={{ filter_funcionario }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor }}&{% endif %}{% if filter_unidade %}filter_unidade={{ filter_unidade }}&{% endif %}page={{ planos.paginator.num_pages }}">Última</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_plano %}filter_plano={{ filter_plano }}&{% endif %}{% if filter_seq_manutencao %}filter_seq_manutencao={{ filter_seq_manutencao }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_periodo %}filter_periodo={{ filter_periodo }}&{% endif %}{% if filter_seq_tarefa %}filter_seq_tarefa={{ filter_seq_tarefa }}&{% endif %}{% if filter_tarefa %}filter_tarefa={{ filter_tarefa }}&{% endif %}{% if filter_desc_detalhada %}filter_desc_detalhada={{ filter_desc_detalhada }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_funcionario %}filter_funcionario={{ filter_funcionario }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor }}&{% endif %}page={{ planos.paginator.num_pages }}">Última</a>
                             </li>
                         {% endif %}
                     </ul>

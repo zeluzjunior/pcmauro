@@ -662,39 +662,78 @@ document.addEventListener('DOMContentLoaded', function() {
                 const docId = checkbox.value;
                 const url = '{% url "associar_documento_plano_pcm" plano.id 0 %}'.replace('0', docId);
                 
+                // Obter CSRF token
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+                if (!csrfToken) {
+                    console.error('CSRF token não encontrado');
+                    erros++;
+                    return;
+                }
+                
                 // Criar form data para POST
                 const formData = new FormData();
-                formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+                formData.append('csrfmiddlewaretoken', csrfToken.value);
                 
                 promises.push(
                     fetch(url, {
                         method: 'POST',
                         body: formData,
                         headers: {
-                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                            'X-CSRFToken': csrfToken.value,
+                            'X-Requested-With': 'XMLHttpRequest',  // Indicar que é uma requisição AJAX
                         },
                         credentials: 'same-origin'
                     })
                     .then(response => {
-                        if (response.ok || response.redirected) {
-                            associados++;
+                        console.log('Resposta para documento', docId, ':', response.status, response.statusText);
+                        
+                        // Tentar parsear como JSON primeiro
+                        const contentType = response.headers.get('content-type');
+                        if (contentType && contentType.includes('application/json')) {
+                            return response.json().then(data => {
+                                if (data.success) {
+                                    associados++;
+                                    console.log('Documento', docId, 'associado com sucesso:', data.message);
+                                } else {
+                                    console.error('Erro ao associar documento', docId, ':', data.error);
+                                    erros++;
+                                }
+                                return data;
+                            });
                         } else {
-                            erros++;
+                            // Se não for JSON, verificar status HTTP
+                            if (response.status >= 200 && response.status < 400) {
+                                associados++;
+                                console.log('Documento', docId, 'associado com sucesso (status:', response.status, ')');
+                            } else {
+                                console.error('Erro ao associar documento', docId, ':', response.status, response.statusText);
+                                erros++;
+                            }
+                            return response.text();
                         }
                     })
                     .catch(error => {
-                        console.error('Erro ao associar documento:', error);
+                        console.error('Erro ao associar documento', docId, ':', error);
                         erros++;
                     })
                 );
             });
             
             Promise.all(promises).then(() => {
+                console.log(`Associação concluída: ${associados} sucesso(s), ${erros} erro(s)`);
                 if (associados > 0) {
+                    // Mostrar mensagem de sucesso
+                    if (erros > 0) {
+                        alert(`${associados} documento(s) associado(s) com sucesso, mas ${erros} documento(s) falharam. A página será recarregada.`);
+                    } else {
+                        alert(`${associados} documento(s) associado(s) com sucesso! A página será recarregada.`);
+                    }
                     // Recarregar página para mostrar documentos associados
-                    window.location.reload();
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 500);
                 } else {
-                    alert('Erro ao associar documentos. Por favor, tente novamente.');
+                    alert(`Erro ao associar documentos. Nenhum documento foi associado. Por favor, verifique o console para mais detalhes e tente novamente.`);
                     btnAssociarSelecionados.disabled = false;
                     btnAssociarSelecionados.innerHTML = '<i class="fas fa-link me-2"></i>Associar Documentos Selecionados';
                 }

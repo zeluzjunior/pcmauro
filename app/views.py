@@ -114,10 +114,61 @@ def em_desenvolvimento(request):
 
 
 def testes(request):
-    """Página de testes"""
+    """Página de testes - Hierarquia de Máquinas Primárias e Secundárias"""
+    from app.models import Maquina, MaquinaPrimariaSecundaria
+    import json
+    
+    # Buscar todas as máquinas primárias (descr_gerenc = "MÁQUINAS PRINCIPAL")
+    maquinas_primarias = Maquina.objects.filter(
+        descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
+    ).order_by('cd_maquina')
+    
+    # Buscar todos os relacionamentos
+    relacionamentos = MaquinaPrimariaSecundaria.objects.select_related(
+        'maquina_primaria', 'maquina_secundaria'
+    ).order_by('maquina_primaria__cd_maquina', 'maquina_secundaria__cd_maquina')
+    
+    # Construir lista de nós no formato básico do OrgChartJS
+    # Formato: { id: X, pid: Y, name: "..." }
+    nodes = []
+    
+    # Adicionar máquinas primárias como nós raiz (sem pid)
+    for maq_prim in maquinas_primarias:
+        nodes.append({
+            'id': maq_prim.id,
+            'name': f"{maq_prim.cd_maquina} - {maq_prim.descr_maquina or 'Sem descrição'}"
+        })
+    
+    # Adicionar máquinas secundárias como nós filhos (com pid)
+    for rel in relacionamentos:
+        maq_sec = rel.maquina_secundaria
+        nodes.append({
+            'id': maq_sec.id,
+            'pid': rel.maquina_primaria.id,
+            'name': f"{maq_sec.cd_maquina} - {maq_sec.descr_maquina or 'Sem descrição'}"
+        })
+    
+    # Debug: imprimir informações
+    print(f"Total de máquinas primárias: {maquinas_primarias.count()}")
+    print(f"Total de relacionamentos: {relacionamentos.count()}")
+    print(f"Total de nós criados: {len(nodes)}")
+    
+    # Serializar JSON
+    try:
+        dados_json_str = json.dumps(nodes, ensure_ascii=False, default=str)
+    except Exception as e:
+        print(f"Erro ao serializar JSON: {e}")
+        dados_json_str = json.dumps([{
+            'id': 0,
+            'name': 'Erro ao processar dados'
+        }], ensure_ascii=False)
+    
     context = {
-        'page_title': 'Testes',
-        'active_page': 'testes'
+        'page_title': 'Testes - Hierarquia de Máquinas',
+        'active_page': 'testes',
+        'dados_json': dados_json_str,
+        'total_primarias': maquinas_primarias.count(),
+        'total_relacionamentos': relacionamentos.count()
     }
     return render(request, 'testes/testes.html', context)
 
@@ -1111,8 +1162,20 @@ def importar_maquinas(request):
         # Verificar se deve atualizar registros existentes
         # Se only_new_records estiver marcado, update_existing será ignorado
         update_existing = False
+        update_fields = []
         if not only_new_records:
             update_existing = request.POST.get('update_existing', 'off') == 'on'
+            # Se update_existing estiver marcado, pegar lista de campos para atualizar
+            if update_existing:
+                update_fields = request.POST.getlist('update_fields')
+                # Se nenhum campo foi selecionado, atualizar todos (comportamento padrão)
+                if not update_fields:
+                    update_fields = [
+                        'cd_unid', 'nome_unid', 'cs_tt_maquina', 'descr_maquina',
+                        'cd_setormanut', 'descr_setormanut', 'cd_priomaqutv',
+                        'nro_patrimonio', 'cd_modelo', 'cd_grupo', 'cd_tpcentativ',
+                        'descr_gerenc'
+                    ]
         
         try:
             from app.utils import upload_maquinas_from_file
@@ -1121,7 +1184,8 @@ def importar_maquinas(request):
             # Se only_new_records estiver marcado, update_existing será False (ignora duplicados)
             created_count, updated_count, errors = upload_maquinas_from_file(
                 file, 
-                update_existing=update_existing
+                update_existing=update_existing,
+                update_fields=update_fields if update_existing else None
             )
             
             # Preparar mensagens
@@ -1241,7 +1305,7 @@ def importar_ordens_corretivas_e_outros(request):
                 'page_title': 'Importar Ordens Corretivas e Outros',
                 'active_page': 'importar_ordens_corretivas_e_outros'
             }
-            return render(request, 'importar/ordens_corretivas_e_outros.html', context)
+            return render(request, 'importar/importar_ordens_corretiva_outros.html', context)
         
         file = request.FILES['file']
         print(f"DEBUG - Arquivo recebido: {file.name}, Tamanho: {file.size}")
@@ -1259,7 +1323,7 @@ def importar_ordens_corretivas_e_outros(request):
                 'page_title': 'Importar Ordens Corretivas e Outros',
                 'active_page': 'importar_ordens_corretivas_e_outros'
             }
-            return render(request, 'importar/ordens_corretivas_e_outros.html', context)
+            return render(request, 'importar/importar_ordens_corretiva_outros.html', context)
         
         # Verificar se deve atualizar registros existentes
         update_existing = request.POST.get('update_existing', 'off') == 'on'
@@ -1315,7 +1379,7 @@ def importar_ordens_corretivas_e_outros(request):
         'page_title': 'Importar Ordens Corretivas e Outros',
         'active_page': 'importar_ordens_corretivas_e_outros'
     }
-    return render(request, 'importar/ordens_corretivas_e_outros.html', context)
+    return render(request, 'importar/importar_ordens_corretiva_outros.html', context)
 
 
 def importar_ordens_preventivas(request):
@@ -1469,6 +1533,84 @@ def importar_roteiro_preventiva(request):
         'active_page': 'importar_roteiro_preventiva'
     }
     return render(request, 'importar/importar_roteiro_preventiva.html', context)
+
+
+def importar_52_semanas(request):
+    """Importar 52 Semanas page view"""
+    if request.method == 'POST':
+        # Verificar se há arquivo enviado
+        if 'file' not in request.FILES:
+            messages.error(request, 'Por favor, selecione um arquivo para importar.')
+            context = {
+                'page_title': 'Importar 52 Semanas',
+                'active_page': 'importar_52_semanas'
+            }
+            return render(request, 'importar/importar_52_semanas.html', context)
+        
+        file = request.FILES['file']
+        
+        # Validar extensão do arquivo
+        allowed_extensions = ['.xlsx', '.xls', '.xlsm']
+        file_extension = '.' + file.name.split('.')[-1].lower()
+        
+        if file_extension not in allowed_extensions:
+            messages.error(
+                request, 
+                f'Formato de arquivo não suportado. Use: {", ".join(allowed_extensions)}'
+            )
+            context = {
+                'page_title': 'Importar 52 Semanas',
+                'active_page': 'importar_52_semanas'
+            }
+            return render(request, 'importar/importar_52_semanas.html', context)
+        
+        # Verificar se deve apenas adicionar novos registros (ignorar duplicados)
+        only_new_records = request.POST.get('only_new_records', 'off') == 'on'
+        
+        # Verificar se deve atualizar registros existentes
+        # Se only_new_records estiver marcado, update_existing será ignorado
+        update_existing = False
+        if not only_new_records:
+            update_existing = request.POST.get('update_existing', 'off') == 'on'
+        
+        try:
+            from app.utils import upload_52_semanas_from_file
+            import traceback
+            
+            # Fazer upload dos dados
+            # Se only_new_records estiver marcado, update_existing será False (ignora duplicados)
+            created_count, updated_count, errors = upload_52_semanas_from_file(
+                file, 
+                update_existing=update_existing
+            )
+            
+            # Preparar mensagens
+            if errors:
+                for error in errors[:10]:  # Mostrar apenas os primeiros 10 erros
+                    messages.warning(request, error)
+                if len(errors) > 10:
+                    messages.warning(request, f'... e mais {len(errors) - 10} erros.')
+            
+            if created_count > 0:
+                messages.success(request, f'{created_count} semana(s) criada(s) com sucesso!')
+            if updated_count > 0:
+                messages.info(request, f'{updated_count} semana(s) atualizada(s)!')
+            if created_count == 0 and updated_count == 0 and not errors:
+                messages.info(request, 'Nenhum registro novo foi importado. Todas as semanas já existem no banco de dados.')
+            
+        except Exception as e:
+            error_msg = f'Erro ao importar arquivo: {str(e)}'
+            messages.error(request, error_msg)
+            # Log detalhado do erro para debug
+            import traceback
+            print(f"Erro ao importar 52 semanas: {error_msg}")
+            traceback.print_exc()
+    
+    context = {
+        'page_title': 'Importar 52 Semanas',
+        'active_page': 'importar_52_semanas'
+    }
+    return render(request, 'importar/importar_52_semanas.html', context)
 
 
 def importar_estoque(request):
@@ -1911,7 +2053,8 @@ def consultar_locais_e_cas(request):
 
 def visualizar_centro_de_atividade(request, ca_id):
     """Visualizar detalhes de um Centro de Atividade específico"""
-    from app.models import CentroAtividade
+    from app.models import CentroAtividade, Maquina, MaquinaPrimariaSecundaria
+    import json
     
     try:
         centro_atividade = CentroAtividade.objects.get(id=ca_id)
@@ -1919,10 +2062,102 @@ def visualizar_centro_de_atividade(request, ca_id):
         messages.error(request, 'Centro de Atividade não encontrado.')
         return redirect('consultar_locais_e_cas')
     
+    # Buscar máquinas relacionadas a este Centro de Atividade
+    # Máquinas podem estar relacionadas através de:
+    # 1. LocalCentroAtividade (local_centro_atividade__centro_atividade)
+    # 2. cd_tpcentativ (campo direto na tabela Maquina que corresponde ao número do CA)
+    from django.db.models import Q
+    
+    maquinas_do_ca = Maquina.objects.filter(
+        Q(local_centro_atividade__centro_atividade=centro_atividade) |
+        Q(cd_tpcentativ=centro_atividade.ca)
+    ).distinct()
+    
+    print(f"DEBUG: Centro de Atividade CA={centro_atividade.ca}, ID={centro_atividade.id}")
+    print(f"DEBUG: Total de máquinas encontradas no CA (via local_centro_atividade): {Maquina.objects.filter(local_centro_atividade__centro_atividade=centro_atividade).count()}")
+    print(f"DEBUG: Total de máquinas encontradas no CA (via cd_tpcentativ={centro_atividade.ca}): {Maquina.objects.filter(cd_tpcentativ=centro_atividade.ca).count()}")
+    print(f"DEBUG: Total de máquinas encontradas no CA (total combinado): {maquinas_do_ca.count()}")
+    
+    # Buscar máquinas primárias (descr_gerenc = "MÁQUINAS PRINCIPAL") relacionadas a este CA
+    maquinas_primarias = maquinas_do_ca.filter(
+        descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
+    ).order_by('cd_maquina')
+    
+    print(f"DEBUG: Máquinas primárias encontradas: {maquinas_primarias.count()}")
+    if maquinas_primarias.exists():
+        for mp in maquinas_primarias[:5]:  # Mostrar apenas as 5 primeiras para debug
+            print(f"  - Máquina Primária: {mp.cd_maquina} - {mp.descr_maquina}")
+    
+    # Buscar relacionamentos entre máquinas primárias e secundárias para estas máquinas
+    relacionamentos = MaquinaPrimariaSecundaria.objects.filter(
+        maquina_primaria__in=maquinas_primarias
+    ).select_related(
+        'maquina_primaria', 'maquina_secundaria'
+    ).order_by('maquina_primaria__cd_maquina', 'maquina_secundaria__cd_maquina')
+    
+    print(f"DEBUG: Relacionamentos encontrados: {relacionamentos.count()}")
+    
+    # Construir lista de nós no formato OrgChartJS
+    nodes = []
+    
+    # Função auxiliar para construir URL da imagem
+    def get_image_url(maquina):
+        if maquina.foto:
+            return request.build_absolute_uri(maquina.foto.url)
+        return None
+    
+    # Adicionar máquinas primárias como nós raiz (sem pid)
+    for maq_prim in maquinas_primarias:
+        node_data = {
+            'id': maq_prim.id,
+            'field_0': maq_prim.descr_maquina or 'Sem descrição',
+            'field_1': str(maq_prim.cd_maquina)
+        }
+        # Adicionar imagem se existir usando img_0
+        foto_url = get_image_url(maq_prim)
+        if foto_url:
+            node_data['img_0'] = foto_url
+        nodes.append(node_data)
+    
+    # Adicionar máquinas secundárias como nós filhos (com pid)
+    for rel in relacionamentos:
+        maq_sec = rel.maquina_secundaria
+        node_data = {
+            'id': maq_sec.id,
+            'pid': rel.maquina_primaria.id,
+            'field_0': maq_sec.descr_maquina or 'Sem descrição',
+            'field_1': str(maq_sec.cd_maquina)
+        }
+        # Adicionar imagem se existir usando img_0
+        foto_url = get_image_url(maq_sec)
+        if foto_url:
+            node_data['img_0'] = foto_url
+        nodes.append(node_data)
+    
+    print(f"DEBUG: Total de nós criados: {len(nodes)}")
+    if nodes:
+        print(f"DEBUG: Primeiro nó: {nodes[0]}")
+    
+    # Serializar JSON
+    try:
+        dados_json_str = json.dumps(nodes, ensure_ascii=False, default=str)
+    except Exception as e:
+        print(f"Erro ao serializar JSON: {e}")
+        dados_json_str = json.dumps([{
+            'id': 0,
+            'name': 'Erro ao processar dados'
+        }], ensure_ascii=False)
+    
     context = {
         'page_title': f'Visualizar CA {centro_atividade.ca}',
         'active_page': 'consultar_locais_e_cas',
         'ca': centro_atividade,
+        'dados_json': dados_json_str,
+        'total_primarias': maquinas_primarias.count(),
+        'total_relacionamentos': relacionamentos.count(),
+        'total_maquinas': maquinas_do_ca.count(),
+        'has_maquinas': maquinas_do_ca.exists(),
+        'has_primarias': maquinas_primarias.exists()
     }
     return render(request, 'visualizar/visualizar_centro_de_atividade.html', context)
 
@@ -2297,12 +2532,51 @@ def analise_maquinas(request):
     # Buscar Centros de Atividade filtrados por local (INDÚSTRIA ou FRIGORÍFICO)
     from app.models import CentroAtividade
     centros_industria = list(CentroAtividade.objects.filter(
-        local__iexact='INDÚSTRIA'
-    ).order_by('ca'))
+        locais__local__iexact='INDÚSTRIA'
+    ).distinct().order_by('ca'))
     
     centros_frigorifico = list(CentroAtividade.objects.filter(
-        local__iexact='FRIGORÍFICO'
-    ).order_by('ca'))
+        locais__local__iexact='FRIGORÍFICO'
+    ).distinct().order_by('ca'))
+    
+    # Preparar dados para o organograma (OrgChartJS)
+    from app.models import MaquinaPrimariaSecundaria
+    maquinas_primarias_org = Maquina.objects.filter(
+        descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
+    ).order_by('cd_maquina')
+    
+    relacionamentos_org = MaquinaPrimariaSecundaria.objects.select_related(
+        'maquina_primaria', 'maquina_secundaria'
+    ).order_by('maquina_primaria__cd_maquina', 'maquina_secundaria__cd_maquina')
+    
+    # Construir lista de nós no formato do OrgChartJS
+    nodes_org = []
+    
+    # Adicionar máquinas primárias como nós raiz (sem pid)
+    for maq_prim in maquinas_primarias_org:
+        nodes_org.append({
+            'id': maq_prim.id,
+            'name': f"{maq_prim.cd_maquina} - {maq_prim.descr_maquina or 'Sem descrição'}"
+        })
+    
+    # Adicionar máquinas secundárias como nós filhos (com pid)
+    for rel in relacionamentos_org:
+        maq_sec = rel.maquina_secundaria
+        nodes_org.append({
+            'id': maq_sec.id,
+            'pid': rel.maquina_primaria.id,
+            'name': f"{maq_sec.cd_maquina} - {maq_sec.descr_maquina or 'Sem descrição'}"
+        })
+    
+    # Serializar JSON para o organograma
+    try:
+        dados_json_org = json.dumps(nodes_org, ensure_ascii=False, default=str)
+    except Exception as e:
+        print(f"Erro ao serializar JSON do organograma: {e}")
+        dados_json_org = json.dumps([{
+            'id': 0,
+            'name': 'Erro ao processar dados'
+        }], ensure_ascii=False)
     
     context = {
         'page_title': 'Análise de Máquinas',
@@ -2340,8 +2614,120 @@ def analise_maquinas(request):
         'maquinas_principais_por_setor': maquinas_principais_por_setor,
         'centros_industria': centros_industria,
         'centros_frigorifico': centros_frigorifico,
+        # Dados para organograma
+        'dados_json_org': dados_json_org,
+        'total_primarias_org': maquinas_primarias_org.count(),
+        'total_relacionamentos_org': relacionamentos_org.count(),
     }
     return render(request, 'analise/analise_maquinas.html', context)
+
+
+def analise_maquinas_importadas(request):
+    """Página de análise de máquinas importadas com gráficos e estatísticas"""
+    from app.models import Maquina
+    from django.db.models import Count
+    from datetime import datetime, timedelta
+    from collections import defaultdict
+    import json
+    
+    # Estatísticas básicas - apenas máquinas importadas (com created_at)
+    total_importadas = Maquina.objects.exclude(created_at__isnull=True).count()
+    total_geral = Maquina.objects.count()
+    percentual_importadas = (total_importadas / total_geral * 100) if total_geral > 0 else 0
+    
+    # Máquinas importadas recentes (últimas 30 dias)
+    data_30_dias_atras = datetime.now() - timedelta(days=30)
+    importadas_recentes = Maquina.objects.filter(created_at__gte=data_30_dias_atras).exclude(created_at__isnull=True).count()
+    
+    # Máquinas importadas do mês atual
+    mes_atual = datetime.now().replace(day=1)
+    importadas_mes_atual = Maquina.objects.filter(created_at__gte=mes_atual).exclude(created_at__isnull=True).count()
+    
+    # Máquinas importadas por setor
+    maquinas_importadas_por_setor = Maquina.objects.exclude(
+        created_at__isnull=True
+    ).exclude(
+        cd_setormanut__isnull=True
+    ).exclude(
+        cd_setormanut=''
+    ).values('cd_setormanut').annotate(
+        total=Count('id')
+    ).order_by('-total')[:10]
+    
+    setores_labels = [str(item['cd_setormanut']) for item in maquinas_importadas_por_setor]
+    setores_data = [item['total'] for item in maquinas_importadas_por_setor]
+    
+    # Máquinas importadas por unidade (top 10)
+    maquinas_importadas_por_unidade = Maquina.objects.exclude(
+        created_at__isnull=True
+    ).exclude(
+        nome_unid__isnull=True
+    ).exclude(
+        nome_unid=''
+    ).values('nome_unid').annotate(
+        total=Count('id')
+    ).order_by('-total')[:10]
+    
+    unidades_labels = [item['nome_unid'][:30] for item in maquinas_importadas_por_unidade]
+    unidades_data = [item['total'] for item in maquinas_importadas_por_unidade]
+    
+    # Máquinas importadas por mês (últimos 12 meses)
+    maquinas_importadas_por_mes = defaultdict(int)
+    maquinas_importadas = Maquina.objects.exclude(created_at__isnull=True).order_by('created_at')
+    for maquina in maquinas_importadas:
+        if maquina.created_at:
+            mes_ano = maquina.created_at.strftime('%Y-%m')
+            maquinas_importadas_por_mes[mes_ano] += 1
+    
+    # Ordenar por data e pegar últimos 12 meses
+    meses_ordenados = sorted(maquinas_importadas_por_mes.keys())[-12:]
+    meses_labels = [datetime.strptime(m, '%Y-%m').strftime('%b/%Y') for m in meses_ordenados]
+    meses_data = [maquinas_importadas_por_mes[m] for m in meses_ordenados]
+    
+    # Máquinas importadas recentes para exibir na tabela
+    maquinas_importadas_recentes = Maquina.objects.exclude(
+        created_at__isnull=True
+    ).order_by('-created_at')[:50]
+    
+    # Agrupar máquinas importadas por descr_gerenc
+    from collections import defaultdict
+    maquinas_por_gerencia = defaultdict(list)
+    maquinas_importadas_gerencia = Maquina.objects.exclude(
+        created_at__isnull=True
+    ).exclude(
+        descr_gerenc__isnull=True
+    ).exclude(
+        descr_gerenc=''
+    ).order_by('descr_gerenc', 'cd_maquina')
+    
+    for maquina in maquinas_importadas_gerencia:
+        gerencia = maquina.descr_gerenc or 'Sem Classificação'
+        maquinas_por_gerencia[gerencia].append(maquina)
+    
+    # Converter para lista ordenada por nome da gerência
+    maquinas_por_gerencia_list = sorted(
+        maquinas_por_gerencia.items(),
+        key=lambda x: x[0]
+    )
+    
+    context = {
+        'page_title': 'Análise de Máquinas Importadas',
+        'active_page': 'analise_maquinas_importadas',
+        'total_importadas': total_importadas,
+        'importadas_recentes': importadas_recentes,
+        'importadas_mes_atual': importadas_mes_atual,
+        'percentual_importadas': round(percentual_importadas, 1),
+        'maquinas_importadas_recentes': maquinas_importadas_recentes,
+        'maquinas_por_gerencia': maquinas_por_gerencia_list,
+        # Dados para gráficos (JSON)
+        'setores_labels': json.dumps(setores_labels),
+        'setores_data': json.dumps(setores_data),
+        'unidades_labels': json.dumps(unidades_labels),
+        'unidades_data': json.dumps(unidades_data),
+        'meses_labels': json.dumps(meses_labels),
+        'meses_data': json.dumps(meses_data),
+    }
+    return render(request, 'maquinas/analise_maquinas_importadas.html', context)
 
 
 def consultar_maquinas(request):
@@ -2781,9 +3167,755 @@ def consultar_meu_plano(request):
         'filter_descr_seqplamanu': filter_descr_seqplamanu,
         'filter_funcionario': filter_funcionario,
         'filter_setor': filter_setor,
-        'filter_unidade': filter_unidade,
     }
     return render(request, 'consultar/consultar_meu_plano.html', context)
+
+
+def consultar_52_semanas(request):
+    """Consultar/listar Semanas 52"""
+    from app.models import Semana52
+    from django.core.paginator import Paginator
+    from django.db.models import Q
+    
+    # Buscar todas as semanas
+    semanas_list = Semana52.objects.all()
+    
+    # Filtro de busca geral
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        search_conditions = Q()
+        
+        # Para campos de texto, usar icontains
+        search_conditions |= (
+            Q(semana__icontains=search_query)
+        )
+        
+        # Tentar buscar por data
+        try:
+            from datetime import datetime
+            # Tentar diferentes formatos de data
+            search_date = datetime.strptime(search_query, '%d/%m/%Y').date()
+            search_conditions |= Q(inicio=search_date) | Q(fim=search_date)
+        except (ValueError, TypeError):
+            try:
+                search_date = datetime.strptime(search_query, '%Y-%m-%d').date()
+                search_conditions |= Q(inicio=search_date) | Q(fim=search_date)
+            except (ValueError, TypeError):
+                pass
+        
+        semanas_list = semanas_list.filter(search_conditions)
+    
+    # Filtros por coluna individual
+    filter_semana = request.GET.get('filter_semana', '').strip()
+    if filter_semana:
+        semanas_list = semanas_list.filter(semana__icontains=filter_semana)
+    
+    filter_inicio = request.GET.get('filter_inicio', '').strip()
+    if filter_inicio:
+        # Tentar converter para data
+        try:
+            from datetime import datetime
+            inicio_date = datetime.strptime(filter_inicio, '%d/%m/%Y').date()
+            semanas_list = semanas_list.filter(inicio=inicio_date)
+        except (ValueError, TypeError):
+            # Se não for data válida, buscar como string na representação da data
+            semanas_list = semanas_list.filter(inicio__icontains=filter_inicio)
+    
+    filter_fim = request.GET.get('filter_fim', '').strip()
+    if filter_fim:
+        # Tentar converter para data
+        try:
+            from datetime import datetime
+            fim_date = datetime.strptime(filter_fim, '%d/%m/%Y').date()
+            semanas_list = semanas_list.filter(fim=fim_date)
+        except (ValueError, TypeError):
+            # Se não for data válida, buscar como string na representação da data
+            semanas_list = semanas_list.filter(fim__icontains=filter_fim)
+    
+    # Ordenar por data de início
+    semanas_list = semanas_list.order_by('inicio', 'semana')
+    
+    # Adicionar campo calculado de duração
+    from datetime import timedelta
+    semanas_com_duracao = []
+    for semana in semanas_list:
+        duracao_dias = None
+        if semana.inicio and semana.fim:
+            duracao_dias = (semana.fim - semana.inicio).days + 1
+        semanas_com_duracao.append({
+            'semana': semana,
+            'duracao_dias': duracao_dias
+        })
+    
+    # Paginação
+    paginator = Paginator(semanas_com_duracao, 25)  # 25 itens por página
+    page_number = request.GET.get('page', 1)
+    try:
+        semanas = paginator.page(page_number)
+    except:
+        semanas = paginator.page(1)
+    
+    # Estatísticas
+    total_count = Semana52.objects.count()
+    
+    context = {
+        'page_title': 'Consultar 52 Semanas',
+        'active_page': 'consultar_52_semanas',
+        'semanas': semanas,
+        'total_count': total_count,
+        'search_query': search_query,
+        'filter_semana': filter_semana,
+        'filter_inicio': filter_inicio,
+        'filter_fim': filter_fim,
+    }
+    return render(request, 'consultar/consultar_52_semanas.html', context)
+
+
+def analise_geral_plano_preventiva_pcm(request):
+    """Análise geral dos dados de Plano Preventiva PCM - Dashboard com estatísticas"""
+    from app.models import (
+        MeuPlanoPreventiva, PlanoPreventiva, RoteiroPreventiva,
+        MaquinaPrimariaSecundaria, Maquina, MeuPlanoPreventivaDocumento, Semana52
+    )
+    from django.db.models import Count, Q
+    from datetime import date, timedelta
+    
+    # ========== ESTATÍSTICAS MEU PLANO PREVENTIVA ==========
+    total_meus_planos = MeuPlanoPreventiva.objects.count()
+    meus_planos_com_roteiro = MeuPlanoPreventiva.objects.exclude(roteiro_preventiva__isnull=True).count()
+    meus_planos_sem_roteiro = total_meus_planos - meus_planos_com_roteiro
+    meus_planos_com_desc_detalhada = MeuPlanoPreventiva.objects.exclude(
+        desc_detalhada_do_roteiro_preventiva__isnull=True
+    ).exclude(desc_detalhada_do_roteiro_preventiva='').count()
+    
+    # Máquinas únicas em MeuPlanoPreventiva
+    maquinas_unicas_meus_planos = MeuPlanoPreventiva.objects.exclude(
+        cd_maquina__isnull=True
+    ).values('cd_maquina').distinct().count()
+    
+    # Setores únicos
+    setores_unicos_meus_planos = MeuPlanoPreventiva.objects.exclude(
+        cd_setor__isnull=True
+    ).exclude(cd_setor='').values('cd_setor').distinct().count()
+    
+    # Planos com documentos associados
+    planos_com_documentos = MeuPlanoPreventiva.objects.filter(
+        documentos_associados__isnull=False
+    ).distinct().count()
+    
+    # ========== ESTATÍSTICAS ANÁLISE ROTEIRO/PLANO ==========
+    total_planos = PlanoPreventiva.objects.count()
+    total_roteiros = RoteiroPreventiva.objects.count()
+    
+    # Função para verificar correspondência exata
+    def campos_correspondem(plano, roteiro):
+        if not plano.cd_maquina or not roteiro.cd_maquina:
+            return False
+        if plano.cd_maquina != roteiro.cd_maquina:
+            return False
+        
+        descr_plano = (plano.descr_maquina or '').strip().upper()
+        descr_roteiro = (roteiro.descr_maquina or '').strip().upper()
+        if descr_plano and descr_roteiro:
+            if descr_plano != descr_roteiro:
+                return False
+        elif descr_plano or descr_roteiro:
+            return False
+        
+        if not plano.sequencia_tarefa or not roteiro.cd_tarefamanu:
+            return False
+        if plano.sequencia_tarefa != roteiro.cd_tarefamanu:
+            return False
+        
+        descr_tarefa_plano = (plano.descr_tarefa or '').strip().upper()
+        descr_tarefa_roteiro = (roteiro.descr_tarefamanu or '').strip().upper()
+        if descr_tarefa_plano and descr_tarefa_roteiro:
+            if descr_tarefa_plano != descr_tarefa_roteiro:
+                return False
+        elif descr_tarefa_plano or descr_tarefa_roteiro:
+            return False
+        
+        if not plano.sequencia_manutencao or not roteiro.seq_seqplamanu:
+            return False
+        if plano.sequencia_manutencao != roteiro.seq_seqplamanu:
+            return False
+        
+        return True
+    
+    # Contar relacionamentos encontrados
+    relacionamentos_encontrados = 0
+    planos_processados = set()
+    roteiros_processados = set()
+    
+    planos_list = PlanoPreventiva.objects.all()
+    roteiros_list = RoteiroPreventiva.objects.all()
+    
+    for plano in planos_list:
+        for roteiro in roteiros_list:
+            if campos_correspondem(plano, roteiro):
+                relacionamentos_encontrados += 1
+                planos_processados.add(plano.id)
+                roteiros_processados.add(roteiro.id)
+                break
+    
+    planos_sem_relacao = total_planos - len(planos_processados)
+    roteiros_sem_relacao = total_roteiros - len(roteiros_processados)
+    
+    # Relacionamentos já confirmados (salvos em MeuPlanoPreventiva)
+    relacionamentos_confirmados = MeuPlanoPreventiva.objects.exclude(
+        roteiro_preventiva__isnull=True
+    ).count()
+    
+    relacionamentos_pendentes = max(0, relacionamentos_encontrados - relacionamentos_confirmados)
+    
+    # ========== ESTATÍSTICAS MÁQUINAS PRIMÁRIAS/SECUNDÁRIAS ==========
+    maquinas_primarias_total = Maquina.objects.filter(
+        descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
+    ).count()
+    
+    maquinas_secundarias_total = Maquina.objects.exclude(
+        descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
+    ).count()
+    
+    relacionamentos_maquinas = MaquinaPrimariaSecundaria.objects.count()
+    
+    # Máquinas primárias que têm relacionamentos
+    primarias_com_relacionamentos = MaquinaPrimariaSecundaria.objects.values(
+        'maquina_primaria_id'
+    ).distinct().count()
+    
+    # Máquinas secundárias relacionadas
+    secundarias_relacionadas = MaquinaPrimariaSecundaria.objects.values(
+        'maquina_secundaria_id'
+    ).distinct().count()
+    
+    # Máquinas primárias sem relacionamentos
+    primarias_sem_relacionamentos = maquinas_primarias_total - primarias_com_relacionamentos
+    
+    # Máquinas secundárias disponíveis (não relacionadas)
+    secundarias_disponiveis = maquinas_secundarias_total - secundarias_relacionadas
+    
+    # ========== PERCENTUAIS E TAXAS ==========
+    taxa_cobertura_planos = (relacionamentos_encontrados / total_planos * 100) if total_planos > 0 else 0
+    taxa_cobertura_roteiros = (relacionamentos_encontrados / total_roteiros * 100) if total_roteiros > 0 else 0
+    taxa_confirmacao = (relacionamentos_confirmados / relacionamentos_encontrados * 100) if relacionamentos_encontrados > 0 else 0
+    
+    taxa_meus_planos_com_roteiro = (meus_planos_com_roteiro / total_meus_planos * 100) if total_meus_planos > 0 else 0
+    taxa_meus_planos_com_desc = (meus_planos_com_desc_detalhada / total_meus_planos * 100) if total_meus_planos > 0 else 0
+    
+    taxa_primarias_relacionadas = (primarias_com_relacionamentos / maquinas_primarias_total * 100) if maquinas_primarias_total > 0 else 0
+    
+    # ========== ESTATÍSTICAS SEMANA52 ==========
+    total_semanas = Semana52.objects.count()
+    semanas_com_dados = Semana52.objects.exclude(inicio__isnull=True).exclude(fim__isnull=True).count()
+    
+    # Semanas ordenadas por data de início
+    semanas_ordenadas = Semana52.objects.exclude(inicio__isnull=True).order_by('inicio')
+    
+    # Calcular estatísticas de datas
+    semanas_list = list(semanas_ordenadas)
+    if semanas_list:
+        primeira_semana = semanas_list[0]
+        ultima_semana = semanas_list[-1]
+        primeira_data = primeira_semana.inicio if primeira_semana else None
+        ultima_data = ultima_semana.fim if ultima_semana else None
+        
+        # Calcular duração total em dias
+        if primeira_data and ultima_data:
+            duracao_total_dias = (ultima_data - primeira_data).days + 1
+        else:
+            duracao_total_dias = 0
+        
+        # Calcular média de duração por semana e adicionar duração a cada semana
+        duracoes = []
+        semanas_com_duracao = []
+        # Processar todas as semanas para calcular média, mas limitar preview a 10
+        for semana in semanas_list:
+            duracao_semana = None
+            if semana.inicio and semana.fim:
+                duracao_semana = (semana.fim - semana.inicio).days + 1
+                duracoes.append(duracao_semana)
+            # Adicionar apenas as primeiras 10 para preview
+            if len(semanas_com_duracao) < 10:
+                semanas_com_duracao.append({
+                    'semana': semana,
+                    'duracao_dias': duracao_semana
+                })
+        
+        duracao_media = sum(duracoes) / len(duracoes) if duracoes else 0
+    else:
+        primeira_data = None
+        ultima_data = None
+        duracao_total_dias = 0
+        duracao_media = 0
+        semanas_com_duracao = []
+    
+    # Semanas do ano atual
+    hoje = date.today()
+    ano_atual = hoje.year
+    semanas_ano_atual = Semana52.objects.filter(inicio__year=ano_atual).count()
+    
+    # Semanas futuras (ainda não iniciadas)
+    semanas_futuras = Semana52.objects.filter(inicio__gt=hoje).count()
+    
+    # Semanas passadas (já finalizadas)
+    semanas_passadas = Semana52.objects.filter(fim__lt=hoje).count()
+    
+    # Semana atual (hoje está entre inicio e fim)
+    semana_atual = Semana52.objects.filter(inicio__lte=hoje, fim__gte=hoje).first()
+    
+    context = {
+        'page_title': 'Análise Geral - Plano Preventiva PCM',
+        'active_page': 'analise_geral_plano_preventiva_pcm',
+        
+        # Meus Planos Preventiva
+        'total_meus_planos': total_meus_planos,
+        'meus_planos_com_roteiro': meus_planos_com_roteiro,
+        'meus_planos_sem_roteiro': meus_planos_sem_roteiro,
+        'meus_planos_com_desc_detalhada': meus_planos_com_desc_detalhada,
+        'maquinas_unicas_meus_planos': maquinas_unicas_meus_planos,
+        'setores_unicos_meus_planos': setores_unicos_meus_planos,
+        'planos_com_documentos': planos_com_documentos,
+        'taxa_meus_planos_com_roteiro': taxa_meus_planos_com_roteiro,
+        'taxa_meus_planos_com_desc': taxa_meus_planos_com_desc,
+        
+        # Análise Roteiro/Plano
+        'total_planos': total_planos,
+        'total_roteiros': total_roteiros,
+        'relacionamentos_encontrados': relacionamentos_encontrados,
+        'relacionamentos_confirmados': relacionamentos_confirmados,
+        'relacionamentos_pendentes': relacionamentos_pendentes,
+        'planos_sem_relacao': planos_sem_relacao,
+        'roteiros_sem_relacao': roteiros_sem_relacao,
+        'taxa_cobertura_planos': taxa_cobertura_planos,
+        'taxa_cobertura_roteiros': taxa_cobertura_roteiros,
+        'taxa_confirmacao': taxa_confirmacao,
+        
+        # Máquinas Primárias/Secundárias
+        'maquinas_primarias_total': maquinas_primarias_total,
+        'maquinas_secundarias_total': maquinas_secundarias_total,
+        'relacionamentos_maquinas': relacionamentos_maquinas,
+        'primarias_com_relacionamentos': primarias_com_relacionamentos,
+        'secundarias_relacionadas': secundarias_relacionadas,
+        'primarias_sem_relacionamentos': primarias_sem_relacionamentos,
+        'secundarias_disponiveis': secundarias_disponiveis,
+        'taxa_primarias_relacionadas': taxa_primarias_relacionadas,
+        
+        # Semana52
+        'total_semanas': total_semanas,
+        'semanas_com_dados': semanas_com_dados,
+        'semanas_ordenadas': semanas_ordenadas[:10],  # Primeiras 10 para preview
+        'semanas_com_duracao': semanas_com_duracao,  # Primeiras 10 com duração calculada
+        'primeira_data': primeira_data,
+        'ultima_data': ultima_data,
+        'duracao_total_dias': duracao_total_dias,
+        'duracao_media': duracao_media,
+        'semanas_ano_atual': semanas_ano_atual,
+        'semanas_futuras': semanas_futuras,
+        'semanas_passadas': semanas_passadas,
+        'semana_atual': semana_atual,
+    }
+    
+    return render(request, 'planejamento/analise_geral_plano_preventiva_pcm.html', context)
+
+
+def analise_ordens_de_servico(request):
+    """Análise de Ordens de Serviço - Dashboard com estatísticas"""
+    from app.models import OrdemServicoCorretiva, PlanoPreventiva, OrdemServicoCorretivaFicha
+    from django.db.models import Count, Q, Avg
+    from collections import defaultdict
+    
+    # Estatísticas básicas
+    total_corretivas = OrdemServicoCorretiva.objects.count()
+    total_preventivas = PlanoPreventiva.objects.count()
+    total_ordens = total_corretivas + total_preventivas
+    
+    # ========== ESTATÍSTICAS ORDEMSERVICOCORRETIVA ==========
+    # Ordens por setor (top 10)
+    ordens_por_setor = OrdemServicoCorretiva.objects.exclude(
+        descr_setormanut__isnull=True
+    ).exclude(
+        descr_setormanut=''
+    ).values('descr_setormanut').annotate(
+        total=Count('id')
+    ).order_by('-total')[:10]
+    
+    # Ordens por unidade (top 10)
+    ordens_por_unidade = OrdemServicoCorretiva.objects.exclude(
+        nome_unid__isnull=True
+    ).exclude(
+        nome_unid=''
+    ).values('nome_unid').annotate(
+        total=Count('id')
+    ).order_by('-total')[:10]
+    
+    # Ordens por tipo de manutenção
+    ordens_por_tipo_manut = OrdemServicoCorretiva.objects.exclude(
+        descr_tpmanuttv__isnull=True
+    ).exclude(
+        descr_tpmanuttv=''
+    ).values('descr_tpmanuttv').annotate(
+        total=Count('id')
+    ).order_by('-total')[:10]
+    
+    # Ordens por situação
+    ordens_por_situacao = OrdemServicoCorretiva.objects.exclude(
+        descr_sitordsetv__isnull=True
+    ).exclude(
+        descr_sitordsetv=''
+    ).values('descr_sitordsetv').annotate(
+        total=Count('id')
+    ).order_by('-total')
+    
+    # Ordens com e sem máquina
+    ordens_com_maquina = OrdemServicoCorretiva.objects.exclude(cd_maquina__isnull=True).count()
+    ordens_sem_maquina = total_corretivas - ordens_com_maquina
+    
+    # Ordens com e sem funcionário executor
+    ordens_com_executor = OrdemServicoCorretiva.objects.exclude(
+        nm_func_exec__isnull=True
+    ).exclude(
+        nm_func_exec=''
+    ).count()
+    ordens_sem_executor = total_corretivas - ordens_com_executor
+    
+    # Ordens com e sem funcionário solicitante
+    ordens_com_solicitante = OrdemServicoCorretiva.objects.exclude(
+        nm_func_solic_os__isnull=True
+    ).exclude(
+        nm_func_solic_os=''
+    ).count()
+    ordens_sem_solicitante = total_corretivas - ordens_com_solicitante
+    
+    # Top 10 máquinas com mais ordens
+    top_maquinas = OrdemServicoCorretiva.objects.exclude(
+        cd_maquina__isnull=True
+    ).values('cd_maquina', 'descr_maquina').annotate(
+        total=Count('id')
+    ).order_by('-total')[:10]
+    
+    # Top 10 funcionários executores
+    top_executores = OrdemServicoCorretiva.objects.exclude(
+        nm_func_exec__isnull=True
+    ).exclude(
+        nm_func_exec=''
+    ).values('nm_func_exec').annotate(
+        total=Count('id')
+    ).order_by('-total')[:10]
+    
+    # ========== ESTATÍSTICAS ORDEMSERVICOCORRETIVAFICHA ==========
+    total_fichas = OrdemServicoCorretivaFicha.objects.count()
+    ordens_com_fichas = OrdemServicoCorretiva.objects.filter(fichas__isnull=False).distinct().count()
+    ordens_sem_fichas = total_corretivas - ordens_com_fichas
+    
+    # Média de fichas por ordem
+    if ordens_com_fichas > 0:
+        media_fichas_por_ordem = total_fichas / ordens_com_fichas
+    else:
+        media_fichas_por_ordem = 0
+    
+    # Top 10 ordens com mais fichas
+    top_ordens_fichas = OrdemServicoCorretiva.objects.annotate(
+        num_fichas=Count('fichas')
+    ).filter(
+        num_fichas__gt=0
+    ).order_by('-num_fichas')[:10]
+    
+    # Top 10 funcionários executores de fichas
+    top_executores_fichas = OrdemServicoCorretivaFicha.objects.exclude(
+        nm_func_exec_os__isnull=True
+    ).exclude(
+        nm_func_exec_os=''
+    ).values('nm_func_exec_os').annotate(
+        total=Count('id')
+    ).order_by('-total')[:10]
+    
+    # Percentuais
+    taxa_ordens_com_maquina = (ordens_com_maquina / total_corretivas * 100) if total_corretivas > 0 else 0
+    taxa_ordens_com_executor = (ordens_com_executor / total_corretivas * 100) if total_corretivas > 0 else 0
+    taxa_ordens_com_fichas = (ordens_com_fichas / total_corretivas * 100) if total_corretivas > 0 else 0
+    
+    context = {
+        'page_title': 'Análise de Ordens de Serviço',
+        'active_page': 'analise_ordens_de_servico',
+        'total_ordens': total_ordens,
+        'total_corretivas': total_corretivas,
+        'total_preventivas': total_preventivas,
+        
+        # OrdemServicoCorretiva
+        'ordens_por_setor': ordens_por_setor,
+        'ordens_por_unidade': ordens_por_unidade,
+        'ordens_por_tipo_manut': ordens_por_tipo_manut,
+        'ordens_por_situacao': ordens_por_situacao,
+        'ordens_com_maquina': ordens_com_maquina,
+        'ordens_sem_maquina': ordens_sem_maquina,
+        'ordens_com_executor': ordens_com_executor,
+        'ordens_sem_executor': ordens_sem_executor,
+        'ordens_com_solicitante': ordens_com_solicitante,
+        'ordens_sem_solicitante': ordens_sem_solicitante,
+        'top_maquinas': top_maquinas,
+        'top_executores': top_executores,
+        'taxa_ordens_com_maquina': taxa_ordens_com_maquina,
+        'taxa_ordens_com_executor': taxa_ordens_com_executor,
+        
+        # OrdemServicoCorretivaFicha
+        'total_fichas': total_fichas,
+        'ordens_com_fichas': ordens_com_fichas,
+        'ordens_sem_fichas': ordens_sem_fichas,
+        'media_fichas_por_ordem': media_fichas_por_ordem,
+        'top_ordens_fichas': top_ordens_fichas,
+        'top_executores_fichas': top_executores_fichas,
+        'taxa_ordens_com_fichas': taxa_ordens_com_fichas,
+    }
+    
+    return render(request, 'ordens_de_servico/analise_ordens_de_servico.html', context)
+
+
+def config_analise_ordens(request):
+    """Configuração de Análise de Ordens de Serviço"""
+    from django.contrib import messages
+    
+    if request.method == 'POST':
+        # Aqui você pode processar e salvar as configurações
+        # Por enquanto, apenas mostra uma mensagem de sucesso
+        messages.success(request, 'Configurações salvas com sucesso!')
+        return redirect('config_analise_ordens')
+    
+    context = {
+        'page_title': 'Configuração de Análise de Ordens de Serviço',
+        'active_page': 'config_analise_ordens',
+    }
+    
+    return render(request, 'ordens_de_servico/config_analise_ordens.html', context)
+
+
+def agrupar_acoes_do_plano_por_data(request):
+    """Agrupar ações do plano por data de execução"""
+    from app.models import MeuPlanoPreventiva
+    from django.db.models import Count, Q
+    from collections import defaultdict
+    from datetime import datetime
+    
+    # Buscar todos os planos
+    planos = MeuPlanoPreventiva.objects.all().order_by('dt_execucao', 'cd_maquina', 'sequencia_manutencao')
+    
+    # Agrupar por data de execução
+    planos_por_data = defaultdict(list)
+    planos_sem_data = []
+    
+    for plano in planos:
+        if plano.dt_execucao:
+            # Tentar parsear a data (formato DD/MM/YYYY)
+            try:
+                # Remover espaços e tentar diferentes formatos
+                data_str = plano.dt_execucao.strip()
+                if '/' in data_str:
+                    # Formato DD/MM/YYYY
+                    data_obj = datetime.strptime(data_str, '%d/%m/%Y').date()
+                elif '-' in data_str:
+                    # Formato YYYY-MM-DD
+                    data_obj = datetime.strptime(data_str, '%Y-%m-%d').date()
+                else:
+                    # Tentar outros formatos
+                    data_obj = datetime.strptime(data_str, '%Y%m%d').date()
+                
+                planos_por_data[data_obj].append(plano)
+            except (ValueError, AttributeError):
+                # Se não conseguir parsear, adicionar aos sem data
+                planos_sem_data.append(plano)
+        else:
+            planos_sem_data.append(plano)
+    
+    # Ordenar as datas
+    datas_ordenadas = sorted(planos_por_data.keys())
+    
+    # Estatísticas
+    total_planos = planos.count()
+    total_com_data = sum(len(planos_por_data[data]) for data in datas_ordenadas)
+    total_sem_data = len(planos_sem_data)
+    total_datas_unicas = len(datas_ordenadas)
+    
+    # Agrupar por semana (opcional - para análise semanal)
+    planos_por_semana = defaultdict(list)
+    for data, planos_list in planos_por_data.items():
+        # Calcular número da semana do ano
+        semana_ano = data.isocalendar()[1]
+        ano = data.year
+        chave_semana = f"{ano}-W{semana_ano:02d}"
+        planos_por_semana[chave_semana].extend(planos_list)
+    
+    semanas_ordenadas = sorted(planos_por_semana.keys())
+    
+    # Converter defaultdict para dict e criar lista de tuplas para facilitar acesso no template
+    planos_por_data_list = [(data, planos_por_data[data]) for data in datas_ordenadas]
+    planos_por_semana_list = [(semana, planos_por_semana[semana]) for semana in semanas_ordenadas]
+    
+    context = {
+        'page_title': 'Agrupar Ações do Plano por Data',
+        'active_page': 'agrupar_acoes_do_plano_por_data',
+        'planos_por_data': dict(planos_por_data),
+        'planos_por_data_list': planos_por_data_list,
+        'datas_ordenadas': datas_ordenadas,
+        'planos_sem_data': planos_sem_data,
+        'planos_por_semana': dict(planos_por_semana),
+        'planos_por_semana_list': planos_por_semana_list,
+        'semanas_ordenadas': semanas_ordenadas,
+        'total_planos': total_planos,
+        'total_com_data': total_com_data,
+        'total_sem_data': total_sem_data,
+        'total_datas_unicas': total_datas_unicas,
+    }
+    
+    return render(request, 'planejamento/agrupar_acoes_do_plano_por_data.html', context)
+
+
+def agrupar_preventiva_por_data(request):
+    """Agrupar preventivas por data de execução"""
+    from app.models import PlanoPreventiva
+    from django.db.models import Count, Q
+    from collections import defaultdict
+    from datetime import datetime
+    
+    # Buscar todos os planos preventiva
+    preventivas = PlanoPreventiva.objects.all().order_by('dt_execucao', 'cd_maquina', 'sequencia_manutencao')
+    
+    # Agrupar por data de execução
+    preventivas_por_data = defaultdict(list)
+    preventivas_sem_data = []
+    
+    for preventiva in preventivas:
+        if preventiva.dt_execucao:
+            # Tentar parsear a data (formato DD/MM/YYYY)
+            try:
+                # Remover espaços e tentar diferentes formatos
+                data_str = preventiva.dt_execucao.strip()
+                if '/' in data_str:
+                    # Formato DD/MM/YYYY
+                    data_obj = datetime.strptime(data_str, '%d/%m/%Y').date()
+                elif '-' in data_str:
+                    # Formato YYYY-MM-DD
+                    data_obj = datetime.strptime(data_str, '%Y-%m-%d').date()
+                else:
+                    # Tentar outros formatos
+                    data_obj = datetime.strptime(data_str, '%Y%m%d').date()
+                
+                preventivas_por_data[data_obj].append(preventiva)
+            except (ValueError, AttributeError):
+                # Se não conseguir parsear, adicionar aos sem data
+                preventivas_sem_data.append(preventiva)
+        else:
+            preventivas_sem_data.append(preventiva)
+    
+    # Ordenar as datas
+    datas_ordenadas = sorted(preventivas_por_data.keys())
+    
+    # Estatísticas
+    total_preventivas = preventivas.count()
+    total_com_data = sum(len(preventivas_por_data[data]) for data in datas_ordenadas)
+    total_sem_data = len(preventivas_sem_data)
+    total_datas_unicas = len(datas_ordenadas)
+    
+    # Agrupar por semana (opcional - para análise semanal)
+    preventivas_por_semana = defaultdict(list)
+    for data, preventivas_list in preventivas_por_data.items():
+        # Calcular número da semana do ano
+        semana_ano = data.isocalendar()[1]
+        ano = data.year
+        chave_semana = f"{ano}-W{semana_ano:02d}"
+        preventivas_por_semana[chave_semana].extend(preventivas_list)
+    
+    semanas_ordenadas = sorted(preventivas_por_semana.keys())
+    
+    # Converter defaultdict para dict e criar lista de tuplas para facilitar acesso no template
+    preventivas_por_data_list = [(data, preventivas_por_data[data]) for data in datas_ordenadas]
+    preventivas_por_semana_list = [(semana, preventivas_por_semana[semana]) for semana in semanas_ordenadas]
+    
+    context = {
+        'page_title': 'Agrupar Preventiva por Data',
+        'active_page': 'agrupar_preventiva_por_data',
+        'preventivas_por_data': dict(preventivas_por_data),
+        'preventivas_por_data_list': preventivas_por_data_list,
+        'datas_ordenadas': datas_ordenadas,
+        'preventivas_sem_data': preventivas_sem_data,
+        'preventivas_por_semana': dict(preventivas_por_semana),
+        'preventivas_por_semana_list': preventivas_por_semana_list,
+        'semanas_ordenadas': semanas_ordenadas,
+        'total_preventivas': total_preventivas,
+        'total_com_data': total_com_data,
+        'total_sem_data': total_sem_data,
+        'total_datas_unicas': total_datas_unicas,
+    }
+    
+    return render(request, 'planejamento/agrupar_preventiva_por_data.html', context)
+
+
+def criar_cronograma_planejado_preventiva(request):
+    """Criar cronograma planejado de preventivas"""
+    from app.models import MeuPlanoPreventiva, Semana52
+    from django.db.models import Q
+    from datetime import datetime, date
+    from collections import defaultdict
+    
+    # Buscar todas as semanas do ano
+    semanas = Semana52.objects.all().order_by('inicio')
+    
+    # Buscar todos os planos preventiva PCM
+    planos = MeuPlanoPreventiva.objects.all().order_by('dt_execucao', 'cd_maquina', 'sequencia_manutencao')
+    
+    # Agrupar planos por semana
+    planos_por_semana = defaultdict(list)
+    planos_sem_data = []
+    
+    for plano in planos:
+        if plano.dt_execucao:
+            try:
+                # Tentar parsear a data
+                data_str = plano.dt_execucao.strip()
+                if '/' in data_str:
+                    data_obj = datetime.strptime(data_str, '%d/%m/%Y').date()
+                elif '-' in data_str:
+                    data_obj = datetime.strptime(data_str, '%Y-%m-%d').date()
+                else:
+                    data_obj = datetime.strptime(data_str, '%Y%m%d').date()
+                
+                # Encontrar a semana correspondente
+                semana_encontrada = None
+                for semana in semanas:
+                    if semana.inicio and semana.fim:
+                        if semana.inicio <= data_obj <= semana.fim:
+                            semana_encontrada = semana
+                            break
+                
+                if semana_encontrada:
+                    planos_por_semana[semana_encontrada].append(plano)
+                else:
+                    planos_sem_data.append(plano)
+            except (ValueError, AttributeError):
+                planos_sem_data.append(plano)
+        else:
+            planos_sem_data.append(plano)
+    
+    # Estatísticas
+    total_planos = planos.count()
+    total_com_semana = sum(len(planos_por_semana[semana]) for semana in semanas)
+    total_sem_semana = len(planos_sem_data)
+    
+    # Criar lista de tuplas para facilitar acesso no template
+    planos_por_semana_list = [(semana, planos_por_semana[semana]) for semana in semanas if semana in planos_por_semana]
+    
+    context = {
+        'page_title': 'Criar Calendário Planejado de Preventivas',
+        'active_page': 'criar_cronograma_planejado_preventiva',
+        'semanas': semanas,
+        'planos_por_semana': dict(planos_por_semana),
+        'planos_por_semana_list': planos_por_semana_list,
+        'planos_sem_data': planos_sem_data,
+        'total_planos': total_planos,
+        'total_com_semana': total_com_semana,
+        'total_sem_semana': total_sem_semana,
+    }
+    
+    return render(request, 'planejamento/criar_cronograma_planejado_preventiva.html', context)
 
 
 def consultar_roteiro_preventiva(request):
@@ -4066,36 +5198,72 @@ def associar_documento_plano_pcm(request, plano_id, documento_id):
     """Associar um documento de máquina a um MeuPlanoPreventiva"""
     from app.models import MeuPlanoPreventiva, MaquinaDocumento, MeuPlanoPreventivaDocumento
     
-    if request.method != 'POST':
-        # Permitir GET também para facilitar links diretos
-        pass
+    # Aceitar tanto GET quanto POST
+    if request.method not in ['GET', 'POST']:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'Método não permitido'}, status=405)
+        messages.error(request, 'Método não permitido.')
+        return redirect('editar_plano_pcm', plano_id=plano_id)
     
     try:
         plano = MeuPlanoPreventiva.objects.get(id=plano_id)
     except MeuPlanoPreventiva.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'Plano PCM não encontrado'}, status=404)
         messages.error(request, 'Plano PCM não encontrado.')
         return redirect('editar_plano_pcm', plano_id=plano_id)
     
     try:
         documento = MaquinaDocumento.objects.get(id=documento_id)
     except MaquinaDocumento.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'Documento não encontrado'}, status=404)
         messages.error(request, 'Documento não encontrado.')
         return redirect('editar_plano_pcm', plano_id=plano_id)
     
     # Verificar se já está associado
     if MeuPlanoPreventivaDocumento.objects.filter(meu_plano_preventiva=plano, maquina_documento=documento).exists():
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'Este documento já está associado a este plano'}, status=400)
         messages.warning(request, 'Este documento já está associado a este plano.')
         return redirect('editar_plano_pcm', plano_id=plano_id)
     
     # Criar associação
-    comentario = request.POST.get('comentario', '').strip() if request.method == 'POST' else ''
-    associacao = MeuPlanoPreventivaDocumento.objects.create(
-        meu_plano_preventiva=plano,
-        maquina_documento=documento,
-        comentario=comentario if comentario else None
-    )
-    messages.success(request, 'Documento associado com sucesso!')
-    return redirect('editar_plano_pcm', plano_id=plano_id)
+    try:
+        comentario = request.POST.get('comentario', '').strip() if request.method == 'POST' else ''
+        
+        # Debug: imprimir informações
+        print(f"Associando documento {documento_id} ao plano {plano_id}")
+        print(f"Plano: {plano}")
+        print(f"Documento: {documento}")
+        print(f"Comentário: {comentario}")
+        
+        associacao = MeuPlanoPreventivaDocumento.objects.create(
+            meu_plano_preventiva=plano,
+            maquina_documento=documento,
+            comentario=comentario if comentario else None
+        )
+        
+        print(f"Associação criada com sucesso! ID: {associacao.id}")
+        
+        # Se for requisição AJAX, retornar JSON
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': 'Documento associado com sucesso!',
+                'associacao_id': associacao.id
+            })
+        
+        messages.success(request, 'Documento associado com sucesso!')
+        return redirect('editar_plano_pcm', plano_id=plano_id)
+    except Exception as e:
+        import traceback
+        print(f"ERRO ao associar documento {documento_id} ao plano {plano_id}:")
+        traceback.print_exc()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': f'Erro ao associar documento: {str(e)}'}, status=500)
+        messages.error(request, f'Erro ao associar documento: {str(e)}')
+        return redirect('editar_plano_pcm', plano_id=plano_id)
 
 
 def remover_documento_plano_pcm(request, plano_id, associacao_id):
@@ -4278,7 +5446,7 @@ def remover_documento_maquina(request, maquina_id, documento_id):
 
 def visualizar_maquina(request, maquina_id):
     """Visualizar detalhes de uma máquina específica"""
-    from app.models import Maquina, ItemEstoque, MaquinaPeca, MaquinaPrimariaSecundaria, PlanoPreventiva, MaquinaDocumento
+    from app.models import Maquina, ItemEstoque, MaquinaPeca, MaquinaPrimariaSecundaria, PlanoPreventiva, MaquinaDocumento, MeuPlanoPreventiva
     
     try:
         maquina = Maquina.objects.get(id=maquina_id)
@@ -4309,8 +5477,21 @@ def visualizar_maquina(request, maquina_id):
         Q(maquina=maquina) | Q(cd_maquina=maquina.cd_maquina)
     ).order_by('numero_plano', 'sequencia_manutencao', 'sequencia_tarefa')
     
+    # Buscar MeuPlanoPreventiva relacionados a esta máquina
+    meus_planos_preventiva = MeuPlanoPreventiva.objects.filter(
+        Q(maquina=maquina) | Q(cd_maquina=maquina.cd_maquina)
+    ).order_by('dt_execucao', 'numero_plano', 'sequencia_manutencao')
+    
     # Buscar documentos relacionados a esta máquina
     documentos_maquina = MaquinaDocumento.objects.filter(maquina=maquina).order_by('-created_at')
+    
+    # Verificar se é máquina principal
+    is_maquina_principal = maquina.descr_gerenc and 'MÁQUINAS PRINCIPAL' in maquina.descr_gerenc.upper()
+    
+    # Se for máquina principal, buscar IDs das máquinas secundárias
+    maquinas_secundarias_ids = []
+    if is_maquina_principal and relacionamentos_como_primaria.exists():
+        maquinas_secundarias_ids = relacionamentos_como_primaria.values_list('maquina_secundaria_id', flat=True)
     
     context = {
         'page_title': f'Visualizar Máquina {maquina.cd_maquina}',
@@ -4321,9 +5502,229 @@ def visualizar_maquina(request, maquina_id):
         'relacionamentos_como_primaria': relacionamentos_como_primaria,
         'relacionamentos_como_secundaria': relacionamentos_como_secundaria,
         'planos_preventiva': planos_preventiva,
+        'meus_planos_preventiva': meus_planos_preventiva,
         'documentos_maquina': documentos_maquina,
+        'is_maquina_principal': is_maquina_principal,
+        'maquinas_secundarias_ids': list(maquinas_secundarias_ids),
     }
     return render(request, 'visualizar/visualizar_maquina.html', context)
+
+
+def calendario_planos_maquina(request, maquina_id):
+    """Endpoint JSON para fornecer eventos do calendário de MeuPlanoPreventiva para uma máquina"""
+    from app.models import Maquina, MeuPlanoPreventiva
+    from django.http import JsonResponse
+    from datetime import datetime
+    from django.db.models import Q
+    
+    try:
+        maquina = Maquina.objects.get(id=maquina_id)
+    except Maquina.DoesNotExist:
+        return JsonResponse({'error': 'Máquina não encontrada'}, status=404)
+    
+    # Buscar MeuPlanoPreventiva relacionados a esta máquina
+    planos = MeuPlanoPreventiva.objects.filter(
+        Q(maquina=maquina) | Q(cd_maquina=maquina.cd_maquina)
+    ).exclude(
+        dt_execucao__isnull=True
+    ).exclude(
+        dt_execucao=''
+    )
+    
+    # Converter para formato de eventos do FullCalendar
+    events = []
+    for plano in planos:
+        if plano.dt_execucao:
+            try:
+                # Tentar parsear a data (formato DD/MM/YYYY ou YYYY-MM-DD)
+                data_str = plano.dt_execucao.strip()
+                if '/' in data_str:
+                    # Formato DD/MM/YYYY
+                    data_obj = datetime.strptime(data_str, '%d/%m/%Y').date()
+                elif '-' in data_str:
+                    # Formato YYYY-MM-DD
+                    data_obj = datetime.strptime(data_str, '%Y-%m-%d').date()
+                else:
+                    continue  # Pular se não conseguir parsear
+                
+                # Criar título do evento
+                titulo_parts = []
+                if plano.numero_plano:
+                    titulo_parts.append(f"Plano {plano.numero_plano}")
+                if plano.sequencia_manutencao:
+                    titulo_parts.append(f"Seq: {plano.sequencia_manutencao}")
+                if plano.descr_tarefa:
+                    titulo_parts.append(plano.descr_tarefa[:50])
+                
+                titulo = " - ".join(titulo_parts) if titulo_parts else f"Manutenção Preventiva - {plano.cd_maquina}"
+                
+                # Criar descrição/tooltip
+                descricao_parts = []
+                if plano.descr_tarefa:
+                    descricao_parts.append(f"Tarefa: {plano.descr_tarefa}")
+                if plano.nome_funcionario:
+                    descricao_parts.append(f"Funcionário: {plano.nome_funcionario}")
+                if plano.descr_setor:
+                    descricao_parts.append(f"Setor: {plano.descr_setor}")
+                if plano.quantidade_periodo:
+                    descricao_parts.append(f"Período: {plano.quantidade_periodo} dias")
+                
+                descricao = "\n".join(descricao_parts)
+                
+                # Determinar cor baseada em informações do plano
+                cor = '#3788d8'  # Azul padrão
+                if plano.quantidade_periodo and plano.quantidade_periodo > 30:
+                    cor = '#dc3545'  # Vermelho para períodos longos
+                elif plano.quantidade_periodo and plano.quantidade_periodo <= 7:
+                    cor = '#28a745'  # Verde para períodos curtos
+                
+                events.append({
+                    'id': plano.id,
+                    'title': titulo,
+                    'start': data_obj.isoformat(),
+                    'allDay': True,
+                    'backgroundColor': cor,
+                    'borderColor': cor,
+                    'textColor': '#ffffff',
+                    'extendedProps': {
+                        'plano_id': plano.id,
+                        'numero_plano': plano.numero_plano,
+                        'sequencia_manutencao': plano.sequencia_manutencao,
+                        'descricao': descricao,
+                        'url': f"/plano-pcm/visualizar/{plano.id}/" if plano.id else None,
+                    }
+                })
+            except (ValueError, AttributeError):
+                # Se não conseguir parsear a data, pular este plano
+                continue
+    
+    return JsonResponse(events, safe=False)
+
+
+def calendario_planos_secundarias(request, maquina_id):
+    """Endpoint JSON para fornecer eventos do calendário de MeuPlanoPreventiva para máquinas secundárias de uma máquina principal"""
+    from app.models import Maquina, MeuPlanoPreventiva, MaquinaPrimariaSecundaria
+    from django.http import JsonResponse
+    from datetime import datetime
+    from django.db.models import Q
+    
+    try:
+        maquina_principal = Maquina.objects.get(id=maquina_id)
+    except Maquina.DoesNotExist:
+        return JsonResponse({'error': 'Máquina não encontrada'}, status=404)
+    
+    # Verificar se é máquina principal
+    is_maquina_principal = maquina_principal.descr_gerenc and 'MÁQUINAS PRINCIPAL' in maquina_principal.descr_gerenc.upper()
+    
+    if not is_maquina_principal:
+        return JsonResponse({'error': 'Esta máquina não é uma máquina principal'}, status=400)
+    
+    # Buscar máquinas secundárias relacionadas
+    relacionamentos = MaquinaPrimariaSecundaria.objects.filter(
+        maquina_primaria=maquina_principal
+    ).select_related('maquina_secundaria')
+    
+    if not relacionamentos.exists():
+        return JsonResponse([], safe=False)  # Retornar lista vazia se não houver máquinas secundárias
+    
+    # Obter IDs e códigos das máquinas secundárias
+    maquinas_secundarias_ids = relacionamentos.values_list('maquina_secundaria_id', flat=True)
+    maquinas_secundarias_codigos = relacionamentos.values_list('maquina_secundaria__cd_maquina', flat=True)
+    
+    # Buscar MeuPlanoPreventiva relacionados às máquinas secundárias
+    planos = MeuPlanoPreventiva.objects.filter(
+        Q(maquina_id__in=maquinas_secundarias_ids) | Q(cd_maquina__in=maquinas_secundarias_codigos)
+    ).exclude(
+        dt_execucao__isnull=True
+    ).exclude(
+        dt_execucao=''
+    )
+    
+    # Converter para formato de eventos do FullCalendar
+    events = []
+    for plano in planos:
+        if plano.dt_execucao:
+            try:
+                # Tentar parsear a data (formato DD/MM/YYYY ou YYYY-MM-DD)
+                data_str = plano.dt_execucao.strip()
+                if '/' in data_str:
+                    # Formato DD/MM/YYYY
+                    data_obj = datetime.strptime(data_str, '%d/%m/%Y').date()
+                elif '-' in data_str:
+                    # Formato YYYY-MM-DD
+                    data_obj = datetime.strptime(data_str, '%Y-%m-%d').date()
+                else:
+                    continue  # Pular se não conseguir parsear
+                
+                # Criar título do evento (incluir código da máquina secundária)
+                titulo_parts = []
+                titulo_parts.append(f"Máq: {plano.cd_maquina}")
+                if plano.numero_plano:
+                    titulo_parts.append(f"Plano {plano.numero_plano}")
+                if plano.sequencia_manutencao:
+                    titulo_parts.append(f"Seq: {plano.sequencia_manutencao}")
+                if plano.descr_tarefa:
+                    titulo_parts.append(plano.descr_tarefa[:40])
+                
+                titulo = " - ".join(titulo_parts) if titulo_parts else f"Manutenção Preventiva - {plano.cd_maquina}"
+                
+                # Criar descrição/tooltip
+                descricao_parts = []
+                descricao_parts.append(f"Máquina: {plano.cd_maquina} - {plano.descr_maquina or 'Sem descrição'}")
+                if plano.descr_tarefa:
+                    descricao_parts.append(f"Tarefa: {plano.descr_tarefa}")
+                if plano.nome_funcionario:
+                    descricao_parts.append(f"Funcionário: {plano.nome_funcionario}")
+                if plano.descr_setor:
+                    descricao_parts.append(f"Setor: {plano.descr_setor}")
+                if plano.quantidade_periodo:
+                    descricao_parts.append(f"Período: {plano.quantidade_periodo} dias")
+                
+                descricao = "\n".join(descricao_parts)
+                
+                # Determinar cor baseada em informações do plano (usar cor diferente para distinguir)
+                cor = '#6c757d'  # Cinza para máquinas secundárias
+                if plano.quantidade_periodo and plano.quantidade_periodo > 30:
+                    cor = '#dc3545'  # Vermelho para períodos longos
+                elif plano.quantidade_periodo and plano.quantidade_periodo <= 7:
+                    cor = '#28a745'  # Verde para períodos curtos
+                
+                # Buscar ID da máquina relacionada para criar link
+                maquina_relacionada_id = None
+                if plano.maquina_id:
+                    maquina_relacionada_id = plano.maquina_id
+                else:
+                    # Tentar encontrar pelo código
+                    try:
+                        maquina_obj = Maquina.objects.get(cd_maquina=plano.cd_maquina)
+                        maquina_relacionada_id = maquina_obj.id
+                    except Maquina.DoesNotExist:
+                        pass
+                
+                events.append({
+                    'id': f'sec_{plano.id}',
+                    'title': titulo,
+                    'start': data_obj.isoformat(),
+                    'allDay': True,
+                    'backgroundColor': cor,
+                    'borderColor': cor,
+                    'textColor': '#ffffff',
+                    'extendedProps': {
+                        'plano_id': plano.id,
+                        'maquina_id': maquina_relacionada_id,
+                        'maquina_codigo': plano.cd_maquina,
+                        'numero_plano': plano.numero_plano,
+                        'sequencia_manutencao': plano.sequencia_manutencao,
+                        'descricao': descricao,
+                        'url': f"/plano-pcm/visualizar/{plano.id}/" if plano.id else None,
+                        'maquina_url': f"/maquinas/visualizar/{maquina_relacionada_id}/" if maquina_relacionada_id else None,
+                    }
+                })
+            except (ValueError, AttributeError):
+                # Se não conseguir parsear a data, pular este plano
+                continue
+    
+    return JsonResponse(events, safe=False)
 
 
 def editar_maquina(request, maquina_id):

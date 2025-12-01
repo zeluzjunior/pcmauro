@@ -1,0 +1,248 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Consultar 52 Semanas{% endblock %}
+
+{% block extra_css %}
+<style>
+    .table-container {
+        max-height: 70vh;
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+    .table {
+        width: 100%;
+        table-layout: auto;
+    }
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+        white-space: nowrap;
+        vertical-align: middle;
+        text-align: center;
+        padding: 12px 8px;
+    }
+    .table tbody td {
+        vertical-align: middle;
+        padding: 10px 8px;
+    }
+    .filter-input {
+        width: 100%;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        margin-top: 4px;
+    }
+    .filter-input:focus {
+        outline: none;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    .filter-header {
+        padding: 8px !important;
+        background-color: #e9ecef;
+    }
+    .filter-row th {
+        background-color: #e9ecef;
+        padding: 4px 8px !important;
+        position: sticky;
+        top: 48px;
+        z-index: 8;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar 52 Semanas</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Consultar 52 Semanas</h1>
+                <p class="lead">Visualize e consulte todas as semanas do ano cadastradas</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <!-- Search Bar -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <form method="get" action="{% url 'consultar_52_semanas' %}" class="d-flex">
+                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por semana ou data..." value="{{ search_query|default:'' }}">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total de Semanas</h5>
+                        <p class="card-text display-6">{{ total_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Mostrando</h5>
+                        <p class="card-text display-6">{{ semanas|length }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-calendar-alt me-2"></i>Lista de Semanas
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <form method="get" action="{% url 'consultar_52_semanas' %}" id="filterForm">
+                    <!-- Preservar busca geral -->
+                    <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                    
+                    <div class="table-container">
+                        <table class="table table-hover table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Semana</th>
+                                    <th>Data Início</th>
+                                    <th>Data Fim</th>
+                                    <th>Duração (dias)</th>
+                                </tr>
+                                <tr class="filter-row">
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_semana" class="filter-input" placeholder="Filtrar Semana..." value="{{ filter_semana|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_inicio" class="filter-input" placeholder="Filtrar Início..." value="{{ filter_inicio|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_fim" class="filter-input" placeholder="Filtrar Fim..." value="{{ filter_fim|default:'' }}">
+                                    </th>
+                                    <th class="filter-header"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if semanas %}
+                                    {% for item in semanas %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ item.semana.semana }}</strong>
+                                            </td>
+                                            <td>
+                                                {% if item.semana.inicio %}
+                                                    {{ item.semana.inicio|date:"d/m/Y" }}
+                                                {% else %}
+                                                    <span class="text-muted">Não informado</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if item.semana.fim %}
+                                                    {{ item.semana.fim|date:"d/m/Y" }}
+                                                {% else %}
+                                                    <span class="text-muted">Não informado</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if item.duracao_dias %}
+                                                    <span class="badge bg-info">{{ item.duracao_dias }} dias</span>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="4" class="text-center py-4">
+                                            <div class="alert alert-info mb-0">
+                                                <i class="fas fa-info-circle me-2"></i>
+                                                Nenhuma semana encontrada.
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if semanas.has_other_pages %}
+            <nav aria-label="Paginação">
+                <ul class="pagination justify-content-center mt-4">
+                    {% if semanas.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ semanas.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_semana %}&filter_semana={{ filter_semana }}{% endif %}{% if filter_inicio %}&filter_inicio={{ filter_inicio }}{% endif %}{% if filter_fim %}&filter_fim={{ filter_fim }}{% endif %}">Anterior</a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">Anterior</span>
+                        </li>
+                    {% endif %}
+                    
+                    {% for num in semanas.paginator.page_range %}
+                        {% if semanas.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                        {% elif num > semanas.number|add:'-3' and num < semanas.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_semana %}&filter_semana={{ filter_semana }}{% endif %}{% if filter_inicio %}&filter_inicio={{ filter_inicio }}{% endif %}{% if filter_fim %}&filter_fim={{ filter_fim }}{% endif %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if semanas.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ semanas.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_semana %}&filter_semana={{ filter_semana }}{% endif %}{% if filter_inicio %}&filter_inicio={{ filter_inicio }}{% endif %}{% if filter_fim %}&filter_fim={{ filter_fim }}{% endif %}">Próxima</a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">Próxima</span>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Aplicar filtros automaticamente ao digitar
+    document.querySelectorAll('.filter-input').forEach(function(input) {
+        input.addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('filterForm').submit();
+            }
+        });
+    });
+</script>
+{% endblock %}
+

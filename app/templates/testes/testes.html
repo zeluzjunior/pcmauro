@@ -1,106 +1,236 @@
-<!-- template.html -->
+{% extends 'base.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html>
-<head>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/orgchart/3.16.1/css/jquery.orgchart.css"/>
-    <style>
-        /* Estilos similares ao exemplo acima */
-        .node.nivel-1 { background: #d32f2f; }
-        .node.nivel-2 { background: #1976d2; }
-        .node.nivel-3 { background: #4caf50; }
-        .node.nivel-4 { background: #ff9800; }
-        .node.nivel-5 { background: #9c27b0; }
-    </style>
-</head>
-<body>
-    <button onclick="expandAll()">Expandir Tudo</button>
-    <div id="chart-container"></div>
 
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/orgchart/3.16.1/js/jquery.orgchart.js"></script>
+{% block title %}Hierarquia de Máquinas - Testes{% endblock %}
 
-    <script>
-        const dados = {{ dados_json|safe }};
-        
-        $(function() {
-            $('#chart-container').orgchart({
-                'data': dados,
-                'direction': 'l2r',
-                'visibleLevel': 4
-            });
+{% block extra_css %}
+<!-- Tentar carregar CSS do OrgChartJS -->
+<link rel="stylesheet" href="https://balkan.app/css/orgchart.css" onerror="this.onerror=null; this.href='https://cdn.balkan.app/shared/latest/orgchart.min.css'"/>
+<style>
+    #tree {
+        width: 100%;
+        height: 800px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: #f9f9f9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Testes - Hierarquia de Máquinas</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Hierarquia de Máquinas</h1>
+                <p class="lead">Visualização das relações entre Máquinas Primárias e Secundárias</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Máquinas Primárias</h5>
+                        <p class="card-text display-6">{{ total_primarias }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Relacionamentos</h5>
+                        <p class="card-text display-6">{{ total_relacionamentos }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total de Nós</h5>
+                        <p class="card-text display-6">{{ total_primarias|add:total_relacionamentos }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart Container -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-sitemap me-2"></i>Organograma de Máquinas
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div id="tree"></div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Função para carregar o script do OrgChartJS
+    function loadOrgChartScript() {
+        return new Promise(function(resolve, reject) {
+            // Verificar se já está carregado
+            if (typeof OrgChart !== 'undefined') {
+                resolve();
+                return;
+            }
+            
+            // Lista de CDNs para tentar (em ordem de preferência)
+            var cdns = [
+                'https://balkan.app/js/orgchart.js',  // URL oficial da documentação
+                'https://cdn.balkan.app/shared/latest/orgchart.min.js',
+                'https://unpkg.com/@balkangraph/orgchartjs@latest/dist/orgchart.min.js',
+                'https://cdn.jsdelivr.net/npm/@balkangraph/orgchartjs@latest/dist/orgchart.min.js'
+            ];
+            
+            var currentIndex = 0;
+            
+            function tryNextCDN() {
+                if (currentIndex >= cdns.length) {
+                    reject(new Error('Falha ao carregar OrgChartJS de todos os CDNs. Verifique sua conexão com a internet.'));
+                    return;
+                }
+                
+                var script = document.createElement('script');
+                script.src = cdns[currentIndex];
+                script.async = true;
+                
+                script.onload = function() {
+                    console.log('OrgChartJS carregado com sucesso de:', cdns[currentIndex]);
+                    // Aguardar um pouco para garantir que está disponível
+                    var attempts = 0;
+                    var checkInterval = setInterval(function() {
+                        attempts++;
+                        if (typeof OrgChart !== 'undefined') {
+                            clearInterval(checkInterval);
+                            resolve();
+                        } else if (attempts > 20) { // 2 segundos de tentativas
+                            clearInterval(checkInterval);
+                            if (currentIndex < cdns.length - 1) {
+                                currentIndex++;
+                                tryNextCDN();
+                            } else {
+                                reject(new Error('OrgChart não está disponível após carregar o script'));
+                            }
+                        }
+                    }, 100);
+                };
+                
+                script.onerror = function() {
+                    console.warn('Falha ao carregar de:', cdns[currentIndex]);
+                    // Remover o script que falhou
+                    if (script.parentNode) {
+                        script.parentNode.removeChild(script);
+                    }
+                    currentIndex++;
+                    tryNextCDN();
+                };
+                
+                document.head.appendChild(script);
+            }
+            
+            tryNextCDN();
         });
-        
-        function expandAll() {
-            $('#chart-container').orgchart('expandAll');
-        }
-    </script>
-</body>
-</html>
-
-# views.py
-import json
-from django.shortcuts import render
-from .models import Setor, Maquina, MaquinaSecundaria, Manutencao
-
-def visualizar_maquinas_5niveis(request):
-    setores = Setor.objects.prefetch_related(
-        'maquinas_principais__maquinas_secundarias__manutencoes'
-    ).all()
-    
-    # Construir dados recursivamente
-    def construir_node_manutencao(manutencao):
-        return {
-            'id': f'manut_{manutencao.id}',
-            'name': f"📋 {manutencao.data_manutencao.strftime('%d/%m/%Y')}",
-            'title': 'Manutenção',
-            'className': 'nivel-5'
-        }
-    
-    def construir_node_secundaria(maq_sec):
-        return {
-            'id': f'sub_{maq_sec.id}',
-            'name': f'🔧 {maq_sec.nome}',
-            'title': 'Máquina Secundária',
-            'className': 'nivel-4',
-            'children': [
-                construir_node_manutencao(m) 
-                for m in maq_sec.manutencoes.all()[:5]  # Últimas 5
-            ]
-        }
-    
-    def construir_node_principal(maq_principal):
-        return {
-            'id': f'maq_{maq_principal.id}',
-            'name': f'⚙️ {maq_principal.nome}',
-            'title': 'Máquina Principal',
-            'className': 'nivel-3',
-            'children': [
-                construir_node_secundaria(s) 
-                for s in maq_principal.maquinas_secundarias.all()
-            ]
-        }
-    
-    def construir_node_setor(setor):
-        return {
-            'id': f'setor_{setor.id}',
-            'name': f'📍 {setor.nome}',
-            'title': 'Setor',
-            'className': 'nivel-2',
-            'children': [
-                construir_node_principal(m) 
-                for m in setor.maquinas_principais.all()
-            ]
-        }
-    
-    dados = {
-        'id': 'empresa',
-        'name': '🏢 Empresa',
-        'title': 'Empresa',
-        'className': 'nivel-1',
-        'children': [construir_node_setor(s) for s in setores]
     }
     
-    return render(request, 'maquinas/orgchart_5niveis.html', {
-        'dados_json': json.dumps(dados)
-    })
+    // Função para inicializar o chart
+    function initOrgChart() {
+        var nodes = {{ dados_json|safe }};
+        
+        console.log('Nodes recebidos:', nodes);
+        console.log('Número de nós:', nodes ? nodes.length : 0);
+        
+        var treeElement = document.getElementById('tree');
+        if (!treeElement) {
+            console.error('Elemento #tree não encontrado');
+            return;
+        }
+        
+        if (!nodes || nodes.length === 0) {
+            treeElement.innerHTML = '<div class="alert alert-warning m-3"><strong>Atenção:</strong> Nenhum dado disponível para exibir. Verifique se existem máquinas primárias e relacionamentos no banco de dados.</div>';
+            return;
+        }
+        
+        try {
+            console.log('Inicializando OrgChart...');
+            var chart = new OrgChart(document.getElementById("tree"), {
+                nodeBinding: {
+                    field_0: "name"
+                },
+                nodes: nodes
+            });
+            
+            console.log('OrgChart inicializado com sucesso!', chart);
+        } catch (error) {
+            console.error('Erro ao inicializar OrgChart:', error);
+            treeElement.innerHTML = '<div class="alert alert-danger m-3"><strong>Erro:</strong> ' + error.message + '<br><small>Verifique o console do navegador (F12) para mais detalhes.</small></div>';
+        }
+    }
+    
+    // Aguardar o DOM e carregar o script
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            loadOrgChartScript().then(function() {
+                initOrgChart();
+            }).catch(function(error) {
+                console.error('Erro ao carregar OrgChartJS:', error);
+                var treeElement = document.getElementById('tree');
+                if (treeElement) {
+                    var errorMsg = '<div class="alert alert-danger m-3">';
+                    errorMsg += '<strong>Erro:</strong> Não foi possível carregar o OrgChartJS.<br>';
+                    errorMsg += '<small>' + error.message + '</small><br><br>';
+                    errorMsg += '<strong>Possíveis soluções:</strong><br>';
+                    errorMsg += '<ul class="mb-0">';
+                    errorMsg += '<li>Verifique sua conexão com a internet</li>';
+                    errorMsg += '<li>Verifique se há bloqueadores de anúncios ou extensões bloqueando scripts</li>';
+                    errorMsg += '<li>Verifique o console do navegador (F12) para mais detalhes</li>';
+                    errorMsg += '<li>Tente recarregar a página</li>';
+                    errorMsg += '</ul>';
+                    errorMsg += '</div>';
+                    treeElement.innerHTML = errorMsg;
+                }
+            });
+        });
+    } else {
+        // DOM já carregado
+        loadOrgChartScript().then(function() {
+            initOrgChart();
+        }).catch(function(error) {
+            console.error('Erro ao carregar OrgChartJS:', error);
+            var treeElement = document.getElementById('tree');
+            if (treeElement) {
+                var errorMsg = '<div class="alert alert-danger m-3">';
+                errorMsg += '<strong>Erro:</strong> Não foi possível carregar o OrgChartJS.<br>';
+                errorMsg += '<small>' + error.message + '</small><br><br>';
+                errorMsg += '<strong>Possíveis soluções:</strong><br>';
+                errorMsg += '<ul class="mb-0">';
+                errorMsg += '<li>Verifique sua conexão com a internet</li>';
+                errorMsg += '<li>Verifique se há bloqueadores de anúncios ou extensões bloqueando scripts</li>';
+                errorMsg += '<li>Verifique o console do navegador (F12) para mais detalhes</li>';
+                errorMsg += '<li>Tente recarregar a página</li>';
+                errorMsg += '</ul>';
+                errorMsg += '</div>';
+                treeElement.innerHTML = errorMsg;
+            }
+        });
+    }
+</script>
+{% endblock %}

@@ -17,7 +17,8 @@ from .models import (
     PlanoPreventivaDocumento,
     MeuPlanoPreventiva,
     MeuPlanoPreventivaDocumento,
-    RoteiroPreventiva
+    RoteiroPreventiva,
+    Semana52
 )
 
 
@@ -518,6 +519,26 @@ class MaquinaDocumentoAdmin(admin.ModelAdmin):
         }),
         ('Documento', {
             'fields': ('arquivo', 'comentario')
+        }),
+        ('Sistema', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(Semana52)
+class Semana52Admin(admin.ModelAdmin):
+    """Admin configuration for Semana52 model"""
+    list_display = ('semana', 'inicio', 'fim', 'created_at')
+    list_filter = ('inicio', 'fim', 'created_at')
+    search_fields = ('semana',)
+    readonly_fields = ('created_at', 'updated_at')
+    list_per_page = 52
+    
+    fieldsets = (
+        ('Informações da Semana', {
+            'fields': ('semana', 'inicio', 'fim')
         }),
         ('Sistema', {
             'fields': ('created_at', 'updated_at'),

@@ -3,6 +3,33 @@
 
 {% block title %}Visualizar CA {{ ca.ca }}{% endblock %}
 
+{% block extra_css %}
+<!-- Tentar carregar CSS do OrgChartJS -->
+<link rel="stylesheet" href="https://balkan.app/css/orgchart.css" onerror="this.onerror=null; this.href='https://cdn.balkan.app/shared/latest/orgchart.min.css'"/>
+<style>
+    #tree-maquinas {
+        width: 100%;
+        height: 600px;
+        min-height: 600px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: #f9f9f9;
+        position: relative;
+    }
+    
+    /* Garantir que o OrgChartJS tenha espaço suficiente */
+    #tree-maquinas > div {
+        width: 100% !important;
+        height: 100% !important;
+    }
+    
+    /* Ocultar o menu de controle do OrgChartJS */
+    [data-ctrl-menu] {
+        display: none !important;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <!-- Page Header -->
 <section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
@@ -140,7 +167,56 @@
                             </div>
                         </div>
 
-                <!-- Informações do Sistema -->
+                <!-- Hierarquia de Máquinas -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-sitemap me-2"></i>Hierarquia de Máquinas do Centro de Atividade (CA {{ ca.ca }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if has_maquinas %}
+                            <!-- Statistics -->
+                            <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="card bg-primary text-white">
+                                    <div class="card-body p-2">
+                                        <h6 class="card-title mb-1">Máquinas Primárias</h6>
+                                        <p class="card-text mb-0 h4">{{ total_primarias }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-info text-white">
+                                    <div class="card-body p-2">
+                                        <h6 class="card-title mb-1">Relacionamentos</h6>
+                                        <p class="card-text mb-0 h4">{{ total_relacionamentos }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-secondary text-white">
+                                    <div class="card-body p-2">
+                                        <h6 class="card-title mb-1">Total de Máquinas</h6>
+                                        <p class="card-text mb-0 h4">{{ total_maquinas }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            </div>
+                            
+                            <!-- Chart Container -->
+                            <div id="tree-maquinas"></div>
+                        {% else %}
+                            <div class="alert alert-info mb-0">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Nenhuma máquina encontrada relacionada a este Centro de Atividade (CA {{ ca.ca }}).
+                                <br><small>As máquinas precisam estar associadas a um Local do Centro de Atividade relacionado a este CA.</small>
+                            </div>
+                        {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Informações do Sistema -->
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-secondary text-white">
                         <h5 class="mb-0">
@@ -180,6 +256,233 @@
         </div>
     </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Função para carregar o script do OrgChartJS
+    function loadOrgChartScript() {
+        return new Promise(function(resolve, reject) {
+            // Verificar se já está carregado
+            if (typeof OrgChart !== 'undefined') {
+                resolve();
+                return;
+            }
+            
+            // Lista de CDNs para tentar (em ordem de preferência)
+            var cdns = [
+                'https://balkan.app/js/orgchart.js',  // URL oficial da documentação
+                'https://cdn.balkan.app/shared/latest/orgchart.min.js',
+                'https://unpkg.com/@balkangraph/orgchartjs@latest/dist/orgchart.min.js',
+                'https://cdn.jsdelivr.net/npm/@balkangraph/orgchartjs@latest/dist/orgchart.min.js'
+            ];
+            
+            var currentIndex = 0;
+            
+            function tryNextCDN() {
+                if (currentIndex >= cdns.length) {
+                    reject(new Error('Falha ao carregar OrgChartJS de todos os CDNs. Verifique sua conexão com a internet.'));
+                    return;
+                }
+                
+                var script = document.createElement('script');
+                script.src = cdns[currentIndex];
+                script.async = true;
+                
+                script.onload = function() {
+                    console.log('OrgChartJS carregado com sucesso de:', cdns[currentIndex]);
+                    // Aguardar um pouco para garantir que está disponível
+                    var attempts = 0;
+                    var checkInterval = setInterval(function() {
+                        attempts++;
+                        if (typeof OrgChart !== 'undefined') {
+                            clearInterval(checkInterval);
+                            resolve();
+                        } else if (attempts > 20) { // 2 segundos de tentativas
+                            clearInterval(checkInterval);
+                            if (currentIndex < cdns.length - 1) {
+                                currentIndex++;
+                                tryNextCDN();
+                            } else {
+                                reject(new Error('OrgChart não está disponível após carregar o script'));
+                            }
+                        }
+                    }, 100);
+                };
+                
+                script.onerror = function() {
+                    console.warn('Falha ao carregar de:', cdns[currentIndex]);
+                    // Remover o script que falhou
+                    if (script.parentNode) {
+                        script.parentNode.removeChild(script);
+                    }
+                    currentIndex++;
+                    tryNextCDN();
+                };
+                
+                document.head.appendChild(script);
+            }
+            
+            tryNextCDN();
+        });
+    }
+    
+    // Função para inicializar o chart
+    function initOrgChart() {
+        var nodes = {{ dados_json|safe }};
+        
+        console.log('=== DEBUG ORGCHART ===');
+        console.log('Nodes recebidos:', nodes);
+        console.log('Tipo de nodes:', typeof nodes);
+        console.log('Número de nós:', nodes ? nodes.length : 0);
+        console.log('Nodes é array?', Array.isArray(nodes));
+        
+        var treeElement = document.getElementById('tree-maquinas');
+        if (!treeElement) {
+            console.error('Elemento #tree-maquinas não encontrado');
+            return;
+        }
+        
+        if (!nodes || nodes.length === 0) {
+            console.warn('Nenhum nó encontrado');
+            treeElement.innerHTML = '<div class="alert alert-warning m-3"><strong>Informação:</strong> Nenhuma máquina primária encontrada para este Centro de Atividade (CA {{ ca.ca }}).<br><small>Verifique se existem máquinas classificadas como "MÁQUINAS PRINCIPAL" relacionadas a este CA através de Locais do Centro de Atividade.</small></div>';
+            return;
+        }
+        
+        // Verificar se há nós sem pid (raiz)
+        var rootNodes = nodes.filter(function(n) { return !n.pid; });
+        if (rootNodes.length === 0) {
+            console.warn('Nenhum nó raiz encontrado');
+            treeElement.innerHTML = '<div class="alert alert-warning m-3"><strong>Informação:</strong> Nenhuma máquina primária encontrada para este Centro de Atividade.<br><small>Todas as máquinas encontradas são secundárias. Verifique se existem máquinas classificadas como "MÁQUINAS PRINCIPAL".</small></div>';
+            return;
+        }
+        
+        // Verificar se OrgChart está disponível
+        if (typeof OrgChart === 'undefined') {
+            console.error('OrgChart não está definido!');
+            treeElement.innerHTML = '<div class="alert alert-danger m-3"><strong>Erro:</strong> OrgChartJS não foi carregado corretamente.<br><small>Verifique o console do navegador (F12) para mais detalhes.</small></div>';
+            return;
+        }
+        
+        try {
+            console.log('Inicializando OrgChart com', nodes.length, 'nós...');
+            console.log('Primeiros 3 nós:', nodes.slice(0, 3));
+            
+            // Verificar se os nós têm a estrutura correta
+            if (nodes.length > 0) {
+                console.log('Estrutura do primeiro nó:', Object.keys(nodes[0]));
+                console.log('Valores do primeiro nó:', nodes[0]);
+            }
+            
+            var chart = new OrgChart(document.getElementById("tree-maquinas"), {
+                nodeBinding: {
+                    field_0: "field_0",  // descr_maquina
+                    field_1: "field_1",  // cd_maquina
+                    img_0: "img_0"        // foto da máquina
+                },
+                nodes: nodes,
+                // Adicionar evento de clique para redirecionar para visualizar_maquina
+                nodeMenu: false,
+                menu: false,
+                mouseScrool: OrgChart.action.none
+            });
+            
+            console.log('Chart criado com sucesso:', chart);
+            
+            // Adicionar evento de clique nos nós
+            chart.on('nodeClick', function(sender, args) {
+                var nodeId = args.node.id;
+                if (nodeId) {
+                    // Construir URL para visualizar a máquina
+                    var url = "{% url 'visualizar_maquina' 999999 %}".replace('999999', nodeId);
+                    console.log('Redirecionando para máquina ID:', nodeId, 'URL:', url);
+                    window.location.href = url;
+                }
+            });
+            
+            // Também adicionar listener de clique direto no container para capturar cliques em qualquer parte do nó
+            treeElement.addEventListener('click', function(e) {
+                // Encontrar o elemento do nó clicado
+                var clickedElement = e.target;
+                var nodeElement = null;
+                
+                // Subir na hierarquia DOM para encontrar o elemento do nó
+                while (clickedElement && clickedElement !== treeElement) {
+                    // Verificar se encontramos um elemento que representa um nó
+                    if (clickedElement.getAttribute && (
+                        clickedElement.getAttribute('node-id') || 
+                        clickedElement.getAttribute('data-node-id') ||
+                        clickedElement.closest('[node-id]') ||
+                        clickedElement.closest('[data-node-id]')
+                    )) {
+                        nodeElement = clickedElement.closest('[node-id]') || clickedElement.closest('[data-node-id]') || clickedElement;
+                        break;
+                    }
+                    clickedElement = clickedElement.parentElement;
+                }
+                
+                if (nodeElement) {
+                    var nodeId = nodeElement.getAttribute('node-id') || nodeElement.getAttribute('data-node-id');
+                    if (nodeId) {
+                        // Encontrar o nó correspondente nos dados
+                        var clickedNode = nodes.find(function(n) {
+                            return String(n.id) === String(nodeId);
+                        });
+                        
+                        if (clickedNode && clickedNode.id) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            var url = "{% url 'visualizar_maquina' 999999 %}".replace('999999', clickedNode.id);
+                            console.log('Redirecionando para máquina ID:', clickedNode.id, 'URL:', url);
+                            window.location.href = url;
+                        }
+                    }
+                }
+            });
+            
+            console.log('OrgChart inicializado com sucesso!', chart);
+            console.log('Chart object:', chart);
+        } catch (error) {
+            console.error('Erro ao inicializar OrgChart:', error);
+            console.error('Stack trace:', error.stack);
+            treeElement.innerHTML = '<div class="alert alert-danger m-3"><strong>Erro:</strong> ' + error.message + '<br><small>Verifique o console do navegador (F12) para mais detalhes.</small></div>';
+        }
+    }
+    
+    // Aguardar o DOM e carregar o script
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            loadOrgChartScript().then(function() {
+                initOrgChart();
+            }).catch(function(error) {
+                console.error('Erro ao carregar OrgChartJS:', error);
+                var treeElement = document.getElementById('tree-maquinas');
+                if (treeElement) {
+                    var errorMsg = '<div class="alert alert-warning m-3">';
+                    errorMsg += '<strong>Aviso:</strong> Não foi possível carregar o organograma.<br>';
+                    errorMsg += '<small>' + error.message + '</small>';
+                    errorMsg += '</div>';
+                    treeElement.innerHTML = errorMsg;
+                }
+            });
+        });
+    } else {
+        // DOM já carregado
+        loadOrgChartScript().then(function() {
+            initOrgChart();
+        }).catch(function(error) {
+            console.error('Erro ao carregar OrgChartJS:', error);
+            var treeElement = document.getElementById('tree-maquinas');
+            if (treeElement) {
+                var errorMsg = '<div class="alert alert-warning m-3">';
+                errorMsg += '<strong>Aviso:</strong> Não foi possível carregar o organograma.<br>';
+                errorMsg += '<small>' + error.message + '</small>';
+                errorMsg += '</div>';
+                treeElement.innerHTML = errorMsg;
+            }
+        });
+    }
+</script>
 {% endblock %}
 
 

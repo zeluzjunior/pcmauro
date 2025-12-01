@@ -141,11 +141,13 @@
                             <div class="collapse" id="planejamento-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'centros_de_atividade' %}" class="link-dark rounded">Centros de Atividades</a></li>
+                                    <li><a href="{% url 'consultar_52_semanas' %}" class="link-dark rounded">Consultar 52 Semanas</a></li>
                                 </ul>
                             </div>
                         </li>
 
                         <li class="border-top my-3"></li>
+
                         <!-- Plano de Preventiva -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded" data-bs-toggle="collapse" data-bs-target="#plano-collapse" aria-expanded="false">
@@ -174,19 +176,37 @@
                         </li>
                         <li class="border-top my-3"></li>
 
-                        <!-- Plano de Preventiva PCM -->
+                        <!-- Configurar Plano De Preventiva PCM -->
+
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded" data-bs-toggle="collapse" data-bs-target="#plano-pcm-collapse" aria-expanded="false">
                                 <span class="btn-toggle-text">Plano de Preventiva PCM</span>
                             </button>
                             <div class="collapse" id="plano-pcm-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'consultar_meu_plano' %}" class="link-dark rounded">Consultar Meus Planos Preventiva</a></li>
+                                    <li><a href="{% url 'analise_geral_plano_preventiva_pcm' %}" class="link-dark rounded">Análise Geral PCM</a></li>
+                                    <li><a href="{% url 'consultar_meu_plano' %}" class="link-dark rounded">Consultar Meus Planos Preventiva do PCM</a></li>
+                                    <li><a href="{% url 'criar_cronograma_planejado_preventiva' %}" class="link-dark rounded">Criar Calendário Plenejado de Preventivas</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#configurar-plano-pcm-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Configurar Plano De Preventiva PCM</span>
+                            </button>
+                            <div class="collapse" id="configurar-plano-pcm-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+
+                                    <li><a href="{% url 'agrupar_acoes_do_plano_por_data' %}" class="link-dark rounded">Agrupar Ações do Plano por Data</a></li>
+                                    <li><a href="{% url 'agrupar_preventiva_por_data' %}" class="link-dark rounded">Agrupar Preventiva por Data</a></li>
                                     <li><a href="{% url 'analise_roteiro_plano_preventiva' %}" class="link-dark rounded">Análise de Roteiro e Plano de Preventiva</a></li>  <!-- Função limpa - recriar do zero -->
                                     <li><a href="{% url 'maquina_primaria_secundaria' %}" class="link-dark rounded">Agrupar Máquinas Primárias e Secundárias</a></li>
                                 </ul>
                             </div>
                         </li>
+
+
                         <li class="border-top my-3"></li>
                         <!--- manutenção corretiva -->
                         <li class="mb-1">
@@ -198,6 +218,19 @@
                                     <li><a href="{% url 'analise_corretiva_outros' %}" class="link-dark rounded">Análise</a></li>
                                     <li><a href="{% url 'em_desenvolvimento' %}" class="link-dark rounded">Cadastrar Corretiva</a></li>
                                     <li><a href="{% url 'consultar_corretivas_outros' %}" class="link-dark rounded">Consultar Corretiva</a></li>
+                                </ul>
+                            </div>
+                        </li>
+                        <li class="border-top my-3"></li>
+                        <!-- Análise de Ordens de Serviço -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#analise-ordens-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Análise de Ordens de Serviço</span>
+                            </button>
+                            <div class="collapse" id="analise-ordens-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'analise_ordens_de_servico' %}" class="link-dark rounded">Análise Geral</a></li>
+                                    <li><a href="{% url 'config_analise_ordens' %}" class="link-dark rounded">Configuração</a></li>
                                 </ul>
                             </div>
                         </li>
@@ -261,6 +294,7 @@
                             <div class="collapse" id="maquinas-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'analise_maquinas' %}" class="link-dark rounded">Análise</a></li>
+                                    <li><a href="{% url 'analise_maquinas_importadas' %}" class="link-dark rounded">Análise de Importadas</a></li>
                                     <li><a href="{% url 'cadastrar_maquina' %}" class="link-dark rounded">Cadastrar Máquina</a></li>
                                     <li><a href="{% url 'consultar_maquinas' %}" class="link-dark rounded">Consultar Máquinas</a></li>
                                 </ul>
@@ -307,6 +341,7 @@
                                     <li><a href="{% url 'importar_roteiro_preventiva' %}" class="link-dark rounded">Roteiro Preventiva</a></li>
                                     <li><a href="{% url 'importar_locais_e_cas' %}" class="link-dark rounded">Locais e CAs</a></li>
                                     <li><a href="{% url 'importar_estoque' %}" class="link-dark rounded">Estoque</a></li>
+                                    <li><a href="{% url 'importar_52_semanas' %}" class="link-dark rounded">52 Semanas</a></li>
                                 </ul>
                             </div>
                         </li>

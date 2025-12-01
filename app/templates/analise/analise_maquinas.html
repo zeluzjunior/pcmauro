@@ -4,6 +4,8 @@
 {% block title %}Análise de Máquinas{% endblock %}
 
 {% block extra_css %}
+<!-- OrgChartJS CSS -->
+<link rel="stylesheet" href="https://balkan.app/css/orgchart.css" onerror="this.onerror=null; this.href='https://cdn.balkan.app/shared/latest/orgchart.min.css'"/>
 <style>
     .chart-container {
         position: relative;
@@ -30,6 +32,10 @@
     .kpi-info { border-left-color: #0dcaf0; }
     .kpi-danger { border-left-color: #dc3545; }
     .kpi-purple { border-left-color: #6f42c1; }
+    /* Esconder menu de controle padrão do OrgChart */
+    [data-ctrl-menu] {
+        display: none !important;
+    }
 </style>
 {% endblock %}
 
@@ -610,6 +616,63 @@
             </div>
         </div>
 
+        <!-- Organograma de Máquinas -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-sitemap me-2"></i>Organograma de Máquinas - Hierarquia Primária/Secundária
+                            <small class="ms-2">({{ total_primarias_org }} primárias, {{ total_relacionamentos_org }} relacionamentos)</small>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Statistics -->
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                <div class="card bg-primary text-white">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Máquinas Primárias</h6>
+                                        <p class="card-text display-6 mb-0">{{ total_primarias_org }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-success text-white">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Relacionamentos</h6>
+                                        <p class="card-text display-6 mb-0">{{ total_relacionamentos_org }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-info text-white">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Total de Nós</h6>
+                                        <p class="card-text display-6 mb-0">{{ total_primarias_org|add:total_relacionamentos_org }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Chart Container -->
+                        <div id="tree-maquinas" style="width: 100%; height: 800px; border: 1px solid #ddd; border-radius: 8px; background: #f9f9f9; position: relative;">
+                            <div id="loading-orgchart" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #999; z-index: 10;">
+                                <i class="fas fa-spinner fa-spin fa-2x mb-2"></i>
+                                <p>Carregando organograma...</p>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Este organograma mostra a hierarquia entre máquinas primárias (MÁQUINAS PRINCIPAL) e suas máquinas secundárias relacionadas através da tabela MaquinaPrimariaSecundaria.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Summary Statistics -->
         <div class="row">
@@ -949,6 +1012,173 @@ new Chart(gerenciasCtx, {
         }
     }
 });
+
+// Organograma de Máquinas usando OrgChartJS
+// Função para carregar o script do OrgChartJS
+function loadOrgChartScript() {
+    return new Promise(function(resolve, reject) {
+        // Verificar se já está carregado
+        if (typeof OrgChart !== 'undefined') {
+            resolve();
+            return;
+        }
+        
+        // Lista de CDNs para tentar (em ordem de preferência)
+        var cdns = [
+            'https://balkan.app/js/orgchart.js',  // URL oficial da documentação
+            'https://cdn.balkan.app/shared/latest/orgchart.min.js',
+            'https://unpkg.com/@balkangraph/orgchartjs@latest/dist/orgchart.min.js',
+            'https://cdn.jsdelivr.net/npm/@balkangraph/orgchartjs@latest/dist/orgchart.min.js'
+        ];
+        
+        var currentIndex = 0;
+        
+        function tryNextCDN() {
+            if (currentIndex >= cdns.length) {
+                reject(new Error('Falha ao carregar OrgChartJS de todos os CDNs. Verifique sua conexão com a internet.'));
+                return;
+            }
+            
+            var script = document.createElement('script');
+            script.src = cdns[currentIndex];
+            script.async = true;
+            
+            script.onload = function() {
+                console.log('OrgChartJS carregado com sucesso de:', cdns[currentIndex]);
+                // Aguardar um pouco para garantir que está disponível
+                var attempts = 0;
+                var checkInterval = setInterval(function() {
+                    attempts++;
+                    if (typeof OrgChart !== 'undefined') {
+                        clearInterval(checkInterval);
+                        resolve();
+                    } else if (attempts > 20) { // 2 segundos de tentativas
+                        clearInterval(checkInterval);
+                        if (currentIndex < cdns.length - 1) {
+                            currentIndex++;
+                            tryNextCDN();
+                        } else {
+                            reject(new Error('OrgChart não está disponível após carregar o script'));
+                        }
+                    }
+                }, 100);
+            };
+            
+            script.onerror = function() {
+                console.warn('Falha ao carregar de:', cdns[currentIndex]);
+                // Remover o script que falhou
+                if (script.parentNode) {
+                    script.parentNode.removeChild(script);
+                }
+                currentIndex++;
+                tryNextCDN();
+            };
+            
+            document.head.appendChild(script);
+        }
+        
+        tryNextCDN();
+    });
+}
+
+// Função para inicializar o chart
+function initOrgChart() {
+    // Remover loading primeiro
+    var loadingEl = document.getElementById('loading-orgchart');
+    if (loadingEl) {
+        loadingEl.remove();
+    }
+    
+    var nodes = {{ dados_json_org|safe }};
+    
+    console.log('Nodes recebidos:', nodes);
+    console.log('Número de nós:', nodes ? nodes.length : 0);
+    
+    var treeElement = document.getElementById('tree-maquinas');
+    if (!treeElement) {
+        console.error('Elemento #tree-maquinas não encontrado');
+        return;
+    }
+    
+    if (!nodes || nodes.length === 0) {
+        treeElement.innerHTML = '<div class="alert alert-warning m-3"><strong>Atenção:</strong> Nenhum dado disponível para exibir. Verifique se existem máquinas primárias e relacionamentos no banco de dados.</div>';
+        return;
+    }
+    
+    try {
+        console.log('Inicializando OrgChart...');
+        var chart = new OrgChart(document.getElementById("tree-maquinas"), {
+            nodeBinding: {
+                field_0: "name"
+            },
+            nodes: nodes
+        });
+        
+        console.log('OrgChart inicializado com sucesso!', chart);
+    } catch (error) {
+        console.error('Erro ao inicializar OrgChart:', error);
+        treeElement.innerHTML = '<div class="alert alert-danger m-3"><strong>Erro:</strong> ' + error.message + '<br><small>Verifique o console do navegador (F12) para mais detalhes.</small></div>';
+    }
+}
+
+// Aguardar o DOM e carregar o script
+// Aguardar um pouco para garantir que Chart.js terminou de carregar
+setTimeout(function() {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            loadOrgChartScript().then(function() {
+                initOrgChart();
+            }).catch(function(error) {
+                console.error('Erro ao carregar OrgChartJS:', error);
+                var loadingEl = document.getElementById('loading-orgchart');
+                if (loadingEl) {
+                    loadingEl.remove();
+                }
+                var treeElement = document.getElementById('tree-maquinas');
+                if (treeElement) {
+                    var errorMsg = '<div class="alert alert-danger m-3">';
+                    errorMsg += '<strong>Erro:</strong> Não foi possível carregar o OrgChartJS.<br>';
+                    errorMsg += '<small>' + error.message + '</small><br><br>';
+                    errorMsg += '<strong>Possíveis soluções:</strong><br>';
+                    errorMsg += '<ul class="mb-0">';
+                    errorMsg += '<li>Verifique sua conexão com a internet</li>';
+                    errorMsg += '<li>Verifique se há bloqueadores de anúncios ou extensões bloqueando scripts</li>';
+                    errorMsg += '<li>Verifique o console do navegador (F12) para mais detalhes</li>';
+                    errorMsg += '<li>Tente recarregar a página</li>';
+                    errorMsg += '</ul>';
+                    errorMsg += '</div>';
+                    treeElement.innerHTML = errorMsg;
+                }
+            });
+        });
+    } else {
+        // DOM já carregado
+        loadOrgChartScript().then(function() {
+            initOrgChart();
+        }).catch(function(error) {
+            console.error('Erro ao carregar OrgChartJS:', error);
+            var loadingEl = document.getElementById('loading-orgchart');
+            if (loadingEl) {
+                loadingEl.remove();
+            }
+            var treeElement = document.getElementById('tree-maquinas');
+            if (treeElement) {
+                var errorMsg = '<div class="alert alert-danger m-3">';
+                errorMsg += '<strong>Erro:</strong> Não foi possível carregar o OrgChartJS.<br>';
+                errorMsg += '<small>' + error.message + '</small><br><br>';
+                errorMsg += '<strong>Possíveis soluções:</strong><br>';
+                errorMsg += '<ul class="mb-0">';
+                errorMsg += '<li>Verifique sua conexão com a internet</li>';
+                errorMsg += '<li>Verifique se há bloqueadores de anúncios ou extensões bloqueando scripts</li>';
+                errorMsg += '<li>Verifique o console do navegador (F12) para mais detalhes</li>';
+                errorMsg += '<li>Tente recarregar a página</li>';
+                errorMsg += '</ul>';
+                errorMsg += '</div>';
+                treeElement.innerHTML = errorMsg;
+            }
+        });
+    }
+}, 1500); // Aguardar 1.5 segundos para Chart.js terminar
 </script>
 {% endblock %}
 
