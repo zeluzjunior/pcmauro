@@ -11,18 +11,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
     
     function toggleSidebar() {
-        if (sidebar && sidebarWrapper && mainContent) {
+        if (sidebar && sidebarWrapper) {
+            console.log('Toggling sidebar...', { sidebar, sidebarWrapper });
             sidebar.classList.toggle('collapsed');
             sidebarWrapper.classList.toggle('collapsed');
             const isCollapsed = sidebar.classList.contains('collapsed');
             
+            console.log('Sidebar collapsed:', isCollapsed);
+            
             // Update localStorage
             localStorage.setItem('sidebarCollapsed', isCollapsed);
+        } else {
+            console.error('Sidebar elements not found:', { sidebar, sidebarWrapper });
         }
     }
     
     function initializeSidebar() {
-        if (sidebarCollapsed) {
+        if (sidebar && sidebarWrapper && sidebarCollapsed) {
             sidebar.classList.add('collapsed');
             sidebarWrapper.classList.add('collapsed');
         }
@@ -31,11 +36,17 @@ document.addEventListener('DOMContentLoaded', function() {
         function handleResize() {
             if (window.innerWidth < 768) {
                 // Mobile: sidebar should be hidden by default
-                sidebarWrapper.classList.remove('show');
-                sidebarWrapper.classList.remove('collapsed');
+                if (sidebarWrapper) {
+                    sidebarWrapper.classList.remove('show');
+                    sidebarWrapper.classList.remove('collapsed');
+                }
+                if (sidebar) {
+                    sidebar.classList.remove('collapsed');
+                }
             } else {
                 // Desktop: restore saved state
-                if (sidebarCollapsed) {
+                if (sidebarCollapsed && sidebar && sidebarWrapper) {
+                    sidebar.classList.add('collapsed');
                     sidebarWrapper.classList.add('collapsed');
                 }
             }
@@ -53,15 +64,23 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add click event to toggle button
     if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', function() {
+        sidebarToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Sidebar toggle clicked');
+            
             if (window.innerWidth < 768) {
                 // Mobile: toggle show class
-                sidebarWrapper.classList.toggle('show');
+                if (sidebarWrapper) {
+                    sidebarWrapper.classList.toggle('show');
+                }
             } else {
                 // Desktop: toggle collapsed state
                 toggleSidebar();
             }
         });
+    } else {
+        console.error('Sidebar toggle button not found!');
     }
     
     // Close sidebar on mobile when clicking outside
@@ -136,15 +155,41 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Form validation enhancement
+    // Form validation enhancement - ONLY for forms with .needs-validation class
+    // Forms without this class will submit normally without any JavaScript interference
     const forms = document.querySelectorAll('.needs-validation');
     forms.forEach(form => {
         form.addEventListener('submit', function(event) {
-            if (!form.checkValidity()) {
-                event.preventDefault();
-                event.stopPropagation();
+            // Check if form has novalidate attribute
+            const hasNovalidate = form.hasAttribute('novalidate');
+            
+            console.log('Form submit event (needs-validation):', {
+                form: form.id || form.className,
+                hasNovalidate: hasNovalidate,
+                action: form.action,
+                method: form.method
+            });
+            
+            if (hasNovalidate) {
+                // Forms with novalidate: just add styling, DON'T prevent submission
+                // Let Django handle server-side validation
+                console.log('Form has novalidate - allowing submission');
+                form.classList.add('was-validated');
+                // CRITICAL: Don't call preventDefault() - allow form to submit
+                // Just return without preventing - form will submit normally
+                return; // Exit early, form will submit normally
+            } else {
+                // Forms without novalidate: use HTML5 client-side validation
+                console.log('Form without novalidate - checking validity');
+                if (!form.checkValidity()) {
+                    console.log('Form validation failed - preventing submission');
+                    event.preventDefault();
+                    event.stopPropagation();
+                } else {
+                    console.log('Form validation passed - allowing submission');
+                }
+                form.classList.add('was-validated');
             }
-            form.classList.add('was-validated');
         });
     });
 
@@ -305,20 +350,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Loading state for buttons
+    // Loading state for buttons - ONLY disable AFTER form starts submitting
+    // Don't disable immediately as it can prevent form submission
     const submitButtons = document.querySelectorAll('button[type="submit"]');
     submitButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const originalText = this.innerHTML;
-            this.innerHTML = '<span class="loading me-2"></span>Enviando...';
-            this.disabled = true;
-            
-            // Re-enable after 3 seconds (adjust as needed)
-            setTimeout(() => {
-                this.innerHTML = originalText;
-                this.disabled = false;
-            }, 3000);
-        });
+        const form = button.closest('form');
+        if (form) {
+            // Only disable button AFTER form submit event fires
+            form.addEventListener('submit', function() {
+                const originalText = button.innerHTML;
+                button.innerHTML = '<span class="loading me-2"></span>Enviando...';
+                button.disabled = true;
+                
+                // Re-enable after 5 seconds (in case of error)
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.disabled = false;
+                }, 5000);
+            }, false); // Use bubble phase, not capture
+        }
     });
 });
 

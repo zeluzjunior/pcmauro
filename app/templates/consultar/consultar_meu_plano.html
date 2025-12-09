@@ -1,0 +1,492 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Consultar Meus Planos Preventiva{% endblock %}
+
+{% block extra_css %}
+<style>
+    .table-container {
+        max-height: 85vh;
+        min-height: 70vh;
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+    .table {
+        width: 100%;
+        table-layout: auto;
+        min-width: 1800px;
+    }
+    .table th.col-plano,
+    .table td.col-plano {
+        min-width: 120px !important;
+        width: auto;
+    }
+    .table th.col-data,
+    .table td.col-data {
+        min-width: 130px !important;
+        width: auto;
+    }
+    .table th.col-unidade,
+    .table td.col-unidade {
+        min-width: 150px !important;
+        width: auto;
+    }
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+        white-space: nowrap;
+        vertical-align: middle;
+        text-align: center;
+        padding: 12px 8px;
+    }
+    .table tbody td {
+        vertical-align: top;
+        padding: 10px 8px;
+    }
+    .table thead th:first-child {
+        position: sticky;
+        left: 0;
+        background-color: #f8f9fa;
+        z-index: 12;
+        box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+    }
+    .table tbody td:first-child {
+        position: sticky;
+        left: 0;
+        background-color: white;
+        z-index: 11;
+        box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+        min-width: 150px;
+    }
+    .table tbody tr:hover td:first-child {
+        background-color: #f8f9fa;
+    }
+    .table tbody tr:nth-child(even) td:first-child {
+        background-color: #f8f9fa;
+    }
+    .table tbody tr:nth-child(even):hover td:first-child {
+        background-color: #e9ecef;
+    }
+    .filter-input {
+        width: 100%;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        margin-top: 4px;
+    }
+    .filter-input:focus {
+        outline: none;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    .filter-header {
+        padding: 8px !important;
+        background-color: #e9ecef;
+    }
+    .filter-row th {
+        background-color: #e9ecef;
+        padding: 4px 8px !important;
+        position: sticky;
+        top: 48px;
+        z-index: 8;
+    }
+    .filter-row th:first-child {
+        position: sticky;
+        left: 0;
+        background-color: #e9ecef;
+        z-index: 13;
+        box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+    }
+    .description-cell {
+        word-wrap: break-word;
+        white-space: normal;
+        line-height: 1.5;
+        overflow-wrap: break-word;
+    }
+    .col-descricao.description-cell,
+    .col-descricao-detalhada.description-cell {
+        max-width: none;
+        min-width: 250px;
+    }
+    .col-maquina {
+        min-width: 150px;
+        max-width: 200px;
+    }
+    .col-plano {
+        min-width: 120px;
+        max-width: 180px;
+        width: 150px;
+    }
+    .col-numero {
+        min-width: 100px;
+        max-width: 120px;
+        width: 110px;
+        text-align: center;
+    }
+    .col-data {
+        min-width: 130px;
+        max-width: 160px;
+        width: 140px;
+        text-align: center;
+    }
+    .col-descricao {
+        min-width: 250px;
+        max-width: 350px;
+    }
+    .col-descricao-detalhada {
+        min-width: 300px;
+        max-width: 400px;
+    }
+    .col-funcionario {
+        min-width: 120px;
+        max-width: 180px;
+    }
+    .col-setor {
+        min-width: 100px;
+        max-width: 150px;
+    }
+    .col-unidade {
+        min-width: 150px;
+        max-width: 200px;
+        width: 170px;
+    }
+    .col-acoes {
+        min-width: 100px;
+        max-width: 120px;
+        text-align: center;
+    }
+    .table tbody td.col-acoes {
+        text-align: center;
+        vertical-align: middle;
+    }
+    .btn-group-vertical {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Meus Planos Preventiva</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Consultar Meus Planos Preventiva</h1>
+                <p class="lead">Visualize todos os planos de manutenção preventiva com descrição detalhada do roteiro</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Actions Bar -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <form method="get" action="{% url 'consultar_meu_plano' %}" id="searchForm" class="d-flex">
+                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por máquina, tarefa, funcionário, setor ou descrição detalhada..." value="{{ search_query|default:'' }}">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total</h5>
+                        <p class="card-text display-6">{{ total_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Mostrando</h5>
+                        <p class="card-text display-6">{{ planos|length }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Máquinas</h5>
+                        <p class="card-text display-6">{{ maquinas_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Com Roteiro</h5>
+                        <p class="card-text display-6">{{ planos_com_roteiro }}</p>
+                        <small>Planos vinculados</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-calendar-check me-2"></i>Lista de Meus Planos Preventiva
+                </h5>
+                <a href="{% url 'analise_roteiro_plano_preventiva' %}" class="btn btn-light btn-sm">
+                    <i class="fas fa-link me-2"></i>Ir para Análise e Confirmar Relacionamentos
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <form method="get" action="{% url 'consultar_meu_plano' %}" id="filterForm">
+                    <!-- Preservar busca geral -->
+                    <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                    
+                    <div class="table-container">
+                        <table class="table table-hover table-striped mb-0" id="planosTable">
+                            <thead>
+                                <tr>
+                                    <th class="col-maquina">Máquina</th>
+                                    <th class="col-numero">Seq. Manutenção</th>
+                                    <th class="col-data">Data Execução</th>
+                                    <th class="col-numero">Período (dias)</th>
+                                    <th class="col-numero">Seq. Tarefa</th>
+                                    <th class="col-descricao">Descrição Tarefa</th>
+                                    <th class="col-descricao">DESCR_SEQPLAMANU</th>
+                                    <th class="col-descricao-detalhada">Descrição Detalhada Roteiro</th>
+                                    <th class="col-funcionario">Funcionário</th>
+                                    <th class="col-setor">Setor</th>
+                                    <th class="col-acoes">Ações</th>
+                                </tr>
+                                <tr class="filter-row">
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_maquina" class="filter-input" placeholder="Filtrar Máquina..." value="{{ filter_maquina|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_seq_manutencao" class="filter-input" placeholder="Filtrar Seq..." value="{{ filter_seq_manutencao|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_data" class="filter-input" placeholder="Filtrar Data..." value="{{ filter_data|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_periodo" class="filter-input" placeholder="Filtrar Período..." value="{{ filter_periodo|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_seq_tarefa" class="filter-input" placeholder="Filtrar Seq Tarefa..." value="{{ filter_seq_tarefa|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_tarefa" class="filter-input" placeholder="Filtrar Tarefa..." value="{{ filter_tarefa|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_descr_seqplamanu" class="filter-input" placeholder="Filtrar DESCR_SEQPLAMANU..." value="{{ filter_descr_seqplamanu|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_desc_detalhada" class="filter-input" placeholder="Filtrar Desc. Detalhada..." value="{{ filter_desc_detalhada|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_funcionario" class="filter-input" placeholder="Filtrar Funcionário..." value="{{ filter_funcionario|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <input type="text" name="filter_setor" class="filter-input" placeholder="Filtrar Setor..." value="{{ filter_setor|default:'' }}">
+                                    </th>
+                                    <th class="filter-header">
+                                        <!-- Sem filtro na coluna de ações -->
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if planos %}
+                                    {% for plano in planos %}
+                                    <tr>
+                                        <td class="col-maquina">
+                                            <strong>{{ plano.cd_maquina|default:"-" }}</strong>
+                                            {% if plano.descr_maquina %}
+                                                <br><small class="text-muted" style="display: block; margin-top: 4px; word-wrap: break-word;">{{ plano.descr_maquina }}</small>
+                                            {% endif %}
+                                            {% if plano.maquina %}
+                                                <br><a href="{% url 'visualizar_maquina' plano.maquina.id %}" class="btn btn-sm btn-outline-primary mt-1" style="font-size: 0.75rem; padding: 2px 6px;">
+                                                    <i class="fas fa-industry"></i>
+                                                </a>
+                                            {% endif %}
+                                        </td>
+                                        <td class="col-numero text-center">{{ plano.sequencia_manutencao|default:"-" }}</td>
+                                        <td class="col-data text-center">
+                                            {% if plano.dt_execucao %}
+                                                <small>{{ plano.dt_execucao }}</small>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="col-numero text-center">
+                                            {% if plano.quantidade_periodo %}
+                                                <span class="badge bg-info">{{ plano.quantidade_periodo }}</span>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="col-numero text-center">{{ plano.sequencia_tarefa|default:"-" }}</td>
+                                        <td class="col-descricao description-cell">
+                                            {% if plano.descr_tarefa %}
+                                                <small>{{ plano.descr_tarefa }}</small>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="col-descricao description-cell">
+                                            {% if plano.descr_seqplamanu %}
+                                                <div style="word-wrap: break-word; white-space: normal; line-height: 1.5;">
+                                                    {{ plano.descr_seqplamanu }}
+                                                </div>
+                                                {% if plano.roteiro_preventiva %}
+                                                    <small class="text-muted" style="display: block; margin-top: 4px;">
+                                                        <i class="fas fa-link"></i> Roteiro ID: {{ plano.roteiro_preventiva.id }}
+                                                    </small>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="col-descricao-detalhada description-cell">
+                                            {% if plano.desc_detalhada_do_roteiro_preventiva %}
+                                                <div style="word-wrap: break-word; white-space: normal; line-height: 1.5;">
+                                                    {{ plano.desc_detalhada_do_roteiro_preventiva }}
+                                                </div>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="col-funcionario">
+                                            {% if plano.nome_funcionario %}
+                                                <strong style="display: block;">{{ plano.nome_funcionario|truncatewords:2 }}</strong>
+                                                {% if plano.cd_funcionario %}
+                                                    <small class="text-muted" style="display: block; margin-top: 2px;">Cód: {{ plano.cd_funcionario }}</small>
+                                                {% endif %}
+                                            {% elif plano.cd_funcionario %}
+                                                <small class="text-muted">Cód: {{ plano.cd_funcionario }}</small>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="col-setor">
+                                            {% if plano.cd_setor %}
+                                                <span class="badge bg-secondary">{{ plano.cd_setor }}</span>
+                                                {% if plano.descr_setor %}
+                                                    <br><small class="text-muted" style="display: block; margin-top: 2px;">{{ plano.descr_setor|truncatewords:3 }}</small>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="col-acoes">
+                                            <div class="btn-group-vertical">
+                                                <a href="{% url 'visualizar_plano_pcm' plano.id %}" class="btn btn-sm btn-primary" title="Visualizar Plano PCM" style="font-size: 0.75rem; padding: 4px 8px;">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="{% url 'editar_plano_pcm' plano.id %}" class="btn btn-sm btn-warning" title="Editar Plano PCM" style="font-size: 0.75rem; padding: 4px 8px;">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                {% if plano.maquina %}
+                                                <a href="{% url 'visualizar_maquina' plano.maquina.id %}" class="btn btn-sm btn-success" title="Visualizar máquina" style="font-size: 0.75rem; padding: 4px 8px;">
+                                                    <i class="fas fa-industry"></i>
+                                                </a>
+                                                {% endif %}
+                                                {% if plano.roteiro_preventiva %}
+                                                <a href="{% url 'visualizar_roteiro_preventiva' plano.roteiro_preventiva.id %}" class="btn btn-sm btn-info" title="Visualizar roteiro relacionado" style="font-size: 0.75rem; padding: 4px 8px;">
+                                                    <i class="fas fa-route"></i>
+                                                </a>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="11" class="text-center py-5">
+                                            <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                                            <p class="text-muted">Nenhum plano preventiva encontrado.</p>
+                                            <a href="{% url 'analise_roteiro_plano_preventiva' %}" class="btn btn-primary">
+                                                <i class="fas fa-link me-2"></i>Relacionar Planos e Roteiros
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if planos.has_other_pages %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if planos.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_plano %}filter_plano={{ filter_plano }}&{% endif %}{% if filter_seq_manutencao %}filter_seq_manutencao={{ filter_seq_manutencao }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_periodo %}filter_periodo={{ filter_periodo }}&{% endif %}{% if filter_seq_tarefa %}filter_seq_tarefa={{ filter_seq_tarefa }}&{% endif %}{% if filter_tarefa %}filter_tarefa={{ filter_tarefa }}&{% endif %}{% if filter_desc_detalhada %}filter_desc_detalhada={{ filter_desc_detalhada }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_funcionario %}filter_funcionario={{ filter_funcionario }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor }}&{% endif %}page=1">Primeira</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_plano %}filter_plano={{ filter_plano }}&{% endif %}{% if filter_seq_manutencao %}filter_seq_manutencao={{ filter_seq_manutencao }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_periodo %}filter_periodo={{ filter_periodo }}&{% endif %}{% if filter_seq_tarefa %}filter_seq_tarefa={{ filter_seq_tarefa }}&{% endif %}{% if filter_tarefa %}filter_tarefa={{ filter_tarefa }}&{% endif %}{% if filter_desc_detalhada %}filter_desc_detalhada={{ filter_desc_detalhada }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_funcionario %}filter_funcionario={{ filter_funcionario }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor }}&{% endif %}page={{ planos.previous_page_number }}">Anterior</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Página {{ planos.number }} de {{ planos.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if planos.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_plano %}filter_plano={{ filter_plano }}&{% endif %}{% if filter_seq_manutencao %}filter_seq_manutencao={{ filter_seq_manutencao }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_periodo %}filter_periodo={{ filter_periodo }}&{% endif %}{% if filter_seq_tarefa %}filter_seq_tarefa={{ filter_seq_tarefa }}&{% endif %}{% if filter_tarefa %}filter_tarefa={{ filter_tarefa }}&{% endif %}{% if filter_desc_detalhada %}filter_desc_detalhada={{ filter_desc_detalhada }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_funcionario %}filter_funcionario={{ filter_funcionario }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor }}&{% endif %}page={{ planos.next_page_number }}">Próxima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_plano %}filter_plano={{ filter_plano }}&{% endif %}{% if filter_seq_manutencao %}filter_seq_manutencao={{ filter_seq_manutencao }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_periodo %}filter_periodo={{ filter_periodo }}&{% endif %}{% if filter_seq_tarefa %}filter_seq_tarefa={{ filter_seq_tarefa }}&{% endif %}{% if filter_tarefa %}filter_tarefa={{ filter_tarefa }}&{% endif %}{% if filter_desc_detalhada %}filter_desc_detalhada={{ filter_desc_detalhada }}&{% endif %}{% if filter_descr_seqplamanu %}filter_descr_seqplamanu={{ filter_descr_seqplamanu }}&{% endif %}{% if filter_funcionario %}filter_funcionario={{ filter_funcionario }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor }}&{% endif %}page={{ planos.paginator.num_pages }}">Última</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-submit form when filter inputs change
+document.addEventListener('DOMContentLoaded', function() {
+    const filterInputs = document.querySelectorAll('.filter-input');
+    const filterForm = document.getElementById('filterForm');
+    
+    filterInputs.forEach(input => {
+        let timeout;
+        input.addEventListener('input', function() {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                filterForm.submit();
+            }, 500); // Wait 500ms after user stops typing
+        });
+    });
+});
+</script>
+{% endblock %}
+

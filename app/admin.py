@@ -1,6 +1,7 @@
 from django.contrib import admin
 from .models import (
     Maquina, 
+    MaquinaDocumento,
     OrdemServicoCorretiva, 
     OrdemServicoCorretivaFicha,
     CentroAtividade, 
@@ -14,7 +15,10 @@ from .models import (
     MaquinaPrimariaSecundaria,
     PlanoPreventiva,
     PlanoPreventivaDocumento,
-    RoteiroPreventiva
+    MeuPlanoPreventiva,
+    MeuPlanoPreventivaDocumento,
+    RoteiroPreventiva,
+    Semana52
 )
 
 
@@ -161,15 +165,15 @@ class LocalCentroAtividadeAdmin(admin.ModelAdmin):
 @admin.register(Manutentor)
 class ManutentorAdmin(admin.ModelAdmin):
     """Admin configuration for Manutentor model"""
-    list_display = ('Cadastro', 'Nome', 'Cargo', 'tipo', 'turno', 'local_trab', 'created_at')
-    list_filter = ('tipo', 'turno', 'local_trab', 'created_at')
-    search_fields = ('Cadastro', 'Nome', 'Cargo', 'Posto')
+    list_display = ('Matricula', 'Nome', 'Cargo', 'turno', 'local_trab', 'created_at')
+    list_filter = ('turno', 'local_trab', 'created_at')
+    search_fields = ('Matricula', 'Nome', 'Cargo')
     readonly_fields = ('created_at', 'updated_at')
     list_per_page = 50
     
     fieldsets = (
         ('Informações Básicas', {
-            'fields': ('Cadastro', 'Nome', 'Admissao', 'Cargo', 'Posto')
+            'fields': ('Matricula', 'Nome', 'Cargo')
         }),
         ('Horários e Tempo de Trabalho', {
             'fields': ('horario_inicio', 'horario_fim', 'tempo_trabalho')
@@ -260,7 +264,7 @@ class ManutentorMaquinaAdmin(admin.ModelAdmin):
     """Admin configuration for ManutentorMaquina model"""
     list_display = ('manutentor', 'maquina', 'created_at')
     list_filter = ('manutentor', 'maquina', 'created_at')
-    search_fields = ('manutentor__Cadastro', 'manutentor__Nome', 'maquina__cd_maquina', 'maquina__descr_maquina')
+    search_fields = ('manutentor__Matricula', 'manutentor__Nome', 'maquina__cd_maquina', 'maquina__descr_maquina')
     readonly_fields = ('created_at', 'updated_at')
     raw_id_fields = ('manutentor', 'maquina')  # Para facilitar a seleção em muitos registros
     list_per_page = 50
@@ -363,6 +367,69 @@ class PlanoPreventivaAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(MeuPlanoPreventiva)
+class MeuPlanoPreventivaAdmin(admin.ModelAdmin):
+    """Admin configuration for MeuPlanoPreventiva model"""
+    list_display = ('cd_maquina', 'descr_maquina', 'numero_plano', 'sequencia_manutencao', 'dt_execucao', 'nome_funcionario', 'created_at')
+    list_filter = ('cd_unid', 'cd_setor', 'numero_plano', 'descr_plano', 'created_at')
+    search_fields = ('cd_maquina', 'descr_maquina', 'cd_setor', 'descr_setor', 'descr_tarefa', 'nome_funcionario', 'cd_funcionario', 'desc_detalhada_do_roteiro_preventiva')
+    readonly_fields = ('created_at', 'updated_at')
+    raw_id_fields = ('maquina', 'roteiro_preventiva')
+    list_per_page = 50
+    
+    fieldsets = (
+        ('Unidade e Setor', {
+            'fields': ('cd_unid', 'nome_unid', 'cd_setor', 'descr_setor', 'cd_atividade')
+        }),
+        ('Máquina', {
+            'fields': ('cd_maquina', 'descr_maquina', 'nro_patrimonio', 'maquina')
+        }),
+        ('Plano', {
+            'fields': ('numero_plano', 'descr_plano', 'sequencia_manutencao')
+        }),
+        ('Execução', {
+            'fields': ('dt_execucao', 'quantidade_periodo')
+        }),
+        ('Tarefa', {
+            'fields': ('sequencia_tarefa', 'descr_tarefa')
+        }),
+        ('Funcionário', {
+            'fields': ('cd_funcionario', 'nome_funcionario')
+        }),
+        ('Roteiro Preventiva', {
+            'fields': ('roteiro_preventiva', 'descr_seqplamanu', 'desc_detalhada_do_roteiro_preventiva')
+        }),
+        ('Sistema', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(MeuPlanoPreventivaDocumento)
+class MeuPlanoPreventivaDocumentoAdmin(admin.ModelAdmin):
+    """Admin configuration for MeuPlanoPreventivaDocumento model"""
+    list_display = ('meu_plano_preventiva', 'maquina_documento', 'comentario', 'created_at')
+    list_filter = ('meu_plano_preventiva', 'created_at')
+    search_fields = ('meu_plano_preventiva__numero_plano', 'maquina_documento__arquivo', 'comentario')
+    readonly_fields = ('created_at', 'updated_at')
+    raw_id_fields = ('meu_plano_preventiva', 'maquina_documento')
+    list_per_page = 50
+
+    fieldsets = (
+        ('Associação', {
+            'fields': ('meu_plano_preventiva', 'maquina_documento')
+        }),
+        ('Informações', {
+            'fields': ('comentario',)
+        }),
+        ('Sistema', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
 @admin.register(RoteiroPreventiva)
 class RoteiroPreventivaAdmin(admin.ModelAdmin):
     """Admin configuration for RoteiroPreventiva model"""
@@ -428,6 +495,50 @@ class PlanoPreventivaDocumentoAdmin(admin.ModelAdmin):
         }),
         ('Documento', {
             'fields': ('arquivo', 'comentario')
+        }),
+        ('Sistema', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(MaquinaDocumento)
+class MaquinaDocumentoAdmin(admin.ModelAdmin):
+    """Admin configuration for MaquinaDocumento model"""
+    list_display = ('maquina', 'arquivo', 'comentario', 'created_at')
+    list_filter = ('maquina', 'created_at')
+    search_fields = ('maquina__cd_maquina', 'maquina__descr_maquina', 'comentario', 'arquivo')
+    readonly_fields = ('created_at', 'updated_at')
+    raw_id_fields = ('maquina',)
+    list_per_page = 50
+    
+    fieldsets = (
+        ('Máquina', {
+            'fields': ('maquina',)
+        }),
+        ('Documento', {
+            'fields': ('arquivo', 'comentario')
+        }),
+        ('Sistema', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(Semana52)
+class Semana52Admin(admin.ModelAdmin):
+    """Admin configuration for Semana52 model"""
+    list_display = ('semana', 'inicio', 'fim', 'created_at')
+    list_filter = ('inicio', 'fim', 'created_at')
+    search_fields = ('semana',)
+    readonly_fields = ('created_at', 'updated_at')
+    list_per_page = 52
+    
+    fieldsets = (
+        ('Informações da Semana', {
+            'fields': ('semana', 'inicio', 'fim')
         }),
         ('Sistema', {
             'fields': ('created_at', 'updated_at'),

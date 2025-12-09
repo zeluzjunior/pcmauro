@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Visualizar Manutentor {{ manutentor.Cadastro }}{% endblock %}
+{% block title %}Visualizar Manutentor {{ manutentor.Matricula }}{% endblock %}
 
 {% block content %}
 <!-- Page Header -->
@@ -13,11 +13,11 @@
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'consultar_manutentores' %}" class="text-white">Manutentores</a></li>
-                        <li class="breadcrumb-item active text-white" aria-current="page">Visualizar Manutentor {{ manutentor.Cadastro }}</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Visualizar Manutentor {{ manutentor.Matricula }}</li>
                     </ol>
                 </nav>
                 <h1 class="display-4 fw-bold mt-3">Visualizar Manutentor</h1>
-                <p class="lead">Detalhes completos do manutentor {{ manutentor.Nome|default:manutentor.Cadastro }}</p>
+                <p class="lead">Detalhes completos do manutentor {{ manutentor.Nome|default:manutentor.Matricula }}</p>
             </div>
         </div>
     </div>
@@ -38,7 +38,7 @@
         
         <div class="row">
             <div class="col-12">
-                <!-- Informações Principais -->
+                    <!-- Informações Principais -->
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
@@ -48,9 +48,9 @@
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label fw-bold">Cadastro</label>
+                                <label class="form-label fw-bold">Matrícula</label>
                                 <p class="form-control-plaintext">
-                                    <span class="badge bg-primary fs-6">{{ manutentor.Cadastro }}</span>
+                                    <span class="badge bg-primary fs-6">{{ manutentor.Matricula }}</span>
                                 </p>
                             </div>
                             <div class="col-md-6 mb-3">
@@ -58,26 +58,12 @@
                                 <p class="form-control-plaintext">{{ manutentor.Nome|default:"Não informado" }}</p>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="form-label fw-bold">Data de Admissão</label>
-                                <p class="form-control-plaintext">
-                                    {% if manutentor.Admissao %}
-                                        <span class="badge bg-info">{{ manutentor.Admissao|date:"d/m/Y" }}</span>
-                                    {% else %}
-                                        Não informado
-                                    {% endif %}
-                                </p>
-                            </div>
-                            <div class="col-md-6 mb-3">
                                 <label class="form-label fw-bold">Cargo</label>
                                 <p class="form-control-plaintext">{{ manutentor.Cargo|default:"Não informado" }}</p>
                             </div>
-                            <div class="col-md-12 mb-3">
-                                <label class="form-label fw-bold">Posto</label>
-                                <p class="form-control-plaintext">{{ manutentor.Posto|default:"Não informado" }}</p>
+                        </div>
                             </div>
                         </div>
-                    </div>
-                </div>
 
                 <!-- Informações de Trabalho -->
                 <div class="card shadow-sm mb-4">
@@ -89,14 +75,6 @@
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-4 mb-3">
-                                <label class="form-label fw-bold">Tipo</label>
-                                <p class="form-control-plaintext">
-                                    {% if manutentor.tipo %}
-                                        <span class="badge bg-primary">{{ manutentor.get_tipo_display }}</span>
-                                    {% else %}
-                                        Não informado
-                                    {% endif %}
-                                </p>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">Turno</label>
@@ -149,8 +127,8 @@
                                 </p>
                             </div>
                         </div>
-                    </div>
-                </div>
+                            </div>
+                        </div>
 
                 <!-- Informações do Sistema -->
                 <div class="card shadow-sm mb-4">
@@ -163,7 +141,7 @@
                         <div class="row">
                             <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">Cadastro (ID)</label>
-                                <p class="form-control-plaintext">{{ manutentor.Cadastro }}</p>
+                                <p class="form-control-plaintext">{{ manutentor.Matricula }}</p>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">Data de Criação</label>
@@ -174,8 +152,8 @@
                                 <p class="form-control-plaintext">{{ manutentor.updated_at|date:"d/m/Y H:i:s" }}</p>
                             </div>
                         </div>
-                    </div>
-                </div>
+                            </div>
+                        </div>
 
                 <!-- Máquinas Relacionadas -->
                 <div class="card shadow-sm mb-4">
@@ -191,7 +169,7 @@
                             <h6 class="mb-3">
                                 <i class="fas fa-plus-circle me-2"></i>Adicionar Máquina
                             </h6>
-                            <form method="post" action="{% url 'adicionar_maquina_manutentor' manutentor.Cadastro %}" id="adicionarMaquinaForm">
+                            <form method="post" action="{% url 'adicionar_maquina_manutentor' manutentor.Matricula %}" id="adicionarMaquinaForm">
                                 {% csrf_token %}
                                 <div class="row">
                                     <div class="col-md-7 mb-3">
@@ -259,7 +237,7 @@
                                                             <a href="{% url 'visualizar_maquina' manutentor_maquina.maquina.id %}" class="btn btn-sm btn-primary">
                                                                 <i class="fas fa-eye"></i> Ver
                                                             </a>
-                                                            <form method="post" action="{% url 'remover_maquina_manutentor' manutentor.Cadastro manutentor_maquina.id %}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja remover esta máquina?');">
+                                                            <form method="post" action="{% url 'remover_maquina_manutentor' manutentor.Matricula manutentor_maquina.id %}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja remover esta máquina?');">
                                                                 {% csrf_token %}
                                                                 <button type="submit" class="btn btn-sm btn-danger">
                                                                     <i class="fas fa-trash"></i>
@@ -287,10 +265,10 @@
                         <i class="fas fa-arrow-left me-2"></i>Voltar para Lista de Manutentores
                     </a>
                     <div>
-                        <a href="{% url 'editar_manutentor' manutentor.Cadastro %}" class="btn btn-warning">
+                        <a href="{% url 'editar_manutentor' manutentor.Matricula %}" class="btn btn-warning">
                             <i class="fas fa-edit me-2"></i>Editar Manutentor
                         </a>
-                        <a href="{% url 'consultar_manutentores' %}?search={{ manutentor.Cadastro }}" class="btn btn-outline-primary">
+                        <a href="{% url 'consultar_manutentores' %}?search={{ manutentor.Matricula }}" class="btn btn-outline-primary">
                             <i class="fas fa-search me-2"></i>Buscar Manutentores Similares
                         </a>
                     </div>

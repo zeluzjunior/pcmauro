@@ -4,14 +4,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Meu Projeto Django{% endblock %}</title>
+    <title>{% block title %}Meu Projeto Django{% endblock %} - {% now "H:i:s" %}</title>
+    
+    <!-- Cache Control -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    
+    <!-- Force full-width containers - Loads after Bootstrap to override -->
+    <style>
+        /* Override Bootstrap containers to use full width */
+        .container, .container-fluid {
+            max-width: 100% !important;
+            width: 100% !important;
+            padding-left: 20px !important;
+            padding-right: 20px !important;
+        }
+        
+        .main-content-wrapper {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        
+        .container-fluid.px-0 {
+            max-width: 100% !important;
+            width: 100% !important;
+        }
+        
+        .row {
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+            width: 100% !important;
+        }
+    </style>
+    
+    <style>
+        /* Sidebar styling - Increased width */
+        .sidebar-wrapper {
+            width: 320px !important;
+            min-width: 320px !important;
+            transition: width 0.3s ease, min-width 0.3s ease;
+        }
+        
+        .sidebar-wrapper.collapsed {
+            width: 60px !important;
+            min-width: 60px !important;
+        }
+        
+        .sidebar {
+            width: 100%;
+        }
+        
+        .sidebar.collapsed .btn-toggle-text,
+        .sidebar.collapsed .btn-toggle-nav {
+            opacity: 0 !important;
+            display: none !important;
+        }
+        
+        .sidebar.collapsed .btn-toggle {
+            justify-content: center !important;
+            padding: 0.5rem !important;
+        }
+        
+        .sidebar.collapsed .btn-toggle::before {
+            margin-right: 0 !important;
+        }
+        
+        /* Adjust main content when sidebar is visible */
+        .main-content-wrapper {
+            margin-left: 0;
+            transition: margin-left 0.3s ease;
+        }
+        
+        /* Ensure sidebar text doesn't wrap too early */
+        .btn-toggle-text {
+            white-space: nowrap;
+        }
+        
+        /* Make sidebar items more readable */
+        .btn-toggle-nav a {
+            padding: 0.5rem 1rem;
+            font-size: 0.95rem;
+        }
+        
+        /* Better spacing for sidebar buttons */
+        .btn-toggle {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.95rem;
+        }
+    </style>
     
     {% block extra_css %}{% endblock %}
 </head>
@@ -23,7 +113,7 @@
                 <i class="fas fa-bars fs-5"></i>
             </button>
             <a class="navbar-brand" href="{% url 'home' %}">
-                <i class="fas fa-home me-2"></i>Sistema PCM FAC 
+                <i class="fas fa-home me-2"></i>Sistema PCM FAC
             </a>
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -85,7 +175,7 @@
                             <li><a class="dropdown-item" href="#" data-consultar="local"><i class="fas fa-map-marker-alt me-2"></i>Consultar Local ou CA</a></li>
                             <li><a class="dropdown-item" href="{% url 'consultar_estoque' %}"><i class="fas fa-boxes me-2"></i>Consultar Estoque</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#" data-consultar="visitas"><i class="fas fa-calendar-check me-2"></i>Consultar Agendamentos</a></li>
+                            <li><a class="dropdown-item" href="{% url 'consultar_visitas' %}"><i class="fas fa-calendar-check me-2"></i>Consultar Visitas</a></li>
                         </ul>
                     </li>
                     <li class="nav-item">
@@ -133,62 +223,94 @@
 
                     <ul class="list-unstyled ps-0">
 
-                        <!-- Planejamento de Manutenção -->
+                        <!-- Testes -->
                         <li class="mb-1">
-                            <button class="btn btn-toggle align-items-center rounded" data-bs-toggle="collapse" data-bs-target="#planejamento-collapse" aria-expanded="false">
-                                <span class="btn-toggle-text">Planejamento de Manutenção</span>
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#testes-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Testes</span>
                             </button>
-                            <div class="collapse" id="planejamento-collapse">
+                            <div class="collapse" id="testes-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'centros_de_atividade' %}" class="link-dark rounded">Centros de Atividades</a></li>
+                                    <li><a href="{% url 'testes' %}" class="link-dark rounded">Hierarquia de Máquinas</a></li>
+                                </ul>
+                            </div>
+                        </li>
+                        <li class="border-top my-3"></li>
+
+                        <!-- Análise de Ordens de Serviço -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#analise-ordens-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Análise de Ordens de Serviço</span>
+                            </button>
+                            <div class="collapse" id="analise-ordens-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'analise_ordens_de_servico' %}" class="link-dark rounded">Análise Geral</a></li>
+                                    <li><a href="{% url 'config_analise_ordens' %}" class="link-dark rounded">Configuração</a></li>
                                 </ul>
                             </div>
                         </li>
 
-                        <li class="border-top my-3"></li>
-                        <!-- Plano de Preventiva -->
-                        <li class="mb-1">
-                            <button class="btn btn-toggle align-items-center rounded" data-bs-toggle="collapse" data-bs-target="#plano-collapse" aria-expanded="false">
-                                <span class="btn-toggle-text">Plano de Preventiva</span>
-                            </button>
-                            <div class="collapse" id="plano-collapse">
-                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'em_desenvolvimento' %}" class="link-dark rounded">Análise</a></li>
-                                    <li><a href="{% url 'em_desenvolvimento' %}" class="link-dark rounded">Cadastrar Plano</a></li>
-                                    <li><a href="{% url 'em_desenvolvimento' %}" class="link-dark rounded">Consultar Plano</a></li>
-                                    <li><a href="{% url 'consultar_roteiro_preventiva' %}" class="link-dark rounded">Consultar Roteiro Preventiva</a></li>
-                                    <li><a href="{% url 'analise_roteiro_plano_preventiva' %}" class="link-dark rounded">Análise de Roteiro e Plano de Preventiva</a></li>
-                                    <li><a href="{% url 'maquina_primaria_secundaria' %}" class="link-dark rounded">Agrupar Máquinas Primárias e Secundárias</a></li>
-                                </ul>
-                            </div>
-                        </li>
-                        <!-- Manutenção Preventiva -->
+                        <!-- Manutenção Preventiva (SIGA) -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded" data-bs-toggle="collapse" data-bs-target="#preventiva-collapse" aria-expanded="false">
-                                <span class="btn-toggle-text">Manutenção Preventiva</span>
+                                <span class="btn-toggle-text">Manutenção Preventiva (SIGA)</span>
                             </button>
                             <div class="collapse" id="preventiva-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'em_desenvolvimento' %}" class="link-dark rounded">Cadastrar Manutenção</a></li>
+                                    <li><a href="{% url 'em_desenvolvimento' %}" class="link-dark rounded">Análise Ordens Preventivas</a></li>
                                     <li><a href="{% url 'consultar_manutencoes_preventivas' %}" class="link-dark rounded">Consultar Manutenções Preventivas</a></li>
+                                    <li><a href="{% url 'consultar_manutencoes_preventivas' %}" class="link-dark rounded">Consultar Plano de Preventiva</a></li>
+                                    <li><a href="{% url 'consultar_roteiro_preventiva' %}" class="link-dark rounded">Consultar Roteiro Preventiva</a></li>
+
                                 </ul>
                             </div>
                         </li>
-                        <li class="border-top my-3"></li>
 
                         <!--- manutenção corretiva -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded" data-bs-toggle="collapse" data-bs-target="#corretiva-collapse" aria-expanded="false">
-                                <span class="btn-toggle-text">Manutenção Corretiva</span>
+                                <span class="btn-toggle-text">Manutenção Corretiva (SIGA)</span>
                             </button>
                             <div class="collapse" id="corretiva-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'analise_corretiva_outros' %}" class="link-dark rounded">Análise</a></li>
-                                    <li><a href="{% url 'em_desenvolvimento' %}" class="link-dark rounded">Cadastrar Corretiva</a></li>
+                                    <li><a href="{% url 'analise_corretiva_outros' %}" class="link-dark rounded">Análise Ordens Corretivas</a></li>
                                     <li><a href="{% url 'consultar_corretivas_outros' %}" class="link-dark rounded">Consultar Corretiva</a></li>
                                 </ul>
                             </div>
                         </li>
+            
+                        <li class="border-top my-3"></li>
+                        <!-- Configurar Plano De Preventiva PCM -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#configurar-plano-pcm-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Configurar Plano De Preventiva PCM</span>
+                            </button>
+                            <div class="collapse" id="configurar-plano-pcm-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'agrupar_acoes_do_plano_por_data' %}" class="link-dark rounded">Agrupar Ações do Plano por Data</a></li>
+                                    <li><a href="{% url 'agrupar_preventiva_por_data' %}" class="link-dark rounded">Agrupar Preventiva por Data</a></li>
+                                    <li><a href="{% url 'analise_roteiro_plano_preventiva' %}" class="link-dark rounded">Análise de Roteiro e Plano de Preventiva</a></li>  <!-- Função limpa - recriar do zero -->
+                                    <li><a href="{% url 'maquina_primaria_secundaria' %}" class="link-dark rounded">Agrupar Máquinas Primárias e Secundárias</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
+                        <!-- Plano de Preventiva PCM -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded" data-bs-toggle="collapse" data-bs-target="#plano-pcm-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Plano de Preventiva PCM</span>
+                            </button>
+                            <div class="collapse" id="plano-pcm-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'analise_geral_plano_preventiva_pcm' %}" class="link-dark rounded">Análise Geral PCM</a></li>
+                                    <li><a href="{% url 'consultar_meu_plano' %}" class="link-dark rounded">Consultar Meus Planos Preventiva do PCM</a></li>
+                                    <li><a href="{% url 'criar_cronograma_planejado_preventiva' %}" class="link-dark rounded">Criar Calendário Plenejado de Preventivas</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
+
+
+
                         <li class="border-top my-3"></li>
                         <!-- manutenção de terceiros -->
                         <li class="mb-1">
@@ -209,12 +331,16 @@
                             </button>
                             <div class="collapse" id="visitas-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="#" class="link-dark rounded">Novo Agendamento</a></li>
-                                    <li><a href="#" class="link-dark rounded">Consultar Agendamentos</a></li>
+                                    <li><a href="{% url 'cadastrar_visita' %}" class="link-dark rounded">Nova Visita</a></li>
+                                    <li><a href="{% url 'consultar_visitas' %}" class="link-dark rounded">Consultar Visitas</a></li>
                                 </ul>
                             </div>
                         </li>
                         <li class="border-top my-3"></li>
+
+
+
+
                         <!-- Estoque Almoxarifado -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#estoque-collapse" aria-expanded="false">
@@ -228,15 +354,33 @@
                                 </ul>
                             </div>
                         </li>
+
+                        
+                        
+                        <li class="border-top my-3"></li>
+                        <!-- Orçamento -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#orcamento-collapse" aria-expanded="false">
+                                <span class="btn-toggle-text">Orçamento e GMD</span>
+                            </button>
+                            <div class="collapse" id="orcamento-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'analise_requisicoes' %}" class="link-dark rounded">Análise de Requisições</a></li>
+                                    <li><a href="{% url 'consultar_requisicoes_almoxarifado' %}" class="link-dark rounded">Consultar Requisições Almoxarifado</a></li>
+                                    <li><a href="{% url 'consultar_notas_fiscais' %}" class="link-dark rounded">Consultar Notas Fiscais</a></li>
+                                </ul>
+                            </div>
+                        </li>
                         <li class="border-top my-3"></li>
                         <!-- Máquinas -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#maquinas-collapse" aria-expanded="false">
-                                <span class="btn-toggle-text">Máquinas [ok] </span>
+                                <span class="btn-toggle-text">Máquinas</span>
                             </button>
                             <div class="collapse" id="maquinas-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'analise_maquinas' %}" class="link-dark rounded">Análise</a></li>
+                                    <li><a href="{% url 'analise_maquinas_importadas' %}" class="link-dark rounded">Análise de Importadas</a></li>
                                     <li><a href="{% url 'cadastrar_maquina' %}" class="link-dark rounded">Cadastrar Máquina</a></li>
                                     <li><a href="{% url 'consultar_maquinas' %}" class="link-dark rounded">Consultar Máquinas</a></li>
                                 </ul>
@@ -256,6 +400,7 @@
                             </div>
                         </li>
 
+                        <li class="border-top my-3"></li>
                         <!-- Setores e CA -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#local-collapse" aria-expanded="false">
@@ -269,6 +414,10 @@
                                 </ul>
                             </div>
                         </li>
+
+                        
+                        <li class="border-top my-3"></li>
+                        <!-- Importar Dados -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#importar-collapse" aria-expanded="false">
                                 <span class="btn-toggle-text">Importar Dados</span>
@@ -283,11 +432,13 @@
                                     <li><a href="{% url 'importar_roteiro_preventiva' %}" class="link-dark rounded">Roteiro Preventiva</a></li>
                                     <li><a href="{% url 'importar_locais_e_cas' %}" class="link-dark rounded">Locais e CAs</a></li>
                                     <li><a href="{% url 'importar_estoque' %}" class="link-dark rounded">Estoque</a></li>
+                                    <li><a href="{% url 'importar_52_semanas' %}" class="link-dark rounded">52 Semanas</a></li>
+                                    <li><a href="{% url 'importar_requisicoes_almoxarifado' %}" class="link-dark rounded">Requisições Almoxarifado</a></li>
+                                    <li><a href="{% url 'importar_notas_fiscais' %}" class="link-dark rounded">Notas Fiscais</a></li>
                                 </ul>
                             </div>
                         </li>
 
-                        <li class="border-top my-3"></li>
                         <!-- Administrador -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#administrador-collapse" aria-expanded="false">
@@ -358,5 +509,15 @@
     <script src="{% static 'js/main.js' %}"></script>
     
     {% block extra_js %}{% endblock %}
+    
+    <!-- DEBUG: Template loaded at {% now "Y-m-d H:i:s" %} -->
+    <script>
+        // Force disable browser cache for this page
+        if (window.performance && window.performance.navigation.type === window.performance.navigation.TYPE_RELOAD) {
+            console.log('Page reloaded - cache should be disabled');
+        }
+        // Log template timestamp
+        console.log('Template timestamp: {% now "Y-m-d H:i:s" %}');
+    </script>
 </body>
 </html>

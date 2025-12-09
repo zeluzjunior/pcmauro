@@ -6,9 +6,12 @@ urlpatterns = [
     path('home/', views.home, name="home"),
     path('about/', views.about, name="about"),
     path('em-desenvolvimento/', views.em_desenvolvimento, name="em_desenvolvimento"),
+    path('orcamento/analise-requisicoes/', views.analise_requisicoes, name="analise_requisicoes"),
+    path('testes/', views.testes, name="testes"),
+    path('debug-template/', views.template_debug, name="template_debug"),
     path('analise/plano-preventiva/', views.analise_plano_preventiva, name="analise_plano_preventiva"),
     path('planejamento/maquina-primaria-secundaria/', views.maquina_primaria_secundaria, name="maquina_primaria_secundaria"),
-    path('planejamento/analise-roteiro-plano-preventiva/', views.analise_roteiro_plano_preventiva, name="analise_roteiro_plano_preventiva"),
+    path('planejamento/analise-roteiro-plano-preventiva/', views.analise_roteiro_plano_preventiva, name="analise_roteiro_plano_preventiva"),  # Função limpa - recriar do zero
     path('contact/', views.contact, name="contact"),
     path('services/', views.services, name="services"),
     path('centros-de-atividade/', views.centros_de_atividade, name="centros_de_atividade"),
@@ -46,6 +49,9 @@ urlpatterns = [
     path('importar/ordens-preventivas/', views.importar_ordens_preventivas, name="importar_ordens_preventivas"),
     path('importar/plano-preventiva/', views.importar_plano_preventiva, name="importar_plano_preventiva"),
     path('importar/roteiro-preventiva/', views.importar_roteiro_preventiva, name="importar_roteiro_preventiva"),
+    path('importar/52-semanas/', views.importar_52_semanas, name="importar_52_semanas"),
+    path('importar/requisicoes-almoxarifado/', views.importar_requisicoes_almoxarifado, name="importar_requisicoes_almoxarifado"),
+    path('importar/notas-fiscais/', views.importar_notas_fiscais, name="importar_notas_fiscais"),
     path('importar/locais-e-cas/', views.importar_locais_e_cas, name="importar_locais_e_cas"),
     path('importar/estoque/', views.importar_estoque, name="importar_estoque"),
     
@@ -55,10 +61,28 @@ urlpatterns = [
     
     # Manutenções Preventivas
     path('manutencoes-preventivas/consultar/', views.consultar_manutencoes_preventivas, name="consultar_manutencoes_preventivas"),
-    path('manutencoes-preventivas/visualizar/<int:plano_id>/', views.visualizar_manutencao_preventiva, name="visualizar_manutencao_preventiva"),
+    path('meus-planos-preventiva/consultar/', views.consultar_meu_plano, name="consultar_meu_plano"),
+    path('consultar/52-semanas/', views.consultar_52_semanas, name="consultar_52_semanas"),
+    path('consultar/requisicoes-almoxarifado/', views.consultar_requisicoes_almoxarifado, name="consultar_requisicoes_almoxarifado"),
+    path('consultar/notas-fiscais/', views.consultar_notas_fiscais, name="consultar_notas_fiscais"),
+    path('visualizar/nota-fiscal/<int:nota_id>/', views.visualizar_nota_fiscal, name="visualizar_nota_fiscal"),
+    path('plano-pcm/visualizar/<int:plano_id>/', views.visualizar_plano_pcm, name="visualizar_plano_pcm"),
+    path('plano-pcm/editar/<int:plano_id>/', views.editar_plano_pcm, name="editar_plano_pcm"),
+    path('plano-pcm/<int:plano_id>/gerar-pdf/', views.gerar_pdf_plano_pcm, name="gerar_pdf_plano_pcm"),
+    path('plano-pcm/<int:plano_id>/associar-documento/<int:documento_id>/', views.associar_documento_plano_pcm, name="associar_documento_plano_pcm"),
+    path('plano-pcm/<int:plano_id>/remover-documento/<int:associacao_id>/', views.remover_documento_plano_pcm, name="remover_documento_plano_pcm"),
+    path('planejamento/analise-geral-pcm/', views.analise_geral_plano_preventiva_pcm, name="analise_geral_plano_preventiva_pcm"),
+    path('planejamento/agrupar-acoes-plano-por-data/', views.agrupar_acoes_do_plano_por_data, name="agrupar_acoes_do_plano_por_data"),
+    path('planejamento/agrupar-preventiva-por-data/', views.agrupar_preventiva_por_data, name="agrupar_preventiva_por_data"),
+    path('planejamento/criar-cronograma-planejado-preventiva/', views.criar_cronograma_planejado_preventiva, name="criar_cronograma_planejado_preventiva"),
+    path('plano-preventiva/visualizar/<int:plano_id>/', views.visualizar_manutencao_preventiva, name="visualizar_manutencao_preventiva"),
     path('roteiros-preventiva/consultar/', views.consultar_roteiro_preventiva, name="consultar_roteiro_preventiva"),
     path('roteiros-preventiva/visualizar/<int:roteiro_id>/', views.visualizar_roteiro_preventiva, name="visualizar_roteiro_preventiva"),
-    path('analise/plano-roteiro/visualizar/<int:plano_id>/<int:roteiro_id>/', views.visualizar_analise_plano_roteiro, name="visualizar_analise_plano_roteiro"),
+    path('analise/plano-roteiro/visualizar/<int:plano_id>/<int:roteiro_id>/', views.visualizar_analise_plano_roteiro, name="visualizar_analise_plano_roteiro"),  # Função limpa - recriar do zero
+    path('analise/comparacao-roteiro-plano/<int:plano_id>/<int:roteiro_id>/', views.visualizar_comparacao_roteiro_plano, name="visualizar_comparacao_roteiro_plano"),
+    path('analise/erro-plano-roteiro/', views.erro_analise_plano_roteiro, name="erro_analise_plano_roteiro_geral"),
+    path('analise/erro-plano-roteiro/<int:plano_id>/<int:roteiro_id>/', views.erro_analise_plano_roteiro, name="erro_analise_plano_roteiro"),
+    path('planejamento/relacionar-roteiro-plano/', views.relacionar_roteiro_plano, name="relacionar_roteiro_plano"),
     path('manutencoes-preventivas/<int:plano_id>/adicionar-documento/', views.adicionar_documento_plano_preventiva, name="adicionar_documento_plano_preventiva"),
     path('manutencoes-preventivas/<int:plano_id>/remover-documento/<int:documento_id>/', views.remover_documento_plano_preventiva, name="remover_documento_plano_preventiva"),
     path('estoque/<int:item_id>/atualizar-foto-item/', views.atualizar_foto_item, name="atualizar_foto_item"),
@@ -75,20 +99,27 @@ urlpatterns = [
     
     # Máquinas
     path('maquinas/analise/', views.analise_maquinas, name="analise_maquinas"),
+    path('maquinas/analise-importadas/', views.analise_maquinas_importadas, name="analise_maquinas_importadas"),
     path('maquinas/cadastrar/', views.cadastrar_maquina, name="cadastrar_maquina"),
     path('maquinas/consultar/', views.consultar_maquinas, name="consultar_maquinas"),
     path('maquinas/deletar/<int:maquina_id>/', views.deletar_maquina, name="deletar_maquina"),
     path('maquinas/visualizar/<int:maquina_id>/', views.visualizar_maquina, name="visualizar_maquina"),
+    path('maquinas/<int:maquina_id>/calendario-planos/', views.calendario_planos_maquina, name="calendario_planos_maquina"),
+    path('maquinas/<int:maquina_id>/calendario-planos-secundarias/', views.calendario_planos_secundarias, name="calendario_planos_secundarias"),
     path('maquinas/editar/<int:maquina_id>/', views.editar_maquina, name="editar_maquina"),
     path('maquinas/<int:maquina_id>/pecas/', views.maquinas_pecas, name="maquinas_pecas"),
     path('maquinas/<int:maquina_id>/adicionar-peca/', views.adicionar_peca_maquina, name="adicionar_peca_maquina"),
     path('maquinas/<int:maquina_id>/remover-peca/<int:peca_id>/', views.remover_peca_maquina, name="remover_peca_maquina"),
     path('maquinas/<int:maquina_id>/atualizar-codigo-aurora/', views.atualizar_codigo_aurora, name="atualizar_codigo_aurora"),
     path('maquinas/<int:maquina_id>/atualizar-codigo-fabricante/', views.atualizar_codigo_fabricante, name="atualizar_codigo_fabricante"),
+    path('maquinas/<int:maquina_id>/adicionar-documento/', views.adicionar_documento_maquina, name="adicionar_documento_maquina"),
+    path('maquinas/<int:maquina_id>/remover-documento/<int:documento_id>/', views.remover_documento_maquina, name="remover_documento_maquina"),
     path('maquinas/filtrar-locais/', views.filtrar_locais_por_setormanut, name="filtrar_locais_por_setormanut"),
    
     # Manutenção Corretiva
     path('analise/corretiva-outros/', views.analise_corretiva_outros, name="analise_corretiva_outros"),
+    path('ordens-de-servico/analise/', views.analise_ordens_de_servico, name="analise_ordens_de_servico"),
+    path('ordens-de-servico/config-analise/', views.config_analise_ordens, name="config_analise_ordens"),
     path('manutencao-corretiva/cadastrar/', views.cadastrar_corretiva_outros, name="cadastrar_corretiva_outros"),
     path('manutencao-corretiva/consultar/', views.consultar_corretivas_outros, name="consultar_corretivas_outros"),
     path('manutencao-corretiva/visualizar/<int:ordem_id>/', views.visualizar_corretiva_outros, name="visualizar_corretiva_outros"),
@@ -96,16 +127,31 @@ urlpatterns = [
     # Manutentores
     path('manutentor/cadastrar/', views.cadastrar_manutentor, name="cadastrar_manutentor"),
     path('manutentor/consultar/', views.consultar_manutentores, name="consultar_manutentores"),
-    path('manutentor/visualizar/<str:cadastro>/', views.visualizar_manutentor, name="visualizar_manutentor"),
-    path('manutentor/editar/<str:cadastro>/', views.editar_manutentor, name="editar_manutentor"),
-    path('manutentor/<str:cadastro>/adicionar-maquina/', views.adicionar_maquina_manutentor, name="adicionar_maquina_manutentor"),
-    path('manutentor/<str:cadastro>/remover-maquina/<int:manutentor_maquina_id>/', views.remover_maquina_manutentor, name="remover_maquina_manutentor"),
+    path('manutentor/visualizar/<str:matricula>/', views.visualizar_manutentor, name="visualizar_manutentor"),
+    path('manutentor/editar/<str:matricula>/', views.editar_manutentor, name="editar_manutentor"),
+    path('manutentor/<str:matricula>/adicionar-maquina/', views.adicionar_maquina_manutentor, name="adicionar_maquina_manutentor"),
+    path('manutentor/<str:matricula>/remover-maquina/<int:manutentor_maquina_id>/', views.remover_maquina_manutentor, name="remover_maquina_manutentor"),
     
     # Manutenção Terceiro
     path('manutencao-terceiro/cadastrar/', views.cadastrar_manutencao_terceiro, name="cadastrar_manutencao_terceiro"),
     path('manutencao-terceiro/consultar/', views.consultar_manutencao_terceiros, name="consultar_manutencao_terceiros"),
     
+    # Visitas
+    path('visitas/consultar/', views.consultar_visitas, name="consultar_visitas"),
+    path('visitas/cadastrar/', views.cadastrar_visita, name="cadastrar_visita"),
+    
+    # Agendamentos (mantido para compatibilidade)
+    path('agendamentos/consultar/', views.consultar_agendamentos, name="consultar_agendamentos"),
+    path('agendamentos/cadastrar/', views.cadastrar_visita, name="cadastrar_agendamento"),  # Alias para compatibilidade
+    
     # Administração
     path('administrador/gerenciar/', views.gerenciar_projeto, name="gerenciar_projeto"),
     path('administrador/limpar-tabela/', views.limpar_tabela, name="limpar_tabela"),
+    
+    # API Endpoints
+    path('api/search-maquinas/', views.api_search_maquinas, name="api_search_maquinas"),
+    path('api/search-planos-pcm/', views.api_search_planos_pcm, name="api_search_planos_pcm"),
+    path('api/salvar-agendamentos-cronograma/', views.salvar_agendamentos_cronograma, name="salvar_agendamentos_cronograma"),
+    path('api/dados-diarios-requisicoes/', views.api_dados_diarios_requisicoes, name="api_dados_diarios_requisicoes"),
+    path('api/meses-por-ano/', views.api_meses_por_ano, name="api_meses_por_ano"),
 ]

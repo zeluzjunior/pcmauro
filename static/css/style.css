@@ -7,6 +7,199 @@ body {
     color: #333;
 }
 
+/* FORCE containers to use full width with minimal padding - Applied to ALL pages */
+.container,
+.container-fluid,
+section .container,
+section .container-fluid,
+.row .container,
+.row .container-fluid,
+main .container,
+main .container-fluid,
+.main-content-wrapper .container,
+.main-content-wrapper .container-fluid,
+body .container,
+body .container-fluid {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+/* Override ALL Bootstrap container max-widths - most aggressive override */
+.container[class*="container"],
+.container-fluid[class*="container"] {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+/* Ensure container-fluid uses full width */
+.container-fluid {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+}
+
+/* Ensure main content wrapper uses full width */
+.main-content-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Override Bootstrap's responsive container padding and max-widths at ALL breakpoints */
+@media (min-width: 576px) {
+    .container,
+    .container-fluid,
+    section .container,
+    section .container-fluid,
+    .row .container,
+    .row .container-fluid {
+        padding-left: 20px !important;
+        padding-right: 20px !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+}
+
+@media (min-width: 768px) {
+    .container,
+    .container-fluid,
+    section .container,
+    section .container-fluid,
+    .row .container,
+    .row .container-fluid {
+        padding-left: 20px !important;
+        padding-right: 20px !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+}
+
+@media (min-width: 992px) {
+    .container,
+    .container-fluid,
+    section .container,
+    section .container-fluid,
+    .row .container,
+    .row .container-fluid {
+        padding-left: 20px !important;
+        padding-right: 20px !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+}
+
+@media (min-width: 1200px) {
+    .container,
+    .container-fluid,
+    section .container,
+    section .container-fluid,
+    .row .container,
+    .row .container-fluid {
+        padding-left: 20px !important;
+        padding-right: 20px !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+}
+
+@media (min-width: 1400px) {
+    .container,
+    .container-fluid,
+    section .container,
+    section .container-fluid,
+    .row .container,
+    .row .container-fluid {
+        padding-left: 20px !important;
+        padding-right: 20px !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+}
+
+/* Ensure rows don't add extra negative margins that create large side spacing */
+.row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+}
+
+/* Ensure columns don't add extra padding */
+[class*="col-"] {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+}
+
+/* Remove any body/html constraints */
+body {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+html {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Ensure sections use full width */
+section {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Ensure main content areas use full width */
+main,
+.main-content,
+#mainContent {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Override Bootstrap's container-fluid default padding */
+.container-fluid.px-0 {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+/* Ensure the row inside container-fluid uses full width */
+.container-fluid.px-0 > .row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* But ensure inner containers still have minimal padding */
+.container-fluid.px-0 > .container,
+.container-fluid.px-0 > .container-fluid,
+.container-fluid.px-0 .container,
+.container-fluid.px-0 .container-fluid {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+/* Force main-content-wrapper to use full available width */
+.main-content-wrapper {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+}
+
+/* Ensure the row with flex-nowrap doesn't constrain width */
+.row.flex-nowrap {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
 .main-content {
     min-height: calc(100vh - 200px);
 }
@@ -121,19 +314,19 @@ body {
 .hero-section {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    padding: 80px 0;
-    margin-bottom: 50px;
+    padding: 40px 0;
+    margin-bottom: 30px;
 }
 
 .hero-section h1 {
-    font-size: 3.5rem;
+    font-size: 2.5rem;
     font-weight: bold;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
 }
 
 .hero-section p {
-    font-size: 1.2rem;
-    margin-bottom: 30px;
+    font-size: 1rem;
+    margin-bottom: 20px;
 }
 
 /* Card Styles */
@@ -333,11 +526,13 @@ footer h5 {
     transition: width 0.3s ease;
     position: relative;
     flex: 0 0 auto;
-    width: 280px;
+    width: 320px;
+    min-width: 320px;
 }
 
 .sidebar-wrapper.collapsed {
-    width: 60px;
+    width: 60px !important;
+    min-width: 60px !important;
 }
 
 .sidebar {
@@ -388,7 +583,7 @@ footer h5 {
         left: 0;
         height: calc(100vh - 56px);
         z-index: 1000;
-        margin-left: -280px;
+        margin-left: -320px;
     }
     
     .sidebar-wrapper.show {
@@ -400,7 +595,7 @@ footer h5 {
     }
     
     .sidebar {
-        width: 280px !important;
+        width: 320px !important;
     }
 }
 

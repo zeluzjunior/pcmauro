@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Importar Manutentores{% endblock %}
+{% block title %}Importar Manutentor{% endblock %}
 
 {% block content %}
 <!-- Page Header -->
@@ -13,11 +13,11 @@
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
                         <li class="breadcrumb-item active text-white" aria-current="page">Importar Dados</li>
-                        <li class="breadcrumb-item active text-white" aria-current="page">Importar Manutentores</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Importar Manutentor</li>
                     </ol>
                 </nav>
-                <h1 class="display-4 fw-bold mt-3">Importar Manutentores</h1>
-                <p class="lead">Importe dados de manutentores através de arquivo</p>
+                <h1 class="display-4 fw-bold mt-3">Importar Manutentor</h1>
+                <p class="lead">Importe dados de manutentores através de arquivo Excel ou CSV</p>
             </div>
         </div>
     </div>
@@ -73,20 +73,87 @@
                     </div>
                     <div class="card-body">
                         <h6 class="fw-bold">Formato do Arquivo</h6>
-                        <p>O arquivo CSV deve conter as seguintes colunas (primeira linha como cabeçalho, delimitador: ponto e vírgula ;):</p>
+                        <p>O arquivo Excel ou CSV deve conter as seguintes colunas (primeira linha como cabeçalho):</p>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-sm">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Coluna</th>
+                                        <th>Descrição</th>
+                                        <th>Obrigatório</th>
+                                        <th>Valores Aceitos</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>MATRICULA</strong> ou <strong>CADASTRO</strong></td>
+                                        <td>Matrícula do manutentor</td>
+                                        <td><span class="badge bg-danger">Sim</span></td>
+                                        <td>Texto único</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>NOME</strong></td>
+                                        <td>Nome completo do manutentor</td>
+                                        <td><span class="badge bg-secondary">Não</span></td>
+                                        <td>Texto</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>CARGO</strong></td>
+                                        <td>Cargo do manutentor</td>
+                                        <td><span class="badge bg-secondary">Não</span></td>
+                                        <td>Texto</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>HORARIO_INICIO</strong></td>
+                                        <td>Horário de início do trabalho</td>
+                                        <td><span class="badge bg-secondary">Não</span></td>
+                                        <td>HH:MM ou HH:MM:SS</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>HORARIO_FIM</strong></td>
+                                        <td>Horário de fim do trabalho</td>
+                                        <td><span class="badge bg-secondary">Não</span></td>
+                                        <td>HH:MM ou HH:MM:SS</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>TEMPO_TRABALHO</strong></td>
+                                        <td>Tempo de trabalho</td>
+                                        <td><span class="badge bg-danger">Sim</span></td>
+                                        <td>Texto</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>TURNO</strong></td>
+                                        <td>Turno de trabalho</td>
+                                        <td><span class="badge bg-danger">Sim</span></td>
+                                        <td>Turno A, Turno B, Turno C</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>LOCAL_TRAB</strong></td>
+                                        <td>Local de trabalho</td>
+                                        <td><span class="badge bg-danger">Sim</span></td>
+                                        <td>Industria, Frigorífico, Civil, Indefinido, ETE/ETA, Utilidades, Manutenção</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <hr>
+                        <h6 class="fw-bold">Observações Importantes</h6>
                         <ul>
-                            <li><strong>Cadastro</strong> - Código do manutentor (obrigatório)</li>
-                            <li><strong>Nome</strong> - Nome do manutentor</li>
-                            <li><strong>Admissao</strong> - Data de admissão (formato: DD/MM/YYYY)</li>
-                            <li><strong>Cargo</strong> - Cargo do manutentor</li>
-                            <li><strong>Posto</strong> - Posto do manutentor</li>
-                            <li><strong>local_trab</strong> - Local de trabalho (Industria, Frigorífico, Civil, Indefinido, ETE/ETA, Utilidades, Manutenção)</li>
-                            <li><strong>turno</strong> - Turno (Turno A, Turno B, Turno C)</li>
+                            <li>O sistema aceita variações nos nomes das colunas (maiúsculas/minúsculas, com ou sem acentos)</li>
+                            <li>Para arquivos CSV, use ponto e vírgula (;) como delimitador</li>
+                            <li>A primeira linha deve conter os cabeçalhos das colunas</li>
+                            <li>Campos obrigatórios: <strong>MATRICULA</strong> (ou CADASTRO), <strong>TEMPO_TRABALHO</strong>, <strong>TURNO</strong>, <strong>LOCAL_TRAB</strong></li>
+                            <li>Se a matrícula já existir e a opção "Atualizar registros existentes" estiver marcada, o registro será atualizado</li>
                         </ul>
                         <hr>
-                        <h6 class="fw-bold">Formato Aceito</h6>
-                        <p>Excel (.xlsx, .xls, .xlsm) ou CSV (.csv) com a primeira linha como cabeçalho.</p>
-                        <p class="text-muted"><small>Nota: O sistema aceita variações nos nomes das colunas e tenta inferir o tipo de manutentor baseado no cargo.</small></p>
+                        <h6 class="fw-bold">Exemplo de Estrutura</h6>
+                        <div class="bg-light p-3 rounded">
+                            <code>
+                                MATRICULA;NOME;CARGO;HORARIO_INICIO;HORARIO_FIM;TEMPO_TRABALHO;TURNO;LOCAL_TRAB<br>
+                                12345;João Silva;Mecânico;08:00;17:00;8 horas;Turno A;Industria<br>
+                                12346;Maria Santos;Eletricista;07:00;16:00;8 horas;Turno B;Frigorífico
+                            </code>
+                        </div>
                     </div>
                 </div>
             </div>

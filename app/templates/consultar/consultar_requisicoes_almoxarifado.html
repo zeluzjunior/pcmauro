@@ -1,0 +1,308 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Consultar Requisições Almoxarifado{% endblock %}
+
+{% block extra_css %}
+<style>
+    .table-container {
+        max-height: 70vh;
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+    .table {
+        width: 100%;
+        table-layout: auto;
+    }
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+        white-space: nowrap;
+        vertical-align: middle;
+        text-align: center;
+        padding: 12px 8px;
+    }
+    .table tbody td {
+        vertical-align: middle;
+        padding: 10px 8px;
+    }
+    .filter-input {
+        width: 100%;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        margin-top: 4px;
+    }
+    .filter-input:focus {
+        outline: none;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    .filter-header {
+        padding: 8px !important;
+        background-color: #e9ecef;
+    }
+    .filter-row th {
+        background-color: #e9ecef;
+        padding: 4px 8px !important;
+        position: sticky;
+        top: 48px;
+        z-index: 8;
+    }
+    .col-data { min-width: 120px; }
+    .col-item { min-width: 100px; }
+    .col-descricao { min-width: 250px; }
+    .col-valor { min-width: 120px; text-align: right; }
+    .col-quantidade { min-width: 100px; text-align: right; }
+    .col-centro { min-width: 100px; }
+    .col-usuario { min-width: 150px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Orçamento</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar Requisições Almoxarifado</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Consultar Requisições Almoxarifado</h1>
+                <p class="lead">Visualize e consulte todas as requisições de itens retirados do estoque</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <!-- Search Bar -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <form method="get" action="{% url 'consultar_requisicoes_almoxarifado' %}" class="d-flex">
+                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por item, descrição, centro de atividade..." value="{{ search_query|default:'' }}">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total de Requisições</h5>
+                        <p class="card-text display-6">{{ total_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Itens Únicos</h5>
+                        <p class="card-text display-6">{{ itens_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Centros de Atividade</h5>
+                        <p class="card-text display-6">{{ centros_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Valor Total</h5>
+                        <p class="card-text display-6">R$ {{ valor_total|floatformat:2 }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>Requisições Almoxarifado
+                            <small class="ms-2">({{ requisicoes.paginator.count }} registro{{ requisicoes.paginator.count|pluralize }})</small>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <form method="get" action="{% url 'consultar_requisicoes_almoxarifado' %}" id="filterForm">
+                            <!-- Preservar busca geral -->
+                            <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                            
+                            <div class="table-container">
+                                <table class="table table-hover table-striped mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-data">Data Requisição</th>
+                                            <th class="col-item">Código Item</th>
+                                            <th class="col-descricao">Descrição Item</th>
+                                            <th class="col-quantidade">Quantidade</th>
+                                            <th class="col-valor">Valor Unit.</th>
+                                            <th class="col-valor">Valor Total</th>
+                                            <th class="col-centro">Centro Atividade</th>
+                                            <th class="col-usuario">Usuário Criou</th>
+                                            <th class="col-usuario">Usuário Atendeu</th>
+                                            <th class="col-descricao">Operação</th>
+                                            <th class="col-descricao">Local Físico</th>
+                                        </tr>
+                                        <tr class="filter-row">
+                                            <th>
+                                                <input type="date" name="filter_data" class="filter-input" value="{{ filter_data|default:'' }}" placeholder="Data">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filter_item" class="filter-input" value="{{ filter_item|default:'' }}" placeholder="Código Item">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filter_descricao" class="filter-input" value="{{ filter_descricao|default:'' }}" placeholder="Descrição">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filter_quantidade" class="filter-input" value="{{ filter_quantidade|default:'' }}" placeholder="Qtd">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filter_valor" class="filter-input" value="{{ filter_valor|default:'' }}" placeholder="Valor">
+                                            </th>
+                                            <th></th>
+                                            <th>
+                                                <input type="text" name="filter_centro" class="filter-input" value="{{ filter_centro|default:'' }}" placeholder="Centro">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filter_usuario_criou" class="filter-input" value="{{ filter_usuario_criou|default:'' }}" placeholder="Criou">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filter_usuario_atend" class="filter-input" value="{{ filter_usuario_atend|default:'' }}" placeholder="Atendeu">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filter_operacao" class="filter-input" value="{{ filter_operacao|default:'' }}" placeholder="Operação">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filter_local" class="filter-input" value="{{ filter_local|default:'' }}" placeholder="Local">
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for requisicao in requisicoes %}
+                                        <tr>
+                                            <td>{{ requisicao.data_requisicao|date:"d/m/Y" }}</td>
+                                            <td><span class="badge bg-primary">{{ requisicao.cd_item }}</span></td>
+                                            <td>{{ requisicao.descr_item|default:"-" }}</td>
+                                            <td class="text-end">
+                                                {% if requisicao.qtde_movto_estoq %}
+                                                    {{ requisicao.qtde_movto_estoq|floatformat:2 }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-end">
+                                                {% if requisicao.vlr_movto_estoq %}
+                                                    R$ {{ requisicao.vlr_movto_estoq|floatformat:2 }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-end">
+                                                {% if requisicao.valor_total %}
+                                                    R$ {{ requisicao.valor_total|floatformat:2 }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ requisicao.cd_centro_ativ|default:"-" }}</td>
+                                            <td>{{ requisicao.cd_usu_criou|default:"-" }}</td>
+                                            <td>{{ requisicao.cd_usu_atend|default:"-" }}</td>
+                                            <td>{{ requisicao.descr_operacao|default:"-" }}</td>
+                                            <td>{{ requisicao.descr_local_fisic|default:"-" }}</td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="11" class="text-center text-muted py-5">
+                                                <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+                                                Nenhuma requisição encontrada.
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if requisicoes.has_other_pages %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if requisicoes.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_item %}filter_item={{ filter_item }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_quantidade %}filter_quantidade={{ filter_quantidade }}&{% endif %}{% if filter_valor %}filter_valor={{ filter_valor }}&{% endif %}{% if filter_centro %}filter_centro={{ filter_centro }}&{% endif %}{% if filter_usuario_criou %}filter_usuario_criou={{ filter_usuario_criou }}&{% endif %}{% if filter_usuario_atend %}filter_usuario_atend={{ filter_usuario_atend }}&{% endif %}{% if filter_operacao %}filter_operacao={{ filter_operacao }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page=1">Primeira</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_item %}filter_item={{ filter_item }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_quantidade %}filter_quantidade={{ filter_quantidade }}&{% endif %}{% if filter_valor %}filter_valor={{ filter_valor }}&{% endif %}{% if filter_centro %}filter_centro={{ filter_centro }}&{% endif %}{% if filter_usuario_criou %}filter_usuario_criou={{ filter_usuario_criou }}&{% endif %}{% if filter_usuario_atend %}filter_usuario_atend={{ filter_usuario_atend }}&{% endif %}{% if filter_operacao %}filter_operacao={{ filter_operacao }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page={{ requisicoes.previous_page_number }}">Anterior</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Página {{ requisicoes.number }} de {{ requisicoes.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if requisicoes.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_item %}filter_item={{ filter_item }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_quantidade %}filter_quantidade={{ filter_quantidade }}&{% endif %}{% if filter_valor %}filter_valor={{ filter_valor }}&{% endif %}{% if filter_centro %}filter_centro={{ filter_centro }}&{% endif %}{% if filter_usuario_criou %}filter_usuario_criou={{ filter_usuario_criou }}&{% endif %}{% if filter_usuario_atend %}filter_usuario_atend={{ filter_usuario_atend }}&{% endif %}{% if filter_operacao %}filter_operacao={{ filter_operacao }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page={{ requisicoes.next_page_number }}">Próxima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_item %}filter_item={{ filter_item }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_quantidade %}filter_quantidade={{ filter_quantidade }}&{% endif %}{% if filter_valor %}filter_valor={{ filter_valor }}&{% endif %}{% if filter_centro %}filter_centro={{ filter_centro }}&{% endif %}{% if filter_usuario_criou %}filter_usuario_criou={{ filter_usuario_criou }}&{% endif %}{% if filter_usuario_atend %}filter_usuario_atend={{ filter_usuario_atend }}&{% endif %}{% if filter_operacao %}filter_operacao={{ filter_operacao }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page={{ requisicoes.paginator.num_pages }}">Última</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-submit form when filter inputs change
+document.addEventListener('DOMContentLoaded', function() {
+    const filterInputs = document.querySelectorAll('.filter-input');
+    const filterForm = document.getElementById('filterForm');
+    
+    filterInputs.forEach(input => {
+        let timeout;
+        input.addEventListener('input', function() {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                filterForm.submit();
+            }, 500); // Wait 500ms after user stops typing
+        });
+    });
+});
+</script>
+{% endblock %}
+

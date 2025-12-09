@@ -1,0 +1,325 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Agrupar Ações do Plano por Data{% endblock %}
+
+{% block extra_css %}
+<style>
+    .date-group-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        margin-bottom: 20px;
+    }
+    .date-group-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .date-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 8px 8px 0 0;
+    }
+    .table-container {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .badge-date {
+        font-size: 1rem;
+        padding: 8px 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Planejamento</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Agrupar Ações por Data</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-calendar-alt me-2"></i>Agrupar Ações do Plano por Data
+                </h1>
+                <p class="lead">Visualize e organize os planos PCM agrupados por data de execução</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total de Planos</h5>
+                        <h2 class="mb-0">{{ total_planos }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Com Data</h5>
+                        <h2 class="mb-0">{{ total_com_data }}</h2>
+                        <small>{{ total_datas_unicas }} data(s) única(s)</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card bg-warning text-dark">
+                    <div class="card-body">
+                        <h5 class="card-title">Sem Data</h5>
+                        <h2 class="mb-0">{{ total_sem_data }}</h2>
+                        <small>Aguardando definição</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Datas Únicas</h5>
+                        <h2 class="mb-0">{{ total_datas_unicas }}</h2>
+                        <small>Períodos diferentes</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Planos Agrupados por Data -->
+        {% if datas_ordenadas %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-calendar-check me-2"></i>Planos Agrupados por Data de Execução
+                </h4>
+            </div>
+            <div class="card-body">
+                {% for data, planos_data in planos_por_data_list %}
+                    <div class="card date-group-card shadow-sm mb-3">
+                        <div class="date-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-calendar me-2"></i>{{ data|date:"d/m/Y" }}
+                                    </h5>
+                                    <small>{{ data|date:"l"|capfirst }}</small>
+                                </div>
+                                <span class="badge bg-light text-dark badge-date">
+                                    {{ planos_data|length }} plano(s)
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-container">
+                                <table class="table table-hover table-sm mb-0">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th>Máquina</th>
+                                            <th>Plano</th>
+                                            <th>Seq. Manutenção</th>
+                                            <th>Seq. Tarefa</th>
+                                            <th>Descrição Tarefa</th>
+                                            <th>Período (dias)</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for plano in planos_data %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ plano.cd_maquina|default:"-" }}</strong>
+                                                {% if plano.descr_maquina %}
+                                                    <br><small class="text-muted">{{ plano.descr_maquina|truncatewords:5 }}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <strong>{{ plano.numero_plano|default:"-" }}</strong>
+                                                {% if plano.descr_plano %}
+                                                    <br><small class="text-muted">{{ plano.descr_plano|truncatewords:3 }}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ plano.sequencia_manutencao|default:"-" }}</td>
+                                            <td>{{ plano.sequencia_tarefa|default:"-" }}</td>
+                                            <td>
+                                                {% if plano.descr_tarefa %}
+                                                    <small>{{ plano.descr_tarefa|truncatewords:8 }}</small>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if plano.quantidade_periodo %}
+                                                    <span class="badge bg-info">{{ plano.quantidade_periodo }} dias</span>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <a href="{% url 'visualizar_plano_pcm' plano.id %}" class="btn btn-outline-primary" title="Visualizar">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    <a href="{% url 'editar_plano_pcm' plano.id %}" class="btn btn-outline-warning" title="Editar">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Planos sem Data -->
+        {% if planos_sem_data %}
+        <div class="card shadow-sm mb-4 border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h4 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Planos sem Data de Execução
+                    <span class="badge bg-dark text-white ms-2">{{ total_sem_data }}</span>
+                </h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Estes planos não possuem data de execução definida ou a data está em formato inválido.
+                </p>
+                <div class="table-container">
+                    <table class="table table-hover table-sm">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Máquina</th>
+                                <th>Plano</th>
+                                <th>Seq. Manutenção</th>
+                                <th>Seq. Tarefa</th>
+                                <th>Descrição Tarefa</th>
+                                <th>Data Original</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for plano in planos_sem_data %}
+                            <tr>
+                                <td>
+                                    <strong>{{ plano.cd_maquina|default:"-" }}</strong>
+                                    {% if plano.descr_maquina %}
+                                        <br><small class="text-muted">{{ plano.descr_maquina|truncatewords:5 }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ plano.numero_plano|default:"-" }}</strong>
+                                    {% if plano.descr_plano %}
+                                        <br><small class="text-muted">{{ plano.descr_plano|truncatewords:3 }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>{{ plano.sequencia_manutencao|default:"-" }}</td>
+                                <td>{{ plano.sequencia_tarefa|default:"-" }}</td>
+                                <td>
+                                    {% if plano.descr_tarefa %}
+                                        <small>{{ plano.descr_tarefa|truncatewords:8 }}</small>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if plano.dt_execucao %}
+                                        <span class="badge bg-danger">{{ plano.dt_execucao }}</span>
+                                        <br><small class="text-muted">Formato inválido</small>
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="{% url 'visualizar_plano_pcm' plano.id %}" class="btn btn-outline-primary" title="Visualizar">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'editar_plano_pcm' plano.id %}" class="btn btn-outline-warning" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Resumo por Semana -->
+        {% if semanas_ordenadas %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-calendar-week me-2"></i>Resumo por Semana do Ano
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for semana, planos_semana in planos_por_semana_list %}
+                        <div class="col-md-3 mb-3">
+                            <div class="card border-info">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Semana {{ semana }}</h6>
+                                    <h3 class="text-info mb-0">{{ planos_semana|length }}</h3>
+                                    <small class="text-muted">plano(s)</small>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Links de Ação -->
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Ações Rápidas</h5>
+                        <small class="text-muted">Acesse outras páginas relacionadas</small>
+                    </div>
+                    <div>
+                        <a href="{% url 'consultar_meu_plano' %}" class="btn btn-primary me-2">
+                            <i class="fas fa-list me-2"></i>Consultar Todos os Planos
+                        </a>
+                        <a href="{% url 'analise_geral_plano_preventiva_pcm' %}" class="btn btn-info">
+                            <i class="fas fa-chart-line me-2"></i>Análise Geral PCM
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Adicionar funcionalidade de busca/filtro se necessário
+document.addEventListener('DOMContentLoaded', function() {
+    // Pode adicionar funcionalidades JavaScript aqui se necessário
+    console.log('Página de agrupamento por data carregada');
+});
+</script>
+{% endblock %}
+

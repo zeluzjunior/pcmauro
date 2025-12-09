@@ -1,0 +1,577 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Análise Geral - Plano Preventiva PCM{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .stat-card.border-primary { border-left-color: #0d6efd; }
+    .stat-card.border-success { border-left-color: #198754; }
+    .stat-card.border-info { border-left-color: #0dcaf0; }
+    .stat-card.border-warning { border-left-color: #ffc107; }
+    .stat-card.border-danger { border-left-color: #dc3545; }
+    .stat-card.border-secondary { border-left-color: #6c757d; }
+    
+    .progress-bar-custom {
+        height: 25px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+    
+    .section-header {
+        border-bottom: 3px solid;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .info-box {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Planejamento</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise Geral PCM</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-chart-line me-2"></i>Análise Geral - Plano Preventiva PCM
+                </h1>
+                <p class="lead">Dashboard com estatísticas e análises dos dados de Plano Preventiva PCM</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Info Box -->
+        <div class="info-box">
+            <h4 class="mb-3">
+                <i class="fas fa-info-circle me-2"></i>Visão Geral do Sistema
+            </h4>
+            <p class="mb-0">
+                Esta página apresenta uma análise consolidada dos dados relacionados ao Plano Preventiva PCM,
+                incluindo estatísticas sobre Meus Planos Preventiva, relacionamentos entre Planos e Roteiros,
+                e agrupamentos de Máquinas Primárias e Secundárias.
+            </p>
+        </div>
+
+        <!-- Seção: Meus Planos Preventiva -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0 section-header border-white">
+                    <i class="fas fa-calendar-alt me-2"></i>Meus Planos Preventiva (MeuPlanoPreventiva)
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-3 mb-3">
+                        <div class="card stat-card border-primary h-100">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Total de Planos</h6>
+                                <h2 class="text-primary mb-0">{{ total_meus_planos }}</h2>
+                                <small class="text-muted">Planos PCM cadastrados</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card stat-card border-success h-100">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Com Roteiro</h6>
+                                <h2 class="text-success mb-0">{{ meus_planos_com_roteiro }}</h2>
+                                <small class="text-muted">{{ taxa_meus_planos_com_roteiro|floatformat:1 }}% do total</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card stat-card border-warning h-100">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Sem Roteiro</h6>
+                                <h2 class="text-warning mb-0">{{ meus_planos_sem_roteiro }}</h2>
+                                <small class="text-muted">Aguardando relacionamento</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card stat-card border-info h-100">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Com Descrição Detalhada</h6>
+                                <h2 class="text-info mb-0">{{ meus_planos_com_desc_detalhada }}</h2>
+                                <small class="text-muted">{{ taxa_meus_planos_com_desc|floatformat:1 }}% do total</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-4 mb-3">
+                        <div class="card border-secondary">
+                            <div class="card-body">
+                                <h6 class="card-title">Máquinas Únicas</h6>
+                                <h3 class="mb-0">{{ maquinas_unicas_meus_planos }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card border-secondary">
+                            <div class="card-body">
+                                <h6 class="card-title">Setores Únicos</h6>
+                                <h3 class="mb-0">{{ setores_unicos_meus_planos }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card border-secondary">
+                            <div class="card-body">
+                                <h6 class="card-title">Planos com Documentos</h6>
+                                <h3 class="mb-0">{{ planos_com_documentos }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <a href="{% url 'consultar_meu_plano' %}" class="btn btn-primary">
+                        <i class="fas fa-list me-2"></i>Ver Todos os Planos PCM
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção: Análise Roteiro/Plano -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0 section-header border-white">
+                    <i class="fas fa-link me-2"></i>Análise de Relacionamentos Plano/Roteiro
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-3 mb-3">
+                        <div class="card stat-card border-primary h-100">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Total Planos</h6>
+                                <h2 class="text-primary mb-0">{{ total_planos }}</h2>
+                                <small class="text-muted">PlanoPreventiva</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card stat-card border-info h-100">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Total Roteiros</h6>
+                                <h2 class="text-info mb-0">{{ total_roteiros }}</h2>
+                                <small class="text-muted">RoteiroPreventiva</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card stat-card border-success h-100">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Relacionamentos</h6>
+                                <h2 class="text-success mb-0">{{ relacionamentos_encontrados }}</h2>
+                                <small class="text-muted">Matches encontrados</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card stat-card border-warning h-100">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Confirmados</h6>
+                                <h2 class="text-warning mb-0">{{ relacionamentos_confirmados }}</h2>
+                                <small class="text-muted">{{ taxa_confirmacao|floatformat:1 }}% confirmados</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-warning">
+                            <div class="card-body">
+                                <h6 class="card-title">Planos sem Roteiro</h6>
+                                <h3 class="text-warning mb-3">{{ planos_sem_relacao }}</h3>
+                                <div class="progress progress-bar-custom">
+                                    <div class="progress-bar bg-warning" role="progressbar" 
+                                         style="width: {% if total_planos > 0 %}{% widthratio planos_sem_relacao total_planos 100 %}{% else %}0{% endif %}%">
+                                        {{ planos_sem_relacao }} / {{ total_planos }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-danger">
+                            <div class="card-body">
+                                <h6 class="card-title">Roteiros sem Plano</h6>
+                                <h3 class="text-danger mb-3">{{ roteiros_sem_relacao }}</h3>
+                                <div class="progress progress-bar-custom">
+                                    <div class="progress-bar bg-danger" role="progressbar" 
+                                         style="width: {% if total_roteiros > 0 %}{% widthratio roteiros_sem_relacao total_roteiros 100 %}{% else %}0{% endif %}%">
+                                        {{ roteiros_sem_relacao }} / {{ total_roteiros }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="card border-success">
+                            <div class="card-body">
+                                <h6 class="card-title">Taxa de Cobertura - Planos</h6>
+                                <div class="progress progress-bar-custom">
+                                    <div class="progress-bar bg-success" role="progressbar" 
+                                         style="width: {{ taxa_cobertura_planos|floatformat:1 }}%">
+                                        {{ taxa_cobertura_planos|floatformat:1 }}%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-info">
+                            <div class="card-body">
+                                <h6 class="card-title">Taxa de Cobertura - Roteiros</h6>
+                                <div class="progress progress-bar-custom">
+                                    <div class="progress-bar bg-info" role="progressbar" 
+                                         style="width: {{ taxa_cobertura_roteiros|floatformat:1 }}%">
+                                        {{ taxa_cobertura_roteiros|floatformat:1 }}%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <a href="{% url 'analise_roteiro_plano_preventiva' %}" class="btn btn-success me-2">
+                        <i class="fas fa-balance-scale me-2"></i>Ver Análise Detalhada
+                    </a>
+                    {% if relacionamentos_pendentes > 0 %}
+                    <span class="badge bg-warning text-dark">
+                        {{ relacionamentos_pendentes }} relacionamento(s) pendente(s) de confirmação
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção: Máquinas Primárias/Secundárias -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0 section-header border-white">
+                    <i class="fas fa-sitemap me-2"></i>Máquinas Primárias e Secundárias
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-3 mb-3">
+                        <div class="card stat-card border-primary h-100">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Máquinas Primárias</h6>
+                                <h2 class="text-primary mb-0">{{ maquinas_primarias_total }}</h2>
+                                <small class="text-muted">Total cadastradas</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card stat-card border-info h-100">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Máquinas Secundárias</h6>
+                                <h2 class="text-info mb-0">{{ maquinas_secundarias_total }}</h2>
+                                <small class="text-muted">Total cadastradas</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card stat-card border-success h-100">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Relacionamentos</h6>
+                                <h2 class="text-success mb-0">{{ relacionamentos_maquinas }}</h2>
+                                <small class="text-muted">Criados</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card stat-card border-warning h-100">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Primárias Relacionadas</h6>
+                                <h2 class="text-warning mb-0">{{ primarias_com_relacionamentos }}</h2>
+                                <small class="text-muted">{{ taxa_primarias_relacionadas|floatformat:1 }}% do total</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-warning">
+                            <div class="card-body">
+                                <h6 class="card-title">Primárias sem Relacionamentos</h6>
+                                <h3 class="text-warning mb-0">{{ primarias_sem_relacionamentos }}</h3>
+                                <small class="text-muted">Aguardando agrupamento</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-secondary">
+                            <div class="card-body">
+                                <h6 class="card-title">Secundárias Disponíveis</h6>
+                                <h3 class="text-secondary mb-0">{{ secundarias_disponiveis }}</h3>
+                                <small class="text-muted">Não relacionadas</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <a href="{% url 'maquina_primaria_secundaria' %}" class="btn btn-info">
+                        <i class="fas fa-sitemap me-2"></i>Gerenciar Relacionamentos
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção: Semanas 52 -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h4 class="mb-0 section-header border-white">
+                    <i class="fas fa-calendar-week me-2"></i>Semanas 52 (Calendário Anual)
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-3 mb-3">
+                        <div class="card stat-card border-secondary h-100">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Total de Semanas</h6>
+                                <h2 class="text-secondary mb-0">{{ total_semanas }}</h2>
+                                <small class="text-muted">Cadastradas</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card stat-card border-success h-100">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Com Dados</h6>
+                                <h2 class="text-success mb-0">{{ semanas_com_dados }}</h2>
+                                <small class="text-muted">Com início e fim</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card stat-card border-info h-100">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Ano Atual</h6>
+                                <h2 class="text-info mb-0">{{ semanas_ano_atual }}</h2>
+                                <small class="text-muted">Semanas de {{ "now"|date:"Y" }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card stat-card border-warning h-100">
+                            <div class="card-body">
+                                <h6 class="card-title text-muted">Semana Atual</h6>
+                                {% if semana_atual %}
+                                    <h2 class="text-warning mb-0">{{ semana_atual.semana }}</h2>
+                                    <small class="text-muted">{{ semana_atual.inicio|date:"d/m" }} - {{ semana_atual.fim|date:"d/m" }}</small>
+                                {% else %}
+                                    <h2 class="text-warning mb-0">-</h2>
+                                    <small class="text-muted">Não identificada</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-md-4 mb-3">
+                        <div class="card border-primary">
+                            <div class="card-body">
+                                <h6 class="card-title">Período Coberto</h6>
+                                {% if primeira_data and ultima_data %}
+                                    <p class="mb-2">
+                                        <strong>De:</strong> {{ primeira_data|date:"d/m/Y" }}<br>
+                                        <strong>Até:</strong> {{ ultima_data|date:"d/m/Y" }}
+                                    </p>
+                                    <p class="mb-0">
+                                        <small class="text-muted">{{ duracao_total_dias }} dias totais</small>
+                                    </p>
+                                {% else %}
+                                    <p class="text-muted mb-0">Nenhum período definido</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card border-success">
+                            <div class="card-body">
+                                <h6 class="card-title">Duração Média</h6>
+                                <h3 class="text-success mb-0">{{ duracao_media|floatformat:1 }} dias</h3>
+                                <small class="text-muted">Por semana</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card border-info">
+                            <div class="card-body">
+                                <h6 class="card-title">Distribuição</h6>
+                                <ul class="list-unstyled mb-0">
+                                    <li><i class="fas fa-history text-secondary me-2"></i>{{ semanas_passadas }} passadas</li>
+                                    <li><i class="fas fa-clock text-warning me-2"></i>{{ semana_atual|yesno:"1,0" }} atual</li>
+                                    <li><i class="fas fa-forward text-info me-2"></i>{{ semanas_futuras }} futuras</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Preview das Semanas -->
+                {% if semanas_com_duracao %}
+                <div class="mb-3">
+                    <h6 class="mb-3">
+                        <i class="fas fa-list me-2"></i>Preview das Primeiras Semanas Cadastradas
+                    </h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Semana</th>
+                                    <th>Data Início</th>
+                                    <th>Data Fim</th>
+                                    <th>Duração</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in semanas_com_duracao %}
+                                {% with semana=item.semana %}
+                                <tr {% if semana_atual and semana.id == semana_atual.id %}class="table-warning"{% endif %}>
+                                    <td><strong>{{ semana.semana }}</strong></td>
+                                    <td>
+                                        {% if semana.inicio %}
+                                            {{ semana.inicio|date:"d/m/Y" }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if semana.fim %}
+                                            {{ semana.fim|date:"d/m/Y" }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.duracao_dias %}
+                                            <span class="badge bg-info">{{ item.duracao_dias }} dias</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if semana_atual and semana.id == semana_atual.id %}
+                                            <span class="badge bg-warning text-dark">Semana Atual</span>
+                                        {% elif semana.fim and semana.fim < "now"|date:"Y-m-d" %}
+                                            <span class="badge bg-secondary">Passada</span>
+                                        {% elif semana.inicio and semana.inicio > "now"|date:"Y-m-d" %}
+                                            <span class="badge bg-info">Futura</span>
+                                        {% else %}
+                                            <span class="badge bg-light text-dark">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endwith %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="mt-3">
+                    <a href="{% url 'consultar_52_semanas' %}" class="btn btn-secondary me-2">
+                        <i class="fas fa-list me-2"></i>Ver Todas as Semanas
+                    </a>
+                    <a href="{% url 'importar_52_semanas' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-upload me-2"></i>Importar Semanas
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resumo Geral -->
+        <div class="card shadow-sm border-primary">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>Resumo Geral
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <h6 class="text-primary">Status dos Planos PCM</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check-circle text-success me-2"></i>{{ meus_planos_com_roteiro }} com roteiro vinculado</li>
+                            <li><i class="fas fa-clock text-warning me-2"></i>{{ meus_planos_sem_roteiro }} aguardando relacionamento</li>
+                            <li><i class="fas fa-file-alt text-info me-2"></i>{{ meus_planos_com_desc_detalhada }} com descrição detalhada</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="text-success">Relacionamentos Plano/Roteiro</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-link text-success me-2"></i>{{ relacionamentos_encontrados }} relacionamentos encontrados</li>
+                            <li><i class="fas fa-check-double text-success me-2"></i>{{ relacionamentos_confirmados }} confirmados</li>
+                            <li><i class="fas fa-exclamation-triangle text-warning me-2"></i>{{ relacionamentos_pendentes }} pendentes</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="text-info">Máquinas</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-star text-primary me-2"></i>{{ maquinas_primarias_total }} máquinas primárias</li>
+                            <li><i class="fas fa-cogs text-info me-2"></i>{{ maquinas_secundarias_total }} máquinas secundárias</li>
+                            <li><i class="fas fa-sitemap text-success me-2"></i>{{ relacionamentos_maquinas }} relacionamentos criados</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="text-secondary">Calendário</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-calendar-week text-secondary me-2"></i>{{ total_semanas }} semanas cadastradas</li>
+                            <li><i class="fas fa-calendar-check text-success me-2"></i>{{ semanas_com_dados }} com dados completos</li>
+                            {% if semana_atual %}
+                            <li><i class="fas fa-calendar-day text-warning me-2"></i>Semana atual: {{ semana_atual.semana }}</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+

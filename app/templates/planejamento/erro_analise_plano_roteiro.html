@@ -1,0 +1,911 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Análise de Erros - Roteiro e Plano Preventiva{% endblock %}
+
+{% block extra_css %}
+<style>
+    .error-card {
+        border-left: 4px solid #dc3545;
+        background-color: #fff5f5;
+        transition: transform 0.2s;
+    }
+    .error-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .value-box {
+        padding: 12px;
+        border-radius: 6px;
+        margin: 8px 0;
+        word-wrap: break-word;
+    }
+    .value-plano {
+        background-color: #e3f2fd;
+        border: 1px solid #90caf9;
+    }
+    .value-roteiro {
+        background-color: #f3e5f5;
+        border: 1px solid #ce93d8;
+    }
+    .value-empty {
+        background-color: #f5f5f5;
+        border: 1px dashed #999;
+        color: #999;
+        font-style: italic;
+    }
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .solution-box {
+        background-color: #e7f3ff;
+        border-left: 4px solid #0d6efd;
+        padding: 15px;
+        border-radius: 6px;
+        margin-top: 10px;
+    }
+    .comparison-container {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        border-radius: 12px;
+        padding: 20px;
+        margin: 15px 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .field-comparison {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 20px;
+        align-items: center;
+        padding: 15px;
+        background: white;
+        border-radius: 8px;
+        margin: 10px 0;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .field-comparison:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+    .field-value {
+        padding: 12px 16px;
+        border-radius: 6px;
+        font-weight: 500;
+        word-break: break-word;
+    }
+    .field-value.plano {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    .field-value.roteiro {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+    }
+    .field-value.empty {
+        background: #e0e0e0;
+        color: #666;
+        font-style: italic;
+    }
+    .comparison-arrow {
+        font-size: 2rem;
+        color: #dc3545;
+    }
+    .match-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    .match-indicator.match {
+        background-color: #28a745;
+    }
+    .match-indicator.no-match {
+        background-color: #dc3545;
+    }
+    .match-indicator.partial {
+        background-color: #ffc107;
+    }
+    .error-severity {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    .severity-high {
+        background-color: #dc3545;
+        color: white;
+    }
+    .severity-medium {
+        background-color: #ffc107;
+        color: #000;
+    }
+    .severity-low {
+        background-color: #17a2b8;
+        color: white;
+    }
+    .progress-ring {
+        width: 120px;
+        height: 120px;
+        margin: 0 auto;
+    }
+    .progress-ring circle {
+        transition: stroke-dashoffset 0.5s;
+    }
+    .field-diff {
+        background: #fff3cd;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+    }
+    .expandable-section {
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    .expandable-section:hover {
+        background-color: #f8f9fa;
+    }
+    .detailed-comparison {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease-out;
+    }
+    .detailed-comparison.expanded {
+        max-height: 1000px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'analise_roteiro_plano_preventiva' %}" class="text-white">Análise Roteiro/Plano</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise de Erros</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Análise de Erros</h1>
+                <p class="lead">
+                    {% if is_geral %}
+                        Visão geral de todas as correspondências não encontradas e o que está faltando
+                    {% else %}
+                        Análise detalhada do que está faltando para encontrar correspondência entre PlanoPreventiva e RoteiroPreventiva
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% if is_geral %}
+        <!-- General Overview Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <h5 class="alert-heading">
+                        <i class="fas fa-info-circle me-2"></i>Visão Geral de Correspondências não Encontradas
+                    </h5>
+                    <p class="mb-0">
+                        Esta página mostra todos os registros de <strong>PlanoPreventiva</strong> e <strong>RoteiroPreventiva</strong> 
+                        que não têm correspondência completa. Para cada registro, é mostrado o melhor match parcial encontrado 
+                        e quais campos estão faltando ou são diferentes.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Cards for General Overview -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card stat-card shadow-sm bg-warning text-dark">
+                    <div class="card-body">
+                        <h5 class="card-title">Planos sem Match</h5>
+                        <p class="card-text display-6">{{ total_planos_sem_match }}</p>
+                        <small>Planos sem roteiro correspondente</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stat-card shadow-sm bg-danger text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Roteiros sem Match</h5>
+                        <p class="card-text display-6">{{ total_roteiros_sem_match }}</p>
+                        <small>Roteiros sem plano correspondente</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stat-card shadow-sm bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total sem Match</h5>
+                        <p class="card-text display-6">{{ total_planos_sem_match|add:total_roteiros_sem_match }}</p>
+                        <small>Registros sem correspondência</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Most Common Errors -->
+        {% if erros_comuns %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Erros Mais Comuns
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-3">Campos que mais frequentemente causam falhas na correspondência:</p>
+                        <div class="row">
+                            {% for campo, count in erros_comuns %}
+                            <div class="col-md-6 mb-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>
+                                        {% if campo == 'cd_maquina' %}
+                                            <i class="fas fa-cog me-2"></i><strong>Código da Máquina</strong>
+                                        {% elif campo == 'descr_maquina' %}
+                                            <i class="fas fa-tag me-2"></i><strong>Descrição da Máquina</strong>
+                                        {% elif campo == 'sequencia_tarefa' %}
+                                            <i class="fas fa-list-ol me-2"></i><strong>Sequência Tarefa</strong>
+                                        {% elif campo == 'descr_tarefa' %}
+                                            <i class="fas fa-tasks me-2"></i><strong>Descrição Tarefa</strong>
+                                        {% elif campo == 'sequencia_manutencao' %}
+                                            <i class="fas fa-wrench me-2"></i><strong>Sequência Manutenção</strong>
+                                        {% else %}
+                                            <strong>{{ campo }}</strong>
+                                        {% endif %}
+                                    </span>
+                                    <span class="badge bg-danger">{{ count }} ocorrências</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Planos sem Match -->
+        {% if planos_sem_match %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Planos sem Roteiro Correspondente
+                            <span class="badge bg-dark text-white ms-2">{{ total_planos_sem_match }}</span>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID Plano</th>
+                                        <th>Código Máquina</th>
+                                        <th>Número Plano</th>
+                                        <th>Seq. Manutenção</th>
+                                        <th>Seq. Tarefa</th>
+                                        <th>Erros Encontrados</th>
+                                        <th>Melhor Match Parcial</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in planos_sem_match %}
+                                    <tr>
+                                        <td><strong>{{ item.plano.id }}</strong></td>
+                                        <td>{{ item.plano.cd_maquina|default:"-" }}</td>
+                                        <td>{{ item.plano.numero_plano|default:"-" }}</td>
+                                        <td>{{ item.plano.sequencia_manutencao|default:"-" }}</td>
+                                        <td>{{ item.plano.sequencia_tarefa|default:"-" }}</td>
+                                        <td>
+                                            <span class="badge bg-danger">{{ item.total_erros }} erro(s)</span>
+                                            <br><small class="text-muted">
+                                                {% for erro in item.erros %}
+                                                    {% if erro == 'cd_maquina' %}cd_maquina{% elif erro == 'descr_maquina' %}descr_maquina{% elif erro == 'sequencia_tarefa' %}seq_tarefa{% elif erro == 'descr_tarefa' %}descr_tarefa{% elif erro == 'sequencia_manutencao' %}seq_manut{% endif %}
+                                                    {% if not forloop.last %}, {% endif %}
+                                                {% endfor %}
+                                            </small>
+                                        </td>
+                                        <td>
+                                            {% if item.melhor_match %}
+                                                <span class="badge bg-info">Roteiro #{{ item.melhor_match.id }}</span>
+                                            {% else %}
+                                                <span class="text-muted">Nenhum</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="{% url 'visualizar_manutencao_preventiva' item.plano.id %}" class="btn btn-sm btn-outline-primary" title="Ver Plano">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                {% if item.melhor_match %}
+                                                <a href="{% url 'erro_analise_plano_roteiro' item.plano.id item.melhor_match.id %}" class="btn btn-sm btn-danger" title="Ver Análise Detalhada de Erros">
+                                                    <i class="fas fa-exclamation-triangle"></i>
+                                                </a>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Roteiros sem Match -->
+        {% if roteiros_sem_match %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-exclamation-circle me-2"></i>Roteiros sem Plano Correspondente
+                            <span class="badge bg-light text-dark ms-2">{{ total_roteiros_sem_match }}</span>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID Roteiro</th>
+                                        <th>Código Máquina</th>
+                                        <th>Código Plano</th>
+                                        <th>Seq. Plano</th>
+                                        <th>Código Tarefa</th>
+                                        <th>Erros Encontrados</th>
+                                        <th>Melhor Match Parcial</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in roteiros_sem_match %}
+                                    <tr>
+                                        <td><strong>{{ item.roteiro.id }}</strong></td>
+                                        <td>{{ item.roteiro.cd_maquina|default:"-" }}</td>
+                                        <td>{{ item.roteiro.cd_planmanut|default:"-" }}</td>
+                                        <td>{{ item.roteiro.seq_seqplamanu|default:"-" }}</td>
+                                        <td>{{ item.roteiro.cd_tarefamanu|default:"-" }}</td>
+                                        <td>
+                                            <span class="badge bg-danger">{{ item.total_erros }} erro(s)</span>
+                                            <br><small class="text-muted">
+                                                {% for erro in item.erros %}
+                                                    {% if erro == 'cd_maquina' %}cd_maquina{% elif erro == 'descr_maquina' %}descr_maquina{% elif erro == 'sequencia_tarefa' %}seq_tarefa{% elif erro == 'descr_tarefa' %}descr_tarefa{% elif erro == 'sequencia_manutencao' %}seq_manut{% endif %}
+                                                    {% if not forloop.last %}, {% endif %}
+                                                {% endfor %}
+                                            </small>
+                                        </td>
+                                        <td>
+                                            {% if item.melhor_match %}
+                                                <span class="badge bg-info">Plano #{{ item.melhor_match.id }}</span>
+                                            {% else %}
+                                                <span class="text-muted">Nenhum</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="{% url 'visualizar_roteiro_preventiva' item.roteiro.id %}" class="btn btn-sm btn-outline-success" title="Ver Roteiro">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                {% if item.melhor_match %}
+                                                <a href="{% url 'erro_analise_plano_roteiro' item.melhor_match.id item.roteiro.id %}" class="btn btn-sm btn-danger" title="Ver Análise Detalhada de Erros">
+                                                    <i class="fas fa-exclamation-triangle"></i>
+                                                </a>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Action Buttons for General Overview -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="btn-group" role="group">
+                            <a href="{% url 'relacionar_roteiro_plano' %}" class="btn btn-primary">
+                                <i class="fas fa-link me-2"></i>Relacionar Manualmente
+                            </a>
+                            <a href="{% url 'analise_roteiro_plano_preventiva' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Voltar para Análise Principal
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% else %}
+        <!-- Statistics Cards for Specific Analysis -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card shadow-sm bg-danger text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total de Erros</h5>
+                        <p class="card-text display-6">{{ total_erros }}</p>
+                        <small>Campos com problemas</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card shadow-sm bg-warning text-dark">
+                    <div class="card-body">
+                        <h5 class="card-title">Campos Vazios</h5>
+                        <p class="card-text display-6">{{ campos_vazios }}</p>
+                        <small>Valores faltando</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card shadow-sm bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Campos Diferentes</h5>
+                        <p class="card-text display-6">{{ campos_diferentes }}</p>
+                        <small>Valores não correspondem</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card shadow-sm bg-secondary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Status</h5>
+                        <p class="card-text">
+                            <span class="badge bg-danger" style="font-size: 1rem; padding: 8px 16px;">
+                                <i class="fas fa-times-circle"></i> Sem Match
+                            </span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="btn-group" role="group">
+                            <a href="{% url 'visualizar_manutencao_preventiva' plano.id %}" class="btn btn-outline-primary">
+                                <i class="fas fa-eye me-2"></i>Ver Plano Preventiva
+                            </a>
+                            <a href="{% url 'visualizar_roteiro_preventiva' roteiro.id %}" class="btn btn-outline-success">
+                                <i class="fas fa-eye me-2"></i>Ver Roteiro Preventiva
+                            </a>
+                            <a href="{% url 'visualizar_comparacao_roteiro_plano' plano.id roteiro.id %}" class="btn btn-outline-info">
+                                <i class="fas fa-balance-scale me-2"></i>Ver Comparação Completa
+                            </a>
+                            <a href="{% url 'relacionar_roteiro_plano' %}" class="btn btn-primary">
+                                <i class="fas fa-link me-2"></i>Relacionar Manualmente
+                            </a>
+                            <a href="{% url 'analise_roteiro_plano_preventiva' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Voltar para Análise
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Analysis -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h3 class="mb-3">
+                    <i class="fas fa-exclamation-triangle me-2 text-danger"></i>Análise de Erros Encontrados
+                </h3>
+                <div class="alert alert-warning">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Por que não há match?</strong> Para que um PlanoPreventiva e um RoteiroPreventiva sejam considerados a mesma Preventiva, todos os campos abaixo devem corresponder exatamente. Abaixo estão listados os campos que não correspondem e o que precisa ser corrigido.
+                </div>
+            </div>
+        </div>
+
+        <!-- Complete Field Comparison Summary -->
+        {% if campos_comparados %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list-check me-2"></i>Resumo Completo de Campos Comparados
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for campo in campos_comparados %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card {% if campo.match %}border-success{% else %}border-danger{% endif %}" style="border-width: 3px;">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <h6 class="mb-0">
+                                                <span class="match-indicator {% if campo.match %}match{% else %}no-match{% endif %}"></span>
+                                                {{ campo.label }}
+                                            </h6>
+                                            {% if campo.match %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check me-1"></i>Match
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-danger">
+                                                    <i class="fas fa-times me-1"></i>Erro
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <small class="text-muted d-block mb-1">Plano:</small>
+                                                <div class="p-2 bg-light rounded">
+                                                    <strong>{{ campo.plano_valor|default:"<em class='text-muted'>Vazio</em>" }}</strong>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <small class="text-muted d-block mb-1">Roteiro:</small>
+                                                <div class="p-2 bg-light rounded">
+                                                    <strong>{{ campo.roteiro_valor|default:"<em class='text-muted'>Vazio</em>" }}</strong>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Match Progress Indicator -->
+        {% if erros %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-info">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-3 text-center">
+                                <div class="progress-ring">
+                                    <svg width="120" height="120">
+                                        <circle cx="60" cy="60" r="50" stroke="#e0e0e0" stroke-width="8" fill="none"/>
+                                        <circle cx="60" cy="60" r="50" stroke="{% if percentual_match == 0 %}#dc3545{% elif percentual_match < 60 %}#ffc107{% else %}#17a2b8{% endif %}" 
+                                                stroke-width="8" fill="none" 
+                                                stroke-dasharray="{% widthratio percentual_match 100 314 %} 314"
+                                                stroke-dashoffset="0"
+                                                transform="rotate(-90 60 60)"/>
+                                    </svg>
+                                    <div style="position: relative; top: -100px; text-align: center;">
+                                        <strong style="font-size: 1.5rem; color: {% if percentual_match == 0 %}#dc3545{% elif percentual_match < 60 %}#ffc107{% else %}#17a2b8{% endif %};">
+                                            {{ percentual_match|floatformat:0 }}%
+                                        </strong>
+                                        <br><small>Match</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-9">
+                                <h5 class="mb-3">
+                                    <i class="fas fa-chart-line me-2"></i>Análise de Correspondência
+                                </h5>
+                                <p class="mb-2">
+                                    <span class="match-indicator no-match"></span>
+                                    <strong>{{ total_erros }} de {{ total_campos }} campos</strong> não correspondem
+                                </p>
+                                <p class="mb-2">
+                                    <span class="match-indicator match"></span>
+                                    <strong>{{ campos_match }} de {{ total_campos }} campos</strong> correspondem corretamente
+                                </p>
+                                <div class="progress mb-2" style="height: 25px;">
+                                    <div class="progress-bar bg-success" role="progressbar" 
+                                         style="width: {{ percentual_match }}%">
+                                        {{ percentual_match|floatformat:0 }}% Match
+                                    </div>
+                                    <div class="progress-bar bg-danger" role="progressbar" 
+                                         style="width: {% widthratio total_erros total_campos 100 %}%">
+                                        {% widthratio total_erros total_campos 100 %}% Erro
+                                    </div>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Para um match completo, todos os 5 campos devem corresponder exatamente.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Enhanced Error Cards with Detailed Comparisons -->
+        {% if erros %}
+            {% for erro in erros %}
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card error-card shadow-sm">
+                        <div class="card-header {% if erro.tipo == 'vazio' %}bg-warning text-dark{% else %}bg-danger text-white{% endif %}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-{% if erro.tipo == 'vazio' %}exclamation-triangle{% else %}times-circle{% endif %} me-2"></i>
+                                    {{ erro.label }}
+                                    <span class="badge bg-light {% if erro.tipo == 'vazio' %}text-warning{% else %}text-danger{% endif %} ms-2">
+                                        Erro #{{ forloop.counter }}
+                                    </span>
+                                </h5>
+                                <div>
+                                    {% if erro.tipo == 'vazio' %}
+                                        <span class="error-severity severity-high">
+                                            <i class="fas fa-ban me-1"></i>Campo Vazio
+                                        </span>
+                                    {% elif erro.tipo == 'diferente' %}
+                                        <span class="error-severity severity-medium">
+                                            <i class="fas fa-not-equal me-1"></i>Valores Diferentes
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Enhanced Comparison Container -->
+                            <div class="comparison-container">
+                                <div class="field-comparison">
+                                    <!-- Plano Value -->
+                                    <div>
+                                        <div class="d-flex align-items-center mb-2">
+                                            <i class="fas fa-calendar-check text-primary me-2" style="font-size: 1.2rem;"></i>
+                                            <strong>PlanoPreventiva</strong>
+                                            <small class="text-muted ms-2">({{ erro.campo }})</small>
+                                        </div>
+                                        <div class="field-value {% if erro.plano_valor %}plano{% else %}empty{% endif %}">
+                                            {% if erro.plano_valor %}
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span>{{ erro.plano_valor }}</span>
+                                                    <i class="fas fa-check-circle ms-2"></i>
+                                                </div>
+                                            {% else %}
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span><em>Campo vazio</em></span>
+                                                    <i class="fas fa-times-circle ms-2"></i>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        {% if erro.plano_valor and erro.roteiro_valor and erro.tipo == 'diferente' %}
+                                        <small class="text-muted mt-1 d-block">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Tipo: {{ erro.plano_valor|length }} caracteres
+                                        </small>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Comparison Arrow -->
+                                    <div class="text-center">
+                                        <i class="fas fa-arrow-left-right comparison-arrow"></i>
+                                        <br>
+                                        <span class="badge bg-danger mt-2">
+                                            <i class="fas fa-times me-1"></i>Não Match
+                                        </span>
+                                    </div>
+                                    
+                                    <!-- Roteiro Value -->
+                                    <div>
+                                        <div class="d-flex align-items-center mb-2">
+                                            <i class="fas fa-route text-success me-2" style="font-size: 1.2rem;"></i>
+                                            <strong>RoteiroPreventiva</strong>
+                                            <small class="text-muted ms-2">({{ erro.campo }})</small>
+                                        </div>
+                                        <div class="field-value {% if erro.roteiro_valor %}roteiro{% else %}empty{% endif %}">
+                                            {% if erro.roteiro_valor %}
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span>{{ erro.roteiro_valor }}</span>
+                                                    <i class="fas fa-check-circle ms-2"></i>
+                                                </div>
+                                            {% else %}
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span><em>Campo vazio</em></span>
+                                                    <i class="fas fa-times-circle ms-2"></i>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        {% if erro.plano_valor and erro.roteiro_valor and erro.tipo == 'diferente' %}
+                                        <small class="text-muted mt-1 d-block">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Tipo: {{ erro.roteiro_valor|length }} caracteres
+                                        </small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <!-- Detailed Difference Analysis (for different values) -->
+                                {% if erro.tipo == 'diferente' and erro.plano_valor and erro.roteiro_valor %}
+                                <div class="mt-3 p-3 bg-light border rounded">
+                                    <h6 class="mb-2">
+                                        <i class="fas fa-search me-2"></i>Análise de Diferença
+                                    </h6>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <small class="text-muted d-block mb-1">Valor no Plano:</small>
+                                            <code class="field-diff">{{ erro.plano_valor }}</code>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <small class="text-muted d-block mb-1">Valor no Roteiro:</small>
+                                            <code class="field-diff">{{ erro.roteiro_valor }}</code>
+                                        </div>
+                                    </div>
+                                    {% if erro.plano_valor|length != erro.roteiro_valor|length %}
+                                    <div class="alert alert-warning mt-2 mb-0">
+                                        <i class="fas fa-ruler me-2"></i>
+                                        <strong>Diferença de tamanho:</strong> 
+                                        O valor do Plano tem {{ erro.plano_valor|length }} caracteres, 
+                                        enquanto o Roteiro tem {{ erro.roteiro_valor|length }} caracteres.
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Problem Description -->
+                            <div class="alert {% if erro.tipo == 'vazio' %}alert-warning{% else %}alert-danger{% endif %} mb-3 mt-3">
+                                <div class="d-flex align-items-start">
+                                    <i class="fas fa-exclamation-circle me-2 mt-1" style="font-size: 1.2rem;"></i>
+                                    <div>
+                                        <strong>Problema Identificado:</strong>
+                                        <p class="mb-0 mt-1">{{ erro.problema }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Solution Box -->
+                            <div class="solution-box">
+                                <div class="d-flex align-items-start">
+                                    <i class="fas fa-lightbulb me-2 mt-1" style="font-size: 1.2rem; color: #0d6efd;"></i>
+                                    <div>
+                                        <strong>Solução Recomendada:</strong>
+                                        <p class="mb-0 mt-1">{{ erro.solucao }}</p>
+                                        {% if erro.tipo == 'diferente' and erro.plano_valor and erro.roteiro_valor %}
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <i class="fas fa-tips me-1"></i>
+                                                <strong>Dica:</strong> Verifique se há diferenças de espaços, maiúsculas/minúsculas, ou caracteres especiais.
+                                            </small>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                        <h5>Nenhum erro encontrado!</h5>
+                        <p class="mb-0">Todos os campos correspondem. Esta relação deveria ter sido encontrada como match. Verifique a lógica de comparação.</p>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Summary -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Resumo da Análise
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Informações do Plano</h6>
+                                <ul class="list-unstyled">
+                                    <li><strong>ID:</strong> {{ plano.id }}</li>
+                                    <li><strong>Código Máquina:</strong> {{ plano.cd_maquina|default:"<em class='text-muted'>Vazio</em>" }}</li>
+                                    <li><strong>Número Plano:</strong> {{ plano.numero_plano|default:"<em class='text-muted'>Vazio</em>" }}</li>
+                                    <li><strong>Sequência Manutenção:</strong> {{ plano.sequencia_manutencao|default:"<em class='text-muted'>Vazio</em>" }}</li>
+                                    <li><strong>Sequência Tarefa:</strong> {{ plano.sequencia_tarefa|default:"<em class='text-muted'>Vazio</em>" }}</li>
+                                    <li><strong>Descrição Máquina:</strong> {{ plano.descr_maquina|default:"<em class='text-muted'>Vazio</em>"|truncatewords:10 }}</li>
+                                    <li><strong>Descrição Tarefa:</strong> {{ plano.descr_tarefa|default:"<em class='text-muted'>Vazio</em>"|truncatewords:10 }}</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Informações do Roteiro</h6>
+                                <ul class="list-unstyled">
+                                    <li><strong>ID:</strong> {{ roteiro.id }}</li>
+                                    <li><strong>Código Máquina:</strong> {{ roteiro.cd_maquina|default:"<em class='text-muted'>Vazio</em>" }}</li>
+                                    <li><strong>Código Plano:</strong> {{ roteiro.cd_planmanut|default:"<em class='text-muted'>Vazio</em>" }}</li>
+                                    <li><strong>Sequência Plano:</strong> {{ roteiro.seq_seqplamanu|default:"<em class='text-muted'>Vazio</em>" }}</li>
+                                    <li><strong>Código Tarefa:</strong> {{ roteiro.cd_tarefamanu|default:"<em class='text-muted'>Vazio</em>" }}</li>
+                                    <li><strong>Descrição Máquina:</strong> {{ roteiro.descr_maquina|default:"<em class='text-muted'>Vazio</em>"|truncatewords:10 }}</li>
+                                    <li><strong>Descrição Tarefa:</strong> {{ roteiro.descr_tarefamanu|default:"<em class='text-muted'>Vazio</em>"|truncatewords:10 }}</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">
+                                <i class="fas fa-question-circle me-2"></i>Como corrigir?
+                            </h6>
+                            <p class="mb-2">Para que estes registros sejam considerados a mesma Preventiva, você precisa:</p>
+                            <ol class="mb-0">
+                                <li>Verificar os dados originais nos arquivos CSV/Excel de importação</li>
+                                <li>Corrigir os valores que não correspondem</li>
+                                <li>Reimportar os dados corrigidos</li>
+                                <li>Ou editar manualmente os registros no Django Admin</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Criteria Reference -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list-check me-2"></i>Critérios de Correspondência
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Para que um PlanoPreventiva e um RoteiroPreventiva sejam considerados a mesma Preventiva, <strong>todos</strong> os critérios abaixo devem ser atendidos:</p>
+                        <ul>
+                            <li><strong>cd_maquina</strong> (PlanoPreventiva) = <strong>cd_maquina</strong> (RoteiroPreventiva) - <span class="text-danger">Obrigatório</span></li>
+                            <li><strong>descr_maquina</strong> (PlanoPreventiva) = <strong>descr_maquina</strong> (RoteiroPreventiva) - <span class="text-danger">Obrigatório</span></li>
+                            <li><strong>sequencia_tarefa</strong> (PlanoPreventiva) = <strong>cd_tarefamanu</strong> (RoteiroPreventiva) - <span class="text-danger">Obrigatório</span></li>
+                            <li><strong>descr_tarefa</strong> (PlanoPreventiva) = <strong>descr_tarefamanu</strong> (RoteiroPreventiva) - <span class="text-danger">Obrigatório</span></li>
+                            <li><strong>sequencia_manutencao</strong> (PlanoPreventiva) = <strong>seq_seqplamanu</strong> (RoteiroPreventiva) - <span class="text-danger">Obrigatório</span></li>
+                        </ul>
+                        <div class="alert alert-warning mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Importante:</strong> Se qualquer um destes critérios não for atendido, os registros não serão considerados a mesma Preventiva.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+

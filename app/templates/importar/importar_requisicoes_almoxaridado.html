@@ -1,0 +1,325 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Importar Requisições Almoxarifado{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Importar Dados</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Importar Requisições Almoxarifado</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Importar Requisições Almoxarifado</h1>
+                <p class="lead">Importe dados de itens retirados do estoque através de arquivo CSV</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Upload Section -->
+        <div class="row mb-5">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-upload me-2"></i>Selecionar Arquivo e Data
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'importar_requisicoes_almoxarifado' %}" enctype="multipart/form-data" id="importarForm">
+                            {% csrf_token %}
+                            
+                            <!-- Opção de usar data do nome do arquivo -->
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="useFileNameDate" name="use_file_name_date">
+                                    <label class="form-check-label" for="useFileNameDate">
+                                        <strong>Usar data do nome do arquivo</strong>
+                                    </label>
+                                    <div class="form-text">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Quando marcado, a data será extraída automaticamente do nome do arquivo (formato: DD.MM.YYYY.csv). O campo de data abaixo será desabilitado.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Campo de Data -->
+                            <div class="mb-3">
+                                <label for="dataRequisicao" class="form-label">
+                                    <strong>Data da Requisição <span class="text-danger" id="dataRequired">*</span></strong>
+                                </label>
+                                <input type="date" class="form-control" id="dataRequisicao" name="data_requisicao">
+                                <div class="form-text">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Esta data será associada a todos os itens importados do arquivo. Informe a data em que os itens foram retirados do estoque.
+                                    <span id="extractedDateInfo" class="text-success d-none"></span>
+                                </div>
+                            </div>
+                            
+                            <!-- Campo de Arquivo -->
+                            <div class="mb-3">
+                                <label for="fileInput" class="form-label">
+                                    <strong>Arquivo CSV para Importação <span class="text-danger">*</span></strong>
+                                </label>
+                                <input type="file" class="form-control" id="fileInput" name="file" accept=".csv" required>
+                                <div class="form-text">Formato aceito: CSV (.csv) com delimitador ponto e vírgula (;)</div>
+                            </div>
+                            
+                            <!-- Opções de Importação -->
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="onlyNewRecords" name="only_new_records" checked>
+                                    <label class="form-check-label" for="onlyNewRecords">
+                                        <strong>Apenas adicionar novos registros</strong> (registros duplicados serão ignorados)
+                                    </label>
+                                    <div class="form-text">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Quando marcado, apenas registros que ainda não existem na tabela serão importados.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                    <i class="fas fa-upload me-2"></i>Importar Arquivo
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions Section -->
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Instruções
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <h6 class="fw-bold">Formato do Arquivo:</h6>
+                        <p>O arquivo CSV deve conter as seguintes colunas (primeira linha como cabeçalho):</p>
+                        <ul>
+                            <li><strong>CD_UNID</strong> - Código Unidade</li>
+                            <li><strong>NOME_UNID</strong> - Nome Unidade</li>
+                            <li><strong>CD_USO_CTB</strong> - Código Uso Contábil</li>
+                            <li><strong>DESCR_USO_CTB</strong> - Descrição Uso Contábil</li>
+                            <li><strong>CD_DEPO</strong> - Código Depósito</li>
+                            <li><strong>DESCR_DEPO</strong> - Descrição Depósito</li>
+                            <li><strong>CD_LOCAL_FISIC</strong> - Código Local Físico</li>
+                            <li><strong>DESCR_LOCAL_FISIC</strong> - Descrição Local Físico</li>
+                            <li><strong>CD_ITEM</strong> - Código Item (obrigatório)</li>
+                            <li><strong>CD_EMBALAGEM</strong> - Código Embalagem</li>
+                            <li><strong>DESCR_ITEM</strong> - Descrição Item</li>
+                            <li><strong>CD_OPERACAO</strong> - Código Operação</li>
+                            <li><strong>DESCR_OPERACAO</strong> - Descrição Operação</li>
+                            <li><strong>CD_UNID_MEDIDA</strong> - Código Unidade Medida</li>
+                            <li><strong>QTDE_MOVTO_ESTOQ</strong> - Quantidade Movimento Estoque</li>
+                            <li><strong>VLR_MOVTO_ESTOQ</strong> - Valor Movimento Estoque</li>
+                            <li><strong>VLR_MOVTO_ESTOQ_REAV</strong> - Valor Movimento Estoque Reavaliação</li>
+                            <li><strong>CD_UNID_BAIXA</strong> - Código Unidade Baixa</li>
+                            <li><strong>CD_CENTRO_ATIV</strong> - Código Centro Atividade</li>
+                            <li><strong>CD_USU_CRIOU</strong> - Código Usuário Criou</li>
+                            <li><strong>CD_USU_ATEND</strong> - Código Usuário Atendeu</li>
+                            <li><strong>OBS RM</strong> - Observação RM</li>
+                            <li><strong>OBS ITEM</strong> - Observação Item</li>
+                        </ul>
+                        <hr>
+                        <h6 class="fw-bold">Importante:</h6>
+                        <ul>
+                            <li>O arquivo deve usar ponto e vírgula (<strong>;</strong>) como delimitador</li>
+                            <li>A primeira linha deve conter os cabeçalhos das colunas</li>
+                            <li>A <strong>Data da Requisição</strong> informada no formulário será associada a todos os itens do arquivo</li>
+                            <li>Esta data representa quando os itens foram retirados do estoque</li>
+                            <li>O campo <strong>CD_ITEM</strong> é obrigatório para cada registro</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Messages -->
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Executar após o main.js carregar
+window.addEventListener('load', function() {
+    const form = document.getElementById('importarForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const fileInput = document.getElementById('fileInput');
+    const dataRequisicaoInput = document.getElementById('dataRequisicao');
+    const useFileNameDateCheckbox = document.getElementById('useFileNameDate');
+    const extractedDateInfo = document.getElementById('extractedDateInfo');
+    const dataRequired = document.getElementById('dataRequired');
+    
+    if (!form || !submitBtn) {
+        console.error('Form ou botão de submit não encontrado!');
+        return;
+    }
+    
+    console.log('Form encontrado:', form);
+    console.log('Botão de submit encontrado:', submitBtn);
+    
+    // Função para extrair data do nome do arquivo (formato: DD.MM.YYYY.csv)
+    function extractDateFromFileName(fileName) {
+        if (!fileName) return null;
+        
+        // Remover extensão
+        const nameWithoutExt = fileName.replace(/\.(csv|CSV)$/, '');
+        
+        // Tentar padrão DD.MM.YYYY
+        const datePattern = /(\d{2})\.(\d{2})\.(\d{4})/;
+        const match = nameWithoutExt.match(datePattern);
+        
+        if (match) {
+            const day = match[1];
+            const month = match[2];
+            const year = match[3];
+            
+            // Validar data
+            const date = new Date(year, month - 1, day);
+            if (date.getFullYear() == year && date.getMonth() == month - 1 && date.getDate() == day) {
+                // Formato YYYY-MM-DD para input date
+                return `${year}-${month}-${day}`;
+            }
+        }
+        
+        return null;
+    }
+    
+    // Função para atualizar estado do campo de data
+    function updateDateFieldState() {
+        if (!useFileNameDateCheckbox || !dataRequisicaoInput) return;
+        
+        if (useFileNameDateCheckbox.checked) {
+            // Desabilitar campo de data
+            dataRequisicaoInput.disabled = true;
+            dataRequisicaoInput.removeAttribute('required');
+            dataRequired.classList.add('d-none');
+            
+            // Tentar extrair data do nome do arquivo
+            if (fileInput && fileInput.files.length > 0) {
+                const extractedDate = extractDateFromFileName(fileInput.files[0].name);
+                if (extractedDate) {
+                    dataRequisicaoInput.value = extractedDate;
+                    extractedDateInfo.textContent = `Data extraída do arquivo: ${extractedDate.split('-').reverse().join('/')}`;
+                    extractedDateInfo.classList.remove('d-none');
+                } else {
+                    extractedDateInfo.textContent = 'Não foi possível extrair a data do nome do arquivo. Verifique se o formato é DD.MM.YYYY';
+                    extractedDateInfo.classList.remove('d-none');
+                    extractedDateInfo.classList.remove('text-success');
+                    extractedDateInfo.classList.add('text-warning');
+                }
+            } else {
+                extractedDateInfo.textContent = 'Selecione um arquivo para extrair a data';
+                extractedDateInfo.classList.remove('d-none');
+                extractedDateInfo.classList.remove('text-success');
+                extractedDateInfo.classList.add('text-warning');
+            }
+        } else {
+            // Habilitar campo de data
+            dataRequisicaoInput.disabled = false;
+            dataRequisicaoInput.setAttribute('required', 'required');
+            dataRequired.classList.remove('d-none');
+            extractedDateInfo.classList.add('d-none');
+            
+            // Se não houver valor, definir data padrão como hoje
+            if (!dataRequisicaoInput.value) {
+                const today = new Date().toISOString().split('T')[0];
+                dataRequisicaoInput.value = today;
+            }
+        }
+    }
+    
+    // Listener para checkbox
+    if (useFileNameDateCheckbox) {
+        useFileNameDateCheckbox.addEventListener('change', updateDateFieldState);
+    }
+    
+    // Listener para mudança de arquivo
+    if (fileInput) {
+        fileInput.addEventListener('change', function() {
+            if (useFileNameDateCheckbox && useFileNameDateCheckbox.checked) {
+                updateDateFieldState();
+            }
+        });
+    }
+    
+    // Estado inicial
+    updateDateFieldState();
+    
+    // Remover qualquer listener do main.js que possa estar interferindo
+    const newSubmitBtn = submitBtn.cloneNode(true);
+    submitBtn.parentNode.replaceChild(newSubmitBtn, submitBtn);
+    const cleanSubmitBtn = document.getElementById('submitBtn');
+    
+    // Adicionar listener no formulário - executar ANTES de qualquer outro
+    form.addEventListener('submit', function(e) {
+        console.log('=== FORM SUBMIT EVENT TRIGGERED ===');
+        
+        // Verificar se arquivo foi selecionado
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            console.log('Nenhum arquivo selecionado - validação HTML5 deve prevenir isso');
+            return;
+        }
+        
+        // Verificar se data foi preenchida
+        if (!dataRequisicaoInput || !dataRequisicaoInput.value) {
+            alert('Por favor, informe a data da requisição.');
+            e.preventDefault();
+            return;
+        }
+        
+        console.log('Arquivo selecionado:', fileInput.files[0].name, 'Tamanho:', fileInput.files[0].size);
+        console.log('Data da requisição:', dataRequisicaoInput.value);
+        
+        // Desabilitar botão e mostrar loading
+        cleanSubmitBtn.disabled = true;
+        cleanSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Importando...';
+        
+        // IMPORTANTE: NÃO chamar e.preventDefault() - deixar o formulário ser enviado normalmente
+        console.log('Formulário será enviado normalmente...');
+    }, true); // Use capture phase para executar antes de outros listeners
+    
+    // Listener no botão para debug
+    cleanSubmitBtn.addEventListener('click', function(e) {
+        console.log('=== SUBMIT BUTTON CLICKED ===');
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            console.log('Nenhum arquivo selecionado no clique do botão');
+        } else {
+            console.log('Arquivo pronto para upload:', fileInput.files[0].name, 'Tamanho:', fileInput.files[0].size);
+        }
+        if (!dataRequisicaoInput || !dataRequisicaoInput.value) {
+            console.log('Data da requisição não preenchida');
+        } else {
+            console.log('Data da requisição:', dataRequisicaoInput.value);
+        }
+    });
+});
+</script>
+{% endblock %}
+

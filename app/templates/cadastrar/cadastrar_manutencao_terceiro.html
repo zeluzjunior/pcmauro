@@ -52,7 +52,7 @@
                             <strong>Campos obrigatórios:</strong> Os campos marcados com <span class="text-danger">*</span> são obrigatórios e devem ser preenchidos.
                         </div>
                         
-                        <form method="post" class="needs-validation" novalidate>
+                        <form method="post" action="{% url 'cadastrar_manutencao_terceiro' %}" id="manutencaoForm">
                             {% csrf_token %}
                             
                             <!-- Informações Principais -->
@@ -239,8 +239,11 @@
                                 <a href="{% url 'home' %}" class="btn btn-secondary">
                                     <i class="fas fa-arrow-left me-2"></i>Cancelar
                                 </a>
-                                <button type="submit" class="btn btn-primary">
+                                <button type="submit" class="btn btn-primary" id="submitBtn">
                                     <i class="fas fa-save me-2"></i>Salvar Manutenção Terceiro
+                                </button>
+                                <button type="button" class="btn btn-danger ms-2" onclick="document.getElementById('manutencaoForm').submit(); console.log('FORCED SUBMIT');">
+                                    FORÇAR ENVIO
                                 </button>
                             </div>
                         </form>
@@ -250,5 +253,29 @@
         </div>
     </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Minimal JavaScript - just log, never prevent
+console.log('=== MANUTENCAO TERCEIRO SCRIPT LOADED ===');
+
+window.addEventListener('load', function() {
+    console.log('Page loaded');
+    const form = document.getElementById('manutencaoForm');
+    console.log('Form found:', !!form);
+    
+    if (form) {
+        console.log('Form action:', form.action);
+        console.log('Form method:', form.method);
+        
+        // Simple submit handler - just log, never prevent
+        form.addEventListener('submit', function(e) {
+            console.log('=== FORM SUBMITTING ===');
+            // Don't prevent - let it submit
+        }, false);
+    }
+});
+</script>
 {% endblock %}
 

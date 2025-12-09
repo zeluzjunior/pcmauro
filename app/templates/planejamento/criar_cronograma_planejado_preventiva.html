@@ -1,0 +1,1020 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Criar Calendário Planejado de Preventivas{% endblock %}
+
+{% block extra_css %}
+<!-- Select2 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<style>
+    .week-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        margin-bottom: 20px;
+    }
+    .week-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .week-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 8px 8px 0 0;
+    }
+    .table-container {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .badge-week {
+        font-size: 1rem;
+        padding: 8px 15px;
+    }
+    /* Select2 customização */
+    .select2-container--bootstrap-5 .select2-selection {
+        min-height: 38px;
+    }
+    
+    /* Estilo para o select de máquinas */
+    #maquinaSelect {
+        min-height: 200px;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    #maquinaSelect option {
+        padding: 8px;
+        white-space: normal;
+    }
+    
+    #maquinaSelect option:hover {
+        background-color: #f0f0f0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Planejamento</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Criar Calendário Planejado</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-calendar-alt me-2"></i>Criar Calendário Planejado de Preventivas
+                </h1>
+                <p class="lead">Visualize e organize os planos PCM agrupados por semana do ano</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Nova Seção: Seleção de Máquina ou Plano -->
+        <div class="card shadow-lg mb-5 border-primary" style="border-width: 3px;">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-filter me-2"></i>Selecionar Máquina ou Plano Preventiva
+                </h4>
+            </div>
+            <div class="card-body">
+                {% csrf_token %}
+                <form method="get" action="{% url 'criar_cronograma_planejado_preventiva' %}" id="selectionForm">
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <div class="btn-group" role="group" aria-label="Tipo de seleção">
+                                <input type="radio" class="btn-check" name="selection_type" id="selection_maquina" value="maquina" {% if selected_maquina_id %}checked{% endif %}>
+                                <label class="btn btn-outline-primary" for="selection_maquina">
+                                    <i class="fas fa-cogs me-2"></i>Selecionar Máquina
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="selection_type" id="selection_plano" value="plano" {% if selected_plano_id %}checked{% endif %}>
+                                <label class="btn btn-outline-success" for="selection_plano">
+                                    <i class="fas fa-clipboard-list me-2"></i>Selecionar Plano Preventiva
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Seção de Seleção de Máquina -->
+                    <div id="maquinaSelectionSection" style="display: {% if selected_maquina_id or not selected_plano_id %}block{% else %}none{% endif %};">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="setorFilter" class="form-label">Filtrar por Setor</label>
+                                <select class="form-select" id="setorFilter">
+                                    <option value="">Todos os Setores</option>
+                                    {% for setor in setores_unicos %}
+                                        <option value="{{ setor }}">{{ setor }}</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Selecione um setor para filtrar as máquinas</small>
+                            </div>
+                            <div class="col-md-8">
+                                <label for="maquinaSelect" class="form-label">Selecionar Máquinas (Múltipla Seleção)</label>
+                                <select class="form-select" id="maquinaSelect" name="maquina_id" multiple size="10" style="width: 100%; overflow-y: auto;">
+                                    {% for maquina in todas_maquinas %}
+                                        <option value="{{ maquina.id }}" data-setor="{{ maquina.cd_setormanut|default:'' }}">
+                                            {{ maquina.cd_maquina }} - {{ maquina.descr_maquina|default:"" }}
+                                            {% if maquina.cd_setormanut %} | Setor: {{ maquina.cd_setormanut }}{% endif %}
+                                            {% if maquina.nome_unid %} | Unidade: {{ maquina.nome_unid }}{% endif %}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Selecione múltiplas máquinas (use Ctrl/Cmd + clique para múltipla seleção)</small>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="addMaquinaToList">
+                                    <i class="fas fa-plus me-2"></i>Adicionar Máquinas Selecionadas à Lista
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="limparFiltroSetor">
+                                    <i class="fas fa-filter me-2"></i>Limpar Filtro de Setor
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Seção de Seleção de Plano -->
+                    <div id="planoSelectionSection" style="display: {% if selected_plano_id %}block{% else %}none{% endif %};">
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label for="planoSelect" class="form-label">Selecionar Planos Preventiva (Múltipla Seleção)</label>
+                                <select class="form-select" id="planoSelect" name="plano_id" multiple style="width: 100%;">
+                                    {% for plano in todos_planos %}
+                                        <option value="{{ plano.id }}">
+                                            Máquina {{ plano.cd_maquina }} - Plano {{ plano.numero_plano|default:"-" }} - Seq. Manutenção {{ plano.sequencia_manutencao|default:"-" }} - Seq. Tarefa {{ plano.sequencia_tarefa|default:"-" }}
+                                            {% if plano.descr_maquina %} | {{ plano.descr_maquina|truncatewords:5 }}{% endif %}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Selecione múltiplos planos ou digite para buscar</small>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <button type="button" class="btn btn-sm btn-outline-success" id="addPlanoToList">
+                                    <i class="fas fa-plus me-2"></i>Adicionar Planos Selecionados à Lista
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Lista de Seleções -->
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <div class="card border-info">
+                                <div class="card-header bg-info text-white">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-list me-2"></i>Itens Selecionados para Agendamento
+                                        <span class="badge bg-light text-dark ms-2" id="selectedCount">0</span>
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="selectedItemsList" class="list-group" style="max-height: 300px; overflow-y: auto;">
+                                        <div class="text-muted text-center py-3">
+                                            Nenhum item selecionado ainda. Selecione máquinas ou planos acima e clique em "Adicionar à Lista".
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Campos de Nome do Grupo, Data e Periodicidade -->
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label for="nomeGrupo" class="form-label">Nome do Grupo de Agendamento</label>
+                            <input type="text" class="form-control" id="nomeGrupo" name="nome_grupo" placeholder="Ex: Manutenção Preventiva - Setor A, Revisão Mensal, etc." maxlength="255">
+                            <small class="form-text text-muted">Dê um nome identificador para este grupo de agendamentos (opcional, mas recomendado)</small>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="dataPlanejada" class="form-label">Data Planejada para Execução</label>
+                            <input type="date" class="form-control" id="dataPlanejada" name="data_planejada" required>
+                            <small class="form-text text-muted">Data inicial para associar todos os itens selecionados</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="periodicidade" class="form-label">Periodicidade (dias)</label>
+                            <input type="number" class="form-control" id="periodicidade" name="periodicidade" min="1" placeholder="Ex: 30 para mensal, 7 para semanal">
+                            <small class="form-text text-muted">Número de dias entre cada repetição até o final do ano (deixe em branco para agendamento único)</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">&nbsp;</label>
+                            <div>
+                                <button type="button" class="btn btn-success w-100" id="salvarAgendamentos" disabled>
+                                    <i class="fas fa-save me-2"></i>Salvar Agendamentos
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mb-3" id="previewPeriodicidade" style="display: none;">
+                        <div class="col-md-12">
+                            <div class="alert alert-info">
+                                <strong><i class="fas fa-info-circle me-2"></i>Preview de Repetições:</strong>
+                                <div id="previewDates" class="mt-2"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <button type="button" class="btn btn-outline-danger" id="limparLista">
+                                <i class="fas fa-trash me-2"></i>Limpar Lista de Seleções
+                            </button>
+                            <a href="{% url 'criar_cronograma_planejado_preventiva' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-redo me-2"></i>Limpar Todos os Filtros
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Divisor Visual -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <hr class="border-primary" style="border-width: 3px;">
+                <div class="text-center">
+                    <h5 class="text-muted">
+                        <i class="fas fa-calendar-alt me-2"></i>Visualização do Cronograma Planejado
+                    </h5>
+                </div>
+                <hr class="border-primary" style="border-width: 3px;">
+            </div>
+        </div>
+        
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-2 mb-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total de Planos</h5>
+                        <h2 class="mb-0">{{ total_planos }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 mb-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Planos com Semana</h5>
+                        <h2 class="mb-0">{{ total_com_semana }}</h2>
+                        <small>Com semana definida</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 mb-3">
+                <div class="card bg-warning text-dark">
+                    <div class="card-body">
+                        <h5 class="card-title">Planos sem Semana</h5>
+                        <h2 class="mb-0">{{ total_sem_semana }}</h2>
+                        <small>Aguardando definição</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 mb-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Agendamentos</h5>
+                        <h2 class="mb-0">{{ total_agendamentos }}</h2>
+                        <small>Agendamentos criados</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 mb-3">
+                <div class="card bg-secondary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Agendamentos com Semana</h5>
+                        <h2 class="mb-0">{{ total_agendamentos_com_semana }}</h2>
+                        <small>Com semana definida</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 mb-3">
+                <div class="card bg-dark text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Semanas Cadastradas</h5>
+                        <h2 class="mb-0">{{ semanas|length }}</h2>
+                        <small>Períodos do ano</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Agendamentos e Planos Agrupados por Semana -->
+        {% if semanas_com_dados %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-calendar-week me-2"></i>Agendamentos e Planos Agrupados por Semana do Ano
+                </h4>
+            </div>
+            <div class="card-body">
+                {% for semana, agendamentos_semana, planos_semana in semanas_com_dados %}
+                    <div class="card week-card shadow-sm mb-3">
+                        <div class="week-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-calendar-week me-2"></i>{{ semana.semana }}
+                                    </h5>
+                                    {% if semana.inicio and semana.fim %}
+                                        <small>{{ semana.inicio|date:"d/m/Y" }} até {{ semana.fim|date:"d/m/Y" }}</small>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    {% if agendamentos_semana %}
+                                        <span class="badge bg-primary badge-week me-2">
+                                            {{ agendamentos_semana|length }} agendamento(s)
+                                        </span>
+                                    {% endif %}
+                                    {% if planos_semana %}
+                                        <span class="badge bg-light text-dark badge-week">
+                                            {{ planos_semana|length }} plano(s)
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <!-- Agendamentos -->
+                            {% if agendamentos_semana %}
+                            <div class="p-3 border-bottom">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-clock me-2"></i>Agendamentos Planejados
+                                </h6>
+                                <div class="table-container">
+                                    <table class="table table-hover table-sm mb-0">
+                                        <thead class="table-light sticky-top">
+                                            <tr>
+                                                <th>Tipo</th>
+                                                <th>Nome do Grupo</th>
+                                                <th>Item</th>
+                                                <th>Data Planejada</th>
+                                                <th>Periodicidade</th>
+                                                <th>Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for agendamento in agendamentos_semana %}
+                                            <tr>
+                                                <td>
+                                                    {% if agendamento.tipo_agendamento == 'maquina' %}
+                                                        <span class="badge bg-primary">
+                                                            <i class="fas fa-cogs me-1"></i>Máquina
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="badge bg-success">
+                                                            <i class="fas fa-clipboard-list me-1"></i>Plano
+                                                        </span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if agendamento.nome_grupo %}
+                                                        <strong>{{ agendamento.nome_grupo }}</strong>
+                                                    {% else %}
+                                                        <span class="text-muted">-</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if agendamento.tipo_agendamento == 'maquina' and agendamento.maquina %}
+                                                        <strong>{{ agendamento.maquina.cd_maquina }}</strong>
+                                                        {% if agendamento.maquina.descr_maquina %}
+                                                            <br><small class="text-muted">{{ agendamento.maquina.descr_maquina|truncatewords:5 }}</small>
+                                                        {% endif %}
+                                                    {% elif agendamento.tipo_agendamento == 'plano' and agendamento.plano_preventiva %}
+                                                        <strong>Máquina {{ agendamento.plano_preventiva.cd_maquina }} - Plano {{ agendamento.plano_preventiva.numero_plano|default:"-" }}</strong>
+                                                        {% if agendamento.plano_preventiva.descr_maquina %}
+                                                            <br><small class="text-muted">{{ agendamento.plano_preventiva.descr_maquina|truncatewords:5 }}</small>
+                                                        {% endif %}
+                                                    {% else %}
+                                                        <span class="text-muted">-</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-info">{{ agendamento.data_planejada|date:"d/m/Y" }}</span>
+                                                </td>
+                                                <td>
+                                                    {% if agendamento.periodicidade %}
+                                                        <span class="badge bg-warning text-dark">{{ agendamento.periodicidade }} dias</span>
+                                                    {% else %}
+                                                        <span class="text-muted">Único</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if agendamento.tipo_agendamento == 'maquina' and agendamento.maquina %}
+                                                        <a href="{% url 'visualizar_maquina' agendamento.maquina.id %}" class="btn btn-sm btn-outline-primary" title="Visualizar Máquina">
+                                                            <i class="fas fa-eye"></i>
+                                                        </a>
+                                                    {% elif agendamento.tipo_agendamento == 'plano' and agendamento.plano_preventiva %}
+                                                        <a href="{% url 'visualizar_plano_pcm' agendamento.plano_preventiva.id %}" class="btn btn-sm btn-outline-primary" title="Visualizar Plano">
+                                                            <i class="fas fa-eye"></i>
+                                                        </a>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Planos PCM -->
+                            {% if planos_semana %}
+                            <div class="p-3">
+                                <h6 class="text-success mb-3">
+                                    <i class="fas fa-clipboard-list me-2"></i>Planos Preventiva PCM
+                                </h6>
+                                <div class="table-container">
+                                    <table class="table table-hover table-sm mb-0">
+                                        <thead class="table-light sticky-top">
+                                            <tr>
+                                                <th>Máquina</th>
+                                                <th>Plano</th>
+                                                <th>Seq. Manutenção</th>
+                                                <th>Seq. Tarefa</th>
+                                                <th>Descrição Tarefa</th>
+                                                <th>Data Execução</th>
+                                                <th>Período (dias)</th>
+                                                <th>Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for plano in planos_semana %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ plano.cd_maquina|default:"-" }}</strong>
+                                                    {% if plano.descr_maquina %}
+                                                        <br><small class="text-muted">{{ plano.descr_maquina|truncatewords:5 }}</small>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <strong>{{ plano.numero_plano|default:"-" }}</strong>
+                                                    {% if plano.descr_plano %}
+                                                        <br><small class="text-muted">{{ plano.descr_plano|truncatewords:3 }}</small>
+                                                    {% endif %}
+                                                </td>
+                                                <td>{{ plano.sequencia_manutencao|default:"-" }}</td>
+                                                <td>{{ plano.sequencia_tarefa|default:"-" }}</td>
+                                                <td>
+                                                    {% if plano.descr_tarefa %}
+                                                        <small>{{ plano.descr_tarefa|truncatewords:8 }}</small>
+                                                    {% else %}
+                                                        <span class="text-muted">-</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if plano.dt_execucao %}
+                                                        <span class="badge bg-info">{{ plano.dt_execucao }}</span>
+                                                    {% else %}
+                                                        <span class="text-muted">-</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if plano.quantidade_periodo %}
+                                                        <span class="badge bg-secondary">{{ plano.quantidade_periodo }} dias</span>
+                                                    {% else %}
+                                                        <span class="text-muted">-</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm" role="group">
+                                                        <a href="{% url 'visualizar_plano_pcm' plano.id %}" class="btn btn-outline-primary" title="Visualizar">
+                                                            <i class="fas fa-eye"></i>
+                                                        </a>
+                                                        <a href="{% url 'editar_plano_pcm' plano.id %}" class="btn btn-outline-warning" title="Editar">
+                                                            <i class="fas fa-edit"></i>
+                                                        </a>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Planos sem Semana -->
+        {% if planos_sem_data %}
+        <div class="card shadow-sm mb-4 border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h4 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Planos sem Semana Definida
+                    <span class="badge bg-dark text-white ms-2">{{ total_sem_semana }}</span>
+                </h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Estes planos não possuem data de execução definida ou a data não corresponde a nenhuma semana cadastrada.
+                </p>
+                <div class="table-container">
+                    <table class="table table-hover table-sm">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Máquina</th>
+                                <th>Plano</th>
+                                <th>Seq. Manutenção</th>
+                                <th>Seq. Tarefa</th>
+                                <th>Descrição Tarefa</th>
+                                <th>Data Original</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for plano in planos_sem_data %}
+                            <tr>
+                                <td>
+                                    <strong>{{ plano.cd_maquina|default:"-" }}</strong>
+                                    {% if plano.descr_maquina %}
+                                        <br><small class="text-muted">{{ plano.descr_maquina|truncatewords:5 }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ plano.numero_plano|default:"-" }}</strong>
+                                    {% if plano.descr_plano %}
+                                        <br><small class="text-muted">{{ plano.descr_plano|truncatewords:3 }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>{{ plano.sequencia_manutencao|default:"-" }}</td>
+                                <td>{{ plano.sequencia_tarefa|default:"-" }}</td>
+                                <td>
+                                    {% if plano.descr_tarefa %}
+                                        <small>{{ plano.descr_tarefa|truncatewords:8 }}</small>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if plano.dt_execucao %}
+                                        <span class="badge bg-danger">{{ plano.dt_execucao }}</span>
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="{% url 'visualizar_plano_pcm' plano.id %}" class="btn btn-outline-primary" title="Visualizar">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'editar_plano_pcm' plano.id %}" class="btn btn-outline-warning" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Links de Ação -->
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Ações Rápidas</h5>
+                        <small class="text-muted">Acesse outras páginas relacionadas</small>
+                    </div>
+                    <div>
+                        <a href="{% url 'consultar_meu_plano' %}" class="btn btn-primary me-2">
+                            <i class="fas fa-list me-2"></i>Consultar Todos os Planos
+                        </a>
+                        <a href="{% url 'consultar_52_semanas' %}" class="btn btn-info me-2">
+                            <i class="fas fa-calendar me-2"></i>Consultar 52 Semanas
+                        </a>
+                        <a href="{% url 'analise_geral_plano_preventiva_pcm' %}" class="btn btn-success">
+                            <i class="fas fa-chart-line me-2"></i>Análise Geral PCM
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<!-- jQuery (necessário para Select2) -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<!-- Select2 JS -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Página de criar cronograma planejado carregada');
+    
+    const selectionTypeRadios = document.querySelectorAll('input[name="selection_type"]');
+    const maquinaSection = document.getElementById('maquinaSelectionSection');
+    const planoSection = document.getElementById('planoSelectionSection');
+    const maquinaSelect = document.getElementById('maquinaSelect');
+    const planoSelect = document.getElementById('planoSelect');
+    
+    // Lista de itens selecionados
+    let selectedItems = [];
+    
+    // Função para atualizar visibilidade das máquinas (considera setor e máquinas já selecionadas)
+    function updateMaquinasVisibility() {
+        const setorFilter = document.getElementById('setorFilter');
+        const maquinaSelect = document.getElementById('maquinaSelect');
+        
+        if (!setorFilter || !maquinaSelect) return;
+        
+        const selectedSetor = setorFilter.value;
+        const options = maquinaSelect.querySelectorAll('option');
+        
+        // Obter IDs das máquinas já selecionadas
+        const selectedMaquinaIds = selectedItems
+            .filter(item => item.tipo === 'maquina')
+            .map(item => item.id.toString());
+        
+        let visibleCount = 0;
+        options.forEach(function(option) {
+            if (option.value === '') {
+                // Manter option vazio sempre visível se existir
+                return;
+            }
+            
+            const optionSetor = option.getAttribute('data-setor') || '';
+            const maquinaId = option.value;
+            
+            // Verificar se a máquina já foi selecionada
+            const jaSelecionada = selectedMaquinaIds.includes(maquinaId);
+            
+            // Verificar se passa no filtro de setor
+            const passaFiltroSetor = !selectedSetor || optionSetor === selectedSetor;
+            
+            // Mostrar apenas se não foi selecionada E passa no filtro de setor
+            if (!jaSelecionada && passaFiltroSetor) {
+                option.style.display = '';
+                visibleCount++;
+            } else {
+                option.style.display = 'none';
+                // Desmarcar opções ocultas
+                option.selected = false;
+            }
+        });
+        
+        // Atualizar mensagem de ajuda
+        const helpText = maquinaSelect.nextElementSibling;
+        if (helpText && helpText.classList.contains('form-text')) {
+            if (selectedSetor) {
+                helpText.textContent = `${visibleCount} máquina(s) disponível(is) no setor "${selectedSetor}". Use Ctrl/Cmd + clique para múltipla seleção.`;
+            } else {
+                helpText.textContent = `${visibleCount} máquina(s) disponível(is). Use Ctrl/Cmd + clique para múltipla seleção.`;
+            }
+        }
+    }
+    
+    // Função para filtrar máquinas por setor (mantida para compatibilidade)
+    function filterMaquinasBySetor() {
+        updateMaquinasVisibility();
+    }
+    
+    // Event listener para filtro de setor
+    const setorFilter = document.getElementById('setorFilter');
+    if (setorFilter) {
+        setorFilter.addEventListener('change', filterMaquinasBySetor);
+    }
+    
+    // Botão para limpar filtro de setor
+    const limparFiltroSetor = document.getElementById('limparFiltroSetor');
+    if (limparFiltroSetor) {
+        limparFiltroSetor.addEventListener('click', function() {
+            if (setorFilter) {
+                setorFilter.value = '';
+                filterMaquinasBySetor();
+            }
+        });
+    }
+    
+    // Inicializar Select2 para Plano (múltipla seleção)
+    if (planoSelect) {
+        $(planoSelect).select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Digite para buscar ou selecione múltiplos planos...',
+            allowClear: true,
+            multiple: true,
+            language: {
+                noResults: function() {
+                    return "Nenhum plano encontrado";
+                },
+                searching: function() {
+                    return "Buscando...";
+                }
+            },
+            ajax: {
+                url: '/api/search-planos-pcm/',
+                dataType: 'json',
+                delay: 300,
+                data: function (params) {
+                    return {
+                        q: params.term
+                    };
+                },
+                processResults: function (data) {
+                    return {
+                        results: data.results.map(function(plano) {
+                            return {
+                                id: plano.id,
+                                text: 'Máquina ' + plano.cd_maquina + ' - Plano ' + (plano.numero_plano || '-') + 
+                                      ' - Seq. Manutenção ' + (plano.sequencia_manutencao || '-') + 
+                                      ' - Seq. Tarefa ' + (plano.sequencia_tarefa || '-') +
+                                      (plano.descr_maquina ? ' | ' + plano.descr_maquina.substring(0, 50) : '')
+                            };
+                        })
+                    };
+                },
+                cache: true
+            },
+            minimumInputLength: 2
+        });
+    }
+    
+    // Função para atualizar a lista de seleções
+    function updateSelectedItemsList() {
+        const listContainer = document.getElementById('selectedItemsList');
+        const countBadge = document.getElementById('selectedCount');
+        
+        if (selectedItems.length === 0) {
+            listContainer.innerHTML = '<div class="text-muted text-center py-3">Nenhum item selecionado ainda. Selecione máquinas ou planos acima e clique em "Adicionar à Lista".</div>';
+            countBadge.textContent = '0';
+            document.getElementById('salvarAgendamentos').disabled = true;
+        } else {
+            listContainer.innerHTML = '';
+            selectedItems.forEach(function(item, index) {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'list-group-item d-flex justify-content-between align-items-center';
+                itemDiv.innerHTML = `
+                    <div>
+                        <strong>${item.tipo === 'maquina' ? '<i class="fas fa-cogs text-primary me-2"></i>Máquina' : '<i class="fas fa-clipboard-list text-success me-2"></i>Plano'}</strong>
+                        <span class="ms-2">${item.texto}</span>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeItem(${index})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                listContainer.appendChild(itemDiv);
+            });
+            countBadge.textContent = selectedItems.length;
+            document.getElementById('salvarAgendamentos').disabled = false;
+        }
+        
+        // Atualizar visibilidade das máquinas após mudanças na lista
+        updateMaquinasVisibility();
+    }
+    
+    // Função para remover item da lista
+    window.removeItem = function(index) {
+        selectedItems.splice(index, 1);
+        updateSelectedItemsList();
+    };
+    
+    // Adicionar máquinas selecionadas à lista
+    document.getElementById('addMaquinaToList')?.addEventListener('click', function() {
+        const selectedOptions = Array.from(maquinaSelect.selectedOptions);
+        if (!selectedOptions || selectedOptions.length === 0) {
+            alert('Por favor, selecione pelo menos uma máquina.');
+            return;
+        }
+        
+        selectedOptions.forEach(function(option) {
+            const maquinaId = option.value;
+            const texto = option.textContent;
+            // Verificar se já não está na lista
+            if (!selectedItems.some(item => item.id === maquinaId && item.tipo === 'maquina')) {
+                selectedItems.push({
+                    tipo: 'maquina',
+                    id: maquinaId,
+                    texto: texto
+                });
+            }
+        });
+        
+        updateSelectedItemsList();
+        // Limpar seleção mantendo o filtro
+        Array.from(maquinaSelect.options).forEach(opt => opt.selected = false);
+        // Atualizar visibilidade para esconder máquinas adicionadas
+        updateMaquinasVisibility();
+    });
+    
+    // Adicionar planos selecionados à lista
+    document.getElementById('addPlanoToList')?.addEventListener('click', function() {
+        const selected = $(planoSelect).val();
+        if (!selected || selected.length === 0) {
+            alert('Por favor, selecione pelo menos um plano.');
+            return;
+        }
+        
+        selected.forEach(function(planoId) {
+            const option = planoSelect.querySelector(`option[value="${planoId}"]`);
+            if (option) {
+                const texto = option.textContent;
+                // Verificar se já não está na lista
+                if (!selectedItems.some(item => item.id === planoId && item.tipo === 'plano')) {
+                    selectedItems.push({
+                        tipo: 'plano',
+                        id: planoId,
+                        texto: texto
+                    });
+                }
+            }
+        });
+        
+        updateSelectedItemsList();
+        $(planoSelect).val(null).trigger('change');
+    });
+    
+    // Limpar lista
+    document.getElementById('limparLista')?.addEventListener('click', function() {
+        if (confirm('Tem certeza que deseja limpar toda a lista de seleções?')) {
+            selectedItems = [];
+            updateSelectedItemsList();
+            // Atualizar visibilidade para mostrar todas as máquinas novamente
+            updateMaquinasVisibility();
+        }
+    });
+    
+    // Preview de periodicidade
+    function updatePeriodicidadePreview() {
+        const dataPlanejada = document.getElementById('dataPlanejada').value;
+        const periodicidade = parseInt(document.getElementById('periodicidade').value) || 0;
+        const previewDiv = document.getElementById('previewPeriodicidade');
+        const previewDates = document.getElementById('previewDates');
+        
+        if (!dataPlanejada || !periodicidade || periodicidade < 1) {
+            previewDiv.style.display = 'none';
+            return;
+        }
+        
+        const dataInicial = new Date(dataPlanejada);
+        const anoAtual = new Date().getFullYear();
+        const fimDoAno = new Date(anoAtual, 11, 31); // 31 de dezembro
+        
+        const datas = [];
+        let dataAtual = new Date(dataInicial);
+        
+        while (dataAtual <= fimDoAno) {
+            datas.push(new Date(dataAtual));
+            dataAtual = new Date(dataAtual);
+            dataAtual.setDate(dataAtual.getDate() + periodicidade);
+        }
+        
+        if (datas.length > 0) {
+            previewDates.innerHTML = `
+                <strong>Total de repetições até o final de ${anoAtual}:</strong> ${datas.length}<br>
+                <strong>Datas:</strong> ${datas.slice(0, 5).map(d => d.toLocaleDateString('pt-BR')).join(', ')}${datas.length > 5 ? '...' : ''}
+            `;
+            previewDiv.style.display = 'block';
+        } else {
+            previewDiv.style.display = 'none';
+        }
+    }
+    
+    document.getElementById('dataPlanejada')?.addEventListener('change', updatePeriodicidadePreview);
+    document.getElementById('periodicidade')?.addEventListener('input', updatePeriodicidadePreview);
+    
+    // Salvar agendamentos
+    document.getElementById('salvarAgendamentos')?.addEventListener('click', function() {
+        const dataPlanejada = document.getElementById('dataPlanejada').value;
+        const nomeGrupo = document.getElementById('nomeGrupo').value.trim();
+        const periodicidade = parseInt(document.getElementById('periodicidade').value) || null;
+        
+        if (!dataPlanejada) {
+            alert('Por favor, selecione uma data planejada.');
+            return;
+        }
+        
+        if (selectedItems.length === 0) {
+            alert('Por favor, adicione pelo menos um item à lista.');
+            return;
+        }
+        
+        let confirmMessage = `Deseja salvar ${selectedItems.length} agendamento(s)`;
+        if (periodicidade) {
+            const dataInicial = new Date(dataPlanejada);
+            const anoAtual = new Date().getFullYear();
+            const fimDoAno = new Date(anoAtual, 11, 31);
+            let count = 0;
+            let dataAtual = new Date(dataInicial);
+            while (dataAtual <= fimDoAno) {
+                count++;
+                dataAtual = new Date(dataAtual);
+                dataAtual.setDate(dataAtual.getDate() + periodicidade);
+            }
+            confirmMessage += ` com periodicidade de ${periodicidade} dias (${count} repetições até o final do ano)`;
+        } else {
+            confirmMessage += ` para a data ${dataPlanejada}`;
+        }
+        confirmMessage += '?';
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+        
+        // Preparar dados
+        const agendamentos = selectedItems.map(function(item) {
+            return {
+                tipo: item.tipo,
+                id: item.id,
+                data_planejada: dataPlanejada,
+                nome_grupo: nomeGrupo || null,
+                periodicidade: periodicidade
+            };
+        });
+        
+        // Função para obter CSRF token
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        
+        const csrftoken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+        
+        // Enviar para o servidor
+        fetch('{% url "salvar_agendamentos_cronograma" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify({
+                agendamentos: agendamentos
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Sucesso! ${data.saved_count} agendamento(s) salvo(s) com sucesso.`);
+                selectedItems = [];
+                updateSelectedItemsList();
+                document.getElementById('dataPlanejada').value = '';
+                // Recarregar a página para ver os novos agendamentos
+                window.location.reload();
+            } else {
+                alert('Erro ao salvar agendamentos: ' + (data.error || 'Erro desconhecido'));
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao salvar agendamentos. Verifique o console para mais detalhes.');
+        });
+    });
+    
+    // Alternar entre seções baseado no tipo de seleção
+    selectionTypeRadios.forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            if (this.value === 'maquina') {
+                maquinaSection.style.display = 'block';
+                planoSection.style.display = 'none';
+                if (planoSelect) {
+                    $(planoSelect).val(null).trigger('change');
+                }
+            } else {
+                maquinaSection.style.display = 'none';
+                planoSection.style.display = 'block';
+                if (maquinaSelect) {
+                    Array.from(maquinaSelect.options).forEach(opt => opt.selected = false);
+                }
+            }
+        });
+    });
+    
+    // Inicializar lista vazia
+    updateSelectedItemsList();
+    
+    // Inicializar visibilidade das máquinas
+    updateMaquinasVisibility();
+});
+</script>
+{% endblock %}
+

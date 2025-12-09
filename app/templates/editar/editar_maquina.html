@@ -48,7 +48,7 @@
         </div>
         
         <div class="row">
-            <div class="col-lg-10 mx-auto">
+            <div class="col-12">
                 <div class="card shadow-sm">
                     <div class="card-header bg-warning text-dark">
                         <h5 class="mb-0">
@@ -382,6 +382,105 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Documentos da Máquina - Separado do formulário principal -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-upload me-2"></i>Documentos da Máquina
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Formulário de Upload -->
+                        <div class="mb-4 pb-3 border-bottom">
+                            <h6 class="fw-bold mb-3">Adicionar Novo Documento</h6>
+                            <form method="post" action="{% url 'adicionar_documento_maquina' maquina.id %}" enctype="multipart/form-data" id="documentoForm">
+                                {% csrf_token %}
+                                <div class="row g-3">
+                                    <div class="col-md-8">
+                                        <label for="arquivo" class="form-label">Arquivo *</label>
+                                        <input type="file" class="form-control" id="arquivo" name="arquivo" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.xlsx,.xls,.xlsm,.txt" required>
+                                        <div class="form-text">Formatos aceitos: PDF, Word, Excel, Imagens, TXT</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="comentario" class="form-label">Comentário (opcional)</label>
+                                        <textarea class="form-control" id="comentario" name="comentario" rows="3" placeholder="Comentário sobre o documento"></textarea>
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-primary" id="btnAdicionarDocumento">
+                                            <i class="fas fa-upload me-2"></i>Adicionar Documento
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Lista de Documentos -->
+                        {% if documentos %}
+                            <h6 class="fw-bold mb-3">Documentos Adicionados</h6>
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Arquivo</th>
+                                            <th>Comentário</th>
+                                            <th>Data de Upload</th>
+                                            <th class="text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for documento in documentos %}
+                                        <tr>
+                                            <td>
+                                                <i class="fas fa-file me-2"></i>
+                                                {% with nome_arquivo=documento.arquivo.name|slice:"30:" %}
+                                                    <strong>{{ nome_arquivo|truncatechars:50 }}</strong>
+                                                {% endwith %}
+                                                <br><small class="text-muted" title="{{ documento.arquivo.name }}">{{ documento.arquivo.name|truncatechars:60 }}</small>
+                                            </td>
+                                            <td>
+                                                {% if documento.comentario %}
+                                                    {{ documento.comentario|truncatewords:10 }}
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <small>{{ documento.created_at|date:"d/m/Y H:i" }}</small>
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="btn-group" role="group">
+                                                    <a href="{{ documento.arquivo.url }}" target="_blank" class="btn btn-sm btn-primary" title="Visualizar">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    <a href="{{ documento.arquivo.url }}" download class="btn btn-sm btn-success" title="Download">
+                                                        <i class="fas fa-download"></i>
+                                                    </a>
+                                                    <a href="{% url 'remover_documento_maquina' maquina.id documento.id %}" 
+                                                       class="btn btn-sm btn-danger" 
+                                                       title="Remover"
+                                                       onclick="return confirm('Tem certeza que deseja remover este documento?');">
+                                                        <i class="fas fa-trash"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                                <p class="text-muted">Nenhum documento adicionado ainda.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </section>
 
@@ -511,6 +610,64 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error('Form:', form);
         console.error('Submit button:', submitBtn);
     }
+    
+    // Handle documento form submission - Executar após o main.js carregar
+    window.addEventListener('load', function() {
+        // Aguardar um pouco para garantir que main.js já carregou
+        setTimeout(function() {
+            const documentoForm = document.getElementById('documentoForm');
+            const arquivoInput = document.getElementById('arquivo');
+            const submitBtn = document.getElementById('btnAdicionarDocumento');
+            
+            if (!documentoForm || !arquivoInput || !submitBtn) {
+                console.log('Formulário de documentos não encontrado ou elementos faltando');
+                return;
+            }
+            
+            console.log('Formulário de documentos encontrado:', documentoForm);
+            
+            // Clonar o formulário para remover listeners do main.js
+            const newForm = documentoForm.cloneNode(true);
+            documentoForm.parentNode.replaceChild(newForm, documentoForm);
+            const cleanForm = document.getElementById('documentoForm');
+            const cleanArquivoInput = document.getElementById('arquivo');
+            const cleanSubmitBtn = document.getElementById('btnAdicionarDocumento');
+            
+            if (cleanForm && cleanArquivoInput && cleanSubmitBtn) {
+                cleanForm.addEventListener('submit', function(e) {
+                    console.log('=== DOCUMENT FORM SUBMIT EVENT TRIGGERED ===');
+                    
+                    // Verificar se arquivo foi selecionado
+                    if (!cleanArquivoInput || !cleanArquivoInput.files || cleanArquivoInput.files.length === 0) {
+                        console.log('No file selected - HTML5 validation should prevent this');
+                        // Deixar validação HTML5 funcionar - não prevenir envio
+                        return;
+                    }
+                    
+                    console.log('File selected:', cleanArquivoInput.files[0].name, 'Size:', cleanArquivoInput.files[0].size);
+                    
+                    // Desabilitar botão e mostrar loading
+                    cleanSubmitBtn.disabled = true;
+                    cleanSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Enviando...';
+                    
+                    // IMPORTANTE: NÃO chamar e.preventDefault() - deixar o formulário ser enviado normalmente
+                    console.log('Form will submit normally...');
+                }, true); // Use capture phase para executar antes de outros listeners
+                
+                // Listener no botão para debug
+                cleanSubmitBtn.addEventListener('click', function(e) {
+                    console.log('=== SUBMIT BUTTON CLICKED ===');
+                    if (!cleanArquivoInput || !cleanArquivoInput.files || cleanArquivoInput.files.length === 0) {
+                        console.log('No file selected on button click');
+                    } else {
+                        console.log('File ready for upload:', cleanArquivoInput.files[0].name, 'Size:', cleanArquivoInput.files[0].size);
+                    }
+                });
+            } else {
+                console.error('Could not find form elements after cloning');
+            }
+        }, 500); // Aguardar 500ms para garantir que main.js já carregou
+    });
 });
 </script>
 {% endblock %}

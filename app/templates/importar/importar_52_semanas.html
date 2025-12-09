@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Importar 52 Semanas{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Importar Dados</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Importar 52 Semanas</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Importar 52 Semanas</h1>
+                <p class="lead">Importe dados das 52 semanas do ano através de arquivo Excel</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Upload Section -->
+        <div class="row mb-5">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-upload me-2"></i>Selecionar Arquivo
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'importar_52_semanas' %}" enctype="multipart/form-data" id="importarForm">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="fileInput" class="form-label">Arquivo para Importação</label>
+                                <input type="file" class="form-control" id="fileInput" name="file" accept=".xlsx,.xls,.xlsm" required>
+                                <div class="form-text">Formatos aceitos: Excel (.xlsx, .xls, .xlsm)</div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="onlyNewRecords" name="only_new_records" checked>
+                                    <label class="form-check-label" for="onlyNewRecords">
+                                        <strong>Apenas adicionar novos registros</strong> (registros duplicados serão ignorados)
+                                    </label>
+                                    <div class="form-text">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Quando marcado, apenas registros que ainda não existem na tabela serão importados. Registros duplicados serão ignorados.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="updateExisting" name="update_existing">
+                                    <label class="form-check-label" for="updateExisting">
+                                        Atualizar registros existentes
+                                    </label>
+                                    <div class="form-text">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Quando marcado, registros existentes serão atualizados com os dados do arquivo. <strong>Nota:</strong> Se "Apenas adicionar novos registros" estiver marcado, esta opção será ignorada.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                    <i class="fas fa-upload me-2"></i>Importar Arquivo
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions Section -->
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Instruções
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <h6 class="fw-bold">Formato do Arquivo:</h6>
+                        <p>O arquivo Excel deve conter as seguintes colunas:</p>
+                        <ul>
+                            <li><strong>semana</strong>: Número ou descrição da semana (ex: "semana 52, 2025", "semana 01")</li>
+                            <li><strong>inicio</strong> ou <strong>início</strong>: Data de início da semana</li>
+                            <li><strong>fim</strong>: Data de fim da semana</li>
+                        </ul>
+                        <h6 class="fw-bold mt-3">Formatos de Data Suportados:</h6>
+                        <p>O sistema aceita datas em vários formatos diferentes:</p>
+                        <ul>
+                            <li><strong>Texto com mês:</strong> "22 Dezembro 2025", "22 Dec 2025", "22 de Dezembro de 2025"</li>
+                            <li><strong>Formato brasileiro:</strong> "22/12/2025", "22-12-2025", "22.12.2025"</li>
+                            <li><strong>Formato ISO:</strong> "2025-12-22", "2025/12/22"</li>
+                            <li><strong>Formato curto:</strong> "22/12/25", "22-12-25"</li>
+                            <li><strong>Objetos de data do Excel:</strong> O sistema detecta automaticamente datas do Excel</li>
+                            <li><strong>Números Excel:</strong> Números de série de data do Excel são convertidos automaticamente</li>
+                        </ul>
+                        <p class="text-muted mt-2">
+                            <i class="fas fa-info-circle me-1"></i>
+                            <strong>Nota:</strong> O sistema tenta automaticamente detectar o formato da data. Se houver problemas, verifique se as datas estão em um dos formatos acima.
+                        </p>
+                        <h6 class="fw-bold mt-3">Observações:</h6>
+                        <ul>
+                            <li>A primeira linha do arquivo deve conter os cabeçalhos das colunas</li>
+                            <li>O campo "semana" é obrigatório</li>
+                            <li>As datas são opcionais, mas recomendadas</li>
+                            <li>Registros com a mesma "semana" serão considerados duplicados</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Messages -->
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Executar após o main.js carregar
+window.addEventListener('load', function() {
+    const form = document.getElementById('importarForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const fileInput = document.getElementById('fileInput');
+    
+    if (!form || !submitBtn) {
+        console.error('Form ou botão de submit não encontrado!');
+        return;
+    }
+    
+    console.log('Form encontrado:', form);
+    console.log('Botão de submit encontrado:', submitBtn);
+    
+    // Remover qualquer listener do main.js que possa estar interferindo
+    const newSubmitBtn = submitBtn.cloneNode(true);
+    submitBtn.parentNode.replaceChild(newSubmitBtn, submitBtn);
+    const cleanSubmitBtn = document.getElementById('submitBtn');
+    
+    // Adicionar listener no formulário - executar ANTES de qualquer outro
+    form.addEventListener('submit', function(e) {
+        console.log('=== FORM SUBMIT EVENT TRIGGERED ===');
+        
+        // Verificar se arquivo foi selecionado
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            console.log('Nenhum arquivo selecionado - validação HTML5 deve prevenir isso');
+            // Deixar validação HTML5 funcionar - não prevenir envio
+            return;
+        }
+        
+        console.log('Arquivo selecionado:', fileInput.files[0].name, 'Tamanho:', fileInput.files[0].size);
+        
+        // Desabilitar botão e mostrar loading
+        cleanSubmitBtn.disabled = true;
+        cleanSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Importando...';
+        
+        // IMPORTANTE: NÃO chamar e.preventDefault() - deixar o formulário ser enviado normalmente
+        console.log('Formulário será enviado normalmente...');
+    }, true); // Use capture phase para executar antes de outros listeners
+    
+    // Listener no botão para debug
+    cleanSubmitBtn.addEventListener('click', function(e) {
+        console.log('=== SUBMIT BUTTON CLICKED ===');
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            console.log('Nenhum arquivo selecionado no clique do botão');
+        } else {
+            console.log('Arquivo pronto para upload:', fileInput.files[0].name, 'Tamanho:', fileInput.files[0].size);
+        }
+    });
+});
+</script>
+{% endblock %}
