@@ -1,0 +1,311 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Visualizar Nota Fiscal {{ nota.nota|default:nota.id }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_notas_fiscais' %}" class="text-white">Consultar Notas Fiscais</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Nota Fiscal {{ nota.nota|default:nota.id }}</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-file-invoice me-2"></i>Visualizar Nota Fiscal
+                </h1>
+                <p class="lead">Detalhes completos da Nota Fiscal {{ nota.nota|default:nota.id }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <div class="row">
+            <div class="col-12">
+                <!-- Informações da Nota Fiscal -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-invoice me-2"></i>Informações da Nota Fiscal
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Número da Nota</label>
+                                <p class="form-control-plaintext fs-5">{{ nota.nota|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Série</label>
+                                <p class="form-control-plaintext">{{ nota.serie|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Modelo</label>
+                                <p class="form-control-plaintext">{{ nota.modelo|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Total da Nota</label>
+                                <p class="form-control-plaintext fs-5 text-success fw-bold">
+                                    {% if nota.total_nota %}
+                                        R$ {{ nota.total_nota|floatformat:2 }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Centro de Custo</label>
+                                <p class="form-control-plaintext">{{ nota.centro_de_custo|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Controle</label>
+                                <p class="form-control-plaintext">{{ nota.ctrle|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Situação</label>
+                                <p class="form-control-plaintext">
+                                    {% if nota.situacao %}
+                                        <span class="badge bg-info fs-6">{{ nota.situacao }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dados do Emitente -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-building me-2"></i>Dados do Emitente
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Emitente (CNPJ)</label>
+                                <p class="form-control-plaintext">{{ nota.emitente|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Nome Fantasia Emitente</label>
+                                <p class="form-control-plaintext">{{ nota.nome_fantasia_emitente|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Datas -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-calendar-alt me-2"></i>Datas
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Data Emissão</label>
+                                <p class="form-control-plaintext">{{ nota.data_emissao|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Data Vencimento</label>
+                                <p class="form-control-plaintext">{{ nota.data_vencimento|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Data Inclusão</label>
+                                <p class="form-control-plaintext">{{ nota.data_inclusao|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Data Autorização</label>
+                                <p class="form-control-plaintext">{{ nota.data_autorizacao|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Data Última Situação Fechada</label>
+                                <p class="form-control-plaintext">{{ nota.data_ult_sit_fechada|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dados da Unidade -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-map-marker-alt me-2"></i>Dados da Unidade
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Unidade</label>
+                                <p class="form-control-plaintext">{{ nota.unidade|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Nome Unidade</label>
+                                <p class="form-control-plaintext">{{ nota.nome_unidade|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Unidade Autorização</label>
+                                <p class="form-control-plaintext">{{ nota.unidade_autorizacao|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Nome Unidade Autorização</label>
+                                <p class="form-control-plaintext">{{ nota.nome_unidade_autorizacao|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dados do Centro de Atividade -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-industry me-2"></i>Dados do Centro de Atividade
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Centro Atividade</label>
+                                <p class="form-control-plaintext">{{ nota.centro_atividade|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Nome Centro Atividade</label>
+                                <p class="form-control-plaintext">{{ nota.nome_centro_atividade|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Situação Detalhada -->
+                {% if nota.situacao_detalhada %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Situação Detalhada
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="form-control-plaintext">{{ nota.situacao_detalhada }}</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Usuário e Autorização -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-user me-2"></i>Usuário e Autorização
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Nome Usuário</label>
+                                <p class="form-control-plaintext">{{ nota.nome_usuario|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Autorizador</label>
+                                <p class="form-control-plaintext">{{ nota.autorizador|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Observações -->
+                {% if nota.observacoes or nota.observacoes_csc or nota.observacoes_autorizacao %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-sticky-note me-2"></i>Observações
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if nota.observacoes %}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Observações</label>
+                            <p class="form-control-plaintext">{{ nota.observacoes }}</p>
+                        </div>
+                        {% endif %}
+                        {% if nota.observacoes_csc %}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Observações CSC</label>
+                            <p class="form-control-plaintext">{{ nota.observacoes_csc }}</p>
+                        </div>
+                        {% endif %}
+                        {% if nota.observacoes_autorizacao %}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Observações Autorização</label>
+                            <p class="form-control-plaintext">{{ nota.observacoes_autorizacao }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Lançamento -->
+                {% if nota.lancamento_tesf0028 %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-book me-2"></i>Lançamento
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label fw-bold">Lançamento TESF0028</label>
+                                <p class="form-control-plaintext">{{ nota.lancamento_tesf0028 }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Informações do Sistema -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-database me-2"></i>Informações do Sistema
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">ID do Registro</label>
+                                <p class="form-control-plaintext">{{ nota.id }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Data de Criação</label>
+                                <p class="form-control-plaintext">{{ nota.created_at|date:"d/m/Y H:i:s" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Última Atualização</label>
+                                <p class="form-control-plaintext">{{ nota.updated_at|date:"d/m/Y H:i:s" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botões de Ação -->
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{% url 'consultar_notas_fiscais' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Voltar para Lista
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+

@@ -92,16 +92,6 @@
                                 <input type="hidden" name="search" value="{{ request.GET.search }}">
                                 
                                 <div class="row g-3">
-                                    <!-- Filtro por Tipo -->
-                                    <div class="col-md-3">
-                                        <label for="filtro_tipo" class="form-label">Tipo de Manutentor</label>
-                                        <select class="form-select" id="filtro_tipo" name="filtro_tipo">
-                                            <option value="">Todos os tipos</option>
-                                            {% for tipo_value, tipo_label in tipos_manutentor %}
-                                                <option value="{{ tipo_value }}" {% if filtro_tipo == tipo_value %}selected{% endif %}>{{ tipo_label }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
                                     
                                     <!-- Filtro por Turno -->
                                     <div class="col-md-3">
@@ -271,13 +261,13 @@
                                 <tr>
                                     <td>
                                         <strong>
-                                            <a href="{% url 'visualizar_manutentor' manutentor.Cadastro %}" class="text-decoration-none">
-                                                {{ manutentor.Cadastro }}
+                                            <a href="{% url 'visualizar_manutentor' manutentor.Matricula %}" class="text-decoration-none">
+                                                {{ manutentor.Matricula }}
                                             </a>
                                         </strong>
                                     </td>
                                     <td>
-                                        <a href="{% url 'visualizar_manutentor' manutentor.Cadastro %}" class="text-decoration-none">
+                                        <a href="{% url 'visualizar_manutentor' manutentor.Matricula %}" class="text-decoration-none">
                                             {{ manutentor.Nome|default:"-" }}
                                         </a>
                                     </td>
@@ -301,10 +291,10 @@
                                     </td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <a href="{% url 'visualizar_manutentor' manutentor.Cadastro %}" class="btn btn-sm btn-primary" title="Visualizar detalhes">
+                                            <a href="{% url 'visualizar_manutentor' manutentor.Matricula %}" class="btn btn-sm btn-primary" title="Visualizar detalhes">
                                                 <i class="fas fa-eye me-1"></i>Visualizar
                                             </a>
-                                            <a href="{% url 'editar_manutentor' manutentor.Cadastro %}" class="btn btn-sm btn-warning" title="Editar manutentor">
+                                            <a href="{% url 'editar_manutentor' manutentor.Matricula %}" class="btn btn-sm btn-warning" title="Editar manutentor">
                                                 <i class="fas fa-edit me-1"></i>Editar
                                             </a>
                                         </div>

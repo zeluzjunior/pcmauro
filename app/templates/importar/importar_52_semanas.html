@@ -92,15 +92,23 @@
                         <p>O arquivo Excel deve conter as seguintes colunas:</p>
                         <ul>
                             <li><strong>semana</strong>: Número ou descrição da semana (ex: "semana 52, 2025", "semana 01")</li>
-                            <li><strong>inicio</strong>: Data de início da semana (ex: "22 Dezembro 2025")</li>
-                            <li><strong>fim</strong>: Data de fim da semana (ex: "28 Dezembro 2025")</li>
+                            <li><strong>inicio</strong> ou <strong>início</strong>: Data de início da semana</li>
+                            <li><strong>fim</strong>: Data de fim da semana</li>
                         </ul>
-                        <h6 class="fw-bold mt-3">Formato de Data:</h6>
-                        <p>As datas podem estar nos seguintes formatos:</p>
+                        <h6 class="fw-bold mt-3">Formatos de Data Suportados:</h6>
+                        <p>O sistema aceita datas em vários formatos diferentes:</p>
                         <ul>
-                            <li>"DD Mês YYYY" (ex: "22 Dezembro 2025")</li>
-                            <li>"DD/MM/YYYY" (ex: "22/12/2025")</li>
+                            <li><strong>Texto com mês:</strong> "22 Dezembro 2025", "22 Dec 2025", "22 de Dezembro de 2025"</li>
+                            <li><strong>Formato brasileiro:</strong> "22/12/2025", "22-12-2025", "22.12.2025"</li>
+                            <li><strong>Formato ISO:</strong> "2025-12-22", "2025/12/22"</li>
+                            <li><strong>Formato curto:</strong> "22/12/25", "22-12-25"</li>
+                            <li><strong>Objetos de data do Excel:</strong> O sistema detecta automaticamente datas do Excel</li>
+                            <li><strong>Números Excel:</strong> Números de série de data do Excel são convertidos automaticamente</li>
                         </ul>
+                        <p class="text-muted mt-2">
+                            <i class="fas fa-info-circle me-1"></i>
+                            <strong>Nota:</strong> O sistema tenta automaticamente detectar o formato da data. Se houver problemas, verifique se as datas estão em um dos formatos acima.
+                        </p>
                         <h6 class="fw-bold mt-3">Observações:</h6>
                         <ul>
                             <li>A primeira linha do arquivo deve conter os cabeçalhos das colunas</li>

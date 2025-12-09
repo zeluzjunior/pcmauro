@@ -165,15 +165,15 @@ class LocalCentroAtividadeAdmin(admin.ModelAdmin):
 @admin.register(Manutentor)
 class ManutentorAdmin(admin.ModelAdmin):
     """Admin configuration for Manutentor model"""
-    list_display = ('Cadastro', 'Nome', 'Cargo', 'tipo', 'turno', 'local_trab', 'created_at')
-    list_filter = ('tipo', 'turno', 'local_trab', 'created_at')
-    search_fields = ('Cadastro', 'Nome', 'Cargo', 'Posto')
+    list_display = ('Matricula', 'Nome', 'Cargo', 'turno', 'local_trab', 'created_at')
+    list_filter = ('turno', 'local_trab', 'created_at')
+    search_fields = ('Matricula', 'Nome', 'Cargo')
     readonly_fields = ('created_at', 'updated_at')
     list_per_page = 50
     
     fieldsets = (
         ('Informações Básicas', {
-            'fields': ('Cadastro', 'Nome', 'Admissao', 'Cargo', 'Posto')
+            'fields': ('Matricula', 'Nome', 'Cargo')
         }),
         ('Horários e Tempo de Trabalho', {
             'fields': ('horario_inicio', 'horario_fim', 'tempo_trabalho')
@@ -264,7 +264,7 @@ class ManutentorMaquinaAdmin(admin.ModelAdmin):
     """Admin configuration for ManutentorMaquina model"""
     list_display = ('manutentor', 'maquina', 'created_at')
     list_filter = ('manutentor', 'maquina', 'created_at')
-    search_fields = ('manutentor__Cadastro', 'manutentor__Nome', 'maquina__cd_maquina', 'maquina__descr_maquina')
+    search_fields = ('manutentor__Matricula', 'manutentor__Nome', 'maquina__cd_maquina', 'maquina__descr_maquina')
     readonly_fields = ('created_at', 'updated_at')
     raw_id_fields = ('manutentor', 'maquina')  # Para facilitar a seleção em muitos registros
     list_per_page = 50

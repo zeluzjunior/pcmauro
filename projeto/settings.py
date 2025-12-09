@@ -51,19 +51,25 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# Disable caching in development
+if DEBUG:
+    MIDDLEWARE.append('app.middleware.DisableCacheMiddleware')
+
 ROOT_URLCONF = 'projeto.urls'
 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [],
-        'APP_DIRS': True,
+        'APP_DIRS': True,  # Enable app directories loader
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
+            # Disable template caching in development
+            'debug': DEBUG,
         },
     },
 ]

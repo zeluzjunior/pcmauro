@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Cadastrar Visita{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Visitas</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Cadastrar Visita</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-calendar-check me-2"></i>Cadastrar Visita
+                </h1>
+                <p class="lead">Preencha os dados para cadastrar uma nova visita</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-plus-circle me-2"></i>Dados da Visita
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Aviso sobre campos obrigatórios -->
+                        <div class="alert alert-info mb-4">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Campos obrigatórios:</strong> Os campos marcados com <span class="text-danger">*</span> são obrigatórios e devem ser preenchidos.
+                        </div>
+                        
+                        <!-- Messages -->
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                    {{ message|safe }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                        
+                        <form method="post" action="{% url 'cadastrar_visita' %}" enctype="multipart/form-data" id="visitaForm" class="needs-validation" novalidate>
+                            {% csrf_token %}
+                            
+                            <!-- Informações da Visita -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-calendar-check me-2"></i>Informações da Visita
+                                    </h6>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label for="{{ form.titulo.id_for_label }}" class="form-label">
+                                        {{ form.titulo.label }}
+                                        <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.titulo }}
+                                    {% if form.titulo.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.titulo.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Título da visita</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.data.id_for_label }}" class="form-label">
+                                        {{ form.data.label }}
+                                    </label>
+                                    {{ form.data }}
+                                    {% if form.data.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.data.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Data e hora da visita</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.documento.id_for_label }}" class="form-label">
+                                        {{ form.documento.label }}
+                                    </label>
+                                    {{ form.documento }}
+                                    {% if form.documento.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.documento.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Documento relacionado à visita</div>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label for="{{ form.descricao.id_for_label }}" class="form-label">
+                                        {{ form.descricao.label }}
+                                    </label>
+                                    {{ form.descricao }}
+                                    {% if form.descricao.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.descricao.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Descrição detalhada da visita</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.nome_contato.id_for_label }}" class="form-label">
+                                        {{ form.nome_contato.label }}
+                                    </label>
+                                    {{ form.nome_contato }}
+                                    {% if form.nome_contato.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.nome_contato.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Nome do contato relacionado à visita</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.numero_contato.id_for_label }}" class="form-label">
+                                        {{ form.numero_contato.label }}
+                                    </label>
+                                    {{ form.numero_contato }}
+                                    {% if form.numero_contato.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.numero_contato.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Número de contato</div>
+                                </div>
+                            </div>
+
+                            <!-- Buttons -->
+                            <div class="row">
+                                <div class="col-12">
+                                    <hr>
+                                    <div class="d-flex justify-content-between">
+                                        <a href="{% url 'consultar_visitas' %}" class="btn btn-secondary">
+                                            <i class="fas fa-arrow-left me-2"></i>Voltar
+                                        </a>
+                                        <button type="submit" class="btn btn-primary" id="submitVisitaBtn">
+                                            <i class="fas fa-save me-2"></i>Salvar Visita
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+{% endblock %}
+

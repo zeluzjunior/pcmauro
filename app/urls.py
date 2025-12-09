@@ -6,7 +6,9 @@ urlpatterns = [
     path('home/', views.home, name="home"),
     path('about/', views.about, name="about"),
     path('em-desenvolvimento/', views.em_desenvolvimento, name="em_desenvolvimento"),
+    path('orcamento/analise-requisicoes/', views.analise_requisicoes, name="analise_requisicoes"),
     path('testes/', views.testes, name="testes"),
+    path('debug-template/', views.template_debug, name="template_debug"),
     path('analise/plano-preventiva/', views.analise_plano_preventiva, name="analise_plano_preventiva"),
     path('planejamento/maquina-primaria-secundaria/', views.maquina_primaria_secundaria, name="maquina_primaria_secundaria"),
     path('planejamento/analise-roteiro-plano-preventiva/', views.analise_roteiro_plano_preventiva, name="analise_roteiro_plano_preventiva"),  # Função limpa - recriar do zero
@@ -48,6 +50,8 @@ urlpatterns = [
     path('importar/plano-preventiva/', views.importar_plano_preventiva, name="importar_plano_preventiva"),
     path('importar/roteiro-preventiva/', views.importar_roteiro_preventiva, name="importar_roteiro_preventiva"),
     path('importar/52-semanas/', views.importar_52_semanas, name="importar_52_semanas"),
+    path('importar/requisicoes-almoxarifado/', views.importar_requisicoes_almoxarifado, name="importar_requisicoes_almoxarifado"),
+    path('importar/notas-fiscais/', views.importar_notas_fiscais, name="importar_notas_fiscais"),
     path('importar/locais-e-cas/', views.importar_locais_e_cas, name="importar_locais_e_cas"),
     path('importar/estoque/', views.importar_estoque, name="importar_estoque"),
     
@@ -59,6 +63,9 @@ urlpatterns = [
     path('manutencoes-preventivas/consultar/', views.consultar_manutencoes_preventivas, name="consultar_manutencoes_preventivas"),
     path('meus-planos-preventiva/consultar/', views.consultar_meu_plano, name="consultar_meu_plano"),
     path('consultar/52-semanas/', views.consultar_52_semanas, name="consultar_52_semanas"),
+    path('consultar/requisicoes-almoxarifado/', views.consultar_requisicoes_almoxarifado, name="consultar_requisicoes_almoxarifado"),
+    path('consultar/notas-fiscais/', views.consultar_notas_fiscais, name="consultar_notas_fiscais"),
+    path('visualizar/nota-fiscal/<int:nota_id>/', views.visualizar_nota_fiscal, name="visualizar_nota_fiscal"),
     path('plano-pcm/visualizar/<int:plano_id>/', views.visualizar_plano_pcm, name="visualizar_plano_pcm"),
     path('plano-pcm/editar/<int:plano_id>/', views.editar_plano_pcm, name="editar_plano_pcm"),
     path('plano-pcm/<int:plano_id>/gerar-pdf/', views.gerar_pdf_plano_pcm, name="gerar_pdf_plano_pcm"),
@@ -120,16 +127,31 @@ urlpatterns = [
     # Manutentores
     path('manutentor/cadastrar/', views.cadastrar_manutentor, name="cadastrar_manutentor"),
     path('manutentor/consultar/', views.consultar_manutentores, name="consultar_manutentores"),
-    path('manutentor/visualizar/<str:cadastro>/', views.visualizar_manutentor, name="visualizar_manutentor"),
-    path('manutentor/editar/<str:cadastro>/', views.editar_manutentor, name="editar_manutentor"),
-    path('manutentor/<str:cadastro>/adicionar-maquina/', views.adicionar_maquina_manutentor, name="adicionar_maquina_manutentor"),
-    path('manutentor/<str:cadastro>/remover-maquina/<int:manutentor_maquina_id>/', views.remover_maquina_manutentor, name="remover_maquina_manutentor"),
+    path('manutentor/visualizar/<str:matricula>/', views.visualizar_manutentor, name="visualizar_manutentor"),
+    path('manutentor/editar/<str:matricula>/', views.editar_manutentor, name="editar_manutentor"),
+    path('manutentor/<str:matricula>/adicionar-maquina/', views.adicionar_maquina_manutentor, name="adicionar_maquina_manutentor"),
+    path('manutentor/<str:matricula>/remover-maquina/<int:manutentor_maquina_id>/', views.remover_maquina_manutentor, name="remover_maquina_manutentor"),
     
     # Manutenção Terceiro
     path('manutencao-terceiro/cadastrar/', views.cadastrar_manutencao_terceiro, name="cadastrar_manutencao_terceiro"),
     path('manutencao-terceiro/consultar/', views.consultar_manutencao_terceiros, name="consultar_manutencao_terceiros"),
     
+    # Visitas
+    path('visitas/consultar/', views.consultar_visitas, name="consultar_visitas"),
+    path('visitas/cadastrar/', views.cadastrar_visita, name="cadastrar_visita"),
+    
+    # Agendamentos (mantido para compatibilidade)
+    path('agendamentos/consultar/', views.consultar_agendamentos, name="consultar_agendamentos"),
+    path('agendamentos/cadastrar/', views.cadastrar_visita, name="cadastrar_agendamento"),  # Alias para compatibilidade
+    
     # Administração
     path('administrador/gerenciar/', views.gerenciar_projeto, name="gerenciar_projeto"),
     path('administrador/limpar-tabela/', views.limpar_tabela, name="limpar_tabela"),
+    
+    # API Endpoints
+    path('api/search-maquinas/', views.api_search_maquinas, name="api_search_maquinas"),
+    path('api/search-planos-pcm/', views.api_search_planos_pcm, name="api_search_planos_pcm"),
+    path('api/salvar-agendamentos-cronograma/', views.salvar_agendamentos_cronograma, name="salvar_agendamentos_cronograma"),
+    path('api/dados-diarios-requisicoes/', views.api_dados_diarios_requisicoes, name="api_dados_diarios_requisicoes"),
+    path('api/meses-por-ano/', views.api_meses_por_ano, name="api_meses_por_ano"),
 ]

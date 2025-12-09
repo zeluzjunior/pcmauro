@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Maquina, MaquinaDocumento, OrdemServicoCorretiva, OrdemServicoCorretivaFicha, CentroAtividade, LocalCentroAtividade, Manutentor, ManutencaoTerceiro, PlanoPreventivaDocumento, MeuPlanoPreventiva
+from .models import Maquina, MaquinaDocumento, OrdemServicoCorretiva, OrdemServicoCorretivaFicha, CentroAtividade, LocalCentroAtividade, Manutentor, ManutencaoTerceiro, PlanoPreventivaDocumento, MeuPlanoPreventiva, AgendamentoCronograma, Visitas
 
 
 class MaquinaForm(forms.ModelForm):
@@ -416,43 +416,30 @@ class ManutentorForm(forms.ModelForm):
     class Meta:
         model = Manutentor
         fields = [
-            'Cadastro',
+            'Matricula',
             'Nome',
-            'Admissao',
             'Cargo',
-            'Posto',
             'horario_inicio',
             'horario_fim',
             'tempo_trabalho',
-            'tipo',
             'turno',
             'local_trab',
         ]
         widgets = {
-            'Cadastro': forms.TextInput(attrs={
+            'Matricula': forms.TextInput(attrs={
                 'class': 'form-control',
                 'required': True,
-                'placeholder': 'Código de Cadastro'
+                'placeholder': 'Matrícula'
             }),
             'Nome': forms.TextInput(attrs={
                 'class': 'form-control',
                 'maxlength': '1000',
                 'placeholder': 'Nome Completo'
             }),
-            'Admissao': forms.DateInput(attrs={
-                'class': 'form-control',
-                'type': 'date',
-                'placeholder': 'Data de Admissão'
-            }),
             'Cargo': forms.TextInput(attrs={
                 'class': 'form-control',
                 'maxlength': '1000',
                 'placeholder': 'Cargo'
-            }),
-            'Posto': forms.TextInput(attrs={
-                'class': 'form-control',
-                'maxlength': '1000',
-                'placeholder': 'Posto de Trabalho'
             }),
             'horario_inicio': forms.TimeInput(attrs={
                 'class': 'form-control',
@@ -469,9 +456,6 @@ class ManutentorForm(forms.ModelForm):
                 'maxlength': '250',
                 'placeholder': 'Tempo de Trabalho'
             }),
-            'tipo': forms.Select(attrs={
-                'class': 'form-select',
-            }),
             'turno': forms.Select(attrs={
                 'class': 'form-select',
             }),
@@ -480,15 +464,12 @@ class ManutentorForm(forms.ModelForm):
             }),
         }
         labels = {
-            'Cadastro': 'Cadastro *',
+            'Matricula': 'Matrícula *',
             'Nome': 'Nome',
-            'Admissao': 'Admissão',
             'Cargo': 'Cargo',
-            'Posto': 'Posto',
             'horario_inicio': 'Horário Início',
             'horario_fim': 'Horário Fim',
             'tempo_trabalho': 'Tempo de Trabalho',
-            'tipo': 'Tipo de Manutentor',
             'turno': 'Turno',
             'local_trab': 'Local de Trabalho',
         }
@@ -496,9 +477,8 @@ class ManutentorForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Torna campos obrigatórios
-        self.fields['Cadastro'].required = True
+        self.fields['Matricula'].required = True
         self.fields['tempo_trabalho'].required = True
-        self.fields['tipo'].required = True
         self.fields['turno'].required = True
         self.fields['local_trab'].required = True
 
@@ -567,7 +547,7 @@ class ManutencaoTerceiroForm(forms.ModelForm):
             'data': forms.DateTimeInput(attrs={
                 'class': 'form-control',
                 'type': 'datetime-local',
-            }),
+            }, format='%Y-%m-%dT%H:%M'),
             'descricao': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 3,
@@ -605,10 +585,23 @@ class ManutencaoTerceiroForm(forms.ModelForm):
         self.fields['data'].required = False
         self.fields['descricao'].required = False
         
+        # Configurar formato de data para datetime-local
+        self.fields['data'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d']
+        
         # Personalizar o campo manutentor para ordenar por Nome e exibir Nome
         from app.models import Manutentor
         self.fields['manutentor'].queryset = Manutentor.objects.all().order_by('Nome')
-        self.fields['manutentor'].label_from_instance = lambda obj: f"{obj.Nome or 'Sem nome'} ({obj.Cadastro})" if obj.Nome else f"Sem nome ({obj.Cadastro})"
+        self.fields['manutentor'].label_from_instance = lambda obj: f"{obj.Nome or 'Sem nome'} ({obj.Matricula})" if obj.Nome else f"Sem nome ({obj.Matricula})"
+    
+    def clean_data(self):
+        """Permitir que o campo data seja vazio"""
+        data = self.cleaned_data.get('data')
+        # Se estiver vazio, retornar None (permitido pelo modelo)
+        if not data:
+            return None
+        if isinstance(data, str) and not data.strip():
+            return None
+        return data
 
 
 class PlanoPreventivaDocumentoForm(forms.ModelForm):
@@ -799,4 +792,187 @@ class MeuPlanoPreventivaForm(forms.ModelForm):
         # Tornar campos opcionais
         self.fields['maquina'].required = False
         self.fields['roteiro_preventiva'].required = False
+
+
+class AgendamentoCronogramaForm(forms.ModelForm):
+    """Formulário para cadastro de agendamentos de cronograma"""
+    
+    class Meta:
+        model = AgendamentoCronograma
+        fields = [
+            'tipo_agendamento',
+            'maquina',
+            'plano_preventiva',
+            'nome_grupo',
+            'periodicidade',
+            'data_planejada',
+            'observacoes',
+        ]
+        widgets = {
+            'tipo_agendamento': forms.Select(attrs={
+                'class': 'form-control',
+                'required': True,
+            }),
+            'maquina': forms.Select(attrs={
+                'class': 'form-control',
+            }),
+            'plano_preventiva': forms.Select(attrs={
+                'class': 'form-control',
+            }),
+            'nome_grupo': forms.TextInput(attrs={
+                'class': 'form-control',
+                'maxlength': '255',
+                'placeholder': 'Nome do grupo de agendamentos'
+            }),
+            'periodicidade': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Periodicidade em dias'
+            }),
+            'data_planejada': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+                'required': True,
+            }),
+            'observacoes': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 4,
+                'placeholder': 'Observações adicionais sobre este agendamento'
+            }),
+        }
+        labels = {
+            'tipo_agendamento': 'Tipo de Agendamento',
+            'maquina': 'Máquina',
+            'plano_preventiva': 'Plano Preventiva',
+            'nome_grupo': 'Nome do Grupo',
+            'periodicidade': 'Periodicidade (dias)',
+            'data_planejada': 'Data Planejada',
+            'observacoes': 'Observações',
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .models import Maquina, MeuPlanoPreventiva
+        
+        # Configurar querysets
+        self.fields['maquina'].queryset = Maquina.objects.all().order_by('cd_maquina')
+        self.fields['plano_preventiva'].queryset = MeuPlanoPreventiva.objects.all().order_by('cd_maquina', 'numero_plano')
+        
+        # Tornar campos opcionais inicialmente
+        self.fields['maquina'].required = False
+        self.fields['plano_preventiva'].required = False
+        self.fields['nome_grupo'].required = False
+        self.fields['periodicidade'].required = False
+        self.fields['observacoes'].required = False
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        tipo_agendamento = cleaned_data.get('tipo_agendamento')
+        maquina = cleaned_data.get('maquina')
+        plano_preventiva = cleaned_data.get('plano_preventiva')
+        
+        if tipo_agendamento == 'maquina' and not maquina:
+            raise forms.ValidationError('Quando o tipo é "Máquina", é necessário informar a máquina.')
+        
+        if tipo_agendamento == 'plano' and not plano_preventiva:
+            raise forms.ValidationError('Quando o tipo é "Plano Preventiva", é necessário informar o plano.')
+        
+        if tipo_agendamento == 'maquina' and plano_preventiva:
+            raise forms.ValidationError('Não é possível ter máquina e plano ao mesmo tempo.')
+        
+        if tipo_agendamento == 'plano' and maquina:
+            raise forms.ValidationError('Não é possível ter máquina e plano ao mesmo tempo.')
+        
+        return cleaned_data
+
+
+class VisitasForm(forms.ModelForm):
+    """Formulário para cadastro de visitas"""
+    
+    class Meta:
+        model = Visitas
+        fields = [
+            'titulo',
+            'data',
+            'descricao',
+            'nome_contato',
+            'numero_contato',
+            'documento',
+        ]
+        widgets = {
+            'titulo': forms.TextInput(attrs={
+                'class': 'form-control',
+                'maxlength': '250',
+                'placeholder': 'Título da visita',
+                'required': True,
+            }),
+            'data': forms.DateTimeInput(attrs={
+                'class': 'form-control',
+                'type': 'datetime-local',
+            }, format='%Y-%m-%dT%H:%M'),
+            'descricao': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 4,
+                'maxlength': '1000',
+                'placeholder': 'Descrição da visita'
+            }),
+            'nome_contato': forms.TextInput(attrs={
+                'class': 'form-control',
+                'maxlength': '250',
+                'placeholder': 'Nome do contato'
+            }),
+            'numero_contato': forms.TextInput(attrs={
+                'class': 'form-control',
+                'maxlength': '250',
+                'placeholder': 'Número do contato'
+            }),
+            'documento': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': '.pdf,.doc,.docx,.jpg,.jpeg,.png,.gif',
+            }),
+        }
+        labels = {
+            'titulo': 'Título',
+            'data': 'Data',
+            'descricao': 'Descrição',
+            'nome_contato': 'Nome do Contato',
+            'numero_contato': 'Número do Contato',
+            'documento': 'Documento',
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Tornar campos opcionais exceto título
+        self.fields['titulo'].required = True
+        self.fields['data'].required = False
+        self.fields['descricao'].required = False
+        self.fields['nome_contato'].required = False
+        self.fields['numero_contato'].required = False
+        self.fields['documento'].required = False
+        
+        # Configurar formato de data para datetime-local
+        self.fields['data'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d']
+    
+    def clean_data(self):
+        """Permitir que o campo data seja vazio"""
+        data = self.cleaned_data.get('data')
+        # Se estiver vazio ou for uma string vazia, retornar None (permitido pelo modelo)
+        if not data:
+            return None
+        if isinstance(data, str) and not data.strip():
+            return None
+        return data
+    
+    def clean_titulo(self):
+        """Limpar e validar título"""
+        titulo = self.cleaned_data.get('titulo')
+        if titulo:
+            titulo = titulo.strip()
+            if not titulo:
+                raise forms.ValidationError('O título não pode estar vazio.')
+        return titulo
+    
+    def clean(self):
+        """Validação geral do formulário"""
+        cleaned_data = super().clean()
+        return cleaned_data
 

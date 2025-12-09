@@ -84,20 +84,62 @@
                     <div class="card-body">
                         <h6 class="fw-bold">Formato do Arquivo</h6>
                         <p>O arquivo CSV deve usar delimitador ponto e vírgula (;) e conter as seguintes colunas (primeira linha como cabeçalho):</p>
-                        <ul>
-                            <li><strong>CD_ORDEMSERV</strong> - Código da Ordem de Serviço (obrigatório)</li>
-                            <li><strong>CD_UNID</strong> - Código Unidade</li>
-                            <li><strong>NOME_UNID</strong> - Nome Unidade</li>
-                            <li><strong>CD_SETORMANUT</strong> - Código Setor Manutenção</li>
-                            <li><strong>DESCR_SETORMANUT</strong> - Descrição Setor Manutenção</li>
-                            <li><strong>CD_MAQUINA</strong> - Código Máquina</li>
-                            <li><strong>DESCR_MAQUINA</strong> - Descrição Máquina</li>
-                            <li><strong>DT_ENTRADA</strong> - Data Entrada</li>
-                            <li><strong>NM_FUNC_SOLIC_OS</strong> - Nome Funcionário Solicitante</li>
-                            <li><strong>NM_FUNC_EXEC</strong> - Nome Funcionário Executor</li>
-                            <li><strong>DT_ENCORDMANU</strong> - Data Encerramento Ordem Manutenção</li>
-                            <li>E outras colunas conforme o modelo OrdemServicoCorretiva</li>
-                        </ul>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="fw-bold mt-3">Campos da Ordem de Serviço:</h6>
+                                <ul>
+                                    <li><strong>CD_ORDEMSERV</strong> - Código da Ordem de Serviço (obrigatório)</li>
+                                    <li><strong>CD_UNID</strong> - Código Unidade</li>
+                                    <li><strong>NOME_UNID</strong> - Nome Unidade</li>
+                                    <li><strong>CD_UNID_EXEC</strong> - Código Unidade Execução</li>
+                                    <li><strong>NOME_UNID_EXEC</strong> - Nome Unidade Execução</li>
+                                    <li><strong>CD_SETORMANUT</strong> - Código Setor Manutenção</li>
+                                    <li><strong>DESCR_SETORMANUT</strong> - Descrição Setor Manutenção</li>
+                                    <li><strong>CD_TPCENTATIV</strong> - Código Tipo Centro Atividade</li>
+                                    <li><strong>DESCR_ABREV_TPCENTATIV</strong> - Descrição Abrev Centro Atividade</li>
+                                    <li><strong>CD_MAQUINA</strong> - Código Máquina</li>
+                                    <li><strong>DESCR_MAQUINA</strong> - Descrição Máquina</li>
+                                    <li><strong>DT_ENTRADA</strong> - Data Entrada</li>
+                                    <li><strong>DT_ABERTURA_SOLICITA</strong> - Data Abertura Solicitação</li>
+                                    <li><strong>CD_FUNC_SOLIC_OS</strong> - Código Funcionário Solicitante</li>
+                                    <li><strong>NM_FUNC_SOLIC_OS</strong> - Nome Funcionário Solicitante</li>
+                                    <li><strong>DESCR_QUEIXA</strong> - Descrição Queixa</li>
+                                    <li><strong>EXEC_TAREFAS</strong> - Execução Tarefas</li>
+                                    <li><strong>CD_FUNC_EXEC</strong> - Código Funcionário Executor</li>
+                                    <li><strong>NM_FUNC_EXEC</strong> - Nome Funcionário Executor</li>
+                                    <li><strong>DESCR_OBSORDSERV</strong> - Descrição Observações Ordem Serviço</li>
+                                    <li><strong>DT_ENCORDMANU</strong> - Data Encerramento Ordem Manutenção</li>
+                                    <li><strong>DT_ABERORDSER</strong> - Data Abertura Ordem Serviço</li>
+                                    <li><strong>DT_INIPARMANU</strong> - Data Início Parada Manutenção</li>
+                                    <li><strong>DT_FIMPARMANU</strong> - Data Fim Parada Manutenção</li>
+                                    <li><strong>DT_PREV_EXEC</strong> - Data Prevista Execução</li>
+                                    <li><strong>CD_TPORDSERTV</strong> - Código Tipo Ordem Serviço</li>
+                                    <li><strong>DESCR_TPORDSERTV</strong> - Descrição Tipo Ordem Serviço</li>
+                                    <li><strong>DESCR_SITORDSETV</strong> - Descrição Situação Ordem Serviço</li>
+                                    <li><strong>DESCR_RECOMENOS</strong> - Descrição Recomendações OS</li>
+                                    <li><strong>DESCR_SEQPLAMANU</strong> - Descrição Sequência Plano Manutenção</li>
+                                    <li><strong>CD_TPMANUTTV</strong> - Código Tipo Manutenção</li>
+                                    <li><strong>DESCR_TPMANUTTV</strong> - Descrição Tipo Manutenção</li>
+                                    <li><strong>CD_CLASORIGOS</strong> - Código Classificação Origem OS</li>
+                                    <li><strong>DESCR_CLASORIGOS</strong> - Descrição Classificação Origem OS</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="fw-bold mt-3">Campos da Ficha de Manutenção:</h6>
+                                <p class="small text-muted">Estes campos criam registros na tabela de Fichas de Manutenção (uma ordem pode ter múltiplas fichas):</p>
+                                <ul>
+                                    <li><strong>CD_FUNC_EXEC_OS</strong> - Código Funcionário Executor OS</li>
+                                    <li><strong>NM_FUNC_EXEC_OS</strong> - Nome Funcionário Executor OS</li>
+                                    <li><strong>DT_FICAPOMANU</strong> - Data Ficha Ponto Manutenção</li>
+                                    <li><strong>DT_INIC_ITEFICMANU</strong> - Data Início Item Ficha Manutenção</li>
+                                    <li><strong>DT_FIM_ITEFICMANU</strong> - Data Fim Item Ficha Manutenção</li>
+                                </ul>
+                                <div class="alert alert-info mt-3">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>Nota:</strong> Se uma ordem de serviço aparecer em múltiplas linhas com diferentes dados de ficha, cada linha criará uma ficha separada para a mesma ordem.
+                                </div>
+                            </div>
+                        </div>
                         <hr>
                         <h6 class="fw-bold">Formato Aceito</h6>
                         <p>CSV (.csv) com delimitador ponto e vírgula (;) e encoding Latin-1. A primeira linha deve conter os cabeçalhos das colunas.</p>

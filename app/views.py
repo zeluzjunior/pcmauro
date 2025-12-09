@@ -29,59 +29,384 @@ def handle_form_errors(form, request):
 
 
 def home(request):
-    """Home page view"""
-    from app.models import OrdemServicoCorretiva
-    from datetime import datetime, timedelta
+    """Home page view - Data filtered by current week from Semana52"""
+    from app.models import OrdemServicoCorretiva, RequisicaoAlmoxarifado, Semana52, Maquina, Manutentor
+    from datetime import datetime, timedelta, date
+    from django.db.models import Sum, Count, Q
+    from decimal import Decimal
     
-    # Buscar ordens de serviço para exibir no calendário
-    ordens = OrdemServicoCorretiva.objects.exclude(
-        dt_entrada__isnull=True
-    ).exclude(
-        dt_entrada=''
-    )[:50]  # Limitar a 50 para performance
+    hoje = date.today()
     
-    eventos = []
-    for ordem in ordens:
-        # Tentar parsear a data de entrada
+    # Encontrar a semana atual baseada na data de hoje
+    semana_atual = None
+    try:
+        # Buscar semana onde hoje está entre inicio e fim
+        semana_atual = Semana52.objects.filter(
+            inicio__lte=hoje,
+            fim__gte=hoje
+        ).first()
+        
+        # Se não encontrou, buscar a semana mais próxima
+        if not semana_atual:
+            # Tentar encontrar semana onde inicio é mais próximo de hoje (mas não futuro)
+            semana_atual = Semana52.objects.filter(
+                inicio__lte=hoje
+            ).order_by('-inicio').first()
+        
+        # Se ainda não encontrou, buscar qualquer semana futura próxima
+        if not semana_atual:
+            semana_atual = Semana52.objects.filter(
+                inicio__gte=hoje
+            ).order_by('inicio').first()
+    except Exception as e:
+        print(f"Erro ao buscar semana atual: {e}")
+        semana_atual = None
+    
+    # Definir intervalo de datas para filtros
+    data_inicio_semana = None
+    data_fim_semana = None
+    mes_ano_grafico = None
+    
+    if semana_atual and semana_atual.inicio and semana_atual.fim:
+        data_inicio_semana = semana_atual.inicio
+        data_fim_semana = semana_atual.fim
+        # Usar o mês da semana atual para o gráfico
+        mes_ano_grafico = f"{data_inicio_semana.year}-{str(data_inicio_semana.month).zfill(2)}"
+    else:
+        # Fallback: usar mês atual se não houver semana definida
+        mes_ano_grafico = f"{hoje.year}-{str(hoje.month).zfill(2)}"
+        # Usar início e fim do mês atual como fallback
+        from calendar import monthrange
+        ultimo_dia = monthrange(hoje.year, hoje.month)[1]
+        data_inicio_semana = date(hoje.year, hoje.month, 1)
+        data_fim_semana = date(hoje.year, hoje.month, ultimo_dia)
+    
+    # ========== KPIs BASEADOS NA SEMANA ATUAL ==========
+    
+    # 1. Manutenções Corretivas na semana atual
+    manutencoes_corretivas = 0
+    if data_inicio_semana and data_fim_semana:
         try:
-            # Formato esperado: dd/mm/yyyy hh:mm ou dd/mm/yyyy
-            dt_str = ordem.dt_entrada.strip()
-            if ' ' in dt_str:
-                date_part = dt_str.split(' ')[0]
-            else:
-                date_part = dt_str
+            ordens_semana = OrdemServicoCorretiva.objects.exclude(
+                dt_entrada__isnull=True
+            ).exclude(dt_entrada='')
             
-            # Parsear data dd/mm/yyyy
-            if '/' in date_part:
-                parts = date_part.split('/')
-                if len(parts) == 3:
-                    day, month, year = parts
-                    # Converter para formato ISO (yyyy-mm-dd)
-                    start_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+            # Filtrar por data (precisa parsear dt_entrada que é string)
+            for ordem in ordens_semana:
+                try:
+                    dt_str = ordem.dt_entrada.strip()
+                    if ' ' in dt_str:
+                        date_part = dt_str.split(' ')[0]
+                    else:
+                        date_part = dt_str
                     
-                    eventos.append({
-                        'title': f'OS {ordem.cd_ordemserv} - {ordem.descr_maquina[:30] if ordem.descr_maquina else "Sem descrição"}',
-                        'start': start_date,
-                        'color': '#3788d8',  # Azul
-                        'url': f'/manutencao-corretiva/consultar/?search={ordem.cd_ordemserv}'
-                    })
-        except:
-            # Se não conseguir parsear, continuar
-            continue
+                    if '/' in date_part:
+                        parts = date_part.split('/')
+                        if len(parts) == 3:
+                            day, month, year = parts
+                            ordem_date = date(int(year), int(month), int(day))
+                            if data_inicio_semana <= ordem_date <= data_fim_semana:
+                                manutencoes_corretivas += 1
+                except:
+                    continue
+        except Exception as e:
+            print(f"Erro ao contar manutenções corretivas: {e}")
     
-    # Adicionar exemplo de evento de manutenção preventiva (você pode adicionar mais eventos aqui)
-    hoje = datetime.now()
-    eventos.append({
-        'title': 'Manutenção Preventiva - Exemplo',
-        'start': hoje.strftime('%Y-%m-%d'),
-        'color': '#28a745',  # Verde
-        'url': ''
-    })
+    # 2. Manutenções Preventivas (usar MeuPlanoPreventiva se disponível)
+    try:
+        from app.models import MeuPlanoPreventiva
+        if data_inicio_semana and data_fim_semana:
+            # Contar planos preventivos com ações na semana atual
+            manutencoes_preventivas = MeuPlanoPreventiva.objects.filter(
+                data_planejada__gte=data_inicio_semana,
+                data_planejada__lte=data_fim_semana
+            ).count()
+        else:
+            manutencoes_preventivas = MeuPlanoPreventiva.objects.count()
+    except:
+        manutencoes_preventivas = 0
+    
+    # 3. Requisições de Almoxarifado na semana atual
+    if data_inicio_semana and data_fim_semana:
+        requisicoes_semana = RequisicaoAlmoxarifado.objects.filter(
+            data_requisicao__gte=data_inicio_semana,
+            data_requisicao__lte=data_fim_semana
+        )
+        total_requisicoes_semana = requisicoes_semana.count()
+        valor_total_semana = requisicoes_semana.aggregate(
+            total=Sum('vlr_movto_estoq')
+        )['total'] or Decimal('0')
+    else:
+        total_requisicoes_semana = RequisicaoAlmoxarifado.objects.count()
+        valor_total_semana = Decimal('0')
+    
+    # 4. Máquinas e Manutentores (total geral, não filtrado por semana)
+    total_maquinas = Maquina.objects.count()
+    total_manutentores = Manutentor.objects.count()
+    
+    # 5. Calendário - eventos na semana atual
+    eventos = []
+    if data_inicio_semana and data_fim_semana:
+        # Buscar ordens de serviço na semana atual
+        ordens = OrdemServicoCorretiva.objects.exclude(
+            dt_entrada__isnull=True
+        ).exclude(dt_entrada='')
+        
+        for ordem in ordens:
+            try:
+                dt_str = ordem.dt_entrada.strip()
+                if ' ' in dt_str:
+                    date_part = dt_str.split(' ')[0]
+                else:
+                    date_part = dt_str
+                
+                if '/' in date_part:
+                    parts = date_part.split('/')
+                    if len(parts) == 3:
+                        day, month, year = parts
+                        ordem_date = date(int(year), int(month), int(day))
+                        
+                        # Incluir apenas eventos dentro da semana atual
+                        if data_inicio_semana <= ordem_date <= data_fim_semana:
+                            start_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                            eventos.append({
+                                'title': f'OS {ordem.cd_ordemserv} - {ordem.descr_maquina[:30] if ordem.descr_maquina else "Sem descrição"}',
+                                'start': start_date,
+                                'color': '#3788d8',  # Azul
+                                'url': f'/manutencao-corretiva/consultar/?search={ordem.cd_ordemserv}'
+                            })
+            except:
+                continue
+        
+        # Adicionar eventos de manutenção preventiva na semana atual
+        try:
+            from app.models import MeuPlanoPreventiva
+            preventivas_semana = MeuPlanoPreventiva.objects.filter(
+                data_planejada__gte=data_inicio_semana,
+                data_planejada__lte=data_fim_semana
+            )
+            for preventiva in preventivas_semana:
+                eventos.append({
+                    'title': f'Preventiva - {preventiva.cd_maquina.cd_maquina if preventiva.cd_maquina else "N/A"}',
+                    'start': preventiva.data_planejada.strftime('%Y-%m-%d'),
+                    'color': '#28a745',  # Verde
+                    'url': f'/planejamento/meu-plano/?search={preventiva.cd_maquina.cd_maquina if preventiva.cd_maquina else ""}'
+                })
+        except:
+            pass
+        
+        # Adicionar eventos de Manutenção Terceiro na semana atual
+        try:
+            from app.models import ManutencaoTerceiro
+            manutencoes_terceiro_semana = ManutencaoTerceiro.objects.filter(
+                data__date__gte=data_inicio_semana,
+                data__date__lte=data_fim_semana
+            )
+            for manutencao in manutencoes_terceiro_semana:
+                if manutencao.data:
+                    eventos.append({
+                        'title': f'Manutenção Terceiro - {manutencao.titulo[:30]}',
+                        'start': manutencao.data.strftime('%Y-%m-%d'),
+                        'color': '#ff9800',  # Laranja
+                        'url': '/manutencao-terceiro/consultar/'
+                    })
+        except Exception as e:
+            print(f"Erro ao adicionar eventos de Manutenção Terceiro: {e}")
+        
+        # Adicionar eventos de Visitas na semana atual
+        try:
+            from app.models import Visitas
+            visitas_semana = Visitas.objects.filter(
+                data__date__gte=data_inicio_semana,
+                data__date__lte=data_fim_semana
+            )
+            for visita in visitas_semana:
+                if visita.data:
+                    eventos.append({
+                        'title': f'Visita - {visita.titulo[:30]}',
+                        'start': visita.data.strftime('%Y-%m-%d'),
+                        'color': '#9c27b0',  # Roxo
+                        'url': '/visitas/consultar/'
+                    })
+        except Exception as e:
+            print(f"Erro ao adicionar eventos de Visitas: {e}")
+    
+    # ========== GRÁFICO: ORDENS FECHADAS NA SEMANA ATUAL ==========
+    ordens_fechadas_labels = []
+    ordens_fechadas_data = []
+    
+    def parse_date_from_string(date_str):
+        """
+        Tenta fazer parse de uma data em vários formatos diferentes.
+        Retorna um objeto date ou None se não conseguir fazer parse.
+        """
+        if not date_str:
+            return None
+        
+        date_str = str(date_str).strip()
+        if not date_str:
+            return None
+        
+        # Remover hora se existir (formato: "dd/mm/yyyy hh:mm" ou "dd/mm/yyyy hh:mm:ss")
+        if ' ' in date_str:
+            date_part = date_str.split(' ')[0]
+        else:
+            date_part = date_str
+        
+        # Tentar diferentes formatos de data
+        date_formats = [
+            '%d/%m/%Y',      # 26/09/2025
+            '%d-%m-%Y',      # 26-09-2025
+            '%d.%m.%Y',      # 26.09.2025
+            '%Y-%m-%d',      # 2025-09-26
+            '%Y/%m/%d',      # 2025/09/26
+            '%d/%m/%y',      # 26/09/25
+            '%d-%m-%y',      # 26-09-25
+        ]
+        
+        for fmt in date_formats:
+            try:
+                return datetime.strptime(date_part, fmt).date()
+            except (ValueError, TypeError):
+                continue
+        
+        # Se nenhum formato funcionou, tentar parse manual para formato brasileiro comum
+        if '/' in date_part:
+            parts = date_part.split('/')
+            if len(parts) == 3:
+                try:
+                    day, month, year = parts
+                    # Se ano tem 2 dígitos, assumir 2000+
+                    if len(year) == 2:
+                        year = '20' + year
+                    return date(int(year), int(month), int(day))
+                except (ValueError, TypeError):
+                    pass
+        
+        return None
+    
+    if data_inicio_semana and data_fim_semana:
+        # Criar dicionário para contar ordens por dia
+        from collections import defaultdict
+        ordens_por_dia = defaultdict(int)
+        
+        # Buscar todas as ordens com dt_encordmanu preenchida
+        ordens_fechadas = OrdemServicoCorretiva.objects.exclude(
+            dt_encordmanu__isnull=True
+        ).exclude(dt_encordmanu='')
+        
+        # Processar cada ordem e contar por dia
+        for ordem in ordens_fechadas:
+            try:
+                # Usar função de parse melhorada
+                ordem_date = parse_date_from_string(ordem.dt_encordmanu)
+                
+                if ordem_date:
+                    # Debug: verificar se esta ordem específica está sendo processada
+                    if ordem.cd_ordemserv == 7 or '07/12/2025' in str(ordem.dt_encordmanu):
+                        print(f"DEBUG - Ordem {ordem.cd_ordemserv}:")
+                        print(f"  dt_encordmanu original: {ordem.dt_encordmanu}")
+                        print(f"  Data parseada: {ordem_date}")
+                        print(f"  Semana atual: {data_inicio_semana} a {data_fim_semana}")
+                        print(f"  Está na semana? {data_inicio_semana <= ordem_date <= data_fim_semana}")
+                    
+                    # Verificar se está na semana atual
+                    if data_inicio_semana <= ordem_date <= data_fim_semana:
+                        # Formatar data como chave (YYYY-MM-DD)
+                        data_key = ordem_date.strftime('%Y-%m-%d')
+                        ordens_por_dia[data_key] += 1
+                    elif ordem.cd_ordemserv == 7 or '07/12/2025' in str(ordem.dt_encordmanu):
+                        print(f"  Ordem {ordem.cd_ordemserv} NÃO está na semana atual!")
+                        print(f"  Comparação: {data_inicio_semana} <= {ordem_date} <= {data_fim_semana}")
+                else:
+                    # Debug: se não conseguiu fazer parse
+                    if ordem.cd_ordemserv == 7 or '07/12/2025' in str(ordem.dt_encordmanu):
+                        print(f"DEBUG - Ordem {ordem.cd_ordemserv}: Não conseguiu fazer parse de '{ordem.dt_encordmanu}'")
+            except Exception as e:
+                # Log erro para debug, mas continuar processando outras ordens
+                if ordem.cd_ordemserv == 7 or '07/12/2025' in str(ordem.dt_encordmanu):
+                    print(f"Erro ao processar dt_encordmanu da ordem {ordem.cd_ordemserv}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                continue
+        
+        # Criar lista de todos os dias da semana
+        from datetime import timedelta
+        current_date = data_inicio_semana
+        while current_date <= data_fim_semana:
+            data_key = current_date.strftime('%Y-%m-%d')
+            data_label = current_date.strftime('%d/%m')
+            ordens_fechadas_labels.append(data_label)
+            ordens_fechadas_data.append(ordens_por_dia.get(data_key, 0))
+            current_date += timedelta(days=1)
+    
+    # Converter para JSON para o template
+    import json
+    # Garantir que sempre temos arrays válidos (mesmo que vazios)
+    if not ordens_fechadas_labels:
+        ordens_fechadas_labels = []
+    if not ordens_fechadas_data:
+        ordens_fechadas_data = []
+    
+    # Debug: imprimir dados calculados
+    print(f"DEBUG - Gráfico Ordens Fechadas (usando dt_encordmanu):")
+    print(f"  Data de hoje: {hoje}")
+    print(f"  Semana: {semana_atual.semana if semana_atual else 'N/A'}")
+    print(f"  Data início semana: {data_inicio_semana}, Data fim semana: {data_fim_semana}")
+    print(f"  Total de ordens processadas: {ordens_fechadas.count()}")
+    print(f"  Labels: {ordens_fechadas_labels}")
+    print(f"  Data: {ordens_fechadas_data}")
+    print(f"  Total de ordens fechadas na semana: {sum(ordens_fechadas_data)}")
+    
+    # Debug adicional: verificar se há ordens com dt_encordmanu = 07/12/2025
+    # Tentar encontrar ordem com ID 7 ou com data 07/12/2025
+    ordem_teste = OrdemServicoCorretiva.objects.filter(cd_ordemserv=7).first()
+    if not ordem_teste:
+        # Tentar encontrar qualquer ordem com essa data
+        ordens_com_data = OrdemServicoCorretiva.objects.exclude(dt_encordmanu__isnull=True).exclude(dt_encordmanu='')
+        for ordem in ordens_com_data:
+            if '07/12/2025' in str(ordem.dt_encordmanu):
+                ordem_teste = ordem
+                break
+    
+    if ordem_teste:
+        print(f"DEBUG - Ordem encontrada (ID: {ordem_teste.cd_ordemserv}):")
+        print(f"  dt_encordmanu: {ordem_teste.dt_encordmanu}")
+        ordem_date_teste = parse_date_from_string(ordem_teste.dt_encordmanu)
+        print(f"  Data parseada: {ordem_date_teste}")
+        if ordem_date_teste:
+            print(f"  Está na semana atual ({data_inicio_semana} a {data_fim_semana})? {data_inicio_semana <= ordem_date_teste <= data_fim_semana if data_inicio_semana and data_fim_semana else 'N/A'}")
+            # Verificar qual semana contém essa data
+            semana_com_data = Semana52.objects.filter(
+                inicio__lte=ordem_date_teste,
+                fim__gte=ordem_date_teste
+            ).first()
+            if semana_com_data:
+                print(f"  Esta data pertence à semana: {semana_com_data.semana} ({semana_com_data.inicio} a {semana_com_data.fim})")
+            else:
+                print(f"  Nenhuma semana encontrada que contenha esta data!")
+    
+    ordens_fechadas_labels_json = json.dumps(ordens_fechadas_labels)
+    ordens_fechadas_data_json = json.dumps(ordens_fechadas_data)
     
     context = {
         'page_title': 'Home',
         'active_page': 'home',
-        'eventos': eventos
+        'eventos': eventos,
+        'semana_atual': semana_atual,
+        'data_inicio_semana': data_inicio_semana,
+        'data_fim_semana': data_fim_semana,
+        'mes_ano_grafico': mes_ano_grafico,
+        # KPIs
+        'manutencoes_corretivas': manutencoes_corretivas,
+        'manutencoes_preventivas': manutencoes_preventivas,
+        'total_requisicoes_semana': total_requisicoes_semana,
+        'valor_total_semana': abs(valor_total_semana),  # Usar valor absoluto
+        'total_maquinas': total_maquinas,
+        'total_manutentores': total_manutentores,
+        # Dados do gráfico de ordens fechadas
+        'ordens_fechadas_labels': ordens_fechadas_labels_json,
+        'ordens_fechadas_data': ordens_fechadas_data_json,
     }
     return render(request, 'home.html', context)
 
@@ -111,6 +436,531 @@ def em_desenvolvimento(request):
         'active_page': 'em_desenvolvimento'
     }
     return render(request, 'em_desenvolvimento.html', context)
+
+
+def analise_requisicoes(request):
+    """Análise de requisições de almoxarifado"""
+    from app.models import RequisicaoAlmoxarifado
+    from decimal import Decimal
+    from datetime import datetime, timedelta
+    from django.db.models import Sum, Count, Q, Avg
+    from collections import defaultdict
+    import json
+    from calendar import monthrange
+    
+    # Obter anos e meses disponíveis no banco de dados
+    anos_disponiveis = RequisicaoAlmoxarifado.objects.values_list('data_requisicao__year', flat=True).distinct().order_by('-data_requisicao__year')
+    meses_disponiveis = {}
+    for ano in anos_disponiveis:
+        meses = RequisicaoAlmoxarifado.objects.filter(data_requisicao__year=ano).values_list('data_requisicao__month', flat=True).distinct().order_by('data_requisicao__month')
+        meses_disponiveis[ano] = list(meses)
+    
+    # Processar filtros
+    data_inicio_str = request.GET.get('data_inicio', '').strip()
+    data_fim_str = request.GET.get('data_fim', '').strip()
+    ano_selecionado = request.GET.get('ano', '').strip()
+    mes_selecionado = request.GET.get('mes', '').strip()
+    
+    # Debug: verificar se os filtros estão sendo recebidos
+    # print(f"DEBUG - Filtros recebidos: data_inicio={data_inicio_str}, data_fim={data_fim_str}, ano={ano_selecionado}, mes={mes_selecionado}")
+    
+    # Construir queryset base com filtros
+    queryset_base = RequisicaoAlmoxarifado.objects.all()
+    
+    # Prioridade: Se há filtro de intervalo de datas, usar apenas ele
+    # Caso contrário, usar filtro de ano/mês
+    tem_filtro_data_range = bool(data_inicio_str or data_fim_str)
+    tem_filtro_ano_mes = bool(ano_selecionado)
+    
+    if tem_filtro_data_range:
+        # Aplicar filtro de intervalo de datas
+        if data_inicio_str:
+            try:
+                data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+                queryset_base = queryset_base.filter(data_requisicao__gte=data_inicio)
+            except ValueError as e:
+                # print(f"DEBUG - Erro ao parse data_inicio: {e}")
+                pass
+        
+        if data_fim_str:
+            try:
+                data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+                queryset_base = queryset_base.filter(data_requisicao__lte=data_fim)
+            except ValueError as e:
+                # print(f"DEBUG - Erro ao parse data_fim: {e}")
+                pass
+    elif tem_filtro_ano_mes:
+        # Aplicar filtro de ano/mês
+        try:
+            ano = int(ano_selecionado)
+            queryset_base = queryset_base.filter(data_requisicao__year=ano)
+            
+            if mes_selecionado:
+                try:
+                    mes = int(mes_selecionado)
+                    queryset_base = queryset_base.filter(data_requisicao__month=mes)
+                except ValueError as e:
+                    # print(f"DEBUG - Erro ao parse mes: {e}")
+                    pass
+        except ValueError as e:
+            # print(f"DEBUG - Erro ao parse ano: {e}")
+            pass
+    
+    # Debug: verificar quantos registros após filtro
+    # total_antes = RequisicaoAlmoxarifado.objects.count()
+    # total_depois = queryset_base.count()
+    # print(f"DEBUG - Total antes: {total_antes}, Total depois: {total_depois}")
+    
+    # Estatísticas gerais (usando queryset filtrado)
+    hoje = datetime.now().date()
+    total_requisicoes = queryset_base.count()
+    
+    # Últimos 30 dias (apenas se não houver filtros de data)
+    if not tem_filtro_data_range and not tem_filtro_ano_mes:
+        data_30_dias_atras = hoje - timedelta(days=30)
+        requisicoes_recentes = queryset_base.filter(
+            data_requisicao__gte=data_30_dias_atras
+        ).count()
+    else:
+        # Se há filtros, mostrar total filtrado
+        requisicoes_recentes = total_requisicoes
+    
+    # Mês atual (apenas se não houver filtros de data)
+    if not tem_filtro_data_range and not tem_filtro_ano_mes:
+        primeiro_dia_mes = hoje.replace(day=1)
+        requisicoes_mes_atual = queryset_base.filter(
+            data_requisicao__gte=primeiro_dia_mes
+        ).count()
+    else:
+        # Se há filtros, mostrar total filtrado
+        requisicoes_mes_atual = total_requisicoes
+    
+    # Itens únicos
+    itens_unicos = queryset_base.values('cd_item').distinct().count()
+    
+    # Centros de atividade únicos
+    centros_unicos = queryset_base.exclude(
+        cd_centro_ativ__isnull=True
+    ).values('cd_centro_ativ').distinct().count()
+    
+    # Calcular valor total (vlr_movto_estoq já é o valor total da linha, não precisa multiplicar por quantidade)
+    valor_total = Decimal('0.00')
+    quantidade_total = Decimal('0.00')
+    for req in queryset_base:
+        if req.vlr_movto_estoq:
+            # vlr_movto_estoq já representa o valor total da transação (pode ser negativo para saídas)
+            valor_total += abs(req.vlr_movto_estoq)
+        if req.qtde_movto_estoq:
+            quantidade_total += abs(req.qtde_movto_estoq)
+    
+    # Valor médio por requisição
+    valor_medio = valor_total / total_requisicoes if total_requisicoes > 0 else Decimal('0.00')
+    
+    # Evolução temporal (últimos 12 meses ou período filtrado)
+    meses_labels = []
+    meses_data = []
+    meses_valor = []
+    
+    # Determinar período para evolução temporal
+    if data_inicio_str and data_fim_str:
+        try:
+            periodo_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+            periodo_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+        except ValueError:
+            periodo_inicio = (hoje - timedelta(days=365)).replace(day=1)
+            periodo_fim = hoje
+    elif ano_selecionado:
+        try:
+            ano = int(ano_selecionado)
+            periodo_inicio = datetime(ano, 1, 1).date()
+            if mes_selecionado:
+                try:
+                    mes = int(mes_selecionado)
+                    periodo_inicio = datetime(ano, mes, 1).date()
+                    ultimo_dia = monthrange(ano, mes)[1]
+                    periodo_fim = datetime(ano, mes, ultimo_dia).date()
+                    if periodo_fim > hoje:
+                        periodo_fim = hoje
+                except ValueError:
+                    periodo_fim = datetime(ano, 12, 31).date()
+                    if periodo_fim > hoje:
+                        periodo_fim = hoje
+            else:
+                periodo_fim = datetime(ano, 12, 31).date()
+                if periodo_fim > hoje:
+                    periodo_fim = hoje
+        except ValueError:
+            periodo_inicio = (hoje - timedelta(days=365)).replace(day=1)
+            periodo_fim = hoje
+    else:
+        periodo_inicio = (hoje - timedelta(days=365)).replace(day=1)
+        periodo_fim = hoje
+    
+    # Gerar meses do período
+    data_atual = periodo_inicio.replace(day=1)
+    while data_atual <= periodo_fim:
+        # Calcular último dia do mês
+        ultimo_dia_mes = monthrange(data_atual.year, data_atual.month)[1]
+        fim_mes_calc = datetime(data_atual.year, data_atual.month, ultimo_dia_mes).date()
+        fim_mes = fim_mes_calc if fim_mes_calc <= periodo_fim else periodo_fim
+        
+        count = queryset_base.filter(
+            data_requisicao__gte=data_atual,
+            data_requisicao__lte=fim_mes
+        ).count()
+        
+        valor_mes = Decimal('0.00')
+        for req in queryset_base.filter(
+            data_requisicao__gte=data_atual,
+            data_requisicao__lte=fim_mes
+        ):
+            if req.vlr_movto_estoq:
+                valor_mes += abs(req.vlr_movto_estoq)
+        
+        meses_labels.append(data_atual.strftime('%b/%Y'))
+        meses_data.append(count)
+        meses_valor.append(float(valor_mes))
+        
+        # Próximo mês
+        if data_atual.month == 12:
+            data_atual = data_atual.replace(year=data_atual.year + 1, month=1, day=1)
+        else:
+            data_atual = data_atual.replace(month=data_atual.month + 1, day=1)
+    
+    # Top 10 itens mais requisitados (por quantidade)
+    top_itens_qtd = queryset_base.exclude(
+        qtde_movto_estoq__isnull=True
+    ).values('cd_item', 'descr_item').annotate(
+        total_qtd=Sum('qtde_movto_estoq')
+    ).order_by('-total_qtd')[:10]
+    
+    top_itens_labels = []
+    top_itens_data = []
+    for item in top_itens_qtd:
+        descr = item['descr_item'] or f"Item {item['cd_item']}"
+        if len(descr) > 40:
+            descr = descr[:37] + "..."
+        top_itens_labels.append(f"{item['cd_item']} - {descr}")
+        top_itens_data.append(abs(float(item['total_qtd'])))
+    
+    # Top 10 itens por valor
+    top_itens_valor = []
+    itens_valor_dict = defaultdict(lambda: Decimal('0.00'))
+    
+    for req in queryset_base.exclude(vlr_movto_estoq__isnull=True):
+        if req.vlr_movto_estoq:
+            # vlr_movto_estoq já representa o valor total da transação
+            itens_valor_dict[req.cd_item] += abs(req.vlr_movto_estoq)
+    
+    # Ordenar e pegar top 10
+    sorted_itens = sorted(itens_valor_dict.items(), key=lambda x: x[1], reverse=True)[:10]
+    
+    top_itens_valor_labels = []
+    top_itens_valor_data = []
+    for cd_item, valor in sorted_itens:
+        req = queryset_base.filter(cd_item=cd_item).first()
+        descr = req.descr_item if req and req.descr_item else f"Item {cd_item}"
+        if len(descr) > 40:
+            descr = descr[:37] + "..."
+        top_itens_valor_labels.append(f"{cd_item} - {descr}")
+        top_itens_valor_data.append(float(valor))
+    
+    # Distribuição por centro de atividade (top 10)
+    centros_dict = defaultdict(lambda: {'count': 0, 'valor': Decimal('0.00')})
+    
+    for req in queryset_base.exclude(cd_centro_ativ__isnull=True):
+        centros_dict[req.cd_centro_ativ]['count'] += 1
+        if req.vlr_movto_estoq:
+            # vlr_movto_estoq já representa o valor total da transação
+            centros_dict[req.cd_centro_ativ]['valor'] += abs(req.vlr_movto_estoq)
+    
+    sorted_centros = sorted(centros_dict.items(), key=lambda x: x[1]['valor'], reverse=True)[:10]
+    
+    centros_labels = []
+    centros_data_count = []
+    centros_data_valor = []
+    for centro_id, dados in sorted_centros:
+        centros_labels.append(str(centro_id))
+        centros_data_count.append(dados['count'])
+        centros_data_valor.append(float(dados['valor']))
+    
+    # Distribuição por operação (top 10)
+    operacoes_dict = defaultdict(lambda: {'count': 0, 'valor': Decimal('0.00')})
+    
+    for req in queryset_base.exclude(descr_operacao__isnull=True).exclude(descr_operacao=''):
+        operacoes_dict[req.descr_operacao]['count'] += 1
+        if req.vlr_movto_estoq:
+            # vlr_movto_estoq já representa o valor total da transação
+            operacoes_dict[req.descr_operacao]['valor'] += abs(req.vlr_movto_estoq)
+    
+    sorted_operacoes = sorted(operacoes_dict.items(), key=lambda x: x[1]['count'], reverse=True)[:10]
+    
+    operacoes_labels = []
+    operacoes_data = []
+    for operacao, dados in sorted_operacoes:
+        if len(operacao) > 30:
+            operacao = operacao[:27] + "..."
+        operacoes_labels.append(operacao)
+        operacoes_data.append(dados['count'])
+    
+    # Requisições recentes (últimas 20)
+    requisicoes_recentes_list = queryset_base.order_by('-data_requisicao', '-created_at')[:20]
+    
+    # Dados diários para o mês selecionado (para o gráfico de evolução diária)
+    if ano_selecionado and mes_selecionado:
+        try:
+            ano = int(ano_selecionado)
+            mes = int(mes_selecionado)
+            primeiro_dia_mes_atual = datetime(ano, mes, 1).date()
+            ultimo_dia_mes_atual = datetime(ano, mes, monthrange(ano, mes)[1]).date()
+            if ultimo_dia_mes_atual > hoje:
+                ultimo_dia_mes_atual = hoje
+        except ValueError:
+            primeiro_dia_mes_atual = hoje.replace(day=1)
+            if hoje.month == 12:
+                ultimo_dia_mes_atual = hoje.replace(year=hoje.year + 1, month=1, day=1) - timedelta(days=1)
+            else:
+                ultimo_dia_mes_atual = hoje.replace(month=hoje.month + 1, day=1) - timedelta(days=1)
+            if ultimo_dia_mes_atual > hoje:
+                ultimo_dia_mes_atual = hoje
+    else:
+        primeiro_dia_mes_atual = hoje.replace(day=1)
+        if hoje.month == 12:
+            ultimo_dia_mes_atual = hoje.replace(year=hoje.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            ultimo_dia_mes_atual = hoje.replace(month=hoje.month + 1, day=1) - timedelta(days=1)
+        if ultimo_dia_mes_atual > hoje:
+            ultimo_dia_mes_atual = hoje
+    
+    dias_labels = []
+    dias_data = []
+    dias_valor = []
+    
+    for dia in range(1, ultimo_dia_mes_atual.day + 1):
+        data_dia = primeiro_dia_mes_atual.replace(day=dia)
+        count = queryset_base.filter(data_requisicao=data_dia).count()
+        
+        valor_dia = Decimal('0.00')
+        for req in queryset_base.filter(data_requisicao=data_dia):
+            if req.vlr_movto_estoq:
+                # vlr_movto_estoq já representa o valor total da transação
+                valor_dia += abs(req.vlr_movto_estoq)
+        
+        dias_labels.append(data_dia.strftime('%d/%m'))
+        dias_data.append(count)
+        dias_valor.append(float(valor_dia))
+    
+    # Determinar mês selecionado para o gráfico diário
+    if ano_selecionado and mes_selecionado:
+        mes_selecionado_grafico = f"{ano_selecionado}-{mes_selecionado.zfill(2)}"
+    else:
+        mes_selecionado_grafico = hoje.strftime('%Y-%m')
+    
+    # Nomes dos meses em português
+    meses_nomes = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+    
+    # Meses do ano selecionado (se houver)
+    meses_ano_selecionado = []
+    if ano_selecionado:
+        try:
+            ano_int = int(ano_selecionado)
+            meses_ano_selecionado = meses_disponiveis.get(ano_int, [])
+        except ValueError:
+            pass
+    
+    context = {
+        'page_title': 'Análise de Requisições',
+        'active_page': 'analise_requisicoes',
+        'total_requisicoes': total_requisicoes,
+        'requisicoes_recentes': requisicoes_recentes,
+        'requisicoes_mes_atual': requisicoes_mes_atual,
+        'itens_unicos': itens_unicos,
+        'centros_unicos': centros_unicos,
+        'valor_total': valor_total,
+        'quantidade_total': quantidade_total,
+        'valor_medio': valor_medio,
+        'meses_labels': json.dumps(meses_labels),
+        'meses_data': json.dumps(meses_data),
+        'meses_valor': json.dumps(meses_valor),
+        'dias_labels': json.dumps(dias_labels),
+        'dias_data': json.dumps(dias_data),
+        'dias_valor': json.dumps(dias_valor),
+        'mes_selecionado': mes_selecionado_grafico,
+        'top_itens_labels': json.dumps(top_itens_labels),
+        'top_itens_data': json.dumps(top_itens_data),
+        'top_itens_valor_labels': json.dumps(top_itens_valor_labels),
+        'top_itens_valor_data': json.dumps(top_itens_valor_data),
+        'centros_labels': json.dumps(centros_labels),
+        'centros_data_count': json.dumps(centros_data_count),
+        'centros_data_valor': json.dumps(centros_data_valor),
+        'operacoes_labels': json.dumps(operacoes_labels),
+        'operacoes_data': json.dumps(operacoes_data),
+        'requisicoes_recentes_list': requisicoes_recentes_list,
+        # Filtros
+        'anos_disponiveis': list(anos_disponiveis),
+        'meses_disponiveis': meses_disponiveis,
+        'meses_nomes': meses_nomes,
+        'meses_ano_selecionado': meses_ano_selecionado,
+        'data_inicio': data_inicio_str,
+        'data_fim': data_fim_str,
+        'ano_selecionado': ano_selecionado,
+        'mes_selecionado_filtro': mes_selecionado,
+    }
+    return render(request, 'orcamento/analise_requisicoes.html', context)
+
+
+def api_meses_por_ano(request):
+    """API endpoint para obter meses disponíveis para um ano específico"""
+    from django.http import JsonResponse
+    from app.models import RequisicaoAlmoxarifado
+    
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Método não permitido'}, status=405)
+    
+    ano = request.GET.get('ano')
+    if not ano:
+        return JsonResponse({'error': 'Parâmetro ano é obrigatório'}, status=400)
+    
+    try:
+        ano_int = int(ano)
+        meses = RequisicaoAlmoxarifado.objects.filter(
+            data_requisicao__year=ano_int
+        ).values_list('data_requisicao__month', flat=True).distinct().order_by('data_requisicao__month')
+        
+        meses_nomes = {
+            1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+            5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+            9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+        }
+        
+        meses_list = []
+        for mes_num in meses:
+            meses_list.append({
+                'value': mes_num,
+                'label': meses_nomes[mes_num]
+            })
+        
+        return JsonResponse({'meses': meses_list})
+    except (ValueError, TypeError) as e:
+        return JsonResponse({'error': f'Ano inválido: {str(e)}'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': f'Erro ao processar dados: {str(e)}'}, status=500)
+
+
+def api_dados_diarios_requisicoes(request):
+    """API endpoint para obter dados diários de requisições, manutenções terceiro e visitas para um mês específico"""
+    from django.http import JsonResponse
+    from calendar import monthrange
+    from app.models import RequisicaoAlmoxarifado, ManutencaoTerceiro, Visitas
+    from decimal import Decimal
+    from datetime import datetime
+    
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Método não permitido'}, status=405)
+    
+    mes_ano = request.GET.get('mes_ano')  # Formato: YYYY-MM
+    if not mes_ano:
+        return JsonResponse({'error': 'Parâmetro mes_ano é obrigatório'}, status=400)
+    
+    try:
+        year, month = map(int, mes_ano.split('-'))
+        primeiro_dia = datetime(year, month, 1).date()
+        
+        # Calcular último dia do mês
+        ultimo_dia_num = monthrange(year, month)[1]
+        ultimo_dia = datetime(year, month, ultimo_dia_num).date()
+        
+        # Hoje para limitar se for o mês atual
+        hoje = datetime.now().date()
+        if primeiro_dia.year == hoje.year and primeiro_dia.month == hoje.month:
+            ultimo_dia = hoje
+        
+        dias_labels = []
+        dias_data = []  # Requisições
+        dias_valor = []  # Valor das requisições
+        dias_manutencao_terceiro = []  # Manutenções Terceiro
+        dias_visitas = []  # Visitas
+        
+        for dia in range(1, ultimo_dia.day + 1):
+            data_dia = primeiro_dia.replace(day=dia)
+            
+            # Requisições de Almoxarifado
+            count = RequisicaoAlmoxarifado.objects.filter(data_requisicao=data_dia).count()
+            valor_dia = Decimal('0.00')
+            for req in RequisicaoAlmoxarifado.objects.filter(data_requisicao=data_dia):
+                if req.vlr_movto_estoq:
+                    valor_dia += abs(req.vlr_movto_estoq)
+            
+            # Manutenções Terceiro (filtrar por data, que é DateTimeField)
+            manutencao_count = ManutencaoTerceiro.objects.filter(
+                data__date=data_dia
+            ).count()
+            
+            # Visitas (filtrar por data, que é DateTimeField)
+            visitas_count = Visitas.objects.filter(
+                data__date=data_dia
+            ).count()
+            
+            dias_labels.append(data_dia.strftime('%d/%m'))
+            dias_data.append(count)
+            dias_valor.append(float(valor_dia))
+            dias_manutencao_terceiro.append(manutencao_count)
+            dias_visitas.append(visitas_count)
+        
+        return JsonResponse({
+            'labels': dias_labels,
+            'data': dias_data,
+            'valor': dias_valor,
+            'manutencao_terceiro': dias_manutencao_terceiro,
+            'visitas': dias_visitas
+        })
+        
+    except (ValueError, TypeError) as e:
+        return JsonResponse({'error': f'Formato de data inválido: {str(e)}'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': f'Erro ao processar dados: {str(e)}'}, status=500)
+
+
+def template_debug(request):
+    """Debug view to show which template file is being used"""
+    from django.template import loader
+    import os
+    
+    try:
+        template = loader.get_template('base.html')
+        template_path = template.origin.name if hasattr(template.origin, 'name') else str(template.origin)
+        template_exists = os.path.exists(template_path)
+        file_size = os.path.getsize(template_path) if template_exists else 0
+        file_modified = os.path.getmtime(template_path) if template_exists else None
+        
+        from datetime import datetime
+        modified_str = datetime.fromtimestamp(file_modified).strftime('%Y-%m-%d %H:%M:%S') if file_modified else 'N/A'
+        
+        # Read first few lines of the file
+        first_lines = []
+        if template_exists:
+            with open(template_path, 'r', encoding='utf-8') as f:
+                for i, line in enumerate(f):
+                    if i < 10:
+                        first_lines.append(line.strip())
+                    else:
+                        break
+        
+        context = {
+            'template_path': template_path,
+            'template_exists': template_exists,
+            'file_size': file_size,
+            'file_modified': modified_str,
+            'first_lines': first_lines,
+            'debug_mode': settings.DEBUG,
+        }
+        return render(request, 'debug_template.html', context)
+    except Exception as e:
+        return render(request, 'debug_template.html', {'error': str(e)})
 
 
 def testes(request):
@@ -1229,7 +2079,7 @@ def importar_manutentores(request):
                 'page_title': 'Importar Manutentores',
                 'active_page': 'importar_manutentores'
             }
-            return render(request, 'importar/manutentores.html', context)
+            return render(request, 'importar/importar_manutentor.html', context)
         
         file = request.FILES['file']
         print(f"DEBUG - Arquivo recebido: {file.name}, Tamanho: {file.size}")
@@ -1247,7 +2097,7 @@ def importar_manutentores(request):
                 'page_title': 'Importar Manutentores',
                 'active_page': 'importar_manutentores'
             }
-            return render(request, 'importar/manutentores.html', context)
+            return render(request, 'importar/importar_manutentor.html', context)
         
         # Verificar se deve atualizar registros existentes
         update_existing = request.POST.get('update_existing', 'off') == 'on'
@@ -1291,7 +2141,7 @@ def importar_manutentores(request):
         'page_title': 'Importar Manutentores',
         'active_page': 'importar_manutentores'
     }
-    return render(request, 'importar/manutentores.html', context)
+    return render(request, 'importar/importar_manutentor.html', context)
 
 
 def importar_ordens_corretivas_e_outros(request):
@@ -1611,6 +2461,181 @@ def importar_52_semanas(request):
         'active_page': 'importar_52_semanas'
     }
     return render(request, 'importar/importar_52_semanas.html', context)
+
+
+def importar_notas_fiscais(request):
+    """Importar Notas Fiscais page view"""
+    from app.utils import upload_notas_fiscais_from_file
+    from django.contrib import messages
+    
+    if request.method == 'POST':
+        # Verificar se há arquivo enviado
+        if 'file' not in request.FILES:
+            messages.error(request, 'Por favor, selecione um arquivo para importar.')
+            context = {
+                'page_title': 'Importar Notas Fiscais',
+                'active_page': 'importar_notas_fiscais'
+            }
+            return render(request, 'importar/importar_notas_fiscais.html', context)
+        
+        file = request.FILES['file']
+        update_existing = request.POST.get('update_existing') == 'on'
+        only_new_records = request.POST.get('only_new_records') == 'on'
+        
+        # Se "only_new_records" estiver marcado, não atualizar existentes
+        if only_new_records:
+            update_existing = False
+        
+        # Processar arquivo
+        try:
+            created_count, updated_count, errors = upload_notas_fiscais_from_file(file, update_existing=update_existing)
+            
+            # Mensagens de sucesso
+            if created_count > 0:
+                messages.success(request, f'{created_count} nota(s) fiscal(is) importada(s) com sucesso!')
+            if updated_count > 0:
+                messages.info(request, f'{updated_count} nota(s) fiscal(is) atualizada(s).')
+            if created_count == 0 and updated_count == 0:
+                messages.warning(request, 'Nenhuma nota fiscal foi importada. Verifique se há novos registros no arquivo.')
+            
+            # Mensagens de erro
+            if errors:
+                for error in errors[:10]:  # Limitar a 10 erros para não sobrecarregar
+                    messages.error(request, error)
+                if len(errors) > 10:
+                    messages.error(request, f'... e mais {len(errors) - 10} erro(s). Verifique o console para mais detalhes.')
+        
+        except Exception as e:
+            messages.error(request, f'Erro ao processar arquivo: {str(e)}')
+    
+    context = {
+        'page_title': 'Importar Notas Fiscais',
+        'active_page': 'importar_notas_fiscais'
+    }
+    return render(request, 'importar/importar_notas_fiscais.html', context)
+
+
+def importar_requisicoes_almoxarifado(request):
+    """Importar Requisições Almoxarifado page view"""
+    if request.method == 'POST':
+        # Verificar se há arquivo enviado
+        if 'file' not in request.FILES:
+            messages.error(request, 'Por favor, selecione um arquivo para importar.')
+            context = {
+                'page_title': 'Importar Requisições Almoxarifado',
+                'active_page': 'importar_requisicoes_almoxarifado'
+            }
+            return render(request, 'importar/importar_requisicoes_almoxaridado.html', context)
+        
+        file = request.FILES['file']
+        use_file_name_date = request.POST.get('use_file_name_date') == 'on'
+        data_requisicao_str = request.POST.get('data_requisicao')
+        
+        # Se usar data do nome do arquivo, extrair do nome
+        if use_file_name_date:
+            import re
+            file_name = file.name
+            # Remover extensão
+            name_without_ext = file_name.replace('.csv', '').replace('.CSV', '')
+            # Tentar padrão DD.MM.YYYY
+            date_pattern = r'(\d{2})\.(\d{2})\.(\d{4})'
+            match = re.search(date_pattern, name_without_ext)
+            
+            if match:
+                day = match.group(1)
+                month = match.group(2)
+                year = match.group(3)
+                data_requisicao_str = f"{year}-{month}-{day}"
+            else:
+                messages.error(request, f'Não foi possível extrair a data do nome do arquivo "{file_name}". O formato esperado é DD.MM.YYYY (ex: 01.11.2025.csv).')
+                context = {
+                    'page_title': 'Importar Requisições Almoxarifado',
+                    'active_page': 'importar_requisicoes_almoxarifado'
+                }
+                return render(request, 'importar/importar_requisicoes_almoxaridado.html', context)
+        
+        # Verificar se há data da requisição
+        if not data_requisicao_str:
+            messages.error(request, 'Por favor, informe a data da requisição ou marque a opção para usar a data do nome do arquivo.')
+            context = {
+                'page_title': 'Importar Requisições Almoxarifado',
+                'active_page': 'importar_requisicoes_almoxarifado'
+            }
+            return render(request, 'importar/importar_requisicoes_almoxaridado.html', context)
+        
+        # Validar extensão do arquivo
+        allowed_extensions = ['.csv']
+        file_extension = '.' + file.name.split('.')[-1].lower()
+        
+        if file_extension not in allowed_extensions:
+            messages.error(
+                request, 
+                f'Formato de arquivo não suportado. Use: {", ".join(allowed_extensions)}'
+            )
+            context = {
+                'page_title': 'Importar Requisições Almoxarifado',
+                'active_page': 'importar_requisicoes_almoxarifado'
+            }
+            return render(request, 'importar/importar_requisicoes_almoxaridado.html', context)
+        
+        # Verificar se deve apenas adicionar novos registros (ignorar duplicados)
+        only_new_records = request.POST.get('only_new_records', 'off') == 'on'
+        
+        # Verificar se deve atualizar registros existentes
+        # Se only_new_records estiver marcado, update_existing será ignorado
+        update_existing = False
+        if not only_new_records:
+            update_existing = request.POST.get('update_existing', 'off') == 'on'
+        
+        try:
+            from app.utils import upload_requisicoes_almoxarifado_from_file
+            from datetime import datetime
+            
+            # Converter data_requisicao_str para date
+            try:
+                data_requisicao = datetime.strptime(data_requisicao_str, '%Y-%m-%d').date()
+            except ValueError:
+                messages.error(request, f'Formato de data inválido: {data_requisicao_str}. Use YYYY-MM-DD')
+                context = {
+                    'page_title': 'Importar Requisições Almoxarifado',
+                    'active_page': 'importar_requisicoes_almoxarifado'
+                }
+                return render(request, 'importar/importar_requisicoes_almoxaridado.html', context)
+            
+            # Fazer upload dos dados
+            created_count, updated_count, errors = upload_requisicoes_almoxarifado_from_file(
+                file, 
+                data_requisicao=data_requisicao,
+                update_existing=update_existing
+            )
+            
+            # Preparar mensagens
+            if errors:
+                for error in errors[:10]:  # Mostrar apenas os primeiros 10 erros
+                    messages.warning(request, error)
+                if len(errors) > 10:
+                    messages.warning(request, f'... e mais {len(errors) - 10} erros.')
+            
+            if created_count > 0:
+                messages.success(request, f'{created_count} requisição(ões) criada(s) com sucesso para a data {data_requisicao.strftime("%d/%m/%Y")}!')
+            if updated_count > 0:
+                messages.info(request, f'{updated_count} requisição(ões) atualizada(s) para a data {data_requisicao.strftime("%d/%m/%Y")}!')
+            if created_count == 0 and updated_count == 0 and not errors:
+                messages.info(request, f'Nenhum registro novo foi importado para a data {data_requisicao.strftime("%d/%m/%Y")}. Todas as requisições já existem no banco de dados.')
+            
+        except Exception as e:
+            error_msg = f'Erro ao importar arquivo: {str(e)}'
+            messages.error(request, error_msg)
+            # Log detalhado do erro para debug
+            import traceback
+            print(f"Erro ao importar requisições almoxarifado: {error_msg}")
+            traceback.print_exc()
+    
+    context = {
+        'page_title': 'Importar Requisições Almoxarifado',
+        'active_page': 'importar_requisicoes_almoxarifado'
+    }
+    return render(request, 'importar/importar_requisicoes_almoxaridado.html', context)
 
 
 def importar_estoque(request):
@@ -3171,6 +4196,134 @@ def consultar_meu_plano(request):
     return render(request, 'consultar/consultar_meu_plano.html', context)
 
 
+def consultar_requisicoes_almoxarifado(request):
+    """Consultar/listar requisições de almoxarifado com filtros avançados"""
+    from app.models import RequisicaoAlmoxarifado
+    from decimal import Decimal
+    
+    # Busca geral
+    search_query = request.GET.get('search', '').strip()
+    requisicoes_list = RequisicaoAlmoxarifado.objects.all()
+    
+    # Aplicar busca geral
+    if search_query:
+        requisicoes_list = requisicoes_list.filter(
+            Q(cd_item__icontains=search_query) |
+            Q(descr_item__icontains=search_query) |
+            Q(cd_centro_ativ__icontains=search_query) |
+            Q(cd_usu_criou__icontains=search_query) |
+            Q(cd_usu_atend__icontains=search_query) |
+            Q(descr_operacao__icontains=search_query) |
+            Q(descr_local_fisic__icontains=search_query)
+        )
+    
+    # Filtros específicos
+    filter_data = request.GET.get('filter_data', '').strip()
+    if filter_data:
+        try:
+            from datetime import datetime
+            data_obj = datetime.strptime(filter_data, '%Y-%m-%d').date()
+            requisicoes_list = requisicoes_list.filter(data_requisicao=data_obj)
+        except ValueError:
+            requisicoes_list = requisicoes_list.filter(data_requisicao__icontains=filter_data)
+    
+    filter_item = request.GET.get('filter_item', '').strip()
+    if filter_item:
+        try:
+            item_num = int(float(filter_item))
+            requisicoes_list = requisicoes_list.filter(cd_item=item_num)
+        except (ValueError, TypeError):
+            requisicoes_list = requisicoes_list.filter(cd_item__icontains=filter_item)
+    
+    filter_descricao = request.GET.get('filter_descricao', '').strip()
+    if filter_descricao:
+        requisicoes_list = requisicoes_list.filter(descr_item__icontains=filter_descricao)
+    
+    filter_quantidade = request.GET.get('filter_quantidade', '').strip()
+    if filter_quantidade:
+        try:
+            qtd_num = Decimal(filter_quantidade)
+            requisicoes_list = requisicoes_list.filter(qtde_movto_estoq=qtd_num)
+        except (ValueError, TypeError):
+            requisicoes_list = requisicoes_list.filter(qtde_movto_estoq__icontains=filter_quantidade)
+    
+    filter_valor = request.GET.get('filter_valor', '').strip()
+    if filter_valor:
+        try:
+            valor_num = Decimal(filter_valor)
+            requisicoes_list = requisicoes_list.filter(vlr_movto_estoq=valor_num)
+        except (ValueError, TypeError):
+            requisicoes_list = requisicoes_list.filter(vlr_movto_estoq__icontains=filter_valor)
+    
+    filter_centro = request.GET.get('filter_centro', '').strip()
+    if filter_centro:
+        try:
+            centro_num = int(float(filter_centro))
+            requisicoes_list = requisicoes_list.filter(cd_centro_ativ=centro_num)
+        except (ValueError, TypeError):
+            requisicoes_list = requisicoes_list.filter(cd_centro_ativ__icontains=filter_centro)
+    
+    filter_usuario_criou = request.GET.get('filter_usuario_criou', '').strip()
+    if filter_usuario_criou:
+        requisicoes_list = requisicoes_list.filter(cd_usu_criou__icontains=filter_usuario_criou)
+    
+    filter_usuario_atend = request.GET.get('filter_usuario_atend', '').strip()
+    if filter_usuario_atend:
+        requisicoes_list = requisicoes_list.filter(cd_usu_atend__icontains=filter_usuario_atend)
+    
+    filter_operacao = request.GET.get('filter_operacao', '').strip()
+    if filter_operacao:
+        requisicoes_list = requisicoes_list.filter(descr_operacao__icontains=filter_operacao)
+    
+    filter_local = request.GET.get('filter_local', '').strip()
+    if filter_local:
+        requisicoes_list = requisicoes_list.filter(descr_local_fisic__icontains=filter_local)
+    
+    # Ordenar por data de requisição (mais recente primeiro) e código do item
+    requisicoes_list = requisicoes_list.order_by('-data_requisicao', 'cd_item')
+    
+    # Paginação
+    paginator = Paginator(requisicoes_list, 100)  # 100 itens por página
+    page_number = request.GET.get('page', 1)
+    requisicoes = paginator.get_page(page_number)
+    
+    # Estatísticas
+    total_count = RequisicaoAlmoxarifado.objects.count()
+    itens_count = RequisicaoAlmoxarifado.objects.values('cd_item').distinct().count()
+    centros_count = RequisicaoAlmoxarifado.objects.exclude(cd_centro_ativ__isnull=True).values('cd_centro_ativ').distinct().count()
+    
+    # Calcular valor total (soma de quantidade * valor, usando valores absolutos)
+    valor_total = Decimal('0.00')
+    for req in RequisicaoAlmoxarifado.objects.all():
+        if req.qtde_movto_estoq and req.vlr_movto_estoq:
+            # Usar valor absoluto da quantidade (já que geralmente é negativa para saída)
+            qtd_abs = abs(req.qtde_movto_estoq)
+            valor_total += qtd_abs * abs(req.vlr_movto_estoq)
+    
+    context = {
+        'page_title': 'Consultar Requisições Almoxarifado',
+        'active_page': 'consultar_requisicoes_almoxarifado',
+        'requisicoes': requisicoes,
+        'total_count': total_count,
+        'itens_count': itens_count,
+        'centros_count': centros_count,
+        'valor_total': valor_total,
+        # Preservar filtros no contexto
+        'search_query': search_query,
+        'filter_data': filter_data,
+        'filter_item': filter_item,
+        'filter_descricao': filter_descricao,
+        'filter_quantidade': filter_quantidade,
+        'filter_valor': filter_valor,
+        'filter_centro': filter_centro,
+        'filter_usuario_criou': filter_usuario_criou,
+        'filter_usuario_atend': filter_usuario_atend,
+        'filter_operacao': filter_operacao,
+        'filter_local': filter_local,
+    }
+    return render(request, 'consultar/consultar_requisicoes_almoxarifado.html', context)
+
+
 def consultar_52_semanas(request):
     """Consultar/listar Semanas 52"""
     from app.models import Semana52
@@ -3851,16 +5004,57 @@ def agrupar_preventiva_por_data(request):
 
 def criar_cronograma_planejado_preventiva(request):
     """Criar cronograma planejado de preventivas"""
-    from app.models import MeuPlanoPreventiva, Semana52
+    from app.models import MeuPlanoPreventiva, Semana52, Maquina
     from django.db.models import Q
     from datetime import datetime, date
     from collections import defaultdict
+    
+    # Parâmetros de seleção (para a nova função)
+    selected_maquina_id = request.GET.get('maquina_id', None)
+    selected_plano_id = request.GET.get('plano_id', None)
+    selected_maquina = None
+    selected_plano = None
+    
+    if selected_maquina_id:
+        try:
+            selected_maquina = Maquina.objects.get(id=selected_maquina_id)
+        except Maquina.DoesNotExist:
+            pass
+    
+    if selected_plano_id:
+        try:
+            selected_plano = MeuPlanoPreventiva.objects.get(id=selected_plano_id)
+        except MeuPlanoPreventiva.DoesNotExist:
+            pass
+    
+    # Buscar todas as máquinas e planos para popular os selects
+    todas_maquinas = Maquina.objects.all().order_by('cd_maquina')
+    todos_planos = MeuPlanoPreventiva.objects.all().order_by('cd_maquina', 'numero_plano', 'sequencia_manutencao')[:500]  # Limitar a 500 para performance
+    
+    # Buscar setores únicos para o filtro
+    setores_unicos = Maquina.objects.exclude(
+        cd_setormanut__isnull=True
+    ).exclude(
+        cd_setormanut=''
+    ).values_list('cd_setormanut', flat=True).distinct().order_by('cd_setormanut')
     
     # Buscar todas as semanas do ano
     semanas = Semana52.objects.all().order_by('inicio')
     
     # Buscar todos os planos preventiva PCM
     planos = MeuPlanoPreventiva.objects.all().order_by('dt_execucao', 'cd_maquina', 'sequencia_manutencao')
+    
+    # Se uma máquina foi selecionada, filtrar planos por essa máquina
+    if selected_maquina:
+        planos = planos.filter(cd_maquina=selected_maquina.cd_maquina)
+    
+    # Se um plano foi selecionado, filtrar apenas esse plano
+    if selected_plano:
+        planos = planos.filter(id=selected_plano.id)
+    
+    # Buscar agendamentos de cronograma
+    from app.models import AgendamentoCronograma
+    agendamentos = AgendamentoCronograma.objects.all().select_related('maquina', 'plano_preventiva', 'semana').order_by('data_planejada')
     
     # Agrupar planos por semana
     planos_por_semana = defaultdict(list)
@@ -3895,13 +5089,34 @@ def criar_cronograma_planejado_preventiva(request):
         else:
             planos_sem_data.append(plano)
     
+    # Agrupar agendamentos por semana
+    agendamentos_por_semana = defaultdict(list)
+    agendamentos_sem_semana = []
+    
+    for agendamento in agendamentos:
+        if agendamento.semana:
+            agendamentos_por_semana[agendamento.semana].append(agendamento)
+        else:
+            agendamentos_sem_semana.append(agendamento)
+    
     # Estatísticas
     total_planos = planos.count()
     total_com_semana = sum(len(planos_por_semana[semana]) for semana in semanas)
     total_sem_semana = len(planos_sem_data)
+    total_agendamentos = agendamentos.count()
+    total_agendamentos_com_semana = sum(len(agendamentos_por_semana[semana]) for semana in semanas)
     
     # Criar lista de tuplas para facilitar acesso no template
     planos_por_semana_list = [(semana, planos_por_semana[semana]) for semana in semanas if semana in planos_por_semana]
+    agendamentos_por_semana_list = [(semana, agendamentos_por_semana[semana]) for semana in semanas if semana in agendamentos_por_semana]
+    
+    # Criar lista combinada de semanas com agendamentos e planos
+    semanas_com_dados = []
+    for semana in semanas:
+        agendamentos_semana = agendamentos_por_semana.get(semana, [])
+        planos_semana = planos_por_semana.get(semana, [])
+        if agendamentos_semana or planos_semana:
+            semanas_com_dados.append((semana, agendamentos_semana, planos_semana))
     
     context = {
         'page_title': 'Criar Calendário Planejado de Preventivas',
@@ -3910,12 +5125,237 @@ def criar_cronograma_planejado_preventiva(request):
         'planos_por_semana': dict(planos_por_semana),
         'planos_por_semana_list': planos_por_semana_list,
         'planos_sem_data': planos_sem_data,
+        'agendamentos_por_semana': dict(agendamentos_por_semana),
+        'agendamentos_por_semana_list': agendamentos_por_semana_list,
+        'agendamentos_sem_semana': agendamentos_sem_semana,
+        'semanas_com_dados': semanas_com_dados,
         'total_planos': total_planos,
         'total_com_semana': total_com_semana,
         'total_sem_semana': total_sem_semana,
+        'total_agendamentos': total_agendamentos,
+        'total_agendamentos_com_semana': total_agendamentos_com_semana,
+        'selected_maquina': selected_maquina,
+        'selected_plano': selected_plano,
+        'selected_maquina_id': selected_maquina_id,
+        'selected_plano_id': selected_plano_id,
+        'todas_maquinas': todas_maquinas,
+        'todos_planos': todos_planos,
+        'setores_unicos': setores_unicos,
     }
     
     return render(request, 'planejamento/criar_cronograma_planejado_preventiva.html', context)
+
+
+def api_search_maquinas(request):
+    """API endpoint para buscar máquinas"""
+    from app.models import Maquina
+    from django.http import JsonResponse
+    
+    query = request.GET.get('q', '').strip()
+    
+    if len(query) < 2:
+        return JsonResponse({'results': []})
+    
+    maquinas = Maquina.objects.all()
+    
+    # Buscar por código ou descrição
+    try:
+        query_num = int(float(query))
+        maquinas = maquinas.filter(
+            Q(cd_maquina=query_num) |
+            Q(descr_maquina__icontains=query)
+        )
+    except (ValueError, TypeError):
+        maquinas = maquinas.filter(
+            Q(descr_maquina__icontains=query) |
+            Q(cd_setormanut__icontains=query) |
+            Q(nome_unid__icontains=query)
+        )
+    
+    # Limitar a 20 resultados
+    maquinas = maquinas[:20]
+    
+    results = []
+    for maquina in maquinas:
+        results.append({
+            'id': maquina.id,
+            'cd_maquina': maquina.cd_maquina,
+            'descr_maquina': maquina.descr_maquina or '',
+            'cd_setormanut': maquina.cd_setormanut or '',
+            'nome_unid': maquina.nome_unid or '',
+        })
+    
+    return JsonResponse({'results': results})
+
+
+def api_search_planos_pcm(request):
+    """API endpoint para buscar planos PCM"""
+    from app.models import MeuPlanoPreventiva
+    from django.http import JsonResponse
+    
+    query = request.GET.get('q', '').strip()
+    
+    if len(query) < 2:
+        return JsonResponse({'results': []})
+    
+    planos = MeuPlanoPreventiva.objects.all()
+    
+    # Buscar por código da máquina, número do plano ou descrição
+    try:
+        query_num = int(float(query))
+        planos = planos.filter(
+            Q(cd_maquina=query_num) |
+            Q(numero_plano=query_num) |
+            Q(descr_maquina__icontains=query) |
+            Q(descr_tarefa__icontains=query)
+        )
+    except (ValueError, TypeError):
+        planos = planos.filter(
+            Q(descr_maquina__icontains=query) |
+            Q(descr_tarefa__icontains=query) |
+            Q(descr_plano__icontains=query)
+        )
+    
+    # Limitar a 20 resultados
+    planos = planos[:20]
+    
+    results = []
+    for plano in planos:
+        results.append({
+            'id': plano.id,
+            'cd_maquina': plano.cd_maquina,
+            'descr_maquina': plano.descr_maquina or '',
+            'numero_plano': plano.numero_plano,
+            'sequencia_manutencao': plano.sequencia_manutencao,
+            'sequencia_tarefa': plano.sequencia_tarefa,
+            'descr_tarefa': plano.descr_tarefa or '',
+        })
+    
+    return JsonResponse({'results': results})
+
+
+def salvar_agendamentos_cronograma(request):
+    """Salvar múltiplos agendamentos de cronograma com suporte a periodicidade"""
+    from app.models import AgendamentoCronograma
+    from django.http import JsonResponse
+    from datetime import datetime, date, timedelta
+    import json
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método não permitido'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        agendamentos_data = data.get('agendamentos', [])
+        
+        if not agendamentos_data:
+            return JsonResponse({'success': False, 'error': 'Nenhum agendamento fornecido'})
+        
+        saved_count = 0
+        errors = []
+        
+        for agendamento_data in agendamentos_data:
+            try:
+                tipo = agendamento_data.get('tipo')
+                item_id = agendamento_data.get('id')
+                data_planejada_str = agendamento_data.get('data_planejada')
+                nome_grupo = agendamento_data.get('nome_grupo', '').strip() or None
+                periodicidade = agendamento_data.get('periodicidade')
+                
+                if not tipo or not item_id or not data_planejada_str:
+                    errors.append(f'Agendamento inválido: campos obrigatórios faltando')
+                    continue
+                
+                # Parse da data inicial
+                try:
+                    data_planejada = datetime.strptime(data_planejada_str, '%Y-%m-%d').date()
+                except ValueError:
+                    errors.append(f'Data inválida: {data_planejada_str}')
+                    continue
+                
+                # Obter objeto máquina ou plano
+                maquina_obj = None
+                plano_obj = None
+                
+                if tipo == 'maquina':
+                    from app.models import Maquina
+                    try:
+                        maquina_obj = Maquina.objects.get(id=item_id)
+                    except Maquina.DoesNotExist:
+                        errors.append(f'Máquina com ID {item_id} não encontrada')
+                        continue
+                elif tipo == 'plano':
+                    from app.models import MeuPlanoPreventiva
+                    try:
+                        plano_obj = MeuPlanoPreventiva.objects.get(id=item_id)
+                    except MeuPlanoPreventiva.DoesNotExist:
+                        errors.append(f'Plano com ID {item_id} não encontrado')
+                        continue
+                else:
+                    errors.append(f'Tipo de agendamento inválido: {tipo}')
+                    continue
+                
+                # Calcular datas se houver periodicidade
+                if periodicidade and periodicidade > 0:
+                    # Calcular todas as datas até o final do ano
+                    ano_atual = date.today().year
+                    fim_do_ano = date(ano_atual, 12, 31)
+                    
+                    datas_agendamento = []
+                    data_atual = data_planejada
+                    
+                    while data_atual <= fim_do_ano:
+                        datas_agendamento.append(data_atual)
+                        data_atual = data_atual + timedelta(days=periodicidade)
+                else:
+                    # Sem periodicidade, apenas uma data
+                    datas_agendamento = [data_planejada]
+                
+                # Criar agendamentos para cada data
+                for data_agendamento in datas_agendamento:
+                    try:
+                        agendamento = AgendamentoCronograma(
+                            tipo_agendamento=tipo,
+                            data_planejada=data_agendamento,
+                            nome_grupo=nome_grupo,
+                            periodicidade=periodicidade if periodicidade and periodicidade > 0 else None,
+                            created_by=request.user.username if request.user.is_authenticated else 'Sistema'
+                        )
+                        
+                        if tipo == 'maquina':
+                            agendamento.maquina = maquina_obj
+                        elif tipo == 'plano':
+                            agendamento.plano_preventiva = plano_obj
+                        
+                        agendamento.full_clean()
+                        agendamento.save()
+                        saved_count += 1
+                    except Exception as e:
+                        errors.append(f'Erro ao salvar agendamento para data {data_agendamento}: {str(e)}')
+                        continue
+                
+            except Exception as e:
+                errors.append(f'Erro ao processar agendamento: {str(e)}')
+                continue
+        
+        if saved_count > 0:
+            return JsonResponse({
+                'success': True,
+                'saved_count': saved_count,
+                'total': len(agendamentos_data),
+                'errors': errors if errors else None
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': 'Nenhum agendamento foi salvo',
+                'errors': errors
+            })
+            
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 def consultar_roteiro_preventiva(request):
@@ -6255,7 +7695,7 @@ def consultar_manutencao_terceiros(request):
     if filtro_manutentor:
         try:
             manutentor_id = filtro_manutentor
-            manutencoes_list = manutencoes_list.filter(manutentor__Cadastro=manutentor_id)
+            manutencoes_list = manutencoes_list.filter(manutentor__Matricula=manutentor_id)
         except ValueError:
             manutencoes_list = manutencoes_list.filter(manutentor__Nome__icontains=filtro_manutentor)
     
@@ -6309,7 +7749,7 @@ def consultar_manutencao_terceiros(request):
     
     manutentores_unicos = ManutencaoTerceiro.objects.exclude(
         manutentor__isnull=True
-    ).select_related('manutentor').values_list('manutentor__Cadastro', 'manutentor__Nome').distinct().order_by('manutentor__Nome')
+    ).select_related('manutentor').values_list('manutentor__Matricula', 'manutentor__Nome').distinct().order_by('manutentor__Nome')
     
     context = {
         'page_title': 'Consultar Manutenções Terceiros',
@@ -6336,13 +7776,39 @@ def consultar_manutencao_terceiros(request):
 
 def cadastrar_manutencao_terceiro(request):
     """Cadastrar nova manutenção de terceiro"""
+    print(f"\n{'='*80}")
+    print(f"VIEW CADASTRAR_MANUTENCAO_TERCEIRO CALLED - Method: {request.method}")
+    print(f"URL: {request.path}")
+    print(f"{'='*80}\n")
+    
     from app.forms import ManutencaoTerceiroForm
     
     if request.method == 'POST':
+        print(f"\n{'='*80}")
+        print("POST REQUEST RECEBIDO!")
+        print(f"POST keys: {list(request.POST.keys())}")
+        print(f"POST data: {dict(request.POST)}")
+        print(f"{'='*80}\n")
+        
         form = ManutencaoTerceiroForm(request.POST)
+        
+        print(f"\nForm is_valid: {form.is_valid()}")
+        if not form.is_valid():
+            print(f"\n{'='*60}")
+            print("FORMULÁRIO INVÁLIDO!")
+            print(f"Erros: {form.errors}")
+            print(f"Non-field errors: {form.non_field_errors()}")
+            print(f"{'='*60}\n")
+        
         if form.is_valid():
             try:
-                manutencao = form.save()
+                print("Tentando salvar manutenção terceiro...")
+                print(f"Cleaned data: {form.cleaned_data}")
+                manutencao = form.save(commit=False)
+                print(f"Manutenção objeto criado: {manutencao}")
+                print(f"Título: {manutencao.titulo}, Empresa: {manutencao.empresa}")
+                manutencao.save()
+                print(f"Manutenção salva com sucesso! ID: {manutencao.id}")
                 messages.success(request, f'Manutenção de terceiro "{manutencao.titulo}" cadastrada com sucesso!')
                 return redirect('home')
             except Exception as e:
@@ -6352,21 +7818,39 @@ def cadastrar_manutencao_terceiro(request):
                 messages.error(request, f'Erro ao cadastrar manutenção de terceiro: {str(e)}')
         else:
             # Exibir erros de validação específicos
+            print(f"\n{'='*60}")
+            print("FORMULÁRIO INVÁLIDO - EXIBINDO ERROS")
+            print(f"Total de campos com erro: {len(form.errors)}")
+            print(f"Erros: {form.errors}")
+            print(f"{'='*60}\n")
+            
             missing_required = []
             for field, errors in form.errors.items():
-                field_label = form.fields[field].label
+                field_label = form.fields[field].label if field in form.fields else field
+                print(f"  Campo '{field}' ({field_label}): {errors}")
                 for error in errors:
-                    if 'required' in str(error).lower() or 'obrigatório' in str(error).lower():
-                        missing_required.append(field_label)
+                    error_str = str(error).lower()
+                    if 'required' in error_str or 'obrigatório' in error_str:
+                        if field_label not in missing_required:
+                            missing_required.append(field_label)
                         messages.warning(request, f'<strong>{field_label}</strong>: Este campo é obrigatório e deve ser preenchido.')
                     else:
                         messages.error(request, f'<strong>{field_label}</strong>: {error}')
             
+            # Mostrar erros não relacionados a campos específicos
+            if form.non_field_errors():
+                print(f"Non-field errors: {form.non_field_errors()}")
+                for error in form.non_field_errors():
+                    messages.error(request, f'Erro no formulário: {error}')
+            
             if missing_required:
-                messages.warning(request, f'<strong>Atenção:</strong> {len(missing_required)} campo(s) obrigatório(s) não preenchido(s). Por favor, preencha todos os campos marcados com <span class="text-danger">*</span>.')
-            else:
+                messages.warning(request, f'<strong>Atenção:</strong> {len(missing_required)} campo(s) obrigatório(s) não preenchido(s): {", ".join(missing_required)}. Por favor, preencha todos os campos marcados com <span class="text-danger">*</span>.')
+            elif form.errors:
                 messages.error(request, 'Por favor, corrija os erros no formulário antes de continuar.')
+            else:
+                messages.error(request, 'Ocorreu um erro ao processar o formulário. Por favor, tente novamente.')
     else:
+        print("GET request - mostrando formulário vazio")
         form = ManutencaoTerceiroForm()
     
     context = {
@@ -6407,9 +7891,9 @@ def cadastrar_manutentor(request):
                         print(f"Erro ao relacionar máquina {maquina_id}: {str(e)}")
                 
                 if maquinas_adicionadas > 0:
-                    messages.success(request, f'Manutentor {manutentor.Cadastro} cadastrado com sucesso! {maquinas_adicionadas} máquina(s) relacionada(s).')
+                    messages.success(request, f'Manutentor {manutentor.Matricula} cadastrado com sucesso! {maquinas_adicionadas} máquina(s) relacionada(s).')
                 else:
-                    messages.success(request, f'Manutentor {manutentor.Cadastro} cadastrado com sucesso!')
+                    messages.success(request, f'Manutentor {manutentor.Matricula} cadastrado com sucesso!')
                 
                 return redirect('consultar_manutentores')
             except Exception as e:
@@ -6448,12 +7932,12 @@ def cadastrar_manutentor(request):
     return render(request, 'cadastrar/cadastrar_manutentor.html', context)
 
 
-def visualizar_manutentor(request, cadastro):
+def visualizar_manutentor(request, matricula):
     """Visualizar detalhes de um manutentor específico"""
     from app.models import Manutentor, ManutentorMaquina, Maquina
     
     try:
-        manutentor = Manutentor.objects.get(Cadastro=cadastro)
+        manutentor = Manutentor.objects.get(Matricula=matricula)
     except Manutentor.DoesNotExist:
         messages.error(request, 'Manutentor não encontrado.')
         return redirect('consultar_manutentores')
@@ -6466,7 +7950,7 @@ def visualizar_manutentor(request, cadastro):
     maquinas_disponiveis = Maquina.objects.exclude(id__in=maquinas_ids_relacionadas).order_by('cd_maquina')
     
     context = {
-        'page_title': f'Visualizar Manutentor {manutentor.Cadastro}',
+        'page_title': f'Visualizar Manutentor {manutentor.Matricula}',
         'active_page': 'consultar_manutentores',
         'manutentor': manutentor,
         'maquinas_relacionadas': maquinas_relacionadas,
@@ -6475,29 +7959,29 @@ def visualizar_manutentor(request, cadastro):
     return render(request, 'visualizar/visualizar_manutentor.html', context)
 
 
-def editar_manutentor(request, cadastro):
+def editar_manutentor(request, matricula):
     """Editar um manutentor existente"""
     from app.forms import ManutentorForm
     from app.models import Manutentor
     
     try:
-        manutentor = Manutentor.objects.get(Cadastro=cadastro)
+        manutentor = Manutentor.objects.get(Matricula=matricula)
     except Manutentor.DoesNotExist:
         messages.error(request, 'Manutentor não encontrado.')
         return redirect('consultar_manutentores')
     
     if request.method == 'POST':
-        # Garantir que o Cadastro não seja alterado (é a primary key)
+        # Garantir que a Matricula não seja alterada (é a primary key)
         post_data = request.POST.copy()
-        post_data['Cadastro'] = manutentor.Cadastro
+        post_data['Matricula'] = manutentor.Matricula
         
         form = ManutentorForm(post_data, instance=manutentor)
         
         if form.is_valid():
             try:
                 manutentor = form.save()
-                messages.success(request, f'Manutentor {manutentor.Cadastro} atualizado com sucesso!')
-                return redirect('visualizar_manutentor', cadastro=manutentor.Cadastro)
+                messages.success(request, f'Manutentor {manutentor.Matricula} atualizado com sucesso!')
+                return redirect('visualizar_manutentor', matricula=manutentor.Matricula)
             except Exception as e:
                 import traceback
                 error_detail = traceback.format_exc()
@@ -6507,12 +7991,12 @@ def editar_manutentor(request, cadastro):
             handle_form_errors(form, request)
     else:
         form = ManutentorForm(instance=manutentor)
-        # Tornar o campo Cadastro readonly na edição (é a primary key)
-        form.fields['Cadastro'].widget.attrs['readonly'] = True
-        form.fields['Cadastro'].widget.attrs['class'] = 'form-control bg-light'
+        # Tornar o campo Matricula readonly na edição (é a primary key)
+        form.fields['Matricula'].widget.attrs['readonly'] = True
+        form.fields['Matricula'].widget.attrs['class'] = 'form-control bg-light'
     
     context = {
-        'page_title': f'Editar Manutentor {manutentor.Cadastro}',
+        'page_title': f'Editar Manutentor {manutentor.Matricula}',
         'active_page': 'consultar_manutentores',
         'form': form,
         'manutentor': manutentor,
@@ -6522,7 +8006,7 @@ def editar_manutentor(request, cadastro):
 
 def consultar_manutentores(request):
     """Consultar/listar manutentores cadastrados com filtros avançados"""
-    from app.models import Manutentor, TIPO_MANUTENTOR, TURNO, LOCAL_TRABALHO
+    from app.models import Manutentor, TURNO, LOCAL_TRABALHO
     from datetime import datetime
     
     # Buscar todos os manutentores
@@ -6532,21 +8016,14 @@ def consultar_manutentores(request):
     search_query = request.GET.get('search', '').strip()
     if search_query:
         manutentores_list = manutentores_list.filter(
-            Q(Cadastro__icontains=search_query) |
+            Q(Matricula__icontains=search_query) |
             Q(Nome__icontains=search_query) |
             Q(Cargo__icontains=search_query) |
-            Q(Posto__icontains=search_query) |
-            Q(tipo__icontains=search_query) |
             Q(turno__icontains=search_query) |
             Q(local_trab__icontains=search_query)
         )
     
     # Filtros específicos
-    # Filtro por Tipo
-    filtro_tipo = request.GET.get('filtro_tipo', '')
-    if filtro_tipo:
-        manutentores_list = manutentores_list.filter(tipo=filtro_tipo)
-    
     # Filtro por Turno
     filtro_turno = request.GET.get('filtro_turno', '')
     if filtro_turno:
@@ -6562,32 +8039,8 @@ def consultar_manutentores(request):
     if filtro_cargo:
         manutentores_list = manutentores_list.filter(Cargo__icontains=filtro_cargo)
     
-    # Filtro por Posto
-    filtro_posto = request.GET.get('filtro_posto', '')
-    if filtro_posto:
-        manutentores_list = manutentores_list.filter(Posto__icontains=filtro_posto)
-    
-    # Filtro por Data de Admissão (período)
-    data_admissao_inicio = request.GET.get('data_admissao_inicio', '')
-    data_admissao_fim = request.GET.get('data_admissao_fim', '')
-    if data_admissao_inicio:
-        try:
-            data_inicio = datetime.strptime(data_admissao_inicio, '%Y-%m-%d').date()
-            manutentores_list = manutentores_list.filter(Admissao__gte=data_inicio)
-        except ValueError:
-            pass
-    if data_admissao_fim:
-        try:
-            data_fim = datetime.strptime(data_admissao_fim, '%Y-%m-%d').date()
-            # Adicionar 1 dia para incluir o dia final
-            from datetime import timedelta
-            data_fim = data_fim + timedelta(days=1)
-            manutentores_list = manutentores_list.filter(Admissao__lte=data_fim)
-        except ValueError:
-            pass
-    
-    # Ordenar por nome e cadastro
-    manutentores_list = manutentores_list.order_by('Nome', 'Cadastro')
+    # Ordenar por nome e matricula
+    manutentores_list = manutentores_list.order_by('Nome', 'Matricula')
     
     # Paginação
     paginator = Paginator(manutentores_list, 50)  # 50 itens por página
@@ -6596,7 +8049,6 @@ def consultar_manutentores(request):
     
     # Estatísticas
     total_count = Manutentor.objects.count()
-    tipos_count = Manutentor.objects.exclude(tipo__isnull=True).exclude(tipo='').values('tipo').distinct().count()
     turnos_count = Manutentor.objects.exclude(turno__isnull=True).exclude(turno='').values('turno').distinct().count()
     locais_count = Manutentor.objects.exclude(local_trab__isnull=True).exclude(local_trab='').values('local_trab').distinct().count()
     
@@ -6607,46 +8059,346 @@ def consultar_manutentores(request):
         Cargo=''
     ).values_list('Cargo', flat=True).distinct().order_by('Cargo')
     
-    postos_unicos = Manutentor.objects.exclude(
-        Posto__isnull=True
-    ).exclude(
-        Posto=''
-    ).values_list('Posto', flat=True).distinct().order_by('Posto')
     
     context = {
         'page_title': 'Consultar Manutentores',
         'active_page': 'consultar_manutentores',
         'manutentores': manutentores,
         'total_count': total_count,
-        'tipos_count': tipos_count,
         'turnos_count': turnos_count,
         'locais_count': locais_count,
         # Valores para dropdowns
-        'tipos_manutentor': TIPO_MANUTENTOR,
         'turnos': TURNO,
         'locais_trabalho': LOCAL_TRABALHO,
         'cargos_unicos': cargos_unicos,
-        'postos_unicos': postos_unicos,
         # Valores dos filtros ativos
-        'filtro_tipo': filtro_tipo,
         'filtro_turno': filtro_turno,
         'filtro_local_trab': filtro_local_trab,
         'filtro_cargo': filtro_cargo,
-        'filtro_posto': filtro_posto,
-        'data_admissao_inicio': data_admissao_inicio,
-        'data_admissao_fim': data_admissao_fim,
     }
     return render(request, 'consultar/consultar_manutentores.html', context)
+
+
+def consultar_agendamentos(request):
+    """Consultar/listar agendamentos de cronograma cadastrados com visitas"""
+    from app.models import AgendamentoCronograma, Visitas
+    from django.db.models import Q
+    from django.core.paginator import Paginator
+    from datetime import datetime
+    
+    # Buscar todos os agendamentos com visitas relacionadas
+    agendamentos_list = AgendamentoCronograma.objects.select_related('maquina', 'plano_preventiva', 'semana').prefetch_related('visitas').all()
+    
+    # Filtro de busca geral (incluindo campos de visitas)
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        agendamentos_list = agendamentos_list.filter(
+            Q(nome_grupo__icontains=search_query) |
+            Q(maquina__cd_maquina__icontains=search_query) |
+            Q(maquina__descr_maquina__icontains=search_query) |
+            Q(plano_preventiva__numero_plano__icontains=search_query) |
+            Q(plano_preventiva__descr_plano__icontains=search_query) |
+            Q(observacoes__icontains=search_query) |
+            Q(visitas__titulo__icontains=search_query) |
+            Q(visitas__descricao__icontains=search_query) |
+            Q(visitas__nome_contato__icontains=search_query)
+        ).distinct()
+    
+    # Filtros específicos
+    filtro_tipo = request.GET.get('filtro_tipo', '')
+    if filtro_tipo:
+        agendamentos_list = agendamentos_list.filter(tipo_agendamento=filtro_tipo)
+    
+    filtro_data_inicio = request.GET.get('filtro_data_inicio', '')
+    if filtro_data_inicio:
+        try:
+            data_ini = datetime.strptime(filtro_data_inicio, '%Y-%m-%d').date()
+            agendamentos_list = agendamentos_list.filter(data_planejada__gte=data_ini)
+        except ValueError:
+            pass
+    
+    filtro_data_fim = request.GET.get('filtro_data_fim', '')
+    if filtro_data_fim:
+        try:
+            data_f = datetime.strptime(filtro_data_fim, '%Y-%m-%d').date()
+            agendamentos_list = agendamentos_list.filter(data_planejada__lte=data_f)
+        except ValueError:
+            pass
+    
+    # Ordenar por data planejada
+    agendamentos_list = agendamentos_list.order_by('data_planejada', 'tipo_agendamento')
+    
+    # Paginação
+    paginator = Paginator(agendamentos_list, 50)  # 50 itens por página
+    page_number = request.GET.get('page', 1)
+    agendamentos = paginator.get_page(page_number)
+    
+    # Estatísticas
+    total_count = AgendamentoCronograma.objects.count()
+    tipo_maquina_count = AgendamentoCronograma.objects.filter(tipo_agendamento='maquina').count()
+    tipo_plano_count = AgendamentoCronograma.objects.filter(tipo_agendamento='plano').count()
+    visitas_count = Visitas.objects.count()
+    
+    context = {
+        'page_title': 'Consultar Agendamentos',
+        'active_page': 'consultar_agendamentos',
+        'agendamentos': agendamentos,
+        'total_count': total_count,
+        'tipo_maquina_count': tipo_maquina_count,
+        'tipo_plano_count': tipo_plano_count,
+        'visitas_count': visitas_count,
+        'filtro_tipo': filtro_tipo,
+        'filtro_data_inicio': filtro_data_inicio,
+        'filtro_data_fim': filtro_data_fim,
+        'search_query': search_query,
+    }
+    return render(request, 'consultar/consultar_agendamentos.html', context)
+
+
+def consultar_visitas(request):
+    """Consultar/listar visitas cadastradas"""
+    from app.models import Visitas
+    from django.db.models import Q
+    from django.core.paginator import Paginator
+    from datetime import datetime
+    
+    # Buscar todas as visitas
+    visitas_list = Visitas.objects.all()
+    
+    # Filtro de busca geral
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        visitas_list = visitas_list.filter(
+            Q(titulo__icontains=search_query) |
+            Q(descricao__icontains=search_query) |
+            Q(nome_contato__icontains=search_query) |
+            Q(numero_contato__icontains=search_query)
+        )
+    
+    # Filtros específicos
+    filtro_data_inicio = request.GET.get('filtro_data_inicio', '')
+    if filtro_data_inicio:
+        try:
+            data_ini = datetime.strptime(filtro_data_inicio, '%Y-%m-%d').date()
+            visitas_list = visitas_list.filter(data__date__gte=data_ini)
+        except ValueError:
+            pass
+    
+    filtro_data_fim = request.GET.get('filtro_data_fim', '')
+    if filtro_data_fim:
+        try:
+            data_f = datetime.strptime(filtro_data_fim, '%Y-%m-%d').date()
+            visitas_list = visitas_list.filter(data__date__lte=data_f)
+        except ValueError:
+            pass
+    
+    # Ordenar por data (mais recente primeiro)
+    visitas_list = visitas_list.order_by('-data', '-created_at')
+    
+    # Paginação
+    paginator = Paginator(visitas_list, 50)  # 50 itens por página
+    page_number = request.GET.get('page', 1)
+    visitas = paginator.get_page(page_number)
+    
+    # Estatísticas
+    total_count = Visitas.objects.count()
+    com_documentos_count = Visitas.objects.exclude(documento__isnull=True).exclude(documento='').count()
+    com_contato_count = Visitas.objects.exclude(nome_contato__isnull=True).exclude(nome_contato='').count()
+    
+    context = {
+        'page_title': 'Consultar Visitas',
+        'active_page': 'consultar_visitas',
+        'visitas': visitas,
+        'total_count': total_count,
+        'com_documentos_count': com_documentos_count,
+        'com_contato_count': com_contato_count,
+        'filtro_data_inicio': filtro_data_inicio,
+        'filtro_data_fim': filtro_data_fim,
+        'search_query': search_query,
+    }
+    return render(request, 'consultar/consultar_visitas.html', context)
+
+
+def consultar_notas_fiscais(request):
+    """Consultar/listar notas fiscais cadastradas"""
+    from app.models import NotaFiscal
+    from django.db.models import Q, Sum
+    from django.core.paginator import Paginator
+    from decimal import Decimal
+    
+    # Buscar todas as notas fiscais
+    notas_list = NotaFiscal.objects.all()
+    
+    # Filtro de busca geral
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        notas_list = notas_list.filter(
+            Q(nota__icontains=search_query) |
+            Q(serie__icontains=search_query) |
+            Q(emitente__icontains=search_query) |
+            Q(nome_fantasia_emitente__icontains=search_query) |
+            Q(unidade__icontains=search_query) |
+            Q(nome_unidade__icontains=search_query) |
+            Q(centro_atividade__icontains=search_query) |
+            Q(nome_centro_atividade__icontains=search_query) |
+            Q(situacao__icontains=search_query) |
+            Q(observacoes__icontains=search_query)
+        )
+    
+    # Filtros específicos
+    filtro_emitente = request.GET.get('filtro_emitente', '')
+    if filtro_emitente:
+        notas_list = notas_list.filter(emitente__icontains=filtro_emitente)
+    
+    filtro_unidade = request.GET.get('filtro_unidade', '')
+    if filtro_unidade:
+        notas_list = notas_list.filter(unidade__icontains=filtro_unidade)
+    
+    filtro_situacao = request.GET.get('filtro_situacao', '')
+    if filtro_situacao:
+        notas_list = notas_list.filter(situacao__icontains=filtro_situacao)
+    
+    filtro_total_min = request.GET.get('filtro_total_min', '')
+    if filtro_total_min:
+        try:
+            total_min = Decimal(filtro_total_min)
+            notas_list = notas_list.filter(total_nota__gte=total_min)
+        except (ValueError, TypeError):
+            pass
+    
+    filtro_total_max = request.GET.get('filtro_total_max', '')
+    if filtro_total_max:
+        try:
+            total_max = Decimal(filtro_total_max)
+            notas_list = notas_list.filter(total_nota__lte=total_max)
+        except (ValueError, TypeError):
+            pass
+    
+    # Ordenar por data de emissão (mais recente primeiro) ou por número da nota
+    notas_list = notas_list.order_by('-data_emissao', '-nota', '-created_at')
+    
+    # Paginação
+    paginator = Paginator(notas_list, 50)  # 50 itens por página
+    page_number = request.GET.get('page', 1)
+    notas = paginator.get_page(page_number)
+    
+    # Estatísticas
+    total_count = NotaFiscal.objects.count()
+    total_valor = NotaFiscal.objects.aggregate(total=Sum('total_nota'))['total'] or Decimal('0.00')
+    situacoes_count = NotaFiscal.objects.values('situacao').distinct().count()
+    unidades_count = NotaFiscal.objects.values('unidade').distinct().count()
+    
+    context = {
+        'page_title': 'Consultar Notas Fiscais',
+        'active_page': 'consultar_notas_fiscais',
+        'notas': notas,
+        'total_count': total_count,
+        'total_valor': total_valor,
+        'situacoes_count': situacoes_count,
+        'unidades_count': unidades_count,
+        'filtro_emitente': filtro_emitente,
+        'filtro_unidade': filtro_unidade,
+        'filtro_situacao': filtro_situacao,
+        'filtro_total_min': filtro_total_min,
+        'filtro_total_max': filtro_total_max,
+        'search_query': search_query,
+    }
+    return render(request, 'consultar/consultar_notas_fiscais.html', context)
+
+
+def visualizar_nota_fiscal(request, nota_id):
+    """Visualizar detalhes completos de uma Nota Fiscal"""
+    from app.models import NotaFiscal
+    
+    try:
+        nota = NotaFiscal.objects.get(id=nota_id)
+    except NotaFiscal.DoesNotExist:
+        messages.error(request, 'Nota Fiscal não encontrada.')
+        return redirect('consultar_notas_fiscais')
+    
+    context = {
+        'page_title': f'Visualizar Nota Fiscal {nota.nota or nota.id}',
+        'active_page': 'consultar_notas_fiscais',
+        'nota': nota,
+    }
+    return render(request, 'visualizar/visualizar_nota_fiscal.html', context)
+
+
+def cadastrar_visita(request):
+    """Cadastrar nova visita"""
+    print(f"\n{'='*80}")
+    print(f"VIEW CADASTRAR_VISITA CALLED - Method: {request.method}")
+    print(f"URL: {request.path}")
+    print(f"{'='*80}\n")
+    
+    from app.forms import VisitasForm
+    from app.models import Visitas
+    
+    if request.method == 'POST':
+        print(f"\n{'='*60}")
+        print("DEBUG - POST request recebido")
+        print(f"POST data: {dict(request.POST)}")
+        print(f"FILES data: {dict(request.FILES)}")
+        print(f"{'='*60}\n")
+        
+        form = VisitasForm(request.POST, request.FILES)
+        
+        print(f"Form is_valid: {form.is_valid()}")
+        if not form.is_valid():
+            print(f"Form errors: {form.errors}")
+            print(f"Form data: {form.data}")
+            print(f"Form cleaned_data: {form.cleaned_data if hasattr(form, 'cleaned_data') else 'N/A'}")
+        
+        if form.is_valid():
+            try:
+                print("Tentando salvar visita...")
+                print(f"Cleaned data: {form.cleaned_data}")
+                visita = form.save(commit=False)
+                print(f"Visita objeto criado: {visita}")
+                print(f"Título: {visita.titulo}")
+                visita.save()
+                print(f"Visita salva com sucesso! ID: {visita.id}, Título: {visita.titulo}")
+                messages.success(request, f'Visita "{visita.titulo}" cadastrada com sucesso!')
+                return redirect('consultar_visitas')
+            except Exception as e:
+                import traceback
+                error_details = traceback.format_exc()
+                print(f"\n{'='*60}")
+                print(f"DEBUG - Erro ao salvar visita: {str(e)}")
+                print(f"DEBUG - Traceback: {error_details}")
+                print(f"{'='*60}\n")
+                messages.error(request, f'Erro ao cadastrar visita: {str(e)}')
+        else:
+            # Usar helper function para exibir erros
+            print(f"\n{'='*60}")
+            print("Formulário inválido!")
+            print(f"Erros: {form.errors}")
+            print(f"{'='*60}\n")
+            handle_form_errors(form, request)
+            # Mostrar erros não relacionados a campos específicos
+            if form.non_field_errors():
+                for error in form.non_field_errors():
+                    messages.error(request, f'Erro no formulário: {error}')
+    else:
+        form = VisitasForm()
+    
+    context = {
+        'page_title': 'Cadastrar Visita',
+        'active_page': 'cadastrar_visita',
+        'form': form
+    }
+    return render(request, 'cadastrar/cadastrar_visita.html', context)
 
 
 def gerenciar_projeto(request):
     """Página de gerenciamento administrativo do projeto"""
     from app.models import (
-        Maquina, OrdemServicoCorretiva, OrdemServicoCorretivaFicha,
-        CentroAtividade, LocalCentroAtividade, Manutentor, ManutentorMaquina,
+        Maquina, MaquinaDocumento, OrdemServicoCorretiva, OrdemServicoCorretivaFicha,
+        CentroAtividade, LocalCentroAtividade, Semana52, Manutentor, ManutentorMaquina,
         ItemEstoque, ManutencaoCsv, ManutencaoTerceiro, MaquinaPeca,
         MaquinaPrimariaSecundaria, PlanoPreventiva, PlanoPreventivaDocumento,
-        MeuPlanoPreventiva, RoteiroPreventiva
+        MeuPlanoPreventiva, MeuPlanoPreventivaDocumento, AgendamentoCronograma,
+        RoteiroPreventiva, RequisicaoAlmoxarifado
     )
     
     # Definir todos os modelos com suas informações
@@ -6779,6 +8531,46 @@ def gerenciar_projeto(request):
             'cor': 'primary',
             'descricao': 'Roteiros de manutenção preventiva'
         },
+        {
+            'nome': 'Documentos das Máquinas',
+            'modelo': MaquinaDocumento,
+            'key': 'maquina_documento',
+            'icone': 'fas fa-file-pdf',
+            'cor': 'primary',
+            'descricao': 'Documentos relacionados às máquinas'
+        },
+        {
+            'nome': 'Semanas 52',
+            'modelo': Semana52,
+            'key': 'semana52',
+            'icone': 'fas fa-calendar-week',
+            'cor': 'info',
+            'descricao': 'Semanas do ano (52 semanas)'
+        },
+        {
+            'nome': 'Documentos Meus Planos Preventiva',
+            'modelo': MeuPlanoPreventivaDocumento,
+            'key': 'meu_plano_preventiva_documento',
+            'icone': 'fas fa-file-alt',
+            'cor': 'info',
+            'descricao': 'Documentos associados aos planos PCM'
+        },
+        {
+            'nome': 'Agendamentos Cronograma',
+            'modelo': AgendamentoCronograma,
+            'key': 'agendamento_cronograma',
+            'icone': 'fas fa-calendar-day',
+            'cor': 'success',
+            'descricao': 'Agendamentos de máquinas e planos no cronograma'
+        },
+        {
+            'nome': 'Requisições Almoxarifado',
+            'modelo': RequisicaoAlmoxarifado,
+            'key': 'requisicao_almoxarifado',
+            'icone': 'fas fa-shopping-cart',
+            'cor': 'warning',
+            'descricao': 'Requisições de itens retirados do almoxarifado'
+        },
     ]
     
     # Contar registros em cada tabela
@@ -6794,10 +8586,11 @@ def gerenciar_projeto(request):
         })
     
     # Manter compatibilidade com o template atual (primeiros 4 para cards de estatísticas)
-    maquinas_count = tabelas_info[0]['count'] if len(tabelas_info) > 0 else 0
-    ordens_count = tabelas_info[1]['count'] if len(tabelas_info) > 1 else 0
-    centros_count = tabelas_info[2]['count'] if len(tabelas_info) > 2 else 0
-    manutentores_count = tabelas_info[3]['count'] if len(tabelas_info) > 3 else 0
+    # Buscar pelos keys específicos para garantir que pegamos os valores corretos
+    maquinas_count = next((t['count'] for t in tabelas_info if t['key'] == 'maquinas'), 0)
+    ordens_count = next((t['count'] for t in tabelas_info if t['key'] == 'ordens'), 0)
+    centros_count = next((t['count'] for t in tabelas_info if t['key'] == 'centros'), 0)
+    manutentores_count = next((t['count'] for t in tabelas_info if t['key'] == 'manutentores'), 0)
     
     context = {
         'page_title': 'Gerenciar Projeto',
@@ -6819,11 +8612,12 @@ def limpar_tabela(request):
         return redirect('gerenciar_projeto')
     
     from app.models import (
-        Maquina, OrdemServicoCorretiva, OrdemServicoCorretivaFicha,
-        CentroAtividade, LocalCentroAtividade, Manutentor, ManutentorMaquina,
+        Maquina, MaquinaDocumento, OrdemServicoCorretiva, OrdemServicoCorretivaFicha,
+        CentroAtividade, LocalCentroAtividade, Semana52, Manutentor, ManutentorMaquina,
         ItemEstoque, ManutencaoCsv, ManutencaoTerceiro, MaquinaPeca,
         MaquinaPrimariaSecundaria, PlanoPreventiva, PlanoPreventivaDocumento,
-        MeuPlanoPreventiva, RoteiroPreventiva
+        MeuPlanoPreventiva, MeuPlanoPreventivaDocumento, AgendamentoCronograma,
+        RoteiroPreventiva, RequisicaoAlmoxarifado
     )
     
     # Mapeamento de tabelas para modelos
@@ -6844,6 +8638,11 @@ def limpar_tabela(request):
         'plano_preventiva_documento': {'modelo': PlanoPreventivaDocumento, 'nome': 'Documentos Planos Preventiva'},
         'meu_plano_preventiva': {'modelo': MeuPlanoPreventiva, 'nome': 'Meus Planos Preventiva'},
         'roteiro_preventiva': {'modelo': RoteiroPreventiva, 'nome': 'Roteiros Preventiva'},
+        'maquina_documento': {'modelo': MaquinaDocumento, 'nome': 'Documentos das Máquinas'},
+        'semana52': {'modelo': Semana52, 'nome': 'Semanas 52'},
+        'meu_plano_preventiva_documento': {'modelo': MeuPlanoPreventivaDocumento, 'nome': 'Documentos Meus Planos Preventiva'},
+        'agendamento_cronograma': {'modelo': AgendamentoCronograma, 'nome': 'Agendamentos Cronograma'},
+        'requisicao_almoxarifado': {'modelo': RequisicaoAlmoxarifado, 'nome': 'Requisições Almoxarifado'},
     }
     
     tabela = request.POST.get('tabela', '')
@@ -6962,7 +8761,7 @@ def adicionar_peca_maquina(request, maquina_id):
     return redirect('visualizar_maquina', maquina_id=maquina_id)
 
 
-def adicionar_maquina_manutentor(request, cadastro):
+def adicionar_maquina_manutentor(request, matricula):
     """Adicionar uma máquina a um manutentor"""
     from app.models import Manutentor, ManutentorMaquina, Maquina
     from django.db import IntegrityError
@@ -7002,10 +8801,10 @@ def adicionar_maquina_manutentor(request, cadastro):
                     maquina=maquina,
                     observacoes=observacoes if observacoes else None
                 )
-                messages.success(request, f'Máquina "{maquina.cd_maquina}" adicionada com sucesso ao manutentor {manutentor.Cadastro}.')
+                messages.success(request, f'Máquina "{maquina.cd_maquina}" adicionada com sucesso ao manutentor {manutentor.Matricula}.')
             except Exception as create_error:
                 if isinstance(create_error, IntegrityError):
-                    messages.warning(request, f'Esta máquina já está relacionada ao manutentor {manutentor.Cadastro}.')
+                    messages.warning(request, f'Esta máquina já está relacionada ao manutentor {manutentor.Matricula}.')
                 else:
                     raise create_error
     
@@ -7017,19 +8816,19 @@ def adicionar_maquina_manutentor(request, cadastro):
         messages.error(request, f'Erro ao adicionar máquina: {str(e)}')
         print(f"Erro ao adicionar máquina: {error_detail}")  # Debug
     
-    return redirect('visualizar_manutentor', cadastro=cadastro)
+    return redirect('visualizar_manutentor', matricula=matricula)
 
 
-def remover_maquina_manutentor(request, cadastro, manutentor_maquina_id):
+def remover_maquina_manutentor(request, matricula, manutentor_maquina_id):
     """Remover uma máquina de um manutentor"""
     from app.models import Manutentor, ManutentorMaquina
     
     if request.method != 'POST':
         messages.error(request, 'Método não permitido.')
-        return redirect('visualizar_manutentor', cadastro=cadastro)
+        return redirect('visualizar_manutentor', matricula=matricula)
     
     try:
-        manutentor = Manutentor.objects.get(Cadastro=cadastro)
+        manutentor = Manutentor.objects.get(Matricula=matricula)
     except Manutentor.DoesNotExist:
         messages.error(request, 'Manutentor não encontrado.')
         return redirect('consultar_manutentores')
@@ -7038,7 +8837,7 @@ def remover_maquina_manutentor(request, cadastro, manutentor_maquina_id):
         manutentor_maquina = ManutentorMaquina.objects.get(id=manutentor_maquina_id, manutentor=manutentor)
         maquina_codigo = manutentor_maquina.maquina.cd_maquina
         manutentor_maquina.delete()
-        messages.success(request, f'Máquina "{maquina_codigo}" removida com sucesso do manutentor {manutentor.Cadastro}.')
+        messages.success(request, f'Máquina "{maquina_codigo}" removida com sucesso do manutentor {manutentor.Matricula}.')
     except ManutentorMaquina.DoesNotExist:
         messages.error(request, 'Relação não encontrada.')
     except Exception as e:
