@@ -449,22 +449,35 @@ footer h5 {
 .btn-toggle {
     display: inline-flex;
     align-items: center;
-    padding: 0.25rem 0.5rem;
+    padding: 0.5rem 0.75rem;
     margin-top: 0.125rem;
     font-weight: 600;
-    color: rgba(0, 0, 0, 0.65);
+    color: rgba(0, 0, 0, 0.75);
     background-color: transparent;
     border: 0;
     width: 100%;
     text-align: left;
     cursor: pointer;
-    transition: background-color 0.15s ease-in-out;
+    transition: all 0.2s ease;
+    border-radius: 0.375rem;
 }
 
 .btn-toggle:hover,
 .btn-toggle:focus {
-    color: rgba(0, 0, 0, 0.85);
-    background-color: rgba(0, 0, 0, 0.05);
+    color: rgba(0, 0, 0, 0.95);
+    background-color: rgba(255, 152, 0, 0.1);
+}
+
+.btn-toggle i {
+    width: 20px;
+    text-align: center;
+    font-size: 0.95rem;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+.btn-toggle:hover i {
+    opacity: 1;
 }
 
 .btn-toggle::before {
@@ -509,6 +522,156 @@ footer h5 {
     background-color: rgba(0, 0, 0, 0.05);
 }
 
+/* Three-level sidebar navigation styles */
+.btn-toggle-nav li {
+    position: relative;
+}
+
+/* Level 2 - Submenu items */
+.btn-toggle-nav > li > a {
+    padding: 0.375rem 0.75rem;
+    margin-top: 0.125rem;
+    font-size: 0.9rem;
+    color: rgba(0, 0, 0, 0.7);
+    transition: all 0.2s ease;
+    border-left: 2px solid transparent;
+    background-color: rgba(248, 249, 250, 0.5);
+    margin-left: 0.5rem;
+    border-radius: 0.25rem;
+}
+
+.btn-toggle-nav > li > a:hover {
+    background-color: rgba(255, 152, 0, 0.12);
+    color: rgba(0, 0, 0, 0.9);
+    border-left-color: #ff9800;
+    padding-left: 1rem;
+    transform: translateX(2px);
+}
+
+/* Level 2 - Submenu toggle buttons (for third level) */
+.btn-toggle-nav .btn-toggle-sub {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.375rem 0.75rem;
+    margin-top: 0.125rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: rgba(0, 0, 0, 0.7);
+    background-color: rgba(248, 249, 250, 0.5);
+    border: 0;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-left: 2px solid transparent;
+    margin-left: 0.5rem;
+    border-radius: 0.25rem;
+}
+
+.btn-toggle-nav .btn-toggle-sub:hover,
+.btn-toggle-nav .btn-toggle-sub:focus {
+    color: rgba(0, 0, 0, 0.9);
+    background-color: rgba(255, 152, 0, 0.12);
+    border-left-color: #ff9800;
+    padding-left: 1rem;
+    transform: translateX(2px);
+}
+
+.btn-toggle-nav .btn-toggle-sub::before {
+    width: 1em;
+    line-height: 0;
+    content: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3e%3cpath fill='none' stroke='rgba%280,0,0,.5%29' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 10l4-4-4-4'/%3e%3c/svg%3e");
+    transition: transform 0.35s ease;
+    transform-origin: 0.5em 50%;
+    margin-right: 0.5rem;
+}
+
+.btn-toggle-nav .btn-toggle-sub:not(.collapsed)::before,
+.btn-toggle-nav .btn-toggle-sub[aria-expanded="true"]::before {
+    transform: rotate(90deg);
+}
+
+.btn-toggle-nav .btn-toggle-sub.collapsed::before {
+    transform: rotate(0deg);
+}
+
+/* Level 3 - Third level navigation */
+.btn-toggle-nav-sub {
+    padding-left: 1.5rem;
+    margin-top: 0.25rem;
+    margin-left: 0.5rem;
+}
+
+.btn-toggle-nav-sub a {
+    display: inline-flex;
+    padding: 0.3rem 0.75rem;
+    margin-top: 0.125rem;
+    font-size: 0.85rem;
+    color: rgba(0, 0, 0, 0.65);
+    text-decoration: none;
+    border-radius: 0.25rem;
+    transition: all 0.2s ease;
+    border-left: 2px solid transparent;
+    position: relative;
+    background-color: rgba(255, 255, 255, 0.5);
+}
+
+.btn-toggle-nav-sub a::before {
+    content: "▸";
+    margin-right: 0.5rem;
+    color: rgba(255, 152, 0, 0.6);
+    font-weight: normal;
+    font-size: 0.75rem;
+    transition: all 0.2s ease;
+}
+
+.btn-toggle-nav-sub a:hover,
+.btn-toggle-nav-sub a:focus {
+    background-color: rgba(255, 152, 0, 0.1);
+    color: rgba(0, 0, 0, 0.9);
+    border-left-color: #ff9800;
+    padding-left: 1rem;
+    transform: translateX(2px);
+}
+
+.btn-toggle-nav-sub a:hover::before {
+    color: #ff9800;
+    transform: translateX(2px);
+}
+
+/* Active state for all levels */
+.btn-toggle-nav > li > a.active,
+.btn-toggle-nav-sub a.active {
+    background-color: rgba(255, 152, 0, 0.15);
+    color: rgba(0, 0, 0, 0.95);
+    border-left-color: #ff9800;
+    font-weight: 500;
+}
+
+/* Improved spacing and visual hierarchy */
+.btn-toggle-nav > li {
+    margin-bottom: 0.125rem;
+}
+
+.btn-toggle-nav-sub li {
+    margin-bottom: 0.0625rem;
+}
+
+/* Icon support for level 2 */
+.btn-toggle-nav > li > a i,
+.btn-toggle-nav .btn-toggle-sub i {
+    margin-right: 0.5rem;
+    width: 16px;
+    text-align: center;
+    font-size: 0.85rem;
+    opacity: 0.7;
+}
+
+.btn-toggle-nav > li > a:hover i,
+.btn-toggle-nav .btn-toggle-sub:hover i {
+    opacity: 1;
+}
+
 .scrollarea {
     overflow-y: auto;
 }
@@ -528,6 +691,7 @@ footer h5 {
     flex: 0 0 auto;
     width: 320px;
     min-width: 320px;
+    background-color: #f8f9fa;
 }
 
 .sidebar-wrapper.collapsed {
@@ -540,6 +704,8 @@ footer h5 {
     width: 100%;
     overflow-x: hidden;
     overflow-y: auto;
+    background-color: #ffffff;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
 }
 
 .sidebar.collapsed .sidebar-title,
