@@ -3029,8 +3029,20 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
                     total_nota_str = row_data.get('Total Nota') or row_data.get('total nota') or row_data.get('TOTAL NOTA') or row_data.get('Total nota')
                     total_nota = _safe_decimal(total_nota_str)
                     
-                    # Centro de Custo
-                    centro_de_custo = _safe_str(row_data.get('centro de custo') or row_data.get('Centro de custo') or row_data.get('CENTRO DE CUSTO') or row_data.get('centro de custo'), max_length=100)
+                    # Uso Contábil - Priorizar coluna "uso contabil" do CSV
+                    uso_contabil = _safe_str(
+                        row_data.get('uso contabil') or 
+                        row_data.get('Uso contabil') or 
+                        row_data.get('USO CONTABIL') or 
+                        row_data.get('uso contábil') or 
+                        row_data.get('Uso contábil') or 
+                        row_data.get('USO CONTÁBIL') or
+                        # Fallback para "centro de custo" (compatibilidade com arquivos antigos)
+                        row_data.get('centro de custo') or 
+                        row_data.get('Centro de custo') or 
+                        row_data.get('CENTRO DE CUSTO'),
+                        max_length=100
+                    )
                     
                     # Validar que temos pelo menos emitente e nota
                     if not emitente or not nota:
@@ -3099,7 +3111,7 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
                         'serie': serie,
                         'modelo': modelo,
                         'total_nota': total_nota,
-                        'centro_de_custo': centro_de_custo,
+                        'uso_contabil': uso_contabil,
                         'data_emissao': data_emissao,
                         'data_vencimento': data_vencimento,
                         'data_inclusao': data_inclusao,

@@ -986,7 +986,7 @@ class NotaFiscal(models.Model):
     serie = models.CharField('Série', max_length=50, blank=True, null=True)
     modelo = models.CharField('Modelo', max_length=50, blank=True, null=True)
     total_nota = models.DecimalField('Total da Nota', max_digits=15, decimal_places=2, blank=True, null=True)
-    centro_de_custo = models.CharField('Centro de Custo', max_length=100, blank=True, null=True)
+    uso_contabil = models.CharField('Uso Contábil', max_length=100, blank=True, null=True)
     
     # Datas
     data_emissao = models.CharField('Data Emissão', max_length=50, blank=True, null=True)

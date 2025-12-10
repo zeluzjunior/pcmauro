@@ -279,9 +279,9 @@
                                         </button>
                                         <div class="collapse" id="preventiva-consultas-collapse">
                                             <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
-                                                <li><a href="{% url 'consultar_manutencoes_preventivas' %}" class="link-dark rounded">Consultar Manutenções Preventivas</a></li>
-                                                <li><a href="{% url 'consultar_manutencoes_preventivas' %}" class="link-dark rounded">Consultar Plano de Preventiva</a></li>
-                                                <li><a href="{% url 'consultar_roteiro_preventiva' %}" class="link-dark rounded">Consultar Roteiro Preventiva</a></li>
+                                                <li><a href="{% url 'consultar_manutencoes_preventivas' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Manutenções Preventivas</a></li>
+                                                <li><a href="{% url 'consultar_manutencoes_preventivas' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Plano de Preventiva</a></li>
+                                                <li><a href="{% url 'consultar_roteiro_preventiva' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Roteiro Preventiva</a></li>
                                             </ul>
                                         </div>
                                     </li>
@@ -297,7 +297,7 @@
                             <div class="collapse" id="corretiva-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'analise_corretiva_outros' %}" class="link-dark rounded">Análise Ordens Corretivas</a></li>
-                                    <li><a href="{% url 'consultar_corretivas_outros' %}" class="link-dark rounded">Consultar Corretiva</a></li>
+                                    <li><a href="{% url 'consultar_corretivas_outros' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Corretiva</a></li>
                                 </ul>
                             </div>
                         </li>
@@ -326,7 +326,7 @@
                             <div class="collapse" id="plano-pcm-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'analise_geral_plano_preventiva_pcm' %}" class="link-dark rounded">Análise Geral PCM</a></li>
-                                    <li><a href="{% url 'consultar_meu_plano' %}" class="link-dark rounded">Consultar Meus Planos Preventiva do PCM</a></li>
+                                    <li><a href="{% url 'consultar_meu_plano' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Meus Planos Preventiva do PCM</a></li>
                                     <li><a href="{% url 'criar_cronograma_planejado_preventiva' %}" class="link-dark rounded">Criar Calendário Plenejado de Preventivas</a></li>
                                 </ul>
                             </div>
@@ -344,7 +344,7 @@
                             <div class="collapse" id="terceiro-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'cadastrar_manutencao_terceiro' %}" class="link-dark rounded">Cadastrar Mant. de Terceiros</a></li>
-                                    <li><a href="{% url 'consultar_manutencao_terceiros' %}" class="link-dark rounded">Consultar Mant. de Terceiros</a></li>
+                                    <li><a href="{% url 'consultar_manutencao_terceiros' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Mant. de Terceiros</a></li>
                                 </ul>
                             </div>
                         </li>
@@ -356,7 +356,7 @@
                             <div class="collapse" id="visitas-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'cadastrar_visita' %}" class="link-dark rounded">Nova Visita</a></li>
-                                    <li><a href="{% url 'consultar_visitas' %}" class="link-dark rounded">Consultar Visitas</a></li>
+                                    <li><a href="{% url 'consultar_visitas' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Visitas</a></li>
                                 </ul>
                             </div>
                         </li>
@@ -368,12 +368,13 @@
                         <!-- Estoque Almoxarifado -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#estoque-collapse" aria-expanded="false">
+                                <i class="bi bi-box-seam me-2"></i>
                                 <span class="btn-toggle-text">Estoque e Almoxarifado</span>
                             </button>
                             <div class="collapse" id="estoque-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="#" class="link-dark rounded">Análise de Estoque</a></li>
-                                    <li><a href="{% url 'consultar_estoque' %}" class="link-dark rounded">Consultar Estoque</a></li>
+                                    <li><a href="{% url 'consultar_estoque' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Estoque</a></li>
                                     <li><a href="{% url 'importar_estoque' %}" class="link-dark rounded">Importar Estoque</a></li>
                                 </ul>
                             </div>
@@ -385,13 +386,14 @@
                         <!-- Orçamento -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#orcamento-collapse" aria-expanded="false">
+                                <i class="bi bi-graph-up-arrow me-2"></i>
                                 <span class="btn-toggle-text">Orçamento e GMD</span>
                             </button>
                             <div class="collapse" id="orcamento-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'analise_requisicoes' %}" class="link-dark rounded">Análise de Requisições</a></li>
-                                    <li><a href="{% url 'consultar_requisicoes_almoxarifado' %}" class="link-dark rounded">Consultar Requisições Almoxarifado</a></li>
-                                    <li><a href="{% url 'consultar_notas_fiscais' %}" class="link-dark rounded">Consultar Notas Fiscais</a></li>
+                                    <li><a href="{% url 'consultar_requisicoes_almoxarifado' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Requisições Almoxarifado</a></li>
+                                    <li><a href="{% url 'consultar_notas_fiscais' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Notas Fiscais</a></li>
                                 </ul>
                             </div>
                         </li>
@@ -417,17 +419,10 @@
                                             </ul>
                                         </div>
                                     </li>
-                                    <!-- Level 2: Cadastro -->
-                                    <li>
-                                        <a href="{% url 'cadastrar_maquina' %}" class="link-dark rounded">
-                                            <i class="fas fa-plus-circle"></i>
-                                            Cadastrar Máquina
-                                        </a>
-                                    </li>
                                     <!-- Level 2: Consultas -->
                                     <li>
                                         <a href="{% url 'consultar_maquinas' %}" class="link-dark rounded">
-                                            <i class="fas fa-search"></i>
+                                            <i class="fas fa-search me-2"></i>
                                             Consultar Máquinas
                                         </a>
                                     </li>
@@ -438,12 +433,13 @@
                         <!--- Manutentores -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#manutentor-collapse" aria-expanded="false">
+                                <i class="bi bi-person-lines-fill me-2"></i>
                                 <span class="btn-toggle-text">Manutentores</span>
                             </button>
                             <div class="collapse" id="manutentor-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'cadastrar_manutentor' %}" class="link-dark rounded">Cadastrar Manutentor</a></li>
-                                    <li><a href="{% url 'consultar_manutentores' %}" class="link-dark rounded">Consultar Manutentores</a></li>
+                                    <li><a href="{% url 'consultar_manutentores' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Manutentores</a></li>
                                 </ul>
                             </div>
                         </li>
@@ -452,13 +448,14 @@
                         <!-- Setores e CA -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#local-collapse" aria-expanded="false">
+                                <i class="bi bi-buildings me-2"></i>
                                 <span class="btn-toggle-text">Locais e CAs</span>
                             </button>
                             <div class="collapse" id="local-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'cadastrar_local_e_cas' %}" class="link-dark rounded">Cadastrar Local ou CA</a></li>
-                                    <li><a href="{% url 'consultar_locais_e_cas' %}" class="link-dark rounded">Consultar Local ou CA</a></li>
-                                    <li><a href="{% url 'consultar_locais' %}" class="link-dark rounded">Consultar Locais</a></li>
+                                    <li><a href="{% url 'cadastrar_local_e_cas' %}" class="link-dark rounded">Cadastrar Centros de Atividade</a></li>
+                                    <li><a href="{% url 'consultar_locais_e_cas' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Local ou CA</a></li>
+                                    <li><a href="{% url 'consultar_locais' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Locais ou Salas</a></li>
                                 </ul>
                             </div>
                         </li>

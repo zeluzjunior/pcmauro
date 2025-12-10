@@ -50,7 +50,29 @@
     <div class="container">
         <!-- Statistics Cards -->
         <div class="row mb-4">
-            <div class="col-md-3">
+            <div class="col-md-2">
+                <div class="card bg-dark text-white action-card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-database me-2"></i>Total de Tabelas
+                        </h5>
+                        <p class="card-text display-6">{{ tabelas_info|length }}</p>
+                        <small>Tabelas gerenciadas</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card bg-secondary text-white action-card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-list me-2"></i>Total de Registros
+                        </h5>
+                        <p class="card-text display-6">{{ total_geral }}</p>
+                        <small>Registros no sistema</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
                 <div class="card bg-primary text-white action-card">
                     <div class="card-body">
                         <h5 class="card-title">
@@ -61,7 +83,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card bg-info text-white action-card">
                     <div class="card-body">
                         <h5 class="card-title">
@@ -72,7 +94,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card bg-success text-white action-card">
                     <div class="card-body">
                         <h5 class="card-title">
@@ -83,7 +105,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card bg-warning text-white action-card">
                     <div class="card-body">
                         <h5 class="card-title">
@@ -98,25 +120,31 @@
 
         <!-- Database Tables Overview -->
         <div class="card shadow-sm mb-4">
-            <div class="card-header bg-primary text-white">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
-                    <i class="fas fa-database me-2"></i>Visão Geral das Tabelas
+                    <i class="fas fa-database me-2"></i>Visão Geral das Tabelas ({{ tabelas_info|length }} tabelas)
                 </h5>
+                <div class="input-group" style="max-width: 300px;">
+                    <span class="input-group-text bg-white">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <input type="text" class="form-control" id="searchTables" placeholder="Buscar tabela...">
+                </div>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-hover table-stats">
+                    <table class="table table-hover table-stats" id="tablesTable">
                         <thead>
                             <tr>
-                                <th>Tabela</th>
-                                <th>Descrição</th>
-                                <th class="text-center">Total de Registros</th>
-                                <th class="text-center">Ações</th>
+                                <th style="width: 30%;">Tabela</th>
+                                <th style="width: 45%;">Descrição</th>
+                                <th class="text-center" style="width: 15%;">Total de Registros</th>
+                                <th class="text-center" style="width: 10%;">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for tabela in tabelas_info %}
-                            <tr>
+                            <tr class="table-row" data-name="{{ tabela.nome|lower }}" data-desc="{{ tabela.descricao|lower|default:'' }}">
                                 <td>
                                     <strong>
                                         <i class="{{ tabela.icone }} me-2"></i>{{ tabela.nome }}
@@ -124,12 +152,12 @@
                                 </td>
                                 <td>{{ tabela.descricao|default:"Tabela do sistema" }}</td>
                                 <td class="text-center">
-                                    <span class="badge bg-{{ tabela.cor }} {% if tabela.cor == 'warning' %}text-dark{% endif %}">
-                                        {{ tabela.count }}
+                                    <span class="badge bg-{{ tabela.cor }} {% if tabela.cor == 'warning' %}text-dark{% endif %} fs-6">
+                                        {{ tabela.count|floatformat:0 }}
                                     </span>
                                 </td>
                                 <td class="text-center">
-                                    <button type="button" class="btn btn-sm btn-danger" onclick="confirmarLimpeza('{{ tabela.key }}', '{{ tabela.count }}', '{{ tabela.nome }}')">
+                                    <button type="button" class="btn btn-sm btn-danger" onclick="confirmarLimpeza('{{ tabela.key }}', '{{ tabela.count }}', '{{ tabela.nome }}')" {% if tabela.count == 0 %}disabled title="Tabela vazia"{% endif %}>
                                         <i class="fas fa-trash me-1"></i>Limpar
                                     </button>
                                 </td>
@@ -137,6 +165,10 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                    <div id="noResults" class="text-center text-muted py-4" style="display: none;">
+                        <i class="fas fa-search fa-2x mb-2"></i>
+                        <p>Nenhuma tabela encontrada com o termo pesquisado.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -223,6 +255,40 @@
 
 {% block extra_js %}
 <script>
+    // Search functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('searchTables');
+        const tableRows = document.querySelectorAll('.table-row');
+        const noResults = document.getElementById('noResults');
+        const tableBody = document.querySelector('#tablesTable tbody');
+        
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase().trim();
+            let visibleCount = 0;
+            
+            tableRows.forEach(row => {
+                const name = row.getAttribute('data-name');
+                const desc = row.getAttribute('data-desc');
+                
+                if (name.includes(searchTerm) || desc.includes(searchTerm)) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            
+            // Show/hide no results message
+            if (visibleCount === 0 && searchTerm !== '') {
+                noResults.style.display = 'block';
+                tableBody.style.display = 'none';
+            } else {
+                noResults.style.display = 'none';
+                tableBody.style.display = '';
+            }
+        });
+    });
+    
     function confirmarLimpeza(tabela, count, tabelaNome) {
         const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
         const modalMessage = document.getElementById('modalMessage');

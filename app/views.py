@@ -8398,7 +8398,7 @@ def gerenciar_projeto(request):
         ItemEstoque, ManutencaoCsv, ManutencaoTerceiro, MaquinaPeca,
         MaquinaPrimariaSecundaria, PlanoPreventiva, PlanoPreventivaDocumento,
         MeuPlanoPreventiva, MeuPlanoPreventivaDocumento, AgendamentoCronograma,
-        RoteiroPreventiva, RequisicaoAlmoxarifado
+        RoteiroPreventiva, RequisicaoAlmoxarifado, NotaFiscal, Visitas
     )
     
     # Definir todos os modelos com suas informações
@@ -8571,6 +8571,22 @@ def gerenciar_projeto(request):
             'cor': 'warning',
             'descricao': 'Requisições de itens retirados do almoxarifado'
         },
+        {
+            'nome': 'Notas Fiscais',
+            'modelo': NotaFiscal,
+            'key': 'nota_fiscal',
+            'icone': 'fas fa-file-invoice-dollar',
+            'cor': 'info',
+            'descricao': 'Notas fiscais cadastradas no sistema'
+        },
+        {
+            'nome': 'Visitas',
+            'modelo': Visitas,
+            'key': 'visitas',
+            'icone': 'fas fa-calendar-check',
+            'cor': 'success',
+            'descricao': 'Visitas e agendamentos cadastrados'
+        },
     ]
     
     # Contar registros em cada tabela
@@ -8617,7 +8633,7 @@ def limpar_tabela(request):
         ItemEstoque, ManutencaoCsv, ManutencaoTerceiro, MaquinaPeca,
         MaquinaPrimariaSecundaria, PlanoPreventiva, PlanoPreventivaDocumento,
         MeuPlanoPreventiva, MeuPlanoPreventivaDocumento, AgendamentoCronograma,
-        RoteiroPreventiva, RequisicaoAlmoxarifado
+        RoteiroPreventiva, RequisicaoAlmoxarifado, NotaFiscal, Visitas
     )
     
     # Mapeamento de tabelas para modelos
@@ -8643,6 +8659,8 @@ def limpar_tabela(request):
         'meu_plano_preventiva_documento': {'modelo': MeuPlanoPreventivaDocumento, 'nome': 'Documentos Meus Planos Preventiva'},
         'agendamento_cronograma': {'modelo': AgendamentoCronograma, 'nome': 'Agendamentos Cronograma'},
         'requisicao_almoxarifado': {'modelo': RequisicaoAlmoxarifado, 'nome': 'Requisições Almoxarifado'},
+        'nota_fiscal': {'modelo': NotaFiscal, 'nome': 'Notas Fiscais'},
+        'visitas': {'modelo': Visitas, 'nome': 'Visitas'},
     }
     
     tabela = request.POST.get('tabela', '')
