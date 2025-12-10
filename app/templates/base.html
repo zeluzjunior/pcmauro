@@ -226,6 +226,7 @@
                         <!-- Testes -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#testes-collapse" aria-expanded="false">
+                                <i class="fas fa-flask me-2"></i>
                                 <span class="btn-toggle-text">Testes</span>
                             </button>
                             <div class="collapse" id="testes-collapse">
@@ -252,15 +253,38 @@
                         <!-- Manutenção Preventiva (SIGA) -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded" data-bs-toggle="collapse" data-bs-target="#preventiva-collapse" aria-expanded="false">
+                                <i class="fas fa-tools me-2"></i>
                                 <span class="btn-toggle-text">Manutenção Preventiva (SIGA)</span>
                             </button>
                             <div class="collapse" id="preventiva-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'em_desenvolvimento' %}" class="link-dark rounded">Análise Ordens Preventivas</a></li>
-                                    <li><a href="{% url 'consultar_manutencoes_preventivas' %}" class="link-dark rounded">Consultar Manutenções Preventivas</a></li>
-                                    <li><a href="{% url 'consultar_manutencoes_preventivas' %}" class="link-dark rounded">Consultar Plano de Preventiva</a></li>
-                                    <li><a href="{% url 'consultar_roteiro_preventiva' %}" class="link-dark rounded">Consultar Roteiro Preventiva</a></li>
-
+                                    <!-- Level 2: Análise -->
+                                    <li>
+                                        <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#preventiva-analise-collapse" aria-expanded="false">
+                                            <i class="fas fa-chart-line"></i>
+                                            Análise
+                                        </button>
+                                        <div class="collapse" id="preventiva-analise-collapse">
+                                            <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
+                                                <li><a href="{% url 'em_desenvolvimento' %}" class="link-dark rounded">Análise Ordens Preventivas</a></li>
+                                                <li><a href="{% url 'analise_geral_plano_preventiva_pcm' %}" class="link-dark rounded">Análise Geral</a></li>
+                                            </ul>
+                                        </div>
+                                    </li>
+                                    <!-- Level 2: Consultas -->
+                                    <li>
+                                        <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#preventiva-consultas-collapse" aria-expanded="false">
+                                            <i class="fas fa-search"></i>
+                                            Consultas
+                                        </button>
+                                        <div class="collapse" id="preventiva-consultas-collapse">
+                                            <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
+                                                <li><a href="{% url 'consultar_manutencoes_preventivas' %}" class="link-dark rounded">Consultar Manutenções Preventivas</a></li>
+                                                <li><a href="{% url 'consultar_manutencoes_preventivas' %}" class="link-dark rounded">Consultar Plano de Preventiva</a></li>
+                                                <li><a href="{% url 'consultar_roteiro_preventiva' %}" class="link-dark rounded">Consultar Roteiro Preventiva</a></li>
+                                            </ul>
+                                        </div>
+                                    </li>
                                 </ul>
                             </div>
                         </li>
@@ -375,14 +399,38 @@
                         <!-- Máquinas -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#maquinas-collapse" aria-expanded="false">
+                                <i class="fas fa-industry me-2"></i>
                                 <span class="btn-toggle-text">Máquinas</span>
                             </button>
                             <div class="collapse" id="maquinas-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'analise_maquinas' %}" class="link-dark rounded">Análise</a></li>
-                                    <li><a href="{% url 'analise_maquinas_importadas' %}" class="link-dark rounded">Análise de Importadas</a></li>
-                                    <li><a href="{% url 'cadastrar_maquina' %}" class="link-dark rounded">Cadastrar Máquina</a></li>
-                                    <li><a href="{% url 'consultar_maquinas' %}" class="link-dark rounded">Consultar Máquinas</a></li>
+                                    <!-- Level 2: Análise -->
+                                    <li>
+                                        <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#maquinas-analise-collapse" aria-expanded="false">
+                                            <i class="fas fa-chart-bar"></i>
+                                            Análise
+                                        </button>
+                                        <div class="collapse" id="maquinas-analise-collapse">
+                                            <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
+                                                <li><a href="{% url 'analise_maquinas' %}" class="link-dark rounded">Análise Geral</a></li>
+                                                <li><a href="{% url 'analise_maquinas_importadas' %}" class="link-dark rounded">Análise de Importadas</a></li>
+                                            </ul>
+                                        </div>
+                                    </li>
+                                    <!-- Level 2: Cadastro -->
+                                    <li>
+                                        <a href="{% url 'cadastrar_maquina' %}" class="link-dark rounded">
+                                            <i class="fas fa-plus-circle"></i>
+                                            Cadastrar Máquina
+                                        </a>
+                                    </li>
+                                    <!-- Level 2: Consultas -->
+                                    <li>
+                                        <a href="{% url 'consultar_maquinas' %}" class="link-dark rounded">
+                                            <i class="fas fa-search"></i>
+                                            Consultar Máquinas
+                                        </a>
+                                    </li>
                                 </ul>
                             </div>
                         </li>
