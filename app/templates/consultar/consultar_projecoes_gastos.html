@@ -1,0 +1,313 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Consultar Projeções de Gastos{% endblock %}
+
+{% block extra_css %}
+<style>
+    .table-container {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 153, 0, 0.171)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Orçamento e GMD</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar Projeções de Gastos</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-chart-line me-2"></i>Consultar Projeções de Gastos
+                </h1>
+                <p class="lead">Visualize todas as projeções de gastos e requisições de serviço cadastradas no sistema</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total de Registros:</h5>
+                        <p class="card-text display-6">{{ total_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Valor Total:</h5>
+                        <p class="card-text display-6">R$ {% if total_valor_total %}{{ total_valor_total|floatformat:2 }}{% else %}{{ total_planejado|floatformat:2 }}{% endif %}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Tipos Diferentes:</h5>
+                        <p class="card-text display-6">{{ tipos_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Setores/Centros:</h5>
+                        <p class="card-text display-6">{{ centros_count }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions Bar -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <form method="get" action="{% url 'consultar_projecoes_gastos' %}" class="d-flex">
+                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por tipo, descrição, centro de atividade, fornecedor, número requisição..." value="{{ search_query }}">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Filtros Avançados -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-secondary text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-filter me-2"></i>Filtros Avançados
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <form method="get" action="{% url 'consultar_projecoes_gastos' %}">
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <label for="filtro_tipo" class="form-label">Tipo</label>
+                                    <input type="text" name="filtro_tipo" id="filtro_tipo" class="form-control" value="{{ filtro_tipo }}" placeholder="Tipo de registro">
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="filtro_centro_atividade" class="form-label">Centro de Atividade</label>
+                                    <input type="text" name="filtro_centro_atividade" id="filtro_centro_atividade" class="form-control" value="{{ filtro_centro_atividade }}" placeholder="Código do centro">
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="filtro_status" class="form-label">Status</label>
+                                    <input type="text" name="filtro_status" id="filtro_status" class="form-control" value="{{ filtro_status }}" placeholder="Status do registro">
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="filtro_ano" class="form-label">Ano Referência</label>
+                                    <input type="number" name="filtro_ano" id="filtro_ano" class="form-control" value="{{ filtro_ano }}" placeholder="Ex: 2024">
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="filtro_valor_min" class="form-label">Valor Mínimo</label>
+                                    <input type="number" step="0.01" name="filtro_valor_min" id="filtro_valor_min" class="form-control" value="{{ filtro_valor_min }}" placeholder="0.00">
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="filtro_valor_max" class="form-label">Valor Máximo</label>
+                                    <input type="number" step="0.01" name="filtro_valor_max" id="filtro_valor_max" class="form-control" value="{{ filtro_valor_max }}" placeholder="0.00">
+                                </div>
+                                <div class="col-md-3 mb-3 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="fas fa-filter me-2"></i>Filtrar
+                                    </button>
+                                </div>
+                            </div>
+                            {% if filtro_tipo or filtro_centro_atividade or filtro_status or filtro_ano or filtro_valor_min or filtro_valor_max %}
+                            <div class="row">
+                                <div class="col-12">
+                                    <a href="{% url 'consultar_projecoes_gastos' %}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-times me-1"></i>Limpar Filtros
+                                    </a>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message|safe }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Table -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-list me-2"></i>Lista de Projeções de Gastos
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if projecoes %}
+                <div class="table-responsive table-container">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Setor</th>
+                                <th>Descrição</th>
+                                <th>Valor Total</th>
+                                <th>Data Abertura</th>
+                                <th>Previsão Execução</th>
+                                <th>Fornecedor</th>
+                                <th>Uso Contábil</th>
+                                <th>Nº Requisição</th>
+                                <th>Nº OS</th>
+                                <th>Nº NF</th>
+                                <th>Solicitante</th>
+                                <th>Criado em</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for projecao in projecoes %}
+                            <tr>
+                                <td>
+                                    {% if projecao.setor %}
+                                        <span class="badge bg-primary">{{ projecao.setor }}</span>
+                                    {% elif projecao.centro_atividade %}
+                                        <span class="badge bg-secondary">{{ projecao.centro_atividade }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if projecao.descricao %}
+                                        {{ projecao.descricao|truncatewords:8 }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    {% if projecao.valor_total %}
+                                        <strong>R$ {{ projecao.valor_total|floatformat:2 }}</strong>
+                                    {% elif projecao.valor_planejado %}
+                                        R$ {{ projecao.valor_planejado|floatformat:2 }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if projecao.data_abertura_requisicao %}
+                                        {{ projecao.data_abertura_requisicao|date:"d/m/Y" }}
+                                    {% elif projecao.data_requisicao %}
+                                        {{ projecao.data_requisicao|date:"d/m/Y" }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if projecao.previsao_execucao %}
+                                        {{ projecao.previsao_execucao }}
+                                    {% elif projecao.mes_referencia or projecao.ano_referencia %}
+                                        {% if projecao.mes_referencia %}{{ projecao.mes_referencia }}{% endif %}{% if projecao.ano_referencia %}/{{ projecao.ano_referencia }}{% endif %}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if projecao.fornecedor_nome_fantasia %}
+                                        {{ projecao.fornecedor_nome_fantasia|truncatewords:3 }}
+                                    {% elif projecao.fornecedor %}
+                                        {{ projecao.fornecedor|truncatewords:3 }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if projecao.uso_contabil %}
+                                        <span class="badge bg-secondary">{{ projecao.uso_contabil }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if projecao.numero_requisicao_compra %}
+                                        {{ projecao.numero_requisicao_compra }}
+                                    {% elif projecao.numero_requisicao %}
+                                        {{ projecao.numero_requisicao }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ projecao.numero_ordem_servico|default:"-" }}</td>
+                                <td>{{ projecao.numero_nf|default:"-" }}</td>
+                                <td>{{ projecao.solicitante|default:"-" }}</td>
+                                <td>{{ projecao.created_at|date:"d/m/Y H:i" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>Nenhuma projeção de gastos encontrada.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if projecoes.has_other_pages %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if projecoes.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1">Primeira</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ projecoes.previous_page_number }}">Anterior</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Página {{ projecoes.number }} de {{ projecoes.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if projecoes.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ projecoes.next_page_number }}">Próxima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ projecoes.paginator.num_pages }}">Última</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+

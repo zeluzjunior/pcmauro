@@ -1,20 +1,64 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load form_extras %}
 
 {% block title %}Consultar Notas Fiscais{% endblock %}
 
 {% block extra_css %}
 <style>
     .table-container {
-        max-height: 600px;
+        max-height: 70vh;
         overflow-y: auto;
+        overflow-x: auto;
+    }
+    .table {
+        width: 100%;
+        table-layout: auto;
     }
     .table thead th {
         position: sticky;
         top: 0;
         background-color: #f8f9fa;
         z-index: 10;
+        white-space: nowrap;
+        vertical-align: middle;
+        text-align: center;
+        padding: 12px 8px;
     }
+    .table tbody td {
+        vertical-align: middle;
+        padding: 10px 8px;
+    }
+    .filter-input {
+        width: 100%;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        margin-top: 4px;
+    }
+    .filter-input:focus {
+        outline: none;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    .filter-row th {
+        background-color: #e9ecef;
+        padding: 4px 8px !important;
+        position: sticky;
+        top: 48px;
+        z-index: 8;
+    }
+    .col-nota { min-width: 100px; }
+    .col-serie { min-width: 80px; }
+    .col-emitente { min-width: 150px; }
+    .col-nome-fantasia { min-width: 200px; }
+    .col-data { min-width: 120px; }
+    .col-valor { min-width: 120px; text-align: right; }
+    .col-uso-contabil { min-width: 120px; }
+    .col-centro { min-width: 100px; }
+    .col-situacao { min-width: 120px; }
+    .col-acoes { min-width: 100px; }
 </style>
 {% endblock %}
 
@@ -57,7 +101,7 @@
                 <div class="card bg-success text-white">
                     <div class="card-body">
                         <h5 class="card-title">Valor Total:</h5>
-                        <p class="card-text display-6">R$ {{ total_valor|floatformat:2 }}</p>
+                        <p class="card-text display-6">{{ total_valor|currency_br }}</p>
                     </div>
                 </div>
             </div>
@@ -161,26 +205,66 @@
                     <i class="fas fa-list me-2"></i>Lista de Notas Fiscais
                 </h5>
             </div>
-            <div class="card-body">
-                {% if notas %}
-                <div class="table-responsive table-container">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Nota</th>
-                                <th>Série</th>
-                                <th>Emitente</th>
-                                <th>Nome Fantasia</th>
-                                <th>Data Emissão</th>
-                                <th>Total</th>
-                                <th>Unidade</th>
-                                <th>Centro Atividade</th>
-                                <th>Situação</th>
-                                <th>Criado em</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+            <div class="card-body p-0">
+                <form method="get" action="{% url 'consultar_notas_fiscais' %}" id="filterForm">
+                    <!-- Preservar busca geral e filtros avançados -->
+                    <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                    {% if filtro_emitente %}<input type="hidden" name="filtro_emitente" value="{{ filtro_emitente }}">{% endif %}
+                    {% if filtro_unidade %}<input type="hidden" name="filtro_unidade" value="{{ filtro_unidade }}">{% endif %}
+                    {% if filtro_situacao %}<input type="hidden" name="filtro_situacao" value="{{ filtro_situacao }}">{% endif %}
+                    {% if filtro_total_min %}<input type="hidden" name="filtro_total_min" value="{{ filtro_total_min }}">{% endif %}
+                    {% if filtro_total_max %}<input type="hidden" name="filtro_total_max" value="{{ filtro_total_max }}">{% endif %}
+                    
+                    {% if notas %}
+                    <div class="table-container">
+                        <table class="table table-hover table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="col-nota">Nota</th>
+                                    <th class="col-serie">Série</th>
+                                    <th class="col-emitente">Emitente</th>
+                                    <th class="col-nome-fantasia">Nome Fantasia</th>
+                                    <th class="col-data">Data Emissão</th>
+                                    <th class="col-valor">Total</th>
+                                    <th class="col-uso-contabil">Uso Contábil</th>
+                                    <th class="col-centro">Centro Atividade</th>
+                                    <th class="col-situacao">Situação</th>
+                                    <th class="col-data">Criado em</th>
+                                    <th class="col-acoes">Ações</th>
+                                </tr>
+                                <tr class="filter-row">
+                                    <th>
+                                        <input type="text" name="filter_nota" class="filter-input" value="{{ filter_nota|default:'' }}" placeholder="Nota">
+                                    </th>
+                                    <th>
+                                        <input type="text" name="filter_serie" class="filter-input" value="{{ filter_serie|default:'' }}" placeholder="Série">
+                                    </th>
+                                    <th>
+                                        <input type="text" name="filter_emitente" class="filter-input" value="{{ filter_emitente|default:'' }}" placeholder="Emitente">
+                                    </th>
+                                    <th>
+                                        <input type="text" name="filter_nome_fantasia" class="filter-input" value="{{ filter_nome_fantasia|default:'' }}" placeholder="Nome Fantasia">
+                                    </th>
+                                    <th>
+                                        <input type="text" name="filter_data_emissao" class="filter-input" value="{{ filter_data_emissao|default:'' }}" placeholder="Data Emissão">
+                                    </th>
+                                    <th>
+                                        <input type="text" name="filter_total" class="filter-input" value="{{ filter_total|default:'' }}" placeholder="Total">
+                                    </th>
+                                    <th>
+                                        <input type="text" name="filter_uso_contabil" class="filter-input" value="{{ filter_uso_contabil|default:'' }}" placeholder="Uso Contábil">
+                                    </th>
+                                    <th>
+                                        <input type="text" name="filter_centro_atividade" class="filter-input" value="{{ filter_centro_atividade|default:'' }}" placeholder="Centro">
+                                    </th>
+                                    <th>
+                                        <input type="text" name="filter_situacao" class="filter-input" value="{{ filter_situacao|default:'' }}" placeholder="Situação">
+                                    </th>
+                                    <th></th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
                             {% for nota in notas %}
                             <tr>
                                 <td>
@@ -210,17 +294,14 @@
                                 </td>
                                 <td>
                                     {% if nota.total_nota %}
-                                        <strong>R$ {{ nota.total_nota|floatformat:2 }}</strong>
+                                        <strong>{{ nota.total_nota|currency_br }}</strong>
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if nota.unidade %}
-                                        {{ nota.unidade }}
-                                        {% if nota.nome_unidade %}
-                                            <br><small class="text-muted">{{ nota.nome_unidade|truncatewords:3 }}</small>
-                                        {% endif %}
+                                    {% if nota.uso_contabil %}
+                                        <span class="badge bg-secondary">{{ nota.uso_contabil }}</span>
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
@@ -249,15 +330,23 @@
                                     </a>
                                 </td>
                             </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="11" class="text-center text-muted py-5">
+                                    <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+                                    Nenhuma nota fiscal encontrada.
+                                </td>
+                            </tr>
                             {% endfor %}
                         </tbody>
                     </table>
-                </div>
-                {% else %}
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>Nenhuma nota fiscal encontrada.
-                </div>
-                {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info m-3">
+                        <i class="fas fa-info-circle me-2"></i>Nenhuma nota fiscal encontrada.
+                    </div>
+                    {% endif %}
+                </form>
             </div>
         </div>
 
@@ -269,10 +358,10 @@
                     <ul class="pagination justify-content-center">
                         {% if notas.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1">Primeira</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filtro_emitente %}filtro_emitente={{ filtro_emitente }}&{% endif %}{% if filtro_unidade %}filtro_unidade={{ filtro_unidade }}&{% endif %}{% if filtro_situacao %}filtro_situacao={{ filtro_situacao }}&{% endif %}{% if filtro_total_min %}filtro_total_min={{ filtro_total_min }}&{% endif %}{% if filtro_total_max %}filtro_total_max={{ filtro_total_max }}&{% endif %}{% if filter_nota %}filter_nota={{ filter_nota }}&{% endif %}{% if filter_serie %}filter_serie={{ filter_serie }}&{% endif %}{% if filter_emitente %}filter_emitente={{ filter_emitente }}&{% endif %}{% if filter_nome_fantasia %}filter_nome_fantasia={{ filter_nome_fantasia }}&{% endif %}{% if filter_data_emissao %}filter_data_emissao={{ filter_data_emissao }}&{% endif %}{% if filter_total %}filter_total={{ filter_total }}&{% endif %}{% if filter_uso_contabil %}filter_uso_contabil={{ filter_uso_contabil }}&{% endif %}{% if filter_centro_atividade %}filter_centro_atividade={{ filter_centro_atividade }}&{% endif %}{% if filter_situacao %}filter_situacao={{ filter_situacao }}&{% endif %}page=1">Primeira</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ notas.previous_page_number }}">Anterior</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filtro_emitente %}filtro_emitente={{ filtro_emitente }}&{% endif %}{% if filtro_unidade %}filtro_unidade={{ filtro_unidade }}&{% endif %}{% if filtro_situacao %}filtro_situacao={{ filtro_situacao }}&{% endif %}{% if filtro_total_min %}filtro_total_min={{ filtro_total_min }}&{% endif %}{% if filtro_total_max %}filtro_total_max={{ filtro_total_max }}&{% endif %}{% if filter_nota %}filter_nota={{ filter_nota }}&{% endif %}{% if filter_serie %}filter_serie={{ filter_serie }}&{% endif %}{% if filter_emitente %}filter_emitente={{ filter_emitente }}&{% endif %}{% if filter_nome_fantasia %}filter_nome_fantasia={{ filter_nome_fantasia }}&{% endif %}{% if filter_data_emissao %}filter_data_emissao={{ filter_data_emissao }}&{% endif %}{% if filter_total %}filter_total={{ filter_total }}&{% endif %}{% if filter_uso_contabil %}filter_uso_contabil={{ filter_uso_contabil }}&{% endif %}{% if filter_centro_atividade %}filter_centro_atividade={{ filter_centro_atividade }}&{% endif %}{% if filter_situacao %}filter_situacao={{ filter_situacao }}&{% endif %}page={{ notas.previous_page_number }}">Anterior</a>
                             </li>
                         {% endif %}
                         
@@ -284,10 +373,10 @@
                         
                         {% if notas.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ notas.next_page_number }}">Próxima</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filtro_emitente %}filtro_emitente={{ filtro_emitente }}&{% endif %}{% if filtro_unidade %}filtro_unidade={{ filtro_unidade }}&{% endif %}{% if filtro_situacao %}filtro_situacao={{ filtro_situacao }}&{% endif %}{% if filtro_total_min %}filtro_total_min={{ filtro_total_min }}&{% endif %}{% if filtro_total_max %}filtro_total_max={{ filtro_total_max }}&{% endif %}{% if filter_nota %}filter_nota={{ filter_nota }}&{% endif %}{% if filter_serie %}filter_serie={{ filter_serie }}&{% endif %}{% if filter_emitente %}filter_emitente={{ filter_emitente }}&{% endif %}{% if filter_nome_fantasia %}filter_nome_fantasia={{ filter_nome_fantasia }}&{% endif %}{% if filter_data_emissao %}filter_data_emissao={{ filter_data_emissao }}&{% endif %}{% if filter_total %}filter_total={{ filter_total }}&{% endif %}{% if filter_uso_contabil %}filter_uso_contabil={{ filter_uso_contabil }}&{% endif %}{% if filter_centro_atividade %}filter_centro_atividade={{ filter_centro_atividade }}&{% endif %}{% if filter_situacao %}filter_situacao={{ filter_situacao }}&{% endif %}page={{ notas.next_page_number }}">Próxima</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ notas.paginator.num_pages }}">Última</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filtro_emitente %}filtro_emitente={{ filtro_emitente }}&{% endif %}{% if filtro_unidade %}filtro_unidade={{ filtro_unidade }}&{% endif %}{% if filtro_situacao %}filtro_situacao={{ filtro_situacao }}&{% endif %}{% if filtro_total_min %}filtro_total_min={{ filtro_total_min }}&{% endif %}{% if filtro_total_max %}filtro_total_max={{ filtro_total_max }}&{% endif %}{% if filter_nota %}filter_nota={{ filter_nota }}&{% endif %}{% if filter_serie %}filter_serie={{ filter_serie }}&{% endif %}{% if filter_emitente %}filter_emitente={{ filter_emitente }}&{% endif %}{% if filter_nome_fantasia %}filter_nome_fantasia={{ filter_nome_fantasia }}&{% endif %}{% if filter_data_emissao %}filter_data_emissao={{ filter_data_emissao }}&{% endif %}{% if filter_total %}filter_total={{ filter_total }}&{% endif %}{% if filter_uso_contabil %}filter_uso_contabil={{ filter_uso_contabil }}&{% endif %}{% if filter_centro_atividade %}filter_centro_atividade={{ filter_centro_atividade }}&{% endif %}{% if filter_situacao %}filter_situacao={{ filter_situacao }}&{% endif %}page={{ notas.paginator.num_pages }}">Última</a>
                             </li>
                         {% endif %}
                     </ul>
@@ -297,5 +386,25 @@
         {% endif %}
     </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-submit form when filter inputs change
+document.addEventListener('DOMContentLoaded', function() {
+    const filterInputs = document.querySelectorAll('.filter-input');
+    const filterForm = document.getElementById('filterForm');
+    
+    filterInputs.forEach(input => {
+        let timeout;
+        input.addEventListener('input', function() {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                filterForm.submit();
+            }, 500); // Wait 500ms after user stops typing
+        });
+    });
+});
+</script>
 {% endblock %}
 
