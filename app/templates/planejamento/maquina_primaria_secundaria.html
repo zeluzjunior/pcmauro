@@ -214,10 +214,20 @@
         <div class="row mb-4">
             <div class="col-12">
                 <div class="card shadow-sm">
-                    <div class="card-header bg-success text-white">
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">
                             <i class="fas fa-list me-2"></i>Relacionamentos Existentes ({{ relacionamentos.count }})
                         </h5>
+                        {% if relacionamentos %}
+                            <form method="post" action="{% url 'maquina_primaria_secundaria' %}" id="bulkDeleteForm" style="display: none;" onsubmit="return confirm('Tem certeza que deseja remover os relacionamentos selecionados?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="remover_relacionamentos" value="1">
+                                <div id="bulkDeleteInputs"></div>
+                                <button type="submit" class="btn btn-sm btn-danger" id="bulkDeleteBtn">
+                                    <i class="fas fa-trash me-1"></i>Remover Selecionados (<span id="selectedCount">0</span>)
+                                </button>
+                            </form>
+                        {% endif %}
                     </div>
                     <div class="card-body">
                         {% if relacionamentos %}
@@ -225,15 +235,21 @@
                                 <table class="table table-hover table-sm">
                                     <thead class="table-light sticky-top">
                                         <tr>
-                                            <th style="width: 25%;">Primária</th>
-                                            <th style="width: 25%;">Secundária</th>
-                                            <th style="width: 30%;">Observações</th>
-                                            <th style="width: 20%;" class="text-center">Ações</th>
+                                            <th style="width: 5%;">
+                                                <input type="checkbox" id="selectAll" title="Selecionar todos">
+                                            </th>
+                                            <th style="width: 22%;">Primária</th>
+                                            <th style="width: 22%;">Secundária</th>
+                                            <th style="width: 28%;">Observações</th>
+                                            <th style="width: 23%;" class="text-center">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for rel in relacionamentos %}
                                             <tr>
+                                                <td>
+                                                    <input type="checkbox" class="relacionamento-checkbox" value="{{ rel.id }}" data-rel-id="{{ rel.id }}">
+                                                </td>
                                                 <td>
                                                     <strong>
                                                         <a href="{% url 'visualizar_maquina' rel.maquina_primaria.id %}" class="text-decoration-none" target="_blank">
@@ -551,6 +567,87 @@ window.addEventListener('load', function() {
         // IMPORTANTE: NÃO chamar e.preventDefault() - deixar o formulário ser enviado normalmente
         console.log('Form will submit normally...');
     }, true); // Use capture phase para executar antes de outros listeners
+    
+    // Funcionalidade de seleção múltipla para remoção em lote
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const relacionamentoCheckboxes = document.querySelectorAll('.relacionamento-checkbox');
+    const bulkDeleteForm = document.getElementById('bulkDeleteForm');
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    const bulkDeleteInputs = document.getElementById('bulkDeleteInputs');
+    const selectedCountSpan = document.getElementById('selectedCount');
+    
+    // Função para atualizar o contador e mostrar/ocultar o botão de remoção em lote
+    function updateBulkDeleteUI() {
+        const selectedCheckboxes = document.querySelectorAll('.relacionamento-checkbox:checked');
+        const count = selectedCheckboxes.length;
+        
+        if (selectedCountSpan) {
+            selectedCountSpan.textContent = count;
+        }
+        
+        if (bulkDeleteForm && bulkDeleteBtn) {
+            if (count > 0) {
+                bulkDeleteForm.style.display = 'inline-block';
+            } else {
+                bulkDeleteForm.style.display = 'none';
+            }
+        }
+        
+        // Atualizar estado do "Selecionar todos"
+        if (selectAllCheckbox && relacionamentoCheckboxes.length > 0) {
+            const allChecked = relacionamentoCheckboxes.length === selectedCheckboxes.length;
+            const someChecked = selectedCheckboxes.length > 0 && selectedCheckboxes.length < relacionamentoCheckboxes.length;
+            selectAllCheckbox.checked = allChecked;
+            selectAllCheckbox.indeterminate = someChecked;
+        }
+    }
+    
+    // Listener para "Selecionar todos"
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            relacionamentoCheckboxes.forEach(function(checkbox) {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            updateBulkDeleteUI();
+        });
+    }
+    
+    // Listeners para checkboxes individuais
+    relacionamentoCheckboxes.forEach(function(checkbox) {
+        checkbox.addEventListener('change', function() {
+            updateBulkDeleteUI();
+        });
+    });
+    
+    // Listener para o formulário de remoção em lote
+    if (bulkDeleteForm) {
+        bulkDeleteForm.addEventListener('submit', function(e) {
+            const selectedCheckboxes = document.querySelectorAll('.relacionamento-checkbox:checked');
+            
+            if (selectedCheckboxes.length === 0) {
+                e.preventDefault();
+                alert('Por favor, selecione pelo menos um relacionamento para remover.');
+                return false;
+            }
+            
+            // Limpar inputs anteriores
+            bulkDeleteInputs.innerHTML = '';
+            
+            // Criar inputs hidden para cada relacionamento selecionado
+            selectedCheckboxes.forEach(function(checkbox) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'relacionamento_ids';
+                input.value = checkbox.value;
+                bulkDeleteInputs.appendChild(input);
+            });
+            
+            console.log('Removendo relacionamentos:', Array.from(selectedCheckboxes).map(cb => cb.value));
+        });
+    }
+    
+    // Inicializar UI
+    updateBulkDeleteUI();
 });
 </script>
 {% endblock %}

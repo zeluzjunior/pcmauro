@@ -127,10 +127,12 @@ urlpatterns = [
     # Manutentores
     path('manutentor/cadastrar/', views.cadastrar_manutentor, name="cadastrar_manutentor"),
     path('manutentor/consultar/', views.consultar_manutentores, name="consultar_manutentores"),
+    path('manutentor/analise/', views.analise_manutentores, name="analise_manutentores"),
     path('manutentor/visualizar/<str:matricula>/', views.visualizar_manutentor, name="visualizar_manutentor"),
     path('manutentor/editar/<str:matricula>/', views.editar_manutentor, name="editar_manutentor"),
     path('manutentor/<str:matricula>/adicionar-maquina/', views.adicionar_maquina_manutentor, name="adicionar_maquina_manutentor"),
     path('manutentor/<str:matricula>/remover-maquina/<int:manutentor_maquina_id>/', views.remover_maquina_manutentor, name="remover_maquina_manutentor"),
+    path('api/maquina-primaria/<int:maquina_primaria_id>/secundarias/', views.get_maquinas_secundarias, name="get_maquinas_secundarias"),
     
     # Manutenção Terceiro
     path('manutencao-terceiro/cadastrar/', views.cadastrar_manutencao_terceiro, name="cadastrar_manutencao_terceiro"),

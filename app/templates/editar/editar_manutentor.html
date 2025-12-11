@@ -1,0 +1,745 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Editar Manutentor {{ manutentor.Matricula }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_manutentores' %}" class="text-white">Manutentores</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'visualizar_manutentor' manutentor.Matricula %}" class="text-white">Manutentor {{ manutentor.Matricula }}</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Editar</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Editar Manutentor</h1>
+                <p class="lead">Atualize os dados do manutentor {{ manutentor.Nome|default:manutentor.Matricula }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-edit me-2"></i>Editar Dados do Manutentor
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'editar_manutentor' manutentor.Matricula %}" id="editarManutentorForm" onsubmit="return true;">
+                            {% csrf_token %}
+                            
+                            <!-- Informações Principais -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-user-tie me-2"></i>Informações Principais
+                                    </h6>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.Matricula.id_for_label }}" class="form-label">
+                                        {{ form.Matricula.label }}
+                                        {% if form.Matricula|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.Matricula }}
+                                    {% if form.Matricula.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.Matricula.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        <i class="fas fa-info-circle me-1"></i>Código único identificador do manutentor (não pode ser alterado)
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.Nome.id_for_label }}" class="form-label">
+                                        {{ form.Nome.label }}
+                                        {% if form.Nome|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.Nome }}
+                                    {% if form.Nome.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.Nome.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Nome completo do manutentor{% if not form.Nome|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.Admissao.id_for_label }}" class="form-label">
+                                        {{ form.Admissao.label }}
+                                        {% if form.Admissao|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.Admissao }}
+                                    {% if form.Admissao.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.Admissao.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Data de admissão (formato: DD/MM/YYYY){% if not form.Admissao|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.Cargo.id_for_label }}" class="form-label">
+                                        {{ form.Cargo.label }}
+                                        {% if form.Cargo|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.Cargo }}
+                                    {% if form.Cargo.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.Cargo.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Cargo do manutentor{% if not form.Cargo|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label for="{{ form.Posto.id_for_label }}" class="form-label">
+                                        {{ form.Posto.label }}
+                                        {% if form.Posto|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.Posto }}
+                                    {% if form.Posto.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.Posto.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Posto do manutentor{% if not form.Posto|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                            </div>
+
+                            <!-- Informações de Trabalho -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-info border-bottom pb-2 mb-3">
+                                        <i class="fas fa-briefcase me-2"></i>Informações de Trabalho
+                                    </h6>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.turno.id_for_label }}" class="form-label">
+                                        {{ form.turno.label }}
+                                        {% if form.turno|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.turno }}
+                                    {% if form.turno.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.turno.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Turno de trabalho{% if not form.turno|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.local_trab.id_for_label }}" class="form-label">
+                                        {{ form.local_trab.label }}
+                                        {% if form.local_trab|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.local_trab }}
+                                    {% if form.local_trab.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.local_trab.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Local de trabalho{% if not form.local_trab|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.tempo_trabalho.id_for_label }}" class="form-label">
+                                        {{ form.tempo_trabalho.label }}
+                                        {% if form.tempo_trabalho|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.tempo_trabalho }}
+                                    {% if form.tempo_trabalho.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.tempo_trabalho.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Tempo de trabalho (ex: 8 horas){% if not form.tempo_trabalho|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.horario_inicio.id_for_label }}" class="form-label">
+                                        {{ form.horario_inicio.label }}
+                                        {% if form.horario_inicio|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.horario_inicio }}
+                                    {% if form.horario_inicio.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.horario_inicio.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Horário de início{% if not form.horario_inicio|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="{{ form.horario_fim.id_for_label }}" class="form-label">
+                                        {{ form.horario_fim.label }}
+                                        {% if form.horario_fim|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.horario_fim }}
+                                    {% if form.horario_fim.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.horario_fim.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Horário de fim{% if not form.horario_fim|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Máquinas Relacionadas -->
+                <div class="card shadow-sm mb-4 mt-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-cog me-2"></i>Máquinas Relacionadas
+                            <span class="badge bg-light text-dark ms-2">{{ maquinas_relacionadas.count }}</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Formulário para adicionar máquinas -->
+                        <div class="mb-4">
+                            <h6 class="mb-3">
+                                <i class="fas fa-plus-circle me-2"></i>Adicionar Máquinas (Primária e Secundárias)
+                            </h6>
+                            <form method="post" action="{% url 'adicionar_maquina_manutentor' manutentor.Matricula %}" id="adicionarMaquinaForm" onsubmit="return true;">
+                                {% csrf_token %}
+                                <div class="row">
+                                    <!-- Máquina Primária -->
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card border-primary shadow-sm">
+                                            <div class="card-header bg-primary text-white">
+                                                <h6 class="mb-0">
+                                                    <i class="fas fa-star me-2"></i>Máquina Primária
+                                                    <span class="text-danger">*</span>
+                                                </h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <!-- Campo de busca -->
+                                                <div class="mb-2">
+                                                    <label for="busca_maquina_primaria" class="form-label small text-muted">
+                                                        <i class="fas fa-search me-1"></i>Buscar Máquina Primária
+                                                    </label>
+                                                    <input type="text" class="form-control" id="busca_maquina_primaria" placeholder="Digite para filtrar..." autocomplete="off">
+                                                </div>
+                                                
+                                                <!-- Select de máquinas primárias -->
+                                                <div class="mb-2">
+                                                    <label for="maquina_primaria_select" class="form-label small text-muted">Selecione a máquina primária</label>
+                                                    <select class="form-select" id="maquina_primaria_select" name="maquina_primaria" size="8" style="min-height: 200px;" required>
+                                                        <option value="">-- Selecione uma máquina primária --</option>
+                                                        {% for maquina in maquinas_primarias_disponiveis %}
+                                                            <option value="{{ maquina.id }}" data-search-text="{{ maquina.cd_maquina|lower }} {{ maquina.descr_maquina|default:''|lower }} {{ maquina.descr_setormanut|default:''|lower }}" data-maquina-texto="{{ maquina.cd_maquina }} - {{ maquina.descr_maquina|default:"Sem descrição" }}{% if maquina.descr_setormanut %} ({{ maquina.descr_setormanut }}){% endif %}">
+                                                                {{ maquina.cd_maquina }} - {{ maquina.descr_maquina|default:"Sem descrição" }}
+                                                                {% if maquina.descr_setormanut %}
+                                                                    ({{ maquina.descr_setormanut }})
+                                                                {% endif %}
+                                                            </option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                
+                                                <!-- Preview da máquina primária selecionada -->
+                                                <div id="previewPrimaria" class="alert alert-primary mb-0" style="display: none;">
+                                                    <small>
+                                                        <i class="fas fa-check-circle me-1"></i>
+                                                        <strong id="previewPrimariaTexto"></strong>
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Máquinas Secundárias -->
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card border-info shadow-sm">
+                                            <div class="card-header bg-info text-white">
+                                                <h6 class="mb-0">
+                                                    <i class="fas fa-cogs me-2"></i>Máquinas Secundárias
+                                                    <span class="text-danger">*</span>
+                                                </h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <!-- Campo de busca -->
+                                                <div class="mb-2">
+                                                    <label for="busca_maquina_secundaria" class="form-label small text-muted">
+                                                        <i class="fas fa-search me-1"></i>Buscar Máquina Secundária
+                                                    </label>
+                                                    <input type="text" class="form-control" id="busca_maquina_secundaria" placeholder="Digite para filtrar..." autocomplete="off" disabled>
+                                                </div>
+                                                
+                                                <!-- Select de máquinas secundárias -->
+                                                <div class="mb-2">
+                                                    <label for="maquina_secundaria_select" class="form-label small text-muted">Selecione máquinas secundárias</label>
+                                                    <select class="form-select" id="maquina_secundaria_select" size="8" style="min-height: 200px;" disabled>
+                                                        <option value="">-- Selecione primeiro uma máquina primária --</option>
+                                                    </select>
+                                                </div>
+                                                
+                                                <!-- Lista de máquinas secundárias selecionadas -->
+                                                <div class="mb-2">
+                                                    <label class="form-label small text-muted mb-2">
+                                                        <i class="fas fa-list-check me-1"></i>Máquinas Secundárias Selecionadas:
+                                                        <span id="contadorSelecionadas" class="badge bg-info ms-2">0</span>
+                                                    </label>
+                                                    <div id="listaPreviewSelecionadas" class="d-flex flex-wrap gap-2 p-2 border rounded" style="min-height: 80px;">
+                                                        <div class="text-muted small w-100" style="display: block;" id="nenhumaSelecionada">
+                                                            <i class="fas fa-info-circle me-1"></i>Nenhuma máquina secundária selecionada ainda. Selecione uma máquina primária primeiro.
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mt-3">
+                                    <div class="col-md-8 mb-3">
+                                        <label for="observacoes" class="form-label">Observações (aplicadas a todas as máquinas)</label>
+                                        <input type="text" class="form-control" id="observacoes" name="observacoes" placeholder="Opcional">
+                                        <div class="form-text">
+                                            <small>As observações serão aplicadas à máquina primária e a todas as máquinas secundárias selecionadas.</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 mb-3 d-flex align-items-end">
+                                        <button type="button" class="btn btn-success w-100" id="btnAdicionarMaquina">
+                                            <i class="fas fa-plus me-1"></i>Adicionar Todas
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Hidden inputs para máquinas selecionadas -->
+                                <div id="hiddenInputsContainer"></div>
+                            </form>
+                        </div>
+
+                        <hr>
+
+                        <!-- Lista de máquinas relacionadas -->
+                        <div>
+                            <h6 class="mb-3">
+                                <i class="fas fa-list me-2"></i>Máquinas Relacionadas ({{ maquinas_relacionadas.count }})
+                            </h6>
+                            {% if maquinas_relacionadas %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Código da Máquina</th>
+                                                <th>Descrição</th>
+                                                <th>Setor de Manutenção</th>
+                                                <th>Observações</th>
+                                                <th class="text-center">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for manutentor_maquina in maquinas_relacionadas %}
+                                                <tr>
+                                                    <td>
+                                                        <strong>
+                                                            <a href="{% url 'visualizar_maquina' manutentor_maquina.maquina.id %}" class="text-decoration-none">
+                                                                {{ manutentor_maquina.maquina.cd_maquina }}
+                                                            </a>
+                                                        </strong>
+                                                    </td>
+                                                    <td>
+                                                        <a href="{% url 'visualizar_maquina' manutentor_maquina.maquina.id %}" class="text-decoration-none">
+                                                            {{ manutentor_maquina.maquina.descr_maquina|default:"Sem descrição" }}
+                                                        </a>
+                                                    </td>
+                                                    <td>{{ manutentor_maquina.maquina.descr_setormanut|default:"-" }}</td>
+                                                    <td>{{ manutentor_maquina.observacoes|default:"-" }}</td>
+                                                    <td class="text-center">
+                                                        <div class="btn-group" role="group">
+                                                            <a href="{% url 'visualizar_maquina' manutentor_maquina.maquina.id %}" class="btn btn-sm btn-primary">
+                                                                <i class="fas fa-eye"></i> Ver
+                                                            </a>
+                                                            <form method="post" action="{% url 'remover_maquina_manutentor' manutentor.Matricula manutentor_maquina.id %}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja remover esta máquina?');">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="btn btn-sm btn-danger">
+                                                                    <i class="fas fa-trash"></i>
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>Nenhuma máquina foi relacionada a este manutentor ainda.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botões de Ação -->
+                <div class="card shadow-sm mt-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'visualizar_manutentor' manutentor.Matricula %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Cancelar
+                            </a>
+                            <button type="submit" form="editarManutentorForm" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Salvar Alterações
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Executar após o main.js carregar
+window.addEventListener('load', function() {
+    const form = document.getElementById('adicionarMaquinaForm');
+    const submitBtn = document.getElementById('btnAdicionarMaquina');
+    
+    if (!form || !submitBtn) {
+        console.error('Form or submit button not found!');
+        return;
+    }
+    
+    // Salvar a action original
+    const originalAction = form.getAttribute('action') || form.action || '{% url "adicionar_maquina_manutentor" manutentor.Matricula %}';
+    
+    // Remover qualquer listener do main.js que possa estar interferindo
+    const newForm = form.cloneNode(true);
+    form.parentNode.replaceChild(newForm, form);
+    const cleanForm = document.getElementById('adicionarMaquinaForm');
+    if (cleanForm) {
+        cleanForm.action = originalAction;
+    }
+    
+    const newSubmitBtn = submitBtn.cloneNode(true);
+    submitBtn.parentNode.replaceChild(newSubmitBtn, submitBtn);
+    const cleanSubmitBtn = document.getElementById('btnAdicionarMaquina');
+    
+    // Referências aos elementos
+    const buscaPrimaria = document.getElementById('busca_maquina_primaria');
+    const selectPrimaria = document.getElementById('maquina_primaria_select');
+    const previewPrimaria = document.getElementById('previewPrimaria');
+    const previewPrimariaTexto = document.getElementById('previewPrimariaTexto');
+    const buscaSecundaria = document.getElementById('busca_maquina_secundaria');
+    const selectSecundaria = document.getElementById('maquina_secundaria_select');
+    const previewContainer = document.getElementById('listaPreviewSelecionadas');
+    const contador = document.getElementById('contadorSelecionadas');
+    const nenhumaSelecionada = document.getElementById('nenhumaSelecionada');
+    const hiddenInputsContainer = document.getElementById('hiddenInputsContainer');
+    
+    // Armazenar estado
+    let maquinaPrimariaSelecionada = null; // {id, texto}
+    let maquinasSecundariasSelecionadas = []; // Array de objetos {id, texto}
+    
+    // Função para filtrar opções de um select baseado no texto de busca
+    function filtrarSelect(buscaInput, select) {
+        const termoBusca = buscaInput.value.toLowerCase().trim();
+        const options = select.querySelectorAll('option');
+        
+        options.forEach(function(option) {
+            if (option.value === '') {
+                option.style.display = '';
+                return;
+            }
+            
+            const isSelected = option.getAttribute('data-selected') === 'true';
+            if (isSelected && !termoBusca) {
+                option.style.display = 'none';
+                return;
+            }
+            
+            const searchText = option.getAttribute('data-search-text') || option.textContent.toLowerCase();
+            if (searchText.includes(termoBusca)) {
+                option.style.display = '';
+            } else {
+                option.style.display = 'none';
+            }
+        });
+    }
+    
+    // Função para carregar máquinas secundárias via AJAX
+    function carregarMaquinasSecundarias(maquinaPrimariaId) {
+        if (!maquinaPrimariaId) {
+            return;
+        }
+        
+        // Desabilitar campos de secundárias
+        if (buscaSecundaria) buscaSecundaria.disabled = true;
+        if (selectSecundaria) {
+            selectSecundaria.disabled = true;
+            selectSecundaria.innerHTML = '<option value="">Carregando máquinas secundárias...</option>';
+        }
+        
+        // Limpar seleções anteriores
+        maquinasSecundariasSelecionadas = [];
+        atualizarPreviewSecundarias();
+        
+        // Fazer requisição AJAX
+        const url = '/api/maquina-primaria/' + maquinaPrimariaId + '/secundarias/';
+        const matricula = '{{ manutentor.Matricula }}';
+        const urlCompleta = url + '?matricula=' + encodeURIComponent(matricula);
+        
+        fetch(urlCompleta)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Erro ao carregar máquinas secundárias: ' + data.error);
+                    if (selectSecundaria) {
+                        selectSecundaria.innerHTML = '<option value="">Erro ao carregar máquinas</option>';
+                    }
+                    return;
+                }
+                
+                // Preencher select de secundárias
+                if (selectSecundaria) {
+                    selectSecundaria.innerHTML = '<option value="">-- Selecione uma máquina secundária --</option>';
+                    
+                    data.maquinas_secundarias.forEach(function(maq) {
+                        const option = document.createElement('option');
+                        option.value = maq.id;
+                        option.textContent = maq.texto;
+                        option.setAttribute('data-search-text', (maq.cd_maquina + ' ' + (maq.descr_maquina || '') + ' ' + (maq.descr_setormanut || '')).toLowerCase());
+                        option.setAttribute('data-maquina-texto', maq.texto);
+                        selectSecundaria.appendChild(option);
+                    });
+                    
+                    selectSecundaria.disabled = false;
+                }
+                
+                if (buscaSecundaria) buscaSecundaria.disabled = false;
+            })
+            .catch(error => {
+                console.error('Erro ao carregar máquinas secundárias:', error);
+                alert('Erro ao carregar máquinas secundárias. Por favor, tente novamente.');
+                if (selectSecundaria) {
+                    selectSecundaria.innerHTML = '<option value="">Erro ao carregar máquinas</option>';
+                }
+            });
+    }
+    
+    // Função para adicionar máquina secundária à lista
+    function adicionarMaquinaSecundaria() {
+        if (!selectSecundaria || !selectSecundaria.value) {
+            return;
+        }
+        
+        const option = selectSecundaria.options[selectSecundaria.selectedIndex];
+        const id = selectSecundaria.value;
+        const texto = option.getAttribute('data-maquina-texto') || option.text;
+        
+        // Verificar se já não está na lista
+        if (maquinasSecundariasSelecionadas.find(m => m.id === id)) {
+            selectSecundaria.value = '';
+            return;
+        }
+        
+        // Adicionar à lista
+        maquinasSecundariasSelecionadas.push({
+            id: id,
+            texto: texto
+        });
+        
+        // Esconder a opção do select
+        option.style.display = 'none';
+        option.setAttribute('data-selected', 'true');
+        
+        // Resetar o select
+        selectSecundaria.value = '';
+        
+        // Atualizar preview
+        atualizarPreviewSecundarias();
+    }
+    
+    // Função para remover máquina secundária da lista
+    function removerMaquinaSecundaria(maquinaId) {
+        maquinasSecundariasSelecionadas = maquinasSecundariasSelecionadas.filter(m => m.id !== maquinaId);
+        
+        // Mostrar novamente a opção no select
+        const option = selectSecundaria.querySelector(`option[value="${maquinaId}"]`);
+        if (option) {
+            option.style.display = '';
+            option.removeAttribute('data-selected');
+        }
+        
+        atualizarPreviewSecundarias();
+    }
+    
+    // Função para atualizar preview de máquinas secundárias
+    function atualizarPreviewSecundarias() {
+        // Atualizar contador
+        if (contador) {
+            contador.textContent = maquinasSecundariasSelecionadas.length;
+        }
+        
+        // Limpar preview anterior
+        if (previewContainer) {
+            previewContainer.innerHTML = '';
+            
+            if (maquinasSecundariasSelecionadas.length > 0) {
+                if (nenhumaSelecionada) {
+                    nenhumaSelecionada.style.display = 'none';
+                }
+                
+                // Criar badges para cada máquina selecionada
+                maquinasSecundariasSelecionadas.forEach(function(maquina) {
+                    const badge = document.createElement('div');
+                    badge.className = 'badge bg-info text-white p-2 d-flex align-items-center gap-2 mb-1';
+                    badge.style.fontSize = '0.875rem';
+                    badge.innerHTML = `
+                        <i class="fas fa-cog"></i>
+                        <span>${maquina.texto}</span>
+                        <button type="button" class="btn-close btn-close-white" style="font-size: 0.6rem;" data-maquina-id="${maquina.id}" title="Remover"></button>
+                    `;
+                    
+                    const btnClose = badge.querySelector('.btn-close');
+                    btnClose.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        removerMaquinaSecundaria(maquina.id);
+                    });
+                    
+                    previewContainer.appendChild(badge);
+                });
+            } else {
+                if (nenhumaSelecionada) {
+                    nenhumaSelecionada.style.display = 'block';
+                }
+            }
+        }
+    }
+    
+    // Função para atualizar hidden inputs
+    function atualizarHiddenInputs() {
+        if (!hiddenInputsContainer) {
+            return;
+        }
+        
+        hiddenInputsContainer.innerHTML = '';
+        
+        // Adicionar input para máquina primária
+        if (maquinaPrimariaSelecionada) {
+            const inputPrimaria = document.createElement('input');
+            inputPrimaria.type = 'hidden';
+            inputPrimaria.name = 'maquina_primaria';
+            inputPrimaria.value = maquinaPrimariaSelecionada.id;
+            hiddenInputsContainer.appendChild(inputPrimaria);
+        }
+        
+        // Adicionar inputs para máquinas secundárias
+        maquinasSecundariasSelecionadas.forEach(function(maquina) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'maquinas_secundarias';
+            input.value = maquina.id;
+            hiddenInputsContainer.appendChild(input);
+        });
+    }
+    
+    // Listener para busca de máquina primária
+    if (buscaPrimaria && selectPrimaria) {
+        buscaPrimaria.addEventListener('input', function() {
+            filtrarSelect(buscaPrimaria, selectPrimaria);
+        });
+        
+        // Listener para seleção de máquina primária
+        selectPrimaria.addEventListener('change', function() {
+            const primariaId = selectPrimaria.value;
+            
+            if (primariaId) {
+                const option = selectPrimaria.options[selectPrimaria.selectedIndex];
+                maquinaPrimariaSelecionada = {
+                    id: primariaId,
+                    texto: option.getAttribute('data-maquina-texto') || option.text
+                };
+                
+                // Atualizar preview
+                if (previewPrimaria && previewPrimariaTexto) {
+                    previewPrimariaTexto.textContent = maquinaPrimariaSelecionada.texto;
+                    previewPrimaria.style.display = 'block';
+                }
+                
+                // Carregar máquinas secundárias
+                carregarMaquinasSecundarias(primariaId);
+            } else {
+                maquinaPrimariaSelecionada = null;
+                if (previewPrimaria) previewPrimaria.style.display = 'none';
+                if (selectSecundaria) {
+                    selectSecundaria.innerHTML = '<option value="">-- Selecione primeiro uma máquina primária --</option>';
+                    selectSecundaria.disabled = true;
+                }
+                if (buscaSecundaria) buscaSecundaria.disabled = true;
+                maquinasSecundariasSelecionadas = [];
+                atualizarPreviewSecundarias();
+            }
+            
+            atualizarHiddenInputs();
+        });
+    }
+    
+    // Listener para busca de máquinas secundárias
+    if (buscaSecundaria && selectSecundaria) {
+        buscaSecundaria.addEventListener('input', function() {
+            filtrarSelect(buscaSecundaria, selectSecundaria);
+        });
+        
+        // Listener para seleção de máquina secundária
+        selectSecundaria.addEventListener('change', function() {
+            if (selectSecundaria.value) {
+                adicionarMaquinaSecundaria();
+            }
+        });
+    }
+    
+    // Listener para botão de submit
+    cleanSubmitBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        
+        // Validações
+        if (!maquinaPrimariaSelecionada) {
+            alert('Por favor, selecione uma máquina primária.');
+            return false;
+        }
+        
+        if (maquinasSecundariasSelecionadas.length === 0) {
+            alert('Por favor, selecione pelo menos uma máquina secundária.');
+            return false;
+        }
+        
+        // Atualizar hidden inputs
+        atualizarHiddenInputs();
+        
+        // Desabilitar botão
+        cleanSubmitBtn.disabled = true;
+        cleanSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Salvando...';
+        
+        // Submeter form
+        cleanForm.submit();
+        
+        return false;
+    }, true);
+});
+</script>
+{% endblock %}
