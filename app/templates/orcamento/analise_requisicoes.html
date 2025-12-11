@@ -354,24 +354,7 @@
             </div>
         </div>
 
-        <!-- Charts Row 1 -->
-        <div class="row mb-5">
-            <!-- Gráfico de Linha: Evolução Temporal -->
-            <div class="col-md-12 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-line me-2"></i>Evolução Temporal das Requisições (Últimos 12 Meses)
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="temporalChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+
 
         <!-- Charts Row 1.5: Daily Chart -->
         <div class="row mb-5">
@@ -476,6 +459,25 @@
             </div>
         </div>
 
+        <!-- Charts Row 4 -->
+        <div class="row mb-5">
+            <!-- Gráfico de Barras: Distribuição por Usuário Criou -->
+            <div class="col-md-12 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-user-chart me-2"></i>Top 10 Usuários que Criaram Requisições
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="usuariosChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Data Tables -->
         <div class="row mb-5">
             <!-- Tabela: Requisições Recentes -->
@@ -543,6 +545,26 @@
                 </div>
             </div>
         </div>
+
+        <!-- Charts Row 1 -->
+        <div class="row mb-5">
+            <!-- Gráfico de Linha: Evolução Temporal -->
+            <div class="col-md-12 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Evolução Temporal das Requisições (Últimos 12 Meses)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="temporalChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </section>
 {% endblock %}
@@ -1047,6 +1069,67 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateDailyChart(this.value);
             });
         }
+    }
+
+    // Gráfico de Barras: Top 10 Usuários que Criaram Requisições
+    const usuariosCtx = document.getElementById('usuariosChart');
+    if (usuariosCtx) {
+        new Chart(usuariosCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: {{ usuarios_labels|safe }},
+                datasets: [{
+                    label: 'Quantidade de Requisições',
+                    data: {{ usuarios_data_count|safe }},
+                    backgroundColor: '#6c757d',
+                    yAxisID: 'y'
+                }, {
+                    label: 'Valor Total (R$)',
+                    data: {{ usuarios_data_valor|safe }},
+                    backgroundColor: '#495057',
+                    yAxisID: 'y1'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Quantidade'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Valor (R$)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                            }
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                }
+            }
+        });
     }
 });
 </script>

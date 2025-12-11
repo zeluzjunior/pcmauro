@@ -703,6 +703,25 @@ def analise_requisicoes(request):
         operacoes_labels.append(operacao)
         operacoes_data.append(dados['count'])
     
+    # Distribuição por usuário criou (CD_USU_CRIOU) - top 10
+    usuarios_dict = defaultdict(lambda: {'count': 0, 'valor': Decimal('0.00')})
+    
+    for req in queryset_base.exclude(cd_usu_criou__isnull=True).exclude(cd_usu_criou=''):
+        usuarios_dict[req.cd_usu_criou]['count'] += 1
+        if req.vlr_movto_estoq:
+            # vlr_movto_estoq já representa o valor total da transação
+            usuarios_dict[req.cd_usu_criou]['valor'] += abs(req.vlr_movto_estoq)
+    
+    sorted_usuarios = sorted(usuarios_dict.items(), key=lambda x: x[1]['count'], reverse=True)[:10]
+    
+    usuarios_labels = []
+    usuarios_data_count = []
+    usuarios_data_valor = []
+    for usuario, dados in sorted_usuarios:
+        usuarios_labels.append(usuario)
+        usuarios_data_count.append(dados['count'])
+        usuarios_data_valor.append(float(dados['valor']))
+    
     # Requisições recentes (últimas 20)
     requisicoes_recentes_list = queryset_base.order_by('-data_requisicao', '-created_at')[:20]
     
@@ -799,6 +818,9 @@ def analise_requisicoes(request):
         'centros_data_valor': json.dumps(centros_data_valor),
         'operacoes_labels': json.dumps(operacoes_labels),
         'operacoes_data': json.dumps(operacoes_data),
+        'usuarios_labels': json.dumps(usuarios_labels),
+        'usuarios_data_count': json.dumps(usuarios_data_count),
+        'usuarios_data_valor': json.dumps(usuarios_data_valor),
         'requisicoes_recentes_list': requisicoes_recentes_list,
         # Filtros
         'anos_disponiveis': list(anos_disponiveis),
@@ -811,6 +833,255 @@ def analise_requisicoes(request):
         'mes_selecionado_filtro': mes_selecionado,
     }
     return render(request, 'orcamento/analise_requisicoes.html', context)
+
+
+def analise_projecao_nota_fiscal(request):
+    """Análise comparativa entre Projeções de Gastos e Notas Fiscais"""
+    from app.models import ProjecaoGasto, NotaFiscal
+    from django.db.models import Q, Sum, Count
+    from decimal import Decimal
+    from datetime import datetime, timedelta
+    
+    # Filtros
+    filtro_centro_atividade = request.GET.get('filtro_centro_atividade', '').strip()
+    filtro_ano = request.GET.get('filtro_ano', '').strip()
+    filtro_valor_min = request.GET.get('filtro_valor_min', '').strip()
+    filtro_valor_max = request.GET.get('filtro_valor_max', '').strip()
+    filtro_tipo = request.GET.get('filtro_tipo', '').strip()
+    mostrar_apenas_proximos = request.GET.get('mostrar_apenas_proximos', '') == 'on'
+    
+    # Buscar registros
+    projecoes = ProjecaoGasto.objects.all()
+    notas = NotaFiscal.objects.all()
+    
+    # Aplicar filtros
+    if filtro_centro_atividade:
+        projecoes = projecoes.filter(centro_atividade__icontains=filtro_centro_atividade)
+        notas = notas.filter(centro_atividade__icontains=filtro_centro_atividade)
+    
+    if filtro_ano:
+        try:
+            ano = int(filtro_ano)
+            projecoes = projecoes.filter(ano_referencia=ano)
+            # Para notas fiscais, tentar parsear ano da data_emissao
+            notas = notas.filter(
+                Q(data_emissao__startswith=f"{ano}-") |
+                Q(data_emissao__contains=f"/{ano}") |
+                Q(data_emissao__contains=f"-{ano}")
+            )
+        except ValueError:
+            pass
+    
+    if filtro_tipo:
+        projecoes = projecoes.filter(tipo__icontains=filtro_tipo)
+    
+    if filtro_valor_min:
+        try:
+            valor_min = Decimal(filtro_valor_min)
+            projecoes = projecoes.filter(
+                Q(valor_planejado__gte=valor_min) |
+                Q(valor_realizado__gte=valor_min) |
+                Q(valor_projetado__gte=valor_min)
+            )
+            notas = notas.filter(total_nota__gte=valor_min)
+        except (ValueError, TypeError):
+            pass
+    
+    if filtro_valor_max:
+        try:
+            valor_max = Decimal(filtro_valor_max)
+            projecoes = projecoes.filter(
+                Q(valor_planejado__lte=valor_max) |
+                Q(valor_realizado__lte=valor_max) |
+                Q(valor_projetado__lte=valor_max)
+            )
+            notas = notas.filter(total_nota__lte=valor_max)
+        except (ValueError, TypeError):
+            pass
+    
+    # Função para parsear data de string
+    def parse_date(date_str):
+        if not date_str:
+            return None
+        if isinstance(date_str, datetime):
+            return date_str.date()
+        if isinstance(date_str, str):
+            # Tentar diferentes formatos
+            formats = ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d']
+            for fmt in formats:
+                try:
+                    return datetime.strptime(date_str[:10], fmt).date()
+                except:
+                    continue
+        return None
+    
+    # Função para calcular similaridade entre valores
+    def valor_similar(valor1, valor2, tolerancia_percentual=5):
+        if not valor1 or not valor2:
+            return False
+        try:
+            v1 = Decimal(str(valor1))
+            v2 = Decimal(str(valor2))
+            if v1 == 0 or v2 == 0:
+                return v1 == v2
+            diff_percent = abs((v1 - v2) / max(abs(v1), abs(v2))) * 100
+            return diff_percent <= tolerancia_percentual
+        except:
+            return False
+    
+    # Função para calcular score de correspondência
+    def calcular_score_match(projecao, nota):
+        score = 0
+        max_score = 0
+        detalhes = []
+        
+        # 1. Centro de Atividade (peso: 3)
+        max_score += 3
+        if projecao.centro_atividade and nota.centro_atividade:
+            if projecao.centro_atividade.strip().upper() == nota.centro_atividade.strip().upper():
+                score += 3
+                detalhes.append("Centro de Atividade: ✓")
+            elif projecao.centro_atividade.strip().upper() in nota.centro_atividade.strip().upper() or nota.centro_atividade.strip().upper() in projecao.centro_atividade.strip().upper():
+                score += 1
+                detalhes.append("Centro de Atividade: ~")
+        
+        # 2. Valor (peso: 5)
+        max_score += 5
+        valores_projecao = [projecao.valor_planejado, projecao.valor_realizado, projecao.valor_projetado]
+        valores_projecao = [v for v in valores_projecao if v]
+        if valores_projecao and nota.total_nota:
+            melhor_match = False
+            for vp in valores_projecao:
+                if valor_similar(vp, nota.total_nota, tolerancia_percentual=2):
+                    score += 5
+                    melhor_match = True
+                    detalhes.append(f"Valor: ✓ ({vp} ≈ {nota.total_nota})")
+                    break
+                elif valor_similar(vp, nota.total_nota, tolerancia_percentual=10):
+                    score += 2
+                    melhor_match = True
+                    detalhes.append(f"Valor: ~ ({vp} ≈ {nota.total_nota})")
+                    break
+            if not melhor_match:
+                detalhes.append(f"Valor: ✗")
+        
+        # 3. Data (peso: 3)
+        max_score += 3
+        data_projecao = projecao.data_requisicao or projecao.data_planejada or projecao.data_realizada
+        data_nota = parse_date(nota.data_emissao)
+        if data_projecao and data_nota:
+            diff_dias = abs((data_projecao - data_nota).days)
+            if diff_dias == 0:
+                score += 3
+                detalhes.append("Data: ✓ (mesma data)")
+            elif diff_dias <= 7:
+                score += 2
+                detalhes.append(f"Data: ~ ({diff_dias} dias de diferença)")
+            elif diff_dias <= 30:
+                score += 1
+                detalhes.append(f"Data: ~ ({diff_dias} dias de diferença)")
+            else:
+                detalhes.append(f"Data: ✗ ({diff_dias} dias de diferença)")
+        
+        # 4. Fornecedor/Emitente (peso: 2)
+        max_score += 2
+        if projecao.fornecedor and nota.nome_fantasia_emitente:
+            fornecedor_norm = projecao.fornecedor.strip().upper()
+            emitente_norm = nota.nome_fantasia_emitente.strip().upper()
+            if fornecedor_norm == emitente_norm:
+                score += 2
+                detalhes.append("Fornecedor/Emitente: ✓")
+            elif fornecedor_norm in emitente_norm or emitente_norm in fornecedor_norm:
+                score += 1
+                detalhes.append("Fornecedor/Emitente: ~")
+        
+        # 5. Número Requisição vs Nota (peso: 2)
+        max_score += 2
+        if projecao.numero_requisicao and nota.nota:
+            if projecao.numero_requisicao.strip() == nota.nota.strip():
+                score += 2
+                detalhes.append("Número: ✓")
+            elif projecao.numero_requisicao.strip() in nota.nota.strip() or nota.nota.strip() in projecao.numero_requisicao.strip():
+                score += 1
+                detalhes.append("Número: ~")
+        
+        # Calcular percentual de match
+        percentual_match = (score / max_score * 100) if max_score > 0 else 0
+        
+        return {
+            'score': score,
+            'max_score': max_score,
+            'percentual': percentual_match,
+            'detalhes': detalhes
+        }
+    
+    # Encontrar possíveis correspondências
+    matches = []
+    projecoes_list = list(projecoes)
+    notas_list = list(notas)
+    
+    for projecao in projecoes_list:
+        melhor_match = None
+        melhor_score = 0
+        
+        for nota in notas_list:
+            match_info = calcular_score_match(projecao, nota)
+            if match_info['percentual'] > melhor_score:
+                melhor_score = match_info['percentual']
+                melhor_match = {
+                    'projecao': projecao,
+                    'nota': nota,
+                    'match_info': match_info
+                }
+        
+        if melhor_match and (not mostrar_apenas_proximos or melhor_score >= 50):
+            matches.append(melhor_match)
+    
+    # Ordenar por score decrescente
+    matches.sort(key=lambda x: x['match_info']['percentual'], reverse=True)
+    
+    # Estatísticas
+    total_projecoes = ProjecaoGasto.objects.count()
+    total_notas = NotaFiscal.objects.count()
+    total_projecoes_filtradas = len(projecoes_list)
+    total_notas_filtradas = len(notas_list)
+    
+    # Projeções sem match
+    projecoes_com_match = {m['projecao'].id for m in matches}
+    projecoes_sem_match = [p for p in projecoes_list if p.id not in projecoes_com_match]
+    
+    # Notas sem match
+    notas_com_match = {m['nota'].id for m in matches}
+    notas_sem_match = [n for n in notas_list if n.id not in notas_com_match]
+    
+    # Estatísticas de valores
+    total_planejado = sum([p.valor_planejado or Decimal('0') for p in projecoes_list])
+    total_realizado = sum([p.valor_realizado or Decimal('0') for p in projecoes_list])
+    total_projetado = sum([p.valor_projetado or Decimal('0') for p in projecoes_list])
+    total_notas_valor = sum([n.total_nota or Decimal('0') for n in notas_list])
+    
+    context = {
+        'page_title': 'Análise Projeção vs Nota Fiscal',
+        'active_page': 'analise_projecao_nota_fiscal',
+        'matches': matches,
+        'projecoes_sem_match': projecoes_sem_match[:50],  # Limitar a 50 para performance
+        'notas_sem_match': notas_sem_match[:50],
+        'total_projecoes': total_projecoes,
+        'total_notas': total_notas,
+        'total_projecoes_filtradas': total_projecoes_filtradas,
+        'total_notas_filtradas': total_notas_filtradas,
+        'total_planejado': total_planejado,
+        'total_realizado': total_realizado,
+        'total_projetado': total_projetado,
+        'total_notas_valor': total_notas_valor,
+        'filtro_centro_atividade': filtro_centro_atividade,
+        'filtro_ano': filtro_ano,
+        'filtro_valor_min': filtro_valor_min,
+        'filtro_valor_max': filtro_valor_max,
+        'filtro_tipo': filtro_tipo,
+        'mostrar_apenas_proximos': mostrar_apenas_proximos,
+    }
+    return render(request, 'orcamento/analise_projecao_nota_fiscal.html', context)
 
 
 def api_meses_por_ano(request):
@@ -2655,6 +2926,58 @@ def importar_requisicoes_almoxarifado(request):
     return render(request, 'importar/importar_requisicoes_almoxaridado.html', context)
 
 
+def importar_projecoes_gastos(request):
+    """Importar Projeções de Gastos page view"""
+    from app.utils import upload_projecoes_gastos_from_file
+    from django.contrib import messages
+    
+    if request.method == 'POST':
+        # Verificar se há arquivo enviado
+        if 'file' not in request.FILES:
+            messages.error(request, 'Por favor, selecione um arquivo para importar.')
+            context = {
+                'page_title': 'Importar Projeções de Gastos',
+                'active_page': 'importar_projecoes_gastos'
+            }
+            return render(request, 'importar/importar_projecoes_gastos.html', context)
+        
+        file = request.FILES['file']
+        update_existing = request.POST.get('update_existing') == 'on'
+        only_new_records = request.POST.get('only_new_records') == 'on'
+        
+        # Se "only_new_records" estiver marcado, não atualizar existentes
+        if only_new_records:
+            update_existing = False
+        
+        # Processar arquivo
+        try:
+            created_count, updated_count, errors = upload_projecoes_gastos_from_file(file, update_existing=update_existing)
+            
+            # Mensagens de sucesso
+            if created_count > 0:
+                messages.success(request, f'{created_count} registro(s) de projeção de gastos importado(s) com sucesso!')
+            if updated_count > 0:
+                messages.info(request, f'{updated_count} registro(s) atualizado(s).')
+            if created_count == 0 and updated_count == 0:
+                messages.warning(request, 'Nenhum registro foi importado. Verifique se há novos registros no arquivo.')
+            
+            # Mensagens de erro
+            if errors:
+                for error in errors[:10]:  # Limitar a 10 erros para não sobrecarregar
+                    messages.error(request, error)
+                if len(errors) > 10:
+                    messages.error(request, f'... e mais {len(errors) - 10} erro(s). Verifique o console para mais detalhes.')
+        
+        except Exception as e:
+            messages.error(request, f'Erro ao processar arquivo: {str(e)}')
+    
+    context = {
+        'page_title': 'Importar Projeções de Gastos',
+        'active_page': 'importar_projecoes_gastos'
+    }
+    return render(request, 'importar/importar_projecoes_gastos.html', context)
+
+
 def importar_estoque(request):
     """Importar Estoque page view"""
     if request.method == 'POST':
@@ -4217,10 +4540,54 @@ def consultar_requisicoes_almoxarifado(request):
     """Consultar/listar requisições de almoxarifado com filtros avançados"""
     from app.models import RequisicaoAlmoxarifado
     from decimal import Decimal
+    from datetime import datetime, timedelta
+    from django.db.models import Q
     
     # Busca geral
     search_query = request.GET.get('search', '').strip()
     requisicoes_list = RequisicaoAlmoxarifado.objects.all()
+    
+    # Filtros de data (intervalo de datas ou ano/mês)
+    data_inicio_str = request.GET.get('data_inicio', '').strip()
+    data_fim_str = request.GET.get('data_fim', '').strip()
+    ano_selecionado = request.GET.get('ano', '').strip()
+    mes_selecionado = request.GET.get('mes', '').strip()
+    
+    # Prioridade: Se há filtro de intervalo de datas, usar apenas ele
+    # Caso contrário, usar filtro de ano/mês
+    tem_filtro_data_range = bool(data_inicio_str or data_fim_str)
+    tem_filtro_ano_mes = bool(ano_selecionado)
+    
+    if tem_filtro_data_range:
+        # Aplicar filtro de intervalo de datas
+        if data_inicio_str:
+            try:
+                data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+                requisicoes_list = requisicoes_list.filter(data_requisicao__gte=data_inicio)
+            except ValueError:
+                pass
+        
+        if data_fim_str:
+            try:
+                data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+                requisicoes_list = requisicoes_list.filter(data_requisicao__lte=data_fim)
+            except ValueError:
+                pass
+    elif tem_filtro_ano_mes:
+        # Aplicar filtro de ano
+        try:
+            ano = int(ano_selecionado)
+            requisicoes_list = requisicoes_list.filter(data_requisicao__year=ano)
+            
+            # Se há filtro de mês, aplicar também
+            if mes_selecionado:
+                try:
+                    mes = int(mes_selecionado)
+                    requisicoes_list = requisicoes_list.filter(data_requisicao__month=mes)
+                except ValueError:
+                    pass
+        except ValueError:
+            pass
     
     # Aplicar busca geral
     if search_query:
@@ -4234,7 +4601,7 @@ def consultar_requisicoes_almoxarifado(request):
             Q(descr_local_fisic__icontains=search_query)
         )
     
-    # Filtros específicos
+    # Filtros específicos (inline table filters)
     filter_data = request.GET.get('filter_data', '').strip()
     if filter_data:
         try:
@@ -4300,18 +4667,40 @@ def consultar_requisicoes_almoxarifado(request):
     requisicoes_list = requisicoes_list.order_by('-data_requisicao', 'cd_item')
     
     # Paginação
+    from django.core.paginator import Paginator
     paginator = Paginator(requisicoes_list, 100)  # 100 itens por página
     page_number = request.GET.get('page', 1)
     requisicoes = paginator.get_page(page_number)
     
-    # Estatísticas
+    # Obter anos e meses disponíveis no banco de dados
+    anos_disponiveis = RequisicaoAlmoxarifado.objects.values_list('data_requisicao__year', flat=True).distinct().order_by('-data_requisicao__year')
+    meses_disponiveis = {}
+    for ano in anos_disponiveis:
+        meses = RequisicaoAlmoxarifado.objects.filter(data_requisicao__year=ano).values_list('data_requisicao__month', flat=True).distinct().order_by('data_requisicao__month')
+        meses_disponiveis[ano] = list(meses)
+    
+    # Meses do ano selecionado
+    meses_ano_selecionado = []
+    meses_nomes = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+    if ano_selecionado:
+        try:
+            ano = int(ano_selecionado)
+            meses_ano_selecionado = meses_disponiveis.get(ano, [])
+        except ValueError:
+            pass
+    
+    # Estatísticas (usar lista filtrada)
     total_count = RequisicaoAlmoxarifado.objects.count()
     itens_count = RequisicaoAlmoxarifado.objects.values('cd_item').distinct().count()
     centros_count = RequisicaoAlmoxarifado.objects.exclude(cd_centro_ativ__isnull=True).values('cd_centro_ativ').distinct().count()
     
     # Calcular valor total (soma de quantidade * valor, usando valores absolutos)
     valor_total = Decimal('0.00')
-    for req in RequisicaoAlmoxarifado.objects.all():
+    for req in requisicoes_list:
         if req.qtde_movto_estoq and req.vlr_movto_estoq:
             # Usar valor absoluto da quantidade (já que geralmente é negativa para saída)
             qtd_abs = abs(req.qtde_movto_estoq)
@@ -4337,6 +4726,15 @@ def consultar_requisicoes_almoxarifado(request):
         'filter_usuario_atend': filter_usuario_atend,
         'filter_operacao': filter_operacao,
         'filter_local': filter_local,
+        # Filtros de data
+        'anos_disponiveis': list(anos_disponiveis),
+        'meses_disponiveis': meses_disponiveis,
+        'meses_nomes': meses_nomes,
+        'meses_ano_selecionado': meses_ano_selecionado,
+        'data_inicio': data_inicio_str,
+        'data_fim': data_fim_str,
+        'ano_selecionado': ano_selecionado,
+        'mes_selecionado_filtro': mes_selecionado,
     }
     return render(request, 'consultar/consultar_requisicoes_almoxarifado.html', context)
 
@@ -5018,6 +5416,10 @@ def agrupar_preventiva_por_data(request):
     
     return render(request, 'planejamento/agrupar_preventiva_por_data.html', context)
 
+
+def calendario_de_base(request):
+    """Calendário de Base"""
+    return render(request, 'planejamento/calendario_de_base.html')
 
 def criar_cronograma_planejado_preventiva(request):
     """Criar cronograma planejado de preventivas"""
@@ -8342,6 +8744,128 @@ def consultar_agendamentos(request):
     return render(request, 'consultar/consultar_agendamentos.html', context)
 
 
+def consultar_projecoes_gastos(request):
+    """Consultar/listar projeções de gastos cadastradas"""
+    from app.models import ProjecaoGasto
+    from django.db.models import Q, Sum
+    from django.core.paginator import Paginator
+    from decimal import Decimal
+    
+    # Buscar todas as projeções de gastos
+    projecoes_list = ProjecaoGasto.objects.all()
+    
+    # Filtro de busca geral (buscar nos novos campos e campos legados)
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        projecoes_list = projecoes_list.filter(
+            Q(tipo__icontains=search_query) |
+            Q(descricao__icontains=search_query) |
+            Q(setor__icontains=search_query) |
+            Q(centro_atividade__icontains=search_query) |
+            Q(nome_centro_atividade__icontains=search_query) |
+            Q(fornecedor_nome_fantasia__icontains=search_query) |
+            Q(fornecedor__icontains=search_query) |
+            Q(numero_requisicao_compra__icontains=search_query) |
+            Q(numero_requisicao__icontains=search_query) |
+            Q(numero_ordem_servico__icontains=search_query) |
+            Q(numero_nf__icontains=search_query) |
+            Q(uso_contabil__icontains=search_query) |
+            Q(status__icontains=search_query) |
+            Q(observacoes__icontains=search_query)
+        )
+    
+    # Filtros específicos
+    filtro_tipo = request.GET.get('filtro_tipo', '')
+    if filtro_tipo:
+        projecoes_list = projecoes_list.filter(tipo__icontains=filtro_tipo)
+    
+    filtro_centro_atividade = request.GET.get('filtro_centro_atividade', '')
+    if filtro_centro_atividade:
+        projecoes_list = projecoes_list.filter(
+            Q(setor__icontains=filtro_centro_atividade) |
+            Q(centro_atividade__icontains=filtro_centro_atividade)
+        )
+    
+    filtro_status = request.GET.get('filtro_status', '')
+    if filtro_status:
+        projecoes_list = projecoes_list.filter(status__icontains=filtro_status)
+    
+    filtro_ano = request.GET.get('filtro_ano', '')
+    if filtro_ano:
+        try:
+            ano = int(filtro_ano)
+            projecoes_list = projecoes_list.filter(ano_referencia=ano)
+        except (ValueError, TypeError):
+            pass
+    
+    filtro_valor_min = request.GET.get('filtro_valor_min', '')
+    if filtro_valor_min:
+        try:
+            valor_min = Decimal(filtro_valor_min)
+            projecoes_list = projecoes_list.filter(
+                Q(valor_total__gte=valor_min) |
+                Q(valor_planejado__gte=valor_min) |
+                Q(valor_realizado__gte=valor_min) |
+                Q(valor_projetado__gte=valor_min)
+            )
+        except (ValueError, TypeError):
+            pass
+    
+    filtro_valor_max = request.GET.get('filtro_valor_max', '')
+    if filtro_valor_max:
+        try:
+            valor_max = Decimal(filtro_valor_max)
+            projecoes_list = projecoes_list.filter(
+                Q(valor_total__lte=valor_max) |
+                Q(valor_planejado__lte=valor_max) |
+                Q(valor_realizado__lte=valor_max) |
+                Q(valor_projetado__lte=valor_max)
+            )
+        except (ValueError, TypeError):
+            pass
+    
+    # Ordenar por data (usar novo campo, fallback para legado)
+    projecoes_list = projecoes_list.order_by('-data_abertura_requisicao', '-data_requisicao', '-ano_referencia', '-mes_referencia', '-created_at')
+    
+    # Paginação
+    paginator = Paginator(projecoes_list, 50)  # 50 itens por página
+    page_number = request.GET.get('page', 1)
+    projecoes = paginator.get_page(page_number)
+    
+    # Estatísticas (usar novo campo valor_total, com fallback para campos legados)
+    total_count = ProjecaoGasto.objects.count()
+    total_valor_total = ProjecaoGasto.objects.aggregate(total=Sum('valor_total'))['total'] or Decimal('0.00')
+    total_planejado = ProjecaoGasto.objects.aggregate(total=Sum('valor_planejado'))['total'] or Decimal('0.00')
+    total_realizado = ProjecaoGasto.objects.aggregate(total=Sum('valor_realizado'))['total'] or Decimal('0.00')
+    total_projetado = ProjecaoGasto.objects.aggregate(total=Sum('valor_projetado'))['total'] or Decimal('0.00')
+    # Usar valor_total se disponível, senão somar os outros
+    if total_valor_total > 0:
+        total_planejado = total_valor_total
+    tipos_count = ProjecaoGasto.objects.values('tipo').distinct().count()
+    centros_count = ProjecaoGasto.objects.values('centro_atividade').distinct().count()
+    
+    context = {
+        'page_title': 'Consultar Projeções de Gastos',
+        'active_page': 'consultar_projecoes_gastos',
+        'projecoes': projecoes,
+        'total_count': total_count,
+        'total_planejado': total_planejado,
+        'total_realizado': total_realizado,
+        'total_projetado': total_projetado,
+        'total_valor_total': total_valor_total,
+        'tipos_count': tipos_count,
+        'centros_count': centros_count,
+        'filtro_tipo': filtro_tipo,
+        'filtro_centro_atividade': filtro_centro_atividade,
+        'filtro_status': filtro_status,
+        'filtro_ano': filtro_ano,
+        'filtro_valor_min': filtro_valor_min,
+        'filtro_valor_max': filtro_valor_max,
+        'search_query': search_query,
+    }
+    return render(request, 'consultar/consultar_projecoes_gastos.html', context)
+
+
 def consultar_visitas(request):
     """Consultar/listar visitas cadastradas"""
     from app.models import Visitas
@@ -8432,7 +8956,7 @@ def consultar_notas_fiscais(request):
             Q(observacoes__icontains=search_query)
         )
     
-    # Filtros específicos
+    # Filtros específicos (do card de filtros avançados)
     filtro_emitente = request.GET.get('filtro_emitente', '')
     if filtro_emitente:
         notas_list = notas_list.filter(emitente__icontains=filtro_emitente)
@@ -8460,6 +8984,47 @@ def consultar_notas_fiscais(request):
             notas_list = notas_list.filter(total_nota__lte=total_max)
         except (ValueError, TypeError):
             pass
+    
+    # Filtros inline das colunas da tabela
+    filter_nota = request.GET.get('filter_nota', '').strip()
+    if filter_nota:
+        notas_list = notas_list.filter(nota__icontains=filter_nota)
+    
+    filter_serie = request.GET.get('filter_serie', '').strip()
+    if filter_serie:
+        notas_list = notas_list.filter(serie__icontains=filter_serie)
+    
+    filter_emitente_col = request.GET.get('filter_emitente', '').strip()
+    if filter_emitente_col:
+        notas_list = notas_list.filter(emitente__icontains=filter_emitente_col)
+    
+    filter_nome_fantasia = request.GET.get('filter_nome_fantasia', '').strip()
+    if filter_nome_fantasia:
+        notas_list = notas_list.filter(nome_fantasia_emitente__icontains=filter_nome_fantasia)
+    
+    filter_data_emissao = request.GET.get('filter_data_emissao', '').strip()
+    if filter_data_emissao:
+        notas_list = notas_list.filter(data_emissao__icontains=filter_data_emissao)
+    
+    filter_total = request.GET.get('filter_total', '').strip()
+    if filter_total:
+        try:
+            total_val = Decimal(filter_total)
+            notas_list = notas_list.filter(total_nota=total_val)
+        except (ValueError, TypeError):
+            notas_list = notas_list.filter(total_nota__icontains=filter_total)
+    
+    filter_uso_contabil = request.GET.get('filter_uso_contabil', '').strip()
+    if filter_uso_contabil:
+        notas_list = notas_list.filter(uso_contabil__icontains=filter_uso_contabil)
+    
+    filter_centro_atividade = request.GET.get('filter_centro_atividade', '').strip()
+    if filter_centro_atividade:
+        notas_list = notas_list.filter(centro_atividade__icontains=filter_centro_atividade)
+    
+    filter_situacao_col = request.GET.get('filter_situacao', '').strip()
+    if filter_situacao_col:
+        notas_list = notas_list.filter(situacao__icontains=filter_situacao_col)
     
     # Ordenar por data de emissão (mais recente primeiro) ou por número da nota
     notas_list = notas_list.order_by('-data_emissao', '-nota', '-created_at')
@@ -8489,6 +9054,16 @@ def consultar_notas_fiscais(request):
         'filtro_total_min': filtro_total_min,
         'filtro_total_max': filtro_total_max,
         'search_query': search_query,
+        # Filtros inline das colunas
+        'filter_nota': filter_nota,
+        'filter_serie': filter_serie,
+        'filter_emitente': filter_emitente_col,
+        'filter_nome_fantasia': filter_nome_fantasia,
+        'filter_data_emissao': filter_data_emissao,
+        'filter_total': filter_total,
+        'filter_uso_contabil': filter_uso_contabil,
+        'filter_centro_atividade': filter_centro_atividade,
+        'filter_situacao': filter_situacao_col,
     }
     return render(request, 'consultar/consultar_notas_fiscais.html', context)
 
@@ -8585,7 +9160,7 @@ def gerenciar_projeto(request):
         ItemEstoque, ManutencaoCsv, ManutencaoTerceiro, MaquinaPeca,
         MaquinaPrimariaSecundaria, PlanoPreventiva, PlanoPreventivaDocumento,
         MeuPlanoPreventiva, MeuPlanoPreventivaDocumento, AgendamentoCronograma,
-        RoteiroPreventiva, RequisicaoAlmoxarifado, NotaFiscal, Visitas
+        RoteiroPreventiva, RequisicaoAlmoxarifado, NotaFiscal, Visitas, ProjecaoGasto
     )
     
     # Definir todos os modelos com suas informações
@@ -8774,6 +9349,14 @@ def gerenciar_projeto(request):
             'cor': 'success',
             'descricao': 'Visitas e agendamentos cadastrados'
         },
+        {
+            'nome': 'Projeções de Gastos',
+            'modelo': ProjecaoGasto,
+            'key': 'projecao_gasto',
+            'icone': 'fas fa-chart-line',
+            'cor': 'info',
+            'descricao': 'Projeções de gastos e requisições de serviço'
+        },
     ]
     
     # Contar registros em cada tabela
@@ -8820,7 +9403,7 @@ def limpar_tabela(request):
         ItemEstoque, ManutencaoCsv, ManutencaoTerceiro, MaquinaPeca,
         MaquinaPrimariaSecundaria, PlanoPreventiva, PlanoPreventivaDocumento,
         MeuPlanoPreventiva, MeuPlanoPreventivaDocumento, AgendamentoCronograma,
-        RoteiroPreventiva, RequisicaoAlmoxarifado, NotaFiscal, Visitas
+        RoteiroPreventiva, RequisicaoAlmoxarifado, NotaFiscal, Visitas, ProjecaoGasto
     )
     
     # Mapeamento de tabelas para modelos
@@ -8848,6 +9431,7 @@ def limpar_tabela(request):
         'requisicao_almoxarifado': {'modelo': RequisicaoAlmoxarifado, 'nome': 'Requisições Almoxarifado'},
         'nota_fiscal': {'modelo': NotaFiscal, 'nome': 'Notas Fiscais'},
         'visitas': {'modelo': Visitas, 'nome': 'Visitas'},
+        'projecao_gasto': {'modelo': ProjecaoGasto, 'nome': 'Projeções de Gastos'},
     }
     
     tabela = request.POST.get('tabela', '')

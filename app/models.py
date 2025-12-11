@@ -1072,3 +1072,73 @@ class Visitas(models.Model):
     
     def __str__(self):
         return f"{self.titulo} - {self.data.strftime('%d/%m/%Y') if self.data else 'Sem data'}"
+
+class ProjecaoGasto(models.Model):
+    """Modelo para armazenar informações de projeções de gastos e requisições de serviço"""
+    # Dados básicos
+    setor = models.CharField('Setor', max_length=100, blank=True, null=True, db_index=True)  # SETOR do Excel
+    solicitante = models.CharField('Solicitante', max_length=100, blank=True, null=True)  # SOLICITANTE (CNPJ)
+    descricao = models.CharField('Descrição do Serviço', max_length=500, blank=True, null=True)  # DESCRIÇÃO DO SERVIÇO
+    
+    # Dados financeiros
+    valor_total = models.DecimalField('Valor Total', max_digits=15, decimal_places=2, blank=True, null=True)  # VALOR TOTAL
+    
+    # Datas
+    data_abertura_requisicao = models.DateField('Data de Abertura da Requisição', blank=True, null=True, db_index=True)  # DATA DE ABERTURA DA REQUISIÇÃO
+    previsao_execucao = models.CharField('Previsão para Execução', max_length=50, blank=True, null=True)  # PREVISÃO P/ EXECUÇÃO (ex: "DEZEMBRO / 2025")
+    mes_referencia = models.CharField('Mês Referência', max_length=20, blank=True, null=True, db_index=True)  # Extraído de PREVISÃO
+    ano_referencia = models.IntegerField('Ano Referência', blank=True, null=True, db_index=True)  # Extraído de PREVISÃO
+    
+    # Fornecedor
+    fornecedor_nome_fantasia = models.CharField('Fornecedor Nome Fantasia', max_length=255, blank=True, null=True)  # FORNECEDOR\nNOME FANTASIA
+    fornecedor_cnpj = models.CharField('Fornecedor CNPJ', max_length=20, blank=True, null=True)  # FORNECEDOR\nCNPJ
+    
+    # Dados adicionais
+    uso_contabil = models.CharField('Uso Contábil', max_length=100, blank=True, null=True)  # USO CONTÁBIL
+    numero_nf = models.CharField('Número da NF', max_length=100, blank=True, null=True)  # NÚMERO DA NF
+    numero_ordem_servico = models.CharField('Número Ordem de Serviço', max_length=100, blank=True, null=True, db_index=True)  # ORDEM DE SERVIÇO
+    numero_requisicao_compra = models.CharField('Número da Requisição de Compra', max_length=100, blank=True, null=True, db_index=True)  # NÚMERO DA REQUISIÇÃO DE COMPRA
+    numero_pedido_compra = models.CharField('Número do Pedido de Compra', max_length=100, blank=True, null=True)  # NÚMERO DO PEDIDO DE COMPRA
+    servico_concluido = models.DateField('Serviço Concluído', blank=True, null=True)  # SERVIÇO CONCLUÍDO
+    nf_servico_recebida = models.DateField('NF de Serviço Recebida', blank=True, null=True)  # NF DE SERVIÇO RECEBIDA
+    nf_enviada_lancamento = models.DateField('NF Enviada para Lançamento', blank=True, null=True)  # NF ENVIADA PARA LANÇAMENTO
+    
+    # Campos legados (mantidos para compatibilidade, mas não mais usados)
+    tipo = models.CharField('Tipo', max_length=100, blank=True, null=True, db_index=True)  # Mantido para compatibilidade
+    centro_atividade = models.CharField('Centro de Atividade', max_length=100, blank=True, null=True, db_index=True)  # Mantido para compatibilidade (mapeado de SETOR)
+    nome_centro_atividade = models.CharField('Nome Centro de Atividade', max_length=255, blank=True, null=True)  # Mantido para compatibilidade
+    valor_planejado = models.DecimalField('Valor Planejado', max_digits=15, decimal_places=2, blank=True, null=True)  # Mantido para compatibilidade
+    valor_realizado = models.DecimalField('Valor Realizado', max_digits=15, decimal_places=2, blank=True, null=True)  # Mantido para compatibilidade
+    valor_projetado = models.DecimalField('Valor Projetado', max_digits=15, decimal_places=2, blank=True, null=True)  # Mantido para compatibilidade
+    data_requisicao = models.DateField('Data Requisição', blank=True, null=True, db_index=True)  # Mantido para compatibilidade (mapeado de data_abertura_requisicao)
+    data_planejada = models.DateField('Data Planejada', blank=True, null=True)  # Mantido para compatibilidade
+    data_realizada = models.DateField('Data Realizada', blank=True, null=True)  # Mantido para compatibilidade
+    fornecedor = models.CharField('Fornecedor', max_length=255, blank=True, null=True)  # Mantido para compatibilidade (mapeado de fornecedor_nome_fantasia)
+    numero_requisicao = models.CharField('Número Requisição', max_length=100, blank=True, null=True, db_index=True)  # Mantido para compatibilidade (mapeado de numero_requisicao_compra)
+    status = models.CharField('Status', max_length=100, blank=True, null=True)  # Mantido para compatibilidade
+    observacoes = models.TextField('Observações', blank=True, null=True)  # Mantido para compatibilidade
+    
+    # Campos flexíveis para armazenar dados adicionais do Excel
+    dados_adicionais = models.JSONField('Dados Adicionais', blank=True, null=True, default=dict)
+    
+    # Timestamps
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Projeção de Gasto'
+        verbose_name_plural = 'Projeções de Gastos'
+        ordering = ['-ano_referencia', '-mes_referencia', '-data_abertura_requisicao', '-created_at']
+        indexes = [
+            models.Index(fields=['tipo']),
+            models.Index(fields=['setor']),
+            models.Index(fields=['centro_atividade']),
+            models.Index(fields=['mes_referencia', 'ano_referencia']),
+            models.Index(fields=['data_abertura_requisicao']),
+            models.Index(fields=['numero_requisicao_compra']),
+        ]
+    
+    def __str__(self):
+        tipo_str = self.tipo or 'Sem tipo'
+        descricao_str = self.descricao or 'Sem descrição'
+        return f"{tipo_str} - {descricao_str[:50]}"
