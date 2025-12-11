@@ -240,7 +240,8 @@
                         <!-- Análise de Ordens de Serviço -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#analise-ordens-collapse" aria-expanded="false">
-                                <span class="btn-toggle-text">Análise de Ordens de Serviço</span>
+                                <i class="bi bi-file-earmark-bar-graph me-2"></i>
+                                <span class="btn-toggle-text">Análise de Ordens</span>
                             </button>
                             <div class="collapse" id="analise-ordens-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
@@ -292,6 +293,7 @@
                         <!--- manutenção corretiva -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded" data-bs-toggle="collapse" data-bs-target="#corretiva-collapse" aria-expanded="false">
+                                <i class="fas fa-tools me-2"></i>
                                 <span class="btn-toggle-text">Manutenção Corretiva (SIGA)</span>
                             </button>
                             <div class="collapse" id="corretiva-collapse">
@@ -339,6 +341,7 @@
                         <!-- manutenção de terceiros -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#terceiro-collapse" aria-expanded="false">
+                                <i class="bi bi-cone-striped me-2"></i>
                                 <span class="btn-toggle-text">Manutenção de Terceiros</span>
                             </button>
                             <div class="collapse" id="terceiro-collapse">
@@ -351,6 +354,7 @@
                         <!-- Visitas e Agendamentos -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#visitas-collapse" aria-expanded="false">
+                                <i class="bi bi-calendar-date me-2"></i>
                                 <span class="btn-toggle-text">Visitas e Agendamentos</span>
                             </button>
                             <div class="collapse" id="visitas-collapse">
@@ -438,7 +442,12 @@
                             </button>
                             <div class="collapse" id="manutentor-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'cadastrar_manutentor' %}" class="link-dark rounded">Cadastrar Manutentor</a></li>
+                                    <li><a href="{% url 'analise_manutentores' %}" class="link-dark rounded"><i class="bi bi-reception-4 me-2"></i>Análise de Manutentores</a></li>
+
+                                    <li><a href="{% url 'cadastrar_manutentor' %}" class="link-dark rounded">
+                                        <i class="bi bi-person-add me-2"></i>
+                                            Cadastrar Manutentor</a>
+                                        </li>
                                     <li><a href="{% url 'consultar_manutentores' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Manutentores</a></li>
                                 </ul>
                             </div>
@@ -465,6 +474,7 @@
                         <!-- Importar Dados -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#importar-collapse" aria-expanded="false">
+                                <i class="bi bi-database-fill-up me-2"></i>
                                 <span class="btn-toggle-text">Importar Dados</span>
                             </button>
                             <div class="collapse" id="importar-collapse">
@@ -487,6 +497,7 @@
                         <!-- Administrador -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#administrador-collapse" aria-expanded="false">
+                                <i class="bi bi-door-open me-2"></i>
                                 <span class="btn-toggle-text">Administrador</span>
                             </button>
                             <div class="collapse" id="administrador-collapse">

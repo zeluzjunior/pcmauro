@@ -164,45 +164,8 @@
                         </h5>
                     </div>
                     <div class="card-body">
-                        <!-- Formulário para adicionar máquina -->
-                        <div class="mb-4">
-                            <h6 class="mb-3">
-                                <i class="fas fa-plus-circle me-2"></i>Adicionar Máquina
-                            </h6>
-                            <form method="post" action="{% url 'adicionar_maquina_manutentor' manutentor.Matricula %}" id="adicionarMaquinaForm">
-                                {% csrf_token %}
-                                <div class="row">
-                                    <div class="col-md-7 mb-3">
-                                        <label for="maquina_id" class="form-label">Máquina</label>
-                                        <select class="form-select" id="maquina_id" name="maquina_id" required>
-                                            <option value="">Selecione uma máquina...</option>
-                                            {% for maquina in maquinas_disponiveis %}
-                                                <option value="{{ maquina.id }}">
-                                                    {{ maquina.cd_maquina }} - {{ maquina.descr_maquina|default:"Sem descrição" }}
-                                                </option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="col-md-3 mb-3">
-                                        <label for="observacoes" class="form-label">Observações</label>
-                                        <input type="text" class="form-control" id="observacoes" name="observacoes" placeholder="Opcional">
-                                    </div>
-                                    <div class="col-md-2 mb-3 d-flex align-items-end">
-                                        <button type="submit" class="btn btn-success w-100" id="btnAdicionarMaquina">
-                                            <i class="fas fa-plus me-1"></i>Adicionar
-                                        </button>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
-
-                        <hr>
-
-                        <!-- Lista de máquinas relacionadas -->
+                        <!-- Lista de máquinas relacionadas (somente visualização) -->
                         <div>
-                            <h6 class="mb-3">
-                                <i class="fas fa-list me-2"></i>Máquinas Relacionadas ({{ maquinas_relacionadas.count }})
-                            </h6>
                             {% if maquinas_relacionadas %}
                                 <div class="table-responsive">
                                     <table class="table table-hover">
@@ -233,22 +196,20 @@
                                                     <td>{{ manutentor_maquina.maquina.descr_setormanut|default:"-" }}</td>
                                                     <td>{{ manutentor_maquina.observacoes|default:"-" }}</td>
                                                     <td class="text-center">
-                                                        <div class="btn-group" role="group">
-                                                            <a href="{% url 'visualizar_maquina' manutentor_maquina.maquina.id %}" class="btn btn-sm btn-primary">
-                                                                <i class="fas fa-eye"></i> Ver
-                                                            </a>
-                                                            <form method="post" action="{% url 'remover_maquina_manutentor' manutentor.Matricula manutentor_maquina.id %}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja remover esta máquina?');">
-                                                                {% csrf_token %}
-                                                                <button type="submit" class="btn btn-sm btn-danger">
-                                                                    <i class="fas fa-trash"></i>
-                                                                </button>
-                                                            </form>
-                                                        </div>
+                                                        <a href="{% url 'visualizar_maquina' manutentor_maquina.maquina.id %}" class="btn btn-sm btn-primary">
+                                                            <i class="fas fa-eye"></i> Ver
+                                                        </a>
                                                     </td>
                                                 </tr>
                                             {% endfor %}
                                         </tbody>
                                     </table>
+                                </div>
+                                <div class="mt-3">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Para adicionar ou remover máquinas, edite o manutentor.
+                                    </small>
                                 </div>
                             {% else %}
                                 <div class="alert alert-info">
@@ -277,85 +238,4 @@
         </div>
     </div>
 </section>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-// Garantir que o formulário de adicionar máquina funcione corretamente
-window.addEventListener('load', function() {
-    console.log('=== INICIANDO CONFIGURAÇÃO DO FORMULÁRIO ADICIONAR MÁQUINA ===');
-    
-    // Aguardar um pouco para garantir que main.js já carregou
-    setTimeout(function() {
-        const form = document.getElementById('adicionarMaquinaForm');
-        const submitBtn = document.getElementById('btnAdicionarMaquina');
-        const maquinaSelect = document.getElementById('maquina_id');
-        
-        console.log('Form encontrado:', form);
-        console.log('Submit button encontrado:', submitBtn);
-        console.log('Máquina select encontrado:', maquinaSelect);
-        
-        if (!form || !submitBtn || !maquinaSelect) {
-            console.error('Elementos do formulário não encontrados!');
-            return;
-        }
-        
-        // Remover qualquer listener anterior que possa estar interferindo
-        const newForm = form.cloneNode(true);
-        form.parentNode.replaceChild(newForm, form);
-        const cleanForm = document.getElementById('adicionarMaquinaForm');
-        
-        // Clonar e substituir o botão para remover listeners do main.js
-        const newBtn = submitBtn.cloneNode(true);
-        newBtn.id = 'btnAdicionarMaquina'; // Preservar o ID
-        submitBtn.parentNode.replaceChild(newBtn, submitBtn);
-        const cleanBtn = document.getElementById('btnAdicionarMaquina');
-        
-        // Atualizar referências após clonagem
-        const cleanMaquinaSelect = document.getElementById('maquina_id');
-        
-        if (cleanForm && cleanBtn && cleanMaquinaSelect) {
-            console.log('Todos os elementos limpos encontrados');
-            
-            // Adicionar listener no botão - executar ANTES de qualquer outro
-            cleanBtn.addEventListener('click', function(e) {
-                console.log('=== SUBMIT BUTTON CLICKED ===');
-                
-                if (!cleanMaquinaSelect || !cleanMaquinaSelect.value) {
-                    console.log('Nenhuma máquina selecionada');
-                    e.preventDefault();
-                    e.stopPropagation();
-                    alert('Por favor, selecione uma máquina.');
-                    return false;
-                }
-                
-                console.log('Máquina selecionada:', cleanMaquinaSelect.value);
-                console.log('Formulário será enviado normalmente');
-                // Não prevenir o comportamento padrão - deixar o formulário ser enviado
-            }, true); // Use capture phase para executar antes de outros listeners
-            
-            // Adicionar listener no formulário - executar ANTES de qualquer outro
-            cleanForm.addEventListener('submit', function(e) {
-                console.log('=== FORM SUBMIT EVENT TRIGGERED ===');
-                
-                console.log('Máquina select:', cleanMaquinaSelect, 'Value:', cleanMaquinaSelect ? cleanMaquinaSelect.value : 'N/A');
-                
-                // Validação básica
-                if (!cleanMaquinaSelect || !cleanMaquinaSelect.value) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    alert('Por favor, selecione uma máquina.');
-                    return false;
-                }
-                
-                console.log('Máquina selecionada:', cleanMaquinaSelect.value);
-                console.log('Form will submit normally...');
-                // NÃO chamar e.preventDefault() - deixar o formulário ser enviado normalmente
-            }, true); // Use capture phase para executar antes de outros listeners
-        } else {
-            console.error('Elementos limpos não encontrados após clonagem');
-        }
-    }, 1000); // Aguardar 1 segundo para garantir que main.js já carregou e adicionou seus listeners
-});
-</script>
 {% endblock %}
