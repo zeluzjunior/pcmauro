@@ -1,0 +1,376 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Dados de Orçamento{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .month-section {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        background-color: #f8f9fa;
+    }
+    .month-header {
+        background-color: #e9ecef;
+        padding: 12px 15px;
+        border-bottom: 1px solid #dee2e6;
+        cursor: pointer;
+        border-radius: 8px 8px 0 0;
+    }
+    .month-header:hover {
+        background-color: #dee2e6;
+    }
+    .month-content {
+        padding: 20px;
+    }
+    .budget-item {
+        background-color: white;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+    .year-section {
+        margin-bottom: 40px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Orçamento e GMD</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Dados de Orçamento</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-chart-bar me-2"></i>Dados de Orçamento
+                </h1>
+                <p class="lead">Gerencie dados de orçamento por ano, mês e conta orçamentária</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white stat-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Projeções</h5>
+                        <p class="card-text display-6">{{ total_projecoes|default:0 }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white stat-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Notas Fiscais</h5>
+                        <p class="card-text display-6">{{ total_notas_fiscais|default:0 }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white stat-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Requisições</h5>
+                        <p class="card-text display-6">{{ total_requisicoes|default:0 }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white stat-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Relações Confirmadas</h5>
+                        <p class="card-text display-6">{{ total_relacoes_confirmadas|default:0 }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Year Sections -->
+        {% for ano_data in anos_dados %}
+        <div class="year-section">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">
+                        <i class="fas fa-calendar-alt me-2"></i>Ano {{ ano_data.ano }}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <!-- Month Sections -->
+                    {% for mes_data in ano_data.meses %}
+                    <div class="month-section">
+                        <div class="month-header" data-bs-toggle="collapse" data-bs-target="#mes_{{ ano_data.ano }}_{{ mes_data.mes }}" aria-expanded="false" aria-controls="mes_{{ ano_data.ano }}_{{ mes_data.mes }}">
+                            <h5 class="mb-0">
+                                <i class="fas fa-chevron-down me-2"></i>{{ mes_data.mes_nome }}
+                                <span class="badge bg-secondary ms-2">
+                                    {{ mes_data.dados|length }} registro(s)
+                                </span>
+                            </h5>
+                        </div>
+                        <div class="collapse" id="mes_{{ ano_data.ano }}_{{ mes_data.mes }}">
+                            <div class="month-content">
+                                <!-- Form to add new budget item -->
+                                <div class="card mb-3 border-primary">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-plus-circle me-2"></i>Adicionar Novo Registro
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <form method="post" action="{% url 'dados_orcamento' %}" class="row g-3">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="ano" value="{{ ano_data.ano }}">
+                                            <input type="hidden" name="mes" value="{{ mes_data.mes }}">
+                                            
+                                            <div class="col-md-4">
+                                                <label for="conta_orcamentaria_{{ ano_data.ano }}_{{ mes_data.mes }}" class="form-label">
+                                                    <strong>Conta Orçamentária</strong>
+                                                </label>
+                                                <input type="text" 
+                                                       class="form-control" 
+                                                       id="conta_orcamentaria_{{ ano_data.ano }}_{{ mes_data.mes }}" 
+                                                       name="conta_orcamentaria" 
+                                                       required
+                                                       placeholder="Ex: 3.1.1.01.001">
+                                            </div>
+                                            
+                                            <div class="col-md-4">
+                                                <label for="valor_orcamento_{{ ano_data.ano }}_{{ mes_data.mes }}" class="form-label">
+                                                    <strong>Valor do Orçamento</strong>
+                                                </label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text">R$</span>
+                                                    <input type="text" 
+                                                           class="form-control money-input" 
+                                                           id="valor_orcamento_{{ ano_data.ano }}_{{ mes_data.mes }}" 
+                                                           name="valor_orcamento" 
+                                                           required
+                                                           placeholder="0,00"
+                                                           data-field="valor_orcamento">
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="col-md-4">
+                                                <label for="valor_final_desejado_{{ ano_data.ano }}_{{ mes_data.mes }}" class="form-label">
+                                                    <strong>Valor Final Desejado</strong>
+                                                </label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text">R$</span>
+                                                    <input type="text" 
+                                                           class="form-control money-input" 
+                                                           id="valor_final_desejado_{{ ano_data.ano }}_{{ mes_data.mes }}" 
+                                                           name="valor_final_desejado" 
+                                                           required
+                                                           placeholder="0,00"
+                                                           data-field="valor_final_desejado">
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="col-12">
+                                                <button type="submit" class="btn btn-primary">
+                                                    <i class="fas fa-save me-2"></i>Salvar
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                                
+                                <!-- Existing records for this month -->
+                                {% if mes_data.dados %}
+                                <div class="card">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-list me-2"></i>Registros Existentes
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Conta Orçamentária</th>
+                                                        <th>Valor do Orçamento</th>
+                                                        <th>Valor Final Desejado</th>
+                                                        <th>Última Atualização</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for dado in mes_data.dados %}
+                                                    <tr>
+                                                        <td><strong>{{ dado.conta_orcamentaria }}</strong></td>
+                                                        <td>{{ dado.valor_orcamento|currency_br }}</td>
+                                                        <td>{{ dado.valor_final_desejado|currency_br }}</td>
+                                                        <td>
+                                                            <small class="text-muted">
+                                                                {{ dado.updated_at|date:"d/m/Y H:i" }}
+                                                            </small>
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>Nenhum registro cadastrado para este mês.
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<script>
+// Brazilian currency input mask
+(function() {
+    'use strict';
+    
+    function formatMoney(value) {
+        // Remove tudo que não é número
+        let numbers = value.replace(/\D/g, '');
+        
+        // Se não tiver números, retorna vazio
+        if (!numbers || numbers === '0') return '';
+        
+        // Converte para centavos
+        let cents = parseInt(numbers);
+        
+        // Formata como reais e centavos
+        let reais = Math.floor(cents / 100);
+        let centavos = cents % 100;
+        
+        // Formata com separadores brasileiros (ponto para milhares, vírgula para decimais)
+        let formatted = reais.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0}) + ',' + centavos.toString().padStart(2, '0');
+        
+        return formatted;
+    }
+    
+    function parseMoney(value) {
+        // Remove tudo exceto números
+        let numbers = value.replace(/\D/g, '');
+        
+        if (!numbers) return '0,00';
+        
+        // Converte para decimal (divide por 100 para ter centavos)
+        let decimal = (parseInt(numbers) / 100).toFixed(2);
+        
+        // Substitui ponto por vírgula para o backend
+        return decimal.replace('.', ',');
+    }
+    
+    // Aplicar máscara em todos os inputs de dinheiro
+    document.querySelectorAll('.money-input').forEach(input => {
+        // Ao digitar
+        input.addEventListener('input', function(e) {
+            let cursorPosition = this.selectionStart;
+            let oldValue = this.value;
+            let oldLength = oldValue.length;
+            
+            // Formata o valor
+            let formatted = formatMoney(this.value);
+            this.value = formatted;
+            
+            // Ajusta a posição do cursor
+            let newLength = this.value.length;
+            let lengthDiff = newLength - oldLength;
+            
+            // Calcula nova posição do cursor
+            let newPosition = cursorPosition + lengthDiff;
+            
+            // Se estava no final, mantém no final
+            if (cursorPosition === oldLength) {
+                newPosition = this.value.length;
+            } else {
+                // Ajusta posição considerando a formatação
+                if (newPosition < 0) newPosition = 0;
+                if (newPosition > this.value.length) newPosition = this.value.length;
+            }
+            
+            // Usa setTimeout para garantir que o cursor seja posicionado após o DOM atualizar
+            setTimeout(() => {
+                this.setSelectionRange(newPosition, newPosition);
+            }, 0);
+        });
+        
+        // Ao perder o foco, garante que está formatado
+        input.addEventListener('blur', function() {
+            if (this.value && this.value.replace(/\D/g, '') !== '0') {
+                this.value = formatMoney(this.value);
+            } else {
+                this.value = '';
+            }
+        });
+        
+        // Ao focar, seleciona tudo para facilitar edição
+        input.addEventListener('focus', function() {
+            // Pequeno delay para garantir que o select funcione
+            setTimeout(() => {
+                this.select();
+            }, 0);
+        });
+        
+        // Previne caracteres não numéricos (exceto vírgula e ponto que serão tratados)
+        input.addEventListener('keypress', function(e) {
+            // Permite números, backspace, delete, tab, escape, enter
+            if (e.key.match(/[0-9]/) || 
+                ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                return;
+            }
+            // Previne outros caracteres
+            e.preventDefault();
+        });
+    });
+    
+    // Antes de submeter o formulário, converter para formato numérico
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            // Converter todos os campos de dinheiro para formato numérico
+            this.querySelectorAll('.money-input').forEach(input => {
+                // Converter valor formatado para formato numérico (com vírgula)
+                let numericValue = parseMoney(input.value);
+                
+                // Atualizar o valor do input para o formato numérico
+                input.value = numericValue;
+            });
+        });
+    });
+})();
+</script>
+{% endblock %}

@@ -836,25 +836,481 @@ def analise_requisicoes(request):
 
 
 def analise_projecao_nota_fiscal(request):
-    """Análise comparativa entre Projeções de Gastos e Notas Fiscais"""
-    from app.models import ProjecaoGasto, NotaFiscal
-    from django.db.models import Q, Sum, Count
+    """Análise das relações confirmadas entre Projeções de Gastos e Notas Fiscais"""
+    from app.models import ProjecaoGasto, NotaFiscal, RelacaoProjecaoNotaFiscal
+    from django.db.models import Q, Sum, Count, Avg
     from decimal import Decimal
     from datetime import datetime, timedelta
+    from collections import defaultdict
+    import json
     
     # Filtros
+    filtro_status = request.GET.get('filtro_status', '').strip()
+    filtro_centro_atividade = request.GET.get('filtro_centro_atividade', '').strip()
+    filtro_ano = request.GET.get('filtro_ano', '').strip()
+    filtro_valor_min = request.GET.get('filtro_valor_min', '').strip()
+    filtro_valor_max = request.GET.get('filtro_valor_max', '').strip()
+    
+    # Buscar relações confirmadas
+    relacoes = RelacaoProjecaoNotaFiscal.objects.select_related('projecao', 'nota_fiscal').all()
+    
+    # Aplicar filtros
+    if filtro_status:
+        relacoes = relacoes.filter(status=filtro_status)
+    
+    if filtro_centro_atividade:
+        relacoes = relacoes.filter(
+            Q(projecao__centro_atividade__icontains=filtro_centro_atividade) |
+            Q(nota_fiscal__centro_atividade__icontains=filtro_centro_atividade)
+        )
+    
+    if filtro_ano:
+        try:
+            ano = int(filtro_ano)
+            relacoes = relacoes.filter(
+                Q(projecao__ano_referencia=ano) |
+                Q(nota_fiscal__data_emissao__startswith=f"{ano}-") |
+                Q(nota_fiscal__data_emissao__contains=f"/{ano}") |
+                Q(nota_fiscal__data_emissao__contains=f"-{ano}")
+            )
+        except ValueError:
+            pass
+    
+    if filtro_valor_min:
+        try:
+            valor_min = Decimal(filtro_valor_min)
+            relacoes = relacoes.filter(
+                Q(projecao__valor_planejado__gte=valor_min) |
+                Q(projecao__valor_realizado__gte=valor_min) |
+                Q(projecao__valor_projetado__gte=valor_min) |
+                Q(nota_fiscal__total_nota__gte=valor_min)
+            )
+        except (ValueError, TypeError):
+            pass
+    
+    if filtro_valor_max:
+        try:
+            valor_max = Decimal(filtro_valor_max)
+            relacoes = relacoes.filter(
+                Q(projecao__valor_planejado__lte=valor_max) |
+                Q(projecao__valor_realizado__lte=valor_max) |
+                Q(projecao__valor_projetado__lte=valor_max) |
+                Q(nota_fiscal__total_nota__lte=valor_max)
+            )
+        except (ValueError, TypeError):
+            pass
+    
+    # Estatísticas gerais
+    total_relacoes = RelacaoProjecaoNotaFiscal.objects.count()
+    total_confirmadas = RelacaoProjecaoNotaFiscal.objects.filter(status='confirmado').count()
+    total_rejeitadas = RelacaoProjecaoNotaFiscal.objects.filter(status='rejeitado').count()
+    total_pendentes = RelacaoProjecaoNotaFiscal.objects.filter(status='pendente').count()
+    
+    # Estatísticas de valores
+    relacoes_confirmadas = RelacaoProjecaoNotaFiscal.objects.filter(status='confirmado').select_related('projecao', 'nota_fiscal')
+    total_valor_projecoes = sum([
+        (r.projecao.valor_planejado or Decimal('0')) + 
+        (r.projecao.valor_realizado or Decimal('0')) + 
+        (r.projecao.valor_projetado or Decimal('0'))
+        for r in relacoes_confirmadas
+    ])
+    total_valor_notas = sum([
+        (r.nota_fiscal.total_nota or Decimal('0')) for r in relacoes_confirmadas
+    ])
+    
+    # Média de score
+    score_medio_avg = relacoes_confirmadas.aggregate(avg_score=Avg('score_match'))['avg_score'] or Decimal('0')
+    
+    # Distribuição por status (para gráfico)
+    status_distribuicao = {
+        'Confirmadas': total_confirmadas,
+        'Rejeitadas': total_rejeitadas,
+        'Pendentes': total_pendentes,
+    }
+    
+    # Distribuição por mês (para gráfico de linha)
+    relacoes_por_mes = defaultdict(int)
+    for relacao in relacoes_confirmadas:
+        mes_key = relacao.created_at.strftime('%Y-%m')
+        relacoes_por_mes[mes_key] += 1
+    
+    meses_ordenados = sorted(relacoes_por_mes.keys())
+    meses_labels = [datetime.strptime(m, '%Y-%m').strftime('%b/%Y') for m in meses_ordenados]
+    meses_data = [relacoes_por_mes[m] for m in meses_ordenados]
+    
+    # Distribuição por score (para gráfico)
+    score_alto = 0
+    score_medio_count = 0
+    score_baixo = 0
+    for relacao in relacoes_confirmadas:
+        if relacao.score_match:
+            score = float(relacao.score_match)
+            if score >= 70:
+                score_alto += 1
+            elif score >= 50:
+                score_medio_count += 1
+            else:
+                score_baixo += 1
+    
+    # Top centros de atividade (para gráfico)
+    centros_count = defaultdict(int)
+    for relacao in relacoes_confirmadas:
+        centro = relacao.projecao.centro_atividade or relacao.nota_fiscal.centro_atividade
+        if centro:
+            centros_count[centro] += 1
+    
+    top_centros = sorted(centros_count.items(), key=lambda x: x[1], reverse=True)[:10]
+    centros_labels = [c[0] for c in top_centros]
+    centros_data = [c[1] for c in top_centros]
+    
+    # Lista de relações para a tabela
+    relacoes_list = list(relacoes.order_by('-created_at')[:100])  # Limitar a 100 para performance
+    
+    context = {
+        'page_title': 'Análise Projeção vs Nota Fiscal',
+        'active_page': 'analise_projecao_nota_fiscal',
+        'relacoes': relacoes_list,
+        'total_relacoes': total_relacoes,
+        'total_confirmadas': total_confirmadas,
+        'total_rejeitadas': total_rejeitadas,
+        'total_pendentes': total_pendentes,
+        'total_valor_projecoes': total_valor_projecoes,
+        'total_valor_notas': total_valor_notas,
+        'score_medio': score_medio_avg,
+        'status_distribuicao': status_distribuicao,
+        'meses_labels': json.dumps(meses_labels),
+        'meses_data': json.dumps(meses_data),
+        'score_alto': score_alto,
+        'score_medio_count': score_medio_count,
+        'score_baixo': score_baixo,
+        'centros_labels': json.dumps(centros_labels),
+        'centros_data': json.dumps(centros_data),
+        'filtro_status': filtro_status,
+        'filtro_centro_atividade': filtro_centro_atividade,
+        'filtro_ano': filtro_ano,
+        'filtro_valor_min': filtro_valor_min,
+        'filtro_valor_max': filtro_valor_max,
+    }
+    return render(request, 'orcamento/analise_projecao_nota_fiscal.html', context)
+
+
+def dados_orcamento(request):
+    """Página de dados consolidados de orçamento e GMD"""
+    from app.models import ProjecaoGasto, NotaFiscal, RequisicaoAlmoxarifado, RelacaoProjecaoNotaFiscal, DadosOrcamento
+    from django.db.models import Count, Sum
+    from django.contrib import messages
+    from decimal import Decimal
+    import calendar
+    
+    # Processar POST para salvar dados
+    if request.method == 'POST':
+        ano = request.POST.get('ano')
+        mes = request.POST.get('mes')
+        conta_orcamentaria = request.POST.get('conta_orcamentaria', '').strip()
+        valor_orcamento = request.POST.get('valor_orcamento', '0').strip()
+        valor_final_desejado = request.POST.get('valor_final_desejado', '0').strip()
+        
+        if ano and mes and conta_orcamentaria:
+            try:
+                ano_int = int(ano)
+                mes_int = int(mes)
+                valor_orcamento_decimal = Decimal(valor_orcamento.replace(',', '.')) if valor_orcamento else Decimal('0')
+                valor_final_desejado_decimal = Decimal(valor_final_desejado.replace(',', '.')) if valor_final_desejado else Decimal('0')
+                
+                # Criar ou atualizar registro
+                dados_orcamento, created = DadosOrcamento.objects.update_or_create(
+                    ano=ano_int,
+                    mes=mes_int,
+                    conta_orcamentaria=conta_orcamentaria,
+                    defaults={
+                        'valor_orcamento': valor_orcamento_decimal,
+                        'valor_final_desejado': valor_final_desejado_decimal,
+                        'created_by': request.user.username if request.user.is_authenticated else 'Sistema'
+                    }
+                )
+                
+                if created:
+                    messages.success(request, f'Dados de orçamento salvos com sucesso para {ano_int}/{mes_int:02d}!')
+                else:
+                    messages.success(request, f'Dados de orçamento atualizados com sucesso para {ano_int}/{mes_int:02d}!')
+            except ValueError as e:
+                messages.error(request, f'Erro ao processar valores: {str(e)}')
+            except Exception as e:
+                messages.error(request, f'Erro ao salvar dados: {str(e)}')
+        else:
+            messages.error(request, 'Todos os campos obrigatórios devem ser preenchidos.')
+    
+    # Estatísticas gerais
+    total_projecoes = ProjecaoGasto.objects.count()
+    total_notas_fiscais = NotaFiscal.objects.count()
+    total_requisicoes = RequisicaoAlmoxarifado.objects.count()
+    total_relacoes_confirmadas = RelacaoProjecaoNotaFiscal.objects.filter(status='confirmado').count()
+    
+    # Anos para exibir (2025 e 2026)
+    anos = [2025, 2026]
+    meses_nomes = [calendar.month_name[i] for i in range(1, 13)]
+    
+    # Buscar dados existentes organizados por ano e mês
+    # Criar estrutura mais simples para o template
+    anos_dados = []
+    for ano in anos:
+        meses_dados = []
+        for mes in range(1, 13):
+            dados_mes = list(DadosOrcamento.objects.filter(ano=ano, mes=mes).order_by('conta_orcamentaria'))
+            meses_dados.append({
+                'mes': mes,
+                'mes_nome': meses_nomes[mes - 1],
+                'dados': dados_mes
+            })
+        anos_dados.append({
+            'ano': ano,
+            'meses': meses_dados
+        })
+    
+    context = {
+        'page_title': 'Dados de Orçamento',
+        'active_page': 'dados_orcamento',
+        'total_projecoes': total_projecoes,
+        'total_notas_fiscais': total_notas_fiscais,
+        'total_requisicoes': total_requisicoes,
+        'total_relacoes_confirmadas': total_relacoes_confirmadas,
+        'anos_dados': anos_dados,
+        'meses': list(range(1, 13)),
+        'meses_nomes': meses_nomes,
+    }
+    return render(request, 'orcamento/dados_orcamento.html', context)
+
+
+def relacionar_projecao_nota_fiscal(request):
+    """Página para relacionar e confirmar correspondências entre Projeções de Gastos e Notas Fiscais"""
+    from app.models import ProjecaoGasto, NotaFiscal, RelacaoProjecaoNotaFiscal
+    from django.db.models import Q
+    from django.contrib import messages
+    from decimal import Decimal
+    from datetime import datetime
+    
+    # Processar confirmação de relação (POST)
+    if request.method == 'POST':
+        acao = request.POST.get('acao')
+        projecao_id = request.POST.get('projecao_id')
+        nota_id = request.POST.get('nota_id')
+        observacoes = request.POST.get('observacoes', '').strip()
+        score_match = request.POST.get('score_match', '').strip()
+        
+        try:
+            projecao = ProjecaoGasto.objects.get(id=projecao_id)
+            nota = NotaFiscal.objects.get(id=nota_id)
+            
+            # Converter score_match para Decimal de forma segura
+            score_match_decimal = None
+            if score_match:
+                try:
+                    # Normalizar: substituir vírgula por ponto, remover espaços e caracteres não numéricos (exceto ponto)
+                    score_str = str(score_match).replace(',', '.').replace(' ', '').strip()
+                    # Remover qualquer caractere que não seja dígito ou ponto
+                    import re
+                    score_str = re.sub(r'[^\d.]', '', score_str)
+                    # Garantir que há pelo menos um dígito
+                    if score_str and score_str.replace('.', '').isdigit():
+                        # Tentar converter para float primeiro, depois para Decimal
+                        score_float = float(score_str)
+                        # Limitar a 2 casas decimais e garantir que está entre 0 e 100
+                        score_float = max(0, min(100, score_float))
+                        score_match_decimal = Decimal(f"{score_float:.2f}")
+                except (ValueError, TypeError, Exception) as e:
+                    # Se não conseguir converter, calcular o score novamente
+                    try:
+                        # Recalcular score usando a função de cálculo
+                        def parse_date(date_str):
+                            if not date_str:
+                                return None
+                            if isinstance(date_str, datetime):
+                                return date_str.date()
+                            if isinstance(date_str, str):
+                                formats = ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d']
+                                for fmt in formats:
+                                    try:
+                                        return datetime.strptime(date_str[:10], fmt).date()
+                                    except:
+                                        continue
+                            return None
+                        
+                        def valor_similar(valor1, valor2, tolerancia_percentual=5):
+                            if not valor1 or not valor2:
+                                return False
+                            try:
+                                v1 = Decimal(str(valor1))
+                                v2 = Decimal(str(valor2))
+                                if v1 == 0 or v2 == 0:
+                                    return v1 == v2
+                                diff_percent = abs((v1 - v2) / max(abs(v1), abs(v2))) * 100
+                                return diff_percent <= tolerancia_percentual
+                            except:
+                                return False
+                        
+                        def calcular_score_match(projecao, nota):
+                            score = 0
+                            max_score = 0
+                            
+                            max_score += 3
+                            if projecao.centro_atividade and nota.centro_atividade:
+                                if projecao.centro_atividade.strip().upper() == nota.centro_atividade.strip().upper():
+                                    score += 3
+                                elif projecao.centro_atividade.strip().upper() in nota.centro_atividade.strip().upper() or nota.centro_atividade.strip().upper() in projecao.centro_atividade.strip().upper():
+                                    score += 1
+                            
+                            max_score += 5
+                            valores_projecao = [projecao.valor_planejado, projecao.valor_realizado, projecao.valor_projetado]
+                            valores_projecao = [v for v in valores_projecao if v]
+                            if valores_projecao and nota.total_nota:
+                                for vp in valores_projecao:
+                                    if valor_similar(vp, nota.total_nota, tolerancia_percentual=2):
+                                        score += 5
+                                        break
+                                    elif valor_similar(vp, nota.total_nota, tolerancia_percentual=10):
+                                        score += 2
+                                        break
+                            
+                            max_score += 3
+                            data_projecao = projecao.data_requisicao or projecao.data_planejada or projecao.data_realizada
+                            data_nota = parse_date(nota.data_emissao)
+                            if data_projecao and data_nota:
+                                diff_dias = abs((data_projecao - data_nota).days)
+                                if diff_dias == 0:
+                                    score += 3
+                                elif diff_dias <= 7:
+                                    score += 2
+                                elif diff_dias <= 30:
+                                    score += 1
+                            
+                            max_score += 2
+                            if projecao.fornecedor and nota.nome_fantasia_emitente:
+                                fornecedor_norm = projecao.fornecedor.strip().upper()
+                                emitente_norm = nota.nome_fantasia_emitente.strip().upper()
+                                if fornecedor_norm == emitente_norm:
+                                    score += 2
+                                elif fornecedor_norm in emitente_norm or emitente_norm in fornecedor_norm:
+                                    score += 1
+                            
+                            max_score += 2
+                            if projecao.numero_requisicao and nota.nota:
+                                if projecao.numero_requisicao.strip() == nota.nota.strip():
+                                    score += 2
+                                elif projecao.numero_requisicao.strip() in nota.nota.strip() or nota.nota.strip() in projecao.numero_requisicao.strip():
+                                    score += 1
+                            
+                            percentual_match = (score / max_score * 100) if max_score > 0 else 0
+                            return Decimal(f"{percentual_match:.2f}")
+                        
+                        # Chamar a função para calcular o score
+                        score_match_decimal = calcular_score_match(projecao, nota)
+                    except Exception as calc_error:
+                        # Se não conseguir calcular, deixar None
+                        score_match_decimal = None
+            
+            if acao == 'confirmar':
+                # Verificar se já existe relação
+                relacao_existente = RelacaoProjecaoNotaFiscal.objects.filter(
+                    projecao=projecao,
+                    nota_fiscal=nota
+                ).first()
+                
+                if relacao_existente:
+                    # Atualizar relação existente
+                    relacao_existente.status = 'confirmado'
+                    relacao_existente.observacoes = observacoes
+                    if score_match_decimal is not None:
+                        relacao_existente.score_match = score_match_decimal
+                    relacao_existente.save()
+                    messages.success(request, f'Relação atualizada com sucesso!')
+                else:
+                    # Criar nova relação
+                    relacao = RelacaoProjecaoNotaFiscal.objects.create(
+                        projecao=projecao,
+                        nota_fiscal=nota,
+                        status='confirmado',
+                        observacoes=observacoes,
+                        confirmado_por=request.user.username if request.user.is_authenticated else 'Sistema',
+                        score_match=score_match_decimal
+                    )
+                    messages.success(request, f'Relação confirmada com sucesso!')
+            
+            elif acao == 'rejeitar':
+                # Marcar como rejeitado
+                relacao_existente = RelacaoProjecaoNotaFiscal.objects.filter(
+                    projecao=projecao,
+                    nota_fiscal=nota
+                ).first()
+                
+                if relacao_existente:
+                    relacao_existente.status = 'rejeitado'
+                    relacao_existente.observacoes = observacoes
+                    relacao_existente.save()
+                    messages.info(request, f'Relação rejeitada.')
+                else:
+                    RelacaoProjecaoNotaFiscal.objects.create(
+                        projecao=projecao,
+                        nota_fiscal=nota,
+                        status='rejeitado',
+                        observacoes=observacoes,
+                        confirmado_por=request.user.username if request.user.is_authenticated else 'Sistema'
+                    )
+                    messages.info(request, f'Relação rejeitada.')
+            
+            elif acao == 'remover':
+                # Remover relação confirmada
+                RelacaoProjecaoNotaFiscal.objects.filter(
+                    projecao=projecao,
+                    nota_fiscal=nota
+                ).delete()
+                messages.success(request, f'Relação removida com sucesso!')
+        
+        except ProjecaoGasto.DoesNotExist:
+            messages.error(request, 'Projeção não encontrada.')
+        except NotaFiscal.DoesNotExist:
+            messages.error(request, 'Nota Fiscal não encontrada.')
+        except Exception as e:
+            messages.error(request, f'Erro ao processar: {str(e)}')
+        
+        # Redirecionar após POST para evitar renderização duplicada e melhorar UX
+        from django.shortcuts import redirect
+        # Preservar filtros na URL ao redirecionar
+        redirect_url = 'relacionar_projecao_nota_fiscal'
+        query_params = []
+        if request.GET.get('filtro_centro_atividade'):
+            query_params.append(f"filtro_centro_atividade={request.GET.get('filtro_centro_atividade')}")
+        if request.GET.get('filtro_ano'):
+            query_params.append(f"filtro_ano={request.GET.get('filtro_ano')}")
+        if request.GET.get('filtro_tipo'):
+            query_params.append(f"filtro_tipo={request.GET.get('filtro_tipo')}")
+        if request.GET.get('filtro_valor_min'):
+            query_params.append(f"filtro_valor_min={request.GET.get('filtro_valor_min')}")
+        if request.GET.get('filtro_valor_max'):
+            query_params.append(f"filtro_valor_max={request.GET.get('filtro_valor_max')}")
+        if request.GET.get('mostrar_apenas_proximos') == 'on':
+            query_params.append("mostrar_apenas_proximos=on")
+        if request.GET.get('mostrar_apenas_nao_confirmados') == 'on':
+            query_params.append("mostrar_apenas_nao_confirmados=on")
+        
+        if query_params:
+            redirect_url += '?' + '&'.join(query_params)
+        
+        return redirect(redirect_url)
+    
+    # Filtros (GET)
     filtro_centro_atividade = request.GET.get('filtro_centro_atividade', '').strip()
     filtro_ano = request.GET.get('filtro_ano', '').strip()
     filtro_valor_min = request.GET.get('filtro_valor_min', '').strip()
     filtro_valor_max = request.GET.get('filtro_valor_max', '').strip()
     filtro_tipo = request.GET.get('filtro_tipo', '').strip()
     mostrar_apenas_proximos = request.GET.get('mostrar_apenas_proximos', '') == 'on'
+    mostrar_apenas_nao_confirmados = request.GET.get('mostrar_apenas_nao_confirmados', '') == 'on'
     
     # Buscar registros
     projecoes = ProjecaoGasto.objects.all()
     notas = NotaFiscal.objects.all()
     
-    # Aplicar filtros
+    # Aplicar filtros (mesma lógica da análise)
     if filtro_centro_atividade:
         projecoes = projecoes.filter(centro_atividade__icontains=filtro_centro_atividade)
         notas = notas.filter(centro_atividade__icontains=filtro_centro_atividade)
@@ -863,7 +1319,6 @@ def analise_projecao_nota_fiscal(request):
         try:
             ano = int(filtro_ano)
             projecoes = projecoes.filter(ano_referencia=ano)
-            # Para notas fiscais, tentar parsear ano da data_emissao
             notas = notas.filter(
                 Q(data_emissao__startswith=f"{ano}-") |
                 Q(data_emissao__contains=f"/{ano}") |
@@ -899,14 +1354,13 @@ def analise_projecao_nota_fiscal(request):
         except (ValueError, TypeError):
             pass
     
-    # Função para parsear data de string
+    # Função para parsear data (reutilizar da análise)
     def parse_date(date_str):
         if not date_str:
             return None
         if isinstance(date_str, datetime):
             return date_str.date()
         if isinstance(date_str, str):
-            # Tentar diferentes formatos
             formats = ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d']
             for fmt in formats:
                 try:
@@ -915,7 +1369,6 @@ def analise_projecao_nota_fiscal(request):
                     continue
         return None
     
-    # Função para calcular similaridade entre valores
     def valor_similar(valor1, valor2, tolerancia_percentual=5):
         if not valor1 or not valor2:
             return False
@@ -929,13 +1382,11 @@ def analise_projecao_nota_fiscal(request):
         except:
             return False
     
-    # Função para calcular score de correspondência
     def calcular_score_match(projecao, nota):
         score = 0
         max_score = 0
         detalhes = []
         
-        # 1. Centro de Atividade (peso: 3)
         max_score += 3
         if projecao.centro_atividade and nota.centro_atividade:
             if projecao.centro_atividade.strip().upper() == nota.centro_atividade.strip().upper():
@@ -945,7 +1396,6 @@ def analise_projecao_nota_fiscal(request):
                 score += 1
                 detalhes.append("Centro de Atividade: ~")
         
-        # 2. Valor (peso: 5)
         max_score += 5
         valores_projecao = [projecao.valor_planejado, projecao.valor_realizado, projecao.valor_projetado]
         valores_projecao = [v for v in valores_projecao if v]
@@ -965,7 +1415,6 @@ def analise_projecao_nota_fiscal(request):
             if not melhor_match:
                 detalhes.append(f"Valor: ✗")
         
-        # 3. Data (peso: 3)
         max_score += 3
         data_projecao = projecao.data_requisicao or projecao.data_planejada or projecao.data_realizada
         data_nota = parse_date(nota.data_emissao)
@@ -983,7 +1432,6 @@ def analise_projecao_nota_fiscal(request):
             else:
                 detalhes.append(f"Data: ✗ ({diff_dias} dias de diferença)")
         
-        # 4. Fornecedor/Emitente (peso: 2)
         max_score += 2
         if projecao.fornecedor and nota.nome_fantasia_emitente:
             fornecedor_norm = projecao.fornecedor.strip().upper()
@@ -995,7 +1443,6 @@ def analise_projecao_nota_fiscal(request):
                 score += 1
                 detalhes.append("Fornecedor/Emitente: ~")
         
-        # 5. Número Requisição vs Nota (peso: 2)
         max_score += 2
         if projecao.numero_requisicao and nota.nota:
             if projecao.numero_requisicao.strip() == nota.nota.strip():
@@ -1005,7 +1452,6 @@ def analise_projecao_nota_fiscal(request):
                 score += 1
                 detalhes.append("Número: ~")
         
-        # Calcular percentual de match
         percentual_match = (score / max_score * 100) if max_score > 0 else 0
         
         return {
@@ -1019,6 +1465,10 @@ def analise_projecao_nota_fiscal(request):
     matches = []
     projecoes_list = list(projecoes)
     notas_list = list(notas)
+    
+    # Buscar relações já confirmadas
+    relacoes_confirmadas = RelacaoProjecaoNotaFiscal.objects.filter(status='confirmado').select_related('projecao', 'nota_fiscal')
+    relacoes_dict = {(r.projecao_id, r.nota_fiscal_id): r for r in relacoes_confirmadas}
     
     for projecao in projecoes_list:
         melhor_match = None
@@ -1034,54 +1484,286 @@ def analise_projecao_nota_fiscal(request):
                     'match_info': match_info
                 }
         
-        if melhor_match and (not mostrar_apenas_proximos or melhor_score >= 50):
-            matches.append(melhor_match)
+        if melhor_match:
+            # Verificar se já está confirmado
+            key = (projecao.id, melhor_match['nota'].id)
+            relacao_confirmada = relacoes_dict.get(key)
+            melhor_match['relacao_confirmada'] = relacao_confirmada
+            
+            if mostrar_apenas_nao_confirmados and relacao_confirmada:
+                continue
+            
+            if not mostrar_apenas_proximos or melhor_score >= 50:
+                matches.append(melhor_match)
     
     # Ordenar por score decrescente
     matches.sort(key=lambda x: x['match_info']['percentual'], reverse=True)
     
     # Estatísticas
-    total_projecoes = ProjecaoGasto.objects.count()
-    total_notas = NotaFiscal.objects.count()
-    total_projecoes_filtradas = len(projecoes_list)
-    total_notas_filtradas = len(notas_list)
-    
-    # Projeções sem match
-    projecoes_com_match = {m['projecao'].id for m in matches}
-    projecoes_sem_match = [p for p in projecoes_list if p.id not in projecoes_com_match]
-    
-    # Notas sem match
-    notas_com_match = {m['nota'].id for m in matches}
-    notas_sem_match = [n for n in notas_list if n.id not in notas_com_match]
-    
-    # Estatísticas de valores
-    total_planejado = sum([p.valor_planejado or Decimal('0') for p in projecoes_list])
-    total_realizado = sum([p.valor_realizado or Decimal('0') for p in projecoes_list])
-    total_projetado = sum([p.valor_projetado or Decimal('0') for p in projecoes_list])
-    total_notas_valor = sum([n.total_nota or Decimal('0') for n in notas_list])
+    total_relacoes_confirmadas = RelacaoProjecaoNotaFiscal.objects.filter(status='confirmado').count()
+    total_relacoes_rejeitadas = RelacaoProjecaoNotaFiscal.objects.filter(status='rejeitado').count()
     
     context = {
-        'page_title': 'Análise Projeção vs Nota Fiscal',
-        'active_page': 'analise_projecao_nota_fiscal',
+        'page_title': 'Relacionar Projeção vs Nota Fiscal',
+        'active_page': 'relacionar_projecao_nota_fiscal',
         'matches': matches,
-        'projecoes_sem_match': projecoes_sem_match[:50],  # Limitar a 50 para performance
-        'notas_sem_match': notas_sem_match[:50],
-        'total_projecoes': total_projecoes,
-        'total_notas': total_notas,
-        'total_projecoes_filtradas': total_projecoes_filtradas,
-        'total_notas_filtradas': total_notas_filtradas,
-        'total_planejado': total_planejado,
-        'total_realizado': total_realizado,
-        'total_projetado': total_projetado,
-        'total_notas_valor': total_notas_valor,
+        'total_projecoes': len(projecoes_list),
+        'total_notas': len(notas_list),
+        'total_relacoes_confirmadas': total_relacoes_confirmadas,
+        'total_relacoes_rejeitadas': total_relacoes_rejeitadas,
         'filtro_centro_atividade': filtro_centro_atividade,
         'filtro_ano': filtro_ano,
         'filtro_valor_min': filtro_valor_min,
         'filtro_valor_max': filtro_valor_max,
         'filtro_tipo': filtro_tipo,
         'mostrar_apenas_proximos': mostrar_apenas_proximos,
+        'mostrar_apenas_nao_confirmados': mostrar_apenas_nao_confirmados,
     }
-    return render(request, 'orcamento/analise_projecao_nota_fiscal.html', context)
+    return render(request, 'orcamento/relacionar_projecao_nota_fiscal.html', context)
+
+
+def visualizar_relacao_projecao_nota(request, relation_id=None):
+    """Visualizar detalhes da relação entre Projeção de Gasto e Nota Fiscal"""
+    from app.models import ProjecaoGasto, NotaFiscal, RelacaoProjecaoNotaFiscal
+    from django.shortcuts import redirect
+    from django.contrib import messages
+    from decimal import Decimal
+    from datetime import datetime
+    
+    relacao = None
+    projecao = None
+    nota = None
+    match_info = None
+    
+    # Se relation_id foi fornecido, buscar relação confirmada
+    if relation_id:
+        try:
+            relacao = RelacaoProjecaoNotaFiscal.objects.select_related('projecao', 'nota_fiscal').get(id=relation_id)
+            projecao = relacao.projecao
+            nota = relacao.nota_fiscal
+        except RelacaoProjecaoNotaFiscal.DoesNotExist:
+            messages.error(request, 'Relação não encontrada.')
+            return redirect('relacionar_projecao_nota_fiscal')
+    
+    # Se projecao_id e nota_id foram fornecidos via GET, buscar diretamente
+    else:
+        projecao_id = request.GET.get('projecao_id')
+        nota_id = request.GET.get('nota_id')
+        
+        if projecao_id and nota_id:
+            try:
+                projecao = ProjecaoGasto.objects.get(id=projecao_id)
+                nota = NotaFiscal.objects.get(id=nota_id)
+                # Tentar buscar relação existente
+                relacao = RelacaoProjecaoNotaFiscal.objects.filter(
+                    projecao=projecao,
+                    nota_fiscal=nota
+                ).first()
+            except ProjecaoGasto.DoesNotExist:
+                messages.error(request, 'Projeção não encontrada.')
+                return redirect('relacionar_projecao_nota_fiscal')
+            except NotaFiscal.DoesNotExist:
+                messages.error(request, 'Nota Fiscal não encontrada.')
+                return redirect('relacionar_projecao_nota_fiscal')
+        else:
+            messages.error(request, 'Parâmetros inválidos. É necessário fornecer relation_id ou projecao_id e nota_id.')
+            return redirect('relacionar_projecao_nota_fiscal')
+    
+    # Calcular score de match (mesma lógica da análise)
+    def parse_date(date_str):
+        if not date_str:
+            return None
+        if isinstance(date_str, datetime):
+            return date_str.date()
+        if isinstance(date_str, str):
+            formats = ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d']
+            for fmt in formats:
+                try:
+                    return datetime.strptime(date_str[:10], fmt).date()
+                except:
+                    continue
+        return None
+    
+    def valor_similar(valor1, valor2, tolerancia_percentual=5):
+        if not valor1 or not valor2:
+            return False
+        try:
+            v1 = Decimal(str(valor1))
+            v2 = Decimal(str(valor2))
+            if v1 == 0 or v2 == 0:
+                return v1 == v2
+            diff_percent = abs((v1 - v2) / max(abs(v1), abs(v2))) * 100
+            return diff_percent <= tolerancia_percentual
+        except:
+            return False
+    
+    def calcular_score_match(projecao, nota):
+        score = 0
+        max_score = 0
+        detalhes = []
+        comparacoes = {}
+        
+        # 1. Centro de Atividade (peso: 3)
+        max_score += 3
+        if projecao.centro_atividade and nota.centro_atividade:
+            proj_ca = projecao.centro_atividade.strip().upper()
+            nota_ca = nota.centro_atividade.strip().upper()
+            if proj_ca == nota_ca:
+                score += 3
+                detalhes.append("Centro de Atividade: ✓ (Exato)")
+                comparacoes['centro_atividade'] = {'status': 'exato', 'projecao': projecao.centro_atividade, 'nota': nota.centro_atividade}
+            elif proj_ca in nota_ca or nota_ca in proj_ca:
+                score += 1
+                detalhes.append("Centro de Atividade: ~ (Parcial)")
+                comparacoes['centro_atividade'] = {'status': 'parcial', 'projecao': projecao.centro_atividade, 'nota': nota.centro_atividade}
+            else:
+                comparacoes['centro_atividade'] = {'status': 'diferente', 'projecao': projecao.centro_atividade, 'nota': nota.centro_atividade}
+        else:
+            comparacoes['centro_atividade'] = {'status': 'nao_disponivel', 'projecao': projecao.centro_atividade or '-', 'nota': nota.centro_atividade or '-'}
+        
+        # 2. Valor (peso: 5)
+        max_score += 5
+        valores_projecao = [projecao.valor_planejado, projecao.valor_realizado, projecao.valor_projetado]
+        valores_projecao = [v for v in valores_projecao if v]
+        if valores_projecao and nota.total_nota:
+            melhor_match = False
+            melhor_valor = None
+            melhor_tipo = None
+            for idx, vp in enumerate(valores_projecao):
+                tipo_valor = ['Planejado', 'Realizado', 'Projetado'][idx]
+                if valor_similar(vp, nota.total_nota, tolerancia_percentual=2):
+                    score += 5
+                    melhor_match = True
+                    melhor_valor = vp
+                    melhor_tipo = tipo_valor
+                    detalhes.append(f"Valor: ✓ ({tipo_valor}: {vp} ≈ {nota.total_nota})")
+                    break
+                elif valor_similar(vp, nota.total_nota, tolerancia_percentual=10):
+                    score += 2
+                    melhor_match = True
+                    melhor_valor = vp
+                    melhor_tipo = tipo_valor
+                    detalhes.append(f"Valor: ~ ({tipo_valor}: {vp} ≈ {nota.total_nota})")
+                    break
+            
+            if melhor_match:
+                comparacoes['valor'] = {
+                    'status': 'match' if score >= 5 else 'parcial',
+                    'projecao': melhor_valor,
+                    'tipo': melhor_tipo,
+                    'nota': nota.total_nota,
+                    'diferenca': abs(float(melhor_valor) - float(nota.total_nota)),
+                    'diferenca_percent': abs((float(melhor_valor) - float(nota.total_nota)) / float(nota.total_nota) * 100) if nota.total_nota else 0
+                }
+            else:
+                comparacoes['valor'] = {
+                    'status': 'diferente',
+                    'projecao': valores_projecao[0] if valores_projecao else None,
+                    'nota': nota.total_nota
+                }
+        else:
+            comparacoes['valor'] = {
+                'status': 'nao_disponivel',
+                'projecao': valores_projecao[0] if valores_projecao else None,
+                'nota': nota.total_nota
+            }
+        
+        # 3. Data (peso: 3)
+        max_score += 3
+        data_projecao = projecao.data_requisicao or projecao.data_planejada or projecao.data_realizada
+        data_nota = parse_date(nota.data_emissao)
+        if data_projecao and data_nota:
+            diff_dias = abs((data_projecao - data_nota).days)
+            if diff_dias == 0:
+                score += 3
+                detalhes.append("Data: ✓ (mesma data)")
+                comparacoes['data'] = {'status': 'exato', 'projecao': data_projecao, 'nota': data_nota, 'diff_dias': 0}
+            elif diff_dias <= 7:
+                score += 2
+                detalhes.append(f"Data: ~ ({diff_dias} dias de diferença)")
+                comparacoes['data'] = {'status': 'proximo', 'projecao': data_projecao, 'nota': data_nota, 'diff_dias': diff_dias}
+            elif diff_dias <= 30:
+                score += 1
+                detalhes.append(f"Data: ~ ({diff_dias} dias de diferença)")
+                comparacoes['data'] = {'status': 'parcial', 'projecao': data_projecao, 'nota': data_nota, 'diff_dias': diff_dias}
+            else:
+                detalhes.append(f"Data: ✗ ({diff_dias} dias de diferença)")
+                comparacoes['data'] = {'status': 'diferente', 'projecao': data_projecao, 'nota': data_nota, 'diff_dias': diff_dias}
+        else:
+            comparacoes['data'] = {
+                'status': 'nao_disponivel',
+                'projecao': data_projecao,
+                'nota': data_nota
+            }
+        
+        # 4. Fornecedor/Emitente (peso: 2)
+        max_score += 2
+        if projecao.fornecedor and nota.nome_fantasia_emitente:
+            fornecedor_norm = projecao.fornecedor.strip().upper()
+            emitente_norm = nota.nome_fantasia_emitente.strip().upper()
+            if fornecedor_norm == emitente_norm:
+                score += 2
+                detalhes.append("Fornecedor/Emitente: ✓")
+                comparacoes['fornecedor'] = {'status': 'exato', 'projecao': projecao.fornecedor, 'nota': nota.nome_fantasia_emitente}
+            elif fornecedor_norm in emitente_norm or emitente_norm in fornecedor_norm:
+                score += 1
+                detalhes.append("Fornecedor/Emitente: ~")
+                comparacoes['fornecedor'] = {'status': 'parcial', 'projecao': projecao.fornecedor, 'nota': nota.nome_fantasia_emitente}
+            else:
+                comparacoes['fornecedor'] = {'status': 'diferente', 'projecao': projecao.fornecedor, 'nota': nota.nome_fantasia_emitente}
+        else:
+            comparacoes['fornecedor'] = {
+                'status': 'nao_disponivel',
+                'projecao': projecao.fornecedor or '-',
+                'nota': nota.nome_fantasia_emitente or '-'
+            }
+        
+        # 5. Número Requisição vs Nota (peso: 2)
+        max_score += 2
+        if projecao.numero_requisicao and nota.nota:
+            if projecao.numero_requisicao.strip() == nota.nota.strip():
+                score += 2
+                detalhes.append("Número: ✓")
+                comparacoes['numero'] = {'status': 'exato', 'projecao': projecao.numero_requisicao, 'nota': nota.nota}
+            elif projecao.numero_requisicao.strip() in nota.nota.strip() or nota.nota.strip() in projecao.numero_requisicao.strip():
+                score += 1
+                detalhes.append("Número: ~")
+                comparacoes['numero'] = {'status': 'parcial', 'projecao': projecao.numero_requisicao, 'nota': nota.nota}
+            else:
+                comparacoes['numero'] = {'status': 'diferente', 'projecao': projecao.numero_requisicao, 'nota': nota.nota}
+        else:
+            comparacoes['numero'] = {
+                'status': 'nao_disponivel',
+                'projecao': projecao.numero_requisicao or '-',
+                'nota': nota.nota or '-'
+            }
+        
+        percentual_match = (score / max_score * 100) if max_score > 0 else 0
+        
+        return {
+            'score': score,
+            'max_score': max_score,
+            'percentual': percentual_match,
+            'detalhes': detalhes,
+            'comparacoes': comparacoes
+        }
+    
+    # Calcular match info
+    match_info = calcular_score_match(projecao, nota)
+    
+    # Se houver relação confirmada, usar score salvo se disponível
+    if relacao and relacao.score_match:
+        match_info['percentual'] = float(relacao.score_match)
+    
+    context = {
+        'page_title': f'Visualizar Relação Projeção vs Nota Fiscal',
+        'active_page': 'relacionar_projecao_nota_fiscal',
+        'relacao': relacao,
+        'projecao': projecao,
+        'nota': nota,
+        'match_info': match_info,
+    }
+    return render(request, 'visualizar/visualizar_relacao_projecao_nota.html', context)
 
 
 def api_meses_por_ano(request):
@@ -2275,7 +2957,7 @@ def importar_maquinas(request):
                 'page_title': 'Importar Máquinas',
                 'active_page': 'importar_maquinas'
             }
-            return render(request, 'importar/maquinas.html', context)
+            return render(request, 'importar/importar_maquinas.html', context)
         
         file = request.FILES['file']
         
@@ -2292,7 +2974,7 @@ def importar_maquinas(request):
                 'page_title': 'Importar Máquinas',
                 'active_page': 'importar_maquinas'
             }
-            return render(request, 'importar/maquinas.html', context)
+            return render(request, 'importar/importar_maquinas.html', context)
         
         # Verificar se deve apenas adicionar novos registros (ignorar duplicados)
         only_new_records = request.POST.get('only_new_records', 'off') == 'on'
@@ -2353,7 +3035,7 @@ def importar_maquinas(request):
         'page_title': 'Importar Máquinas',
         'active_page': 'importar_maquinas'
     }
-    return render(request, 'importar/maquinas.html', context)
+    return render(request, 'importar/importar_maquinas.html', context)
 
 
 def importar_manutentores(request):

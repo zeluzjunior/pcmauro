@@ -1,29 +1,30 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load form_extras %}
 
 {% block title %}Análise Projeção vs Nota Fiscal{% endblock %}
 
 {% block extra_css %}
 <style>
-    .match-score {
-        font-size: 1.2rem;
-        font-weight: bold;
-    }
-    .match-high { color: #198754; }
-    .match-medium { color: #ffc107; }
-    .match-low { color: #dc3545; }
-    .comparison-table {
-        font-size: 0.9rem;
-    }
-    .match-details {
-        font-size: 0.85rem;
-    }
     .stat-card {
         transition: transform 0.2s;
     }
     .stat-card:hover {
         transform: translateY(-5px);
     }
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 20px;
+    }
+    .score-badge {
+        font-weight: bold;
+        padding: 4px 8px;
+        border-radius: 4px;
+    }
+    .score-high { background-color: #198754; color: white; }
+    .score-medium { background-color: #ffc107; color: black; }
+    .score-low { background-color: #dc3545; color: white; }
 </style>
 {% endblock %}
 
@@ -43,7 +44,7 @@
                 <h1 class="display-4 fw-bold mt-3">
                     <i class="fas fa-balance-scale me-2"></i>Análise Projeção vs Nota Fiscal
                 </h1>
-                <p class="lead">Compare e identifique correspondências entre projeções de gastos e notas fiscais</p>
+                <p class="lead">Análise das relações confirmadas entre projeções de gastos e notas fiscais</p>
             </div>
         </div>
     </div>
@@ -52,41 +53,67 @@
 <!-- Main Content -->
 <section class="py-5">
     <div class="container">
-        <!-- Statistics -->
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Statistics Cards -->
         <div class="row mb-4">
             <div class="col-md-3">
                 <div class="card bg-primary text-white stat-card">
                     <div class="card-body">
-                        <h5 class="card-title">Total Projeções:</h5>
-                        <p class="card-text display-6">{{ total_projecoes_filtradas }}</p>
-                        <small>de {{ total_projecoes }} total</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-info text-white stat-card">
-                    <div class="card-body">
-                        <h5 class="card-title">Total Notas:</h5>
-                        <p class="card-text display-6">{{ total_notas_filtradas }}</p>
-                        <small>de {{ total_notas }} total</small>
+                        <h5 class="card-title">Total de Relações</h5>
+                        <p class="card-text display-6">{{ total_relacoes }}</p>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="card bg-success text-white stat-card">
                     <div class="card-body">
-                        <h5 class="card-title">Possíveis Matches:</h5>
-                        <p class="card-text display-6">{{ matches|length }}</p>
-                        <small>correspondências encontradas</small>
+                        <h5 class="card-title">Confirmadas</h5>
+                        <p class="card-text display-6">{{ total_confirmadas }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-danger text-white stat-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Rejeitadas</h5>
+                        <p class="card-text display-6">{{ total_rejeitadas }}</p>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="card bg-warning text-white stat-card">
                     <div class="card-body">
-                        <h5 class="card-title">Valor Total:</h5>
-                        <p class="card-text display-6">R$ {{ total_notas_valor|floatformat:0 }}</p>
-                        <small>notas fiscais</small>
+                        <h5 class="card-title">Score Médio</h5>
+                        <p class="card-text display-6">{{ score_medio|floatformat:1 }}%</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Value Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Valor Total Projeções</h5>
+                        <p class="card-text display-6">{{ total_valor_projecoes|currency_br }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card bg-secondary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Valor Total Notas Fiscais</h5>
+                        <p class="card-text display-6">{{ total_valor_notas|currency_br }}</p>
                     </div>
                 </div>
             </div>
@@ -98,12 +125,21 @@
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-secondary text-white">
                         <h6 class="mb-0">
-                            <i class="fas fa-filter me-2"></i>Filtros de Análise
+                            <i class="fas fa-filter me-2"></i>Filtros
                         </h6>
                     </div>
                     <div class="card-body">
                         <form method="get" action="{% url 'analise_projecao_nota_fiscal' %}">
                             <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <label for="filtro_status" class="form-label">Status</label>
+                                    <select name="filtro_status" id="filtro_status" class="form-select">
+                                        <option value="">Todos</option>
+                                        <option value="confirmado" {% if filtro_status == 'confirmado' %}selected{% endif %}>Confirmadas</option>
+                                        <option value="rejeitado" {% if filtro_status == 'rejeitado' %}selected{% endif %}>Rejeitadas</option>
+                                        <option value="pendente" {% if filtro_status == 'pendente' %}selected{% endif %}>Pendentes</option>
+                                    </select>
+                                </div>
                                 <div class="col-md-3 mb-3">
                                     <label for="filtro_centro_atividade" class="form-label">Centro de Atividade</label>
                                     <input type="text" name="filtro_centro_atividade" id="filtro_centro_atividade" class="form-control" value="{{ filtro_centro_atividade }}" placeholder="Código do centro">
@@ -113,10 +149,6 @@
                                     <input type="number" name="filtro_ano" id="filtro_ano" class="form-control" value="{{ filtro_ano }}" placeholder="Ex: 2024">
                                 </div>
                                 <div class="col-md-2 mb-3">
-                                    <label for="filtro_tipo" class="form-label">Tipo</label>
-                                    <input type="text" name="filtro_tipo" id="filtro_tipo" class="form-control" value="{{ filtro_tipo }}" placeholder="Tipo">
-                                </div>
-                                <div class="col-md-2 mb-3">
                                     <label for="filtro_valor_min" class="form-label">Valor Mín.</label>
                                     <input type="number" step="0.01" name="filtro_valor_min" id="filtro_valor_min" class="form-control" value="{{ filtro_valor_min }}" placeholder="0.00">
                                 </div>
@@ -124,21 +156,13 @@
                                     <label for="filtro_valor_max" class="form-label">Valor Máx.</label>
                                     <input type="number" step="0.01" name="filtro_valor_max" id="filtro_valor_max" class="form-control" value="{{ filtro_valor_max }}" placeholder="0.00">
                                 </div>
-                                <div class="col-md-1 mb-3 d-flex align-items-end">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="mostrar_apenas_proximos" id="mostrar_apenas_proximos" {% if mostrar_apenas_proximos %}checked{% endif %}>
-                                        <label class="form-check-label" for="mostrar_apenas_proximos" title="Mostrar apenas matches com score ≥ 50%">
-                                            ≥50%
-                                        </label>
-                                    </div>
-                                </div>
                             </div>
                             <div class="row">
                                 <div class="col-12">
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-filter me-2"></i>Filtrar
                                     </button>
-                                    {% if filtro_centro_atividade or filtro_ano or filtro_tipo or filtro_valor_min or filtro_valor_max %}
+                                    {% if filtro_status or filtro_centro_atividade or filtro_ano or filtro_valor_min or filtro_valor_max %}
                                     <a href="{% url 'analise_projecao_nota_fiscal' %}" class="btn btn-outline-secondary">
                                         <i class="fas fa-times me-1"></i>Limpar Filtros
                                     </a>
@@ -151,114 +175,158 @@
             </div>
         </div>
 
-        <!-- Possíveis Correspondências -->
+        <!-- Charts -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>Distribuição por Status
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Distribuição por Score
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="scoreChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Evolução Temporal
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="temporalChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h6 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Top 10 Centros de Atividade
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="centrosChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela de Relações Confirmadas -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="card shadow-sm">
                     <div class="card-header bg-success text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-link me-2"></i>Possíveis Correspondências ({{ matches|length }})
+                            <i class="fas fa-table me-2"></i>Relações Confirmadas ({{ relacoes|length }})
                         </h5>
                     </div>
                     <div class="card-body">
-                        {% if matches %}
+                        {% if relacoes %}
                         <div class="table-responsive">
-                            <table class="table table-hover comparison-table">
+                            <table class="table table-hover">
                                 <thead>
                                     <tr>
-                                        <th style="width: 7%;">Score</th>
-                                        <th style="width: 13%;">Projeção</th>
-                                        <th style="width: 13%;">Nota Fiscal</th>
-                                        <th style="width: 9%;">Centro Atividade</th>
-                                        <th style="width: 9%;">Valor</th>
-                                        <th style="width: 9%;">Data</th>
-                                        <th style="width: 11%;">Fornecedor/Emitente</th>
-                                        <th style="width: 10%;">Uso Contábil</th>
-                                        <th style="width: 19%;">Detalhes do Match</th>
+                                        <th>Status</th>
+                                        <th>Score</th>
+                                        <th>Projeção</th>
+                                        <th>Nota Fiscal</th>
+                                        <th>Centro Atividade</th>
+                                        <th>Valor Projeção</th>
+                                        <th>Valor Nota</th>
+                                        <th>Data Criação</th>
+                                        <th>Confirmado Por</th>
+                                        <th>Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for match in matches %}
+                                    {% for relacao in relacoes %}
                                     <tr>
                                         <td>
-                                            {% if match.match_info.percentual >= 70 %}
-                                                <span class="match-score match-high">{{ match.match_info.percentual|floatformat:0 }}%</span>
-                                            {% elif match.match_info.percentual >= 50 %}
-                                                <span class="match-score match-medium">{{ match.match_info.percentual|floatformat:0 }}%</span>
+                                            {% if relacao.status == 'confirmado' %}
+                                                <span class="badge bg-success">Confirmado</span>
+                                            {% elif relacao.status == 'rejeitado' %}
+                                                <span class="badge bg-danger">Rejeitado</span>
                                             {% else %}
-                                                <span class="match-score match-low">{{ match.match_info.percentual|floatformat:0 }}%</span>
+                                                <span class="badge bg-warning text-dark">Pendente</span>
                                             {% endif %}
                                         </td>
                                         <td>
-                                            <strong>{{ match.projecao.tipo|default:"-" }}</strong><br>
-                                            <small class="text-muted">{{ match.projecao.descricao|truncatewords:5|default:"-" }}</small><br>
-                                            {% if match.projecao.numero_requisicao %}
-                                                <small><strong>Req:</strong> {{ match.projecao.numero_requisicao }}</small>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <strong>Nota: {{ match.nota.nota|default:"-" }}</strong><br>
-                                            <small class="text-muted">Série: {{ match.nota.serie|default:"-" }}</small><br>
-                                            <small class="text-muted">Modelo: {{ match.nota.modelo|default:"-" }}</small>
-                                        </td>
-                                        <td>
-                                            {% if match.projecao.centro_atividade %}
-                                                {{ match.projecao.centro_atividade }}
-                                                {% if match.projecao.nome_centro_atividade %}
-                                                    <br><small class="text-muted">{{ match.projecao.nome_centro_atividade|truncatewords:2 }}</small>
+                                            {% if relacao.score_match %}
+                                                {% if relacao.score_match >= 70 %}
+                                                    <span class="score-badge score-high">{{ relacao.score_match|floatformat:1 }}%</span>
+                                                {% elif relacao.score_match >= 50 %}
+                                                    <span class="score-badge score-medium">{{ relacao.score_match|floatformat:1 }}%</span>
+                                                {% else %}
+                                                    <span class="score-badge score-low">{{ relacao.score_match|floatformat:1 }}%</span>
                                                 {% endif %}
                                             {% else %}
                                                 <span class="text-muted">-</span>
                                             {% endif %}
                                         </td>
                                         <td>
-                                            <strong>Proj:</strong>
-                                            {% if match.projecao.valor_planejado %}
-                                                R$ {{ match.projecao.valor_planejado|floatformat:2 }}<br>
-                                            {% endif %}
-                                            {% if match.projecao.valor_realizado %}
-                                                <small>Real: R$ {{ match.projecao.valor_realizado|floatformat:2 }}</small><br>
-                                            {% endif %}
-                                            <strong>Nota:</strong>
-                                            {% if match.nota.total_nota %}
-                                                R$ {{ match.nota.total_nota|floatformat:2 }}
+                                            <strong>{{ relacao.projecao.tipo|default:"-" }}</strong><br>
+                                            <small class="text-muted">{{ relacao.projecao.descricao|truncatewords:5|default:"-" }}</small>
+                                        </td>
+                                        <td>
+                                            <strong>Nota: {{ relacao.nota_fiscal.nota|default:"-" }}</strong><br>
+                                            <small class="text-muted">{{ relacao.nota_fiscal.nome_fantasia_emitente|truncatewords:3|default:"-" }}</small>
+                                        </td>
+                                        <td>
+                                            {{ relacao.projecao.centro_atividade|default:relacao.nota_fiscal.centro_atividade|default:"-" }}
+                                        </td>
+                                        <td>
+                                            {% if relacao.projecao.valor_planejado %}
+                                                {{ relacao.projecao.valor_planejado|currency_br }}
+                                            {% elif relacao.projecao.valor_realizado %}
+                                                {{ relacao.projecao.valor_realizado|currency_br }}
                                             {% else %}
                                                 <span class="text-muted">-</span>
                                             {% endif %}
                                         </td>
                                         <td>
-                                            {% if match.projecao.data_requisicao %}
-                                                <strong>Proj:</strong> {{ match.projecao.data_requisicao|date:"d/m/Y" }}<br>
-                                            {% endif %}
-                                            {% if match.nota.data_emissao %}
-                                                <strong>Nota:</strong> {{ match.nota.data_emissao|truncatewords:1 }}
+                                            {% if relacao.nota_fiscal.total_nota %}
+                                                {{ relacao.nota_fiscal.total_nota|currency_br }}
                                             {% else %}
                                                 <span class="text-muted">-</span>
                                             {% endif %}
                                         </td>
                                         <td>
-                                            {% if match.projecao.fornecedor %}
-                                                <strong>Fornec:</strong> {{ match.projecao.fornecedor|truncatewords:2 }}<br>
-                                            {% endif %}
-                                            {% if match.nota.nome_fantasia_emitente %}
-                                                <strong>Emit:</strong> {{ match.nota.nome_fantasia_emitente|truncatewords:2 }}
-                                            {% else %}
-                                                <span class="text-muted">-</span>
-                                            {% endif %}
+                                            <small>{{ relacao.created_at|date:"d/m/Y H:i" }}</small>
                                         </td>
                                         <td>
-                                            {% if match.nota.uso_contabil %}
-                                                <span class="badge bg-secondary">{{ match.nota.uso_contabil }}</span>
-                                            {% else %}
-                                                <span class="text-muted">-</span>
-                                            {% endif %}
+                                            <small>{{ relacao.confirmado_por|default:"Sistema" }}</small>
                                         </td>
                                         <td>
-                                            <div class="match-details">
-                                                {% for detalhe in match.match_info.detalhes %}
-                                                    <div>{{ detalhe }}</div>
-                                                {% endfor %}
-                                            </div>
+                                            <a href="{% url 'visualizar_relacao_projecao_nota' relacao.id %}" class="btn btn-sm btn-info" title="Visualizar Detalhes">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -267,112 +335,147 @@
                         </div>
                         {% else %}
                         <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>Nenhuma correspondência encontrada com os filtros aplicados.
+                            <i class="fas fa-info-circle me-2"></i>Nenhuma relação encontrada com os filtros aplicados.
                         </div>
                         {% endif %}
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- Projeções sem Match -->
-        {% if projecoes_sem_match %}
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-warning text-dark">
-                        <h5 class="mb-0">
-                            <i class="fas fa-exclamation-triangle me-2"></i>Projeções sem Correspondência ({{ projecoes_sem_match|length }})
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-sm table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Tipo</th>
-                                        <th>Descrição</th>
-                                        <th>Centro Atividade</th>
-                                        <th>Valor Planejado</th>
-                                        <th>Valor Realizado</th>
-                                        <th>Data Requisição</th>
-                                        <th>Fornecedor</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for projecao in projecoes_sem_match %}
-                                    <tr>
-                                        <td>{{ projecao.tipo|default:"-" }}</td>
-                                        <td>{{ projecao.descricao|truncatewords:5|default:"-" }}</td>
-                                        <td>{{ projecao.centro_atividade|default:"-" }}</td>
-                                        <td>{% if projecao.valor_planejado %}R$ {{ projecao.valor_planejado|floatformat:2 }}{% else %}-{% endif %}</td>
-                                        <td>{% if projecao.valor_realizado %}R$ {{ projecao.valor_realizado|floatformat:2 }}{% else %}-{% endif %}</td>
-                                        <td>{% if projecao.data_requisicao %}{{ projecao.data_requisicao|date:"d/m/Y" }}{% else %}-{% endif %}</td>
-                                        <td>{{ projecao.fornecedor|truncatewords:2|default:"-" }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Notas sem Match -->
-        {% if notas_sem_match %}
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-danger text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-exclamation-triangle me-2"></i>Notas Fiscais sem Correspondência ({{ notas_sem_match|length }})
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-sm table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Nota</th>
-                                        <th>Série</th>
-                                        <th>Emitente</th>
-                                        <th>Total</th>
-                                        <th>Data Emissão</th>
-                                        <th>Centro Atividade</th>
-                                        <th>Uso Contábil</th>
-                                        <th>Situação</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for nota in notas_sem_match %}
-                                    <tr>
-                                        <td>{{ nota.nota|default:"-" }}</td>
-                                        <td>{{ nota.serie|default:"-" }}</td>
-                                        <td>{{ nota.nome_fantasia_emitente|truncatewords:3|default:nota.emitente|default:"-" }}</td>
-                                        <td>{% if nota.total_nota %}R$ {{ nota.total_nota|floatformat:2 }}{% else %}-{% endif %}</td>
-                                        <td>{{ nota.data_emissao|default:"-" }}</td>
-                                        <td>{{ nota.centro_atividade|default:"-" }}</td>
-                                        <td>
-                                            {% if nota.uso_contabil %}
-                                                <span class="badge bg-secondary">{{ nota.uso_contabil }}</span>
-                                            {% else %}
-                                                <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>{{ nota.situacao|default:"-" }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
     </div>
 </section>
 {% endblock %}
 
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Gráfico de Pizza: Distribuição por Status
+    const statusCtx = document.getElementById('statusChart');
+    if (statusCtx) {
+        new Chart(statusCtx.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Confirmadas', 'Rejeitadas', 'Pendentes'],
+                datasets: [{
+                    data: [
+                        {{ total_confirmadas }},
+                        {{ total_rejeitadas }},
+                        {{ total_pendentes }}
+                    ],
+                    backgroundColor: ['#198754', '#dc3545', '#ffc107']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Barras: Distribuição por Score
+    const scoreCtx = document.getElementById('scoreChart');
+    if (scoreCtx) {
+        new Chart(scoreCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: ['Alto (≥70%)', 'Médio (50-69%)', 'Baixo (<50%)'],
+                datasets: [{
+                    label: 'Quantidade',
+                    data: [
+                        {{ score_alto }},
+                        {{ score_medio_count }},
+                        {{ score_baixo }}
+                    ],
+                    backgroundColor: ['#198754', '#ffc107', '#dc3545']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Linha: Evolução Temporal
+    const temporalCtx = document.getElementById('temporalChart');
+    if (temporalCtx) {
+        new Chart(temporalCtx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: {{ meses_labels|safe }},
+                datasets: [{
+                    label: 'Relações Confirmadas',
+                    data: {{ meses_data|safe }},
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Barras Horizontal: Top Centros
+    const centrosCtx = document.getElementById('centrosChart');
+    if (centrosCtx) {
+        new Chart(centrosCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: {{ centros_labels|safe }},
+                datasets: [{
+                    label: 'Relações',
+                    data: {{ centros_data|safe }},
+                    backgroundColor: '#0dcaf0'
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

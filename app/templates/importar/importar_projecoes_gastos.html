@@ -99,37 +99,42 @@
                     </div>
                     <div class="card-body">
                         <h6 class="fw-bold">Formato do Arquivo:</h6>
-                        <p>O arquivo Excel deve conter as seguintes informações (primeira linha como cabeçalho):</p>
+                        <p class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Importante:</strong> O arquivo Excel deve conter uma planilha chamada <strong>"GASTOS"</strong>. Apenas os dados desta planilha serão importados.
+                        </p>
+                        <p>O arquivo Excel deve conter a planilha "GASTOS" com as seguintes colunas (primeira linha como cabeçalho):</p>
                         <ul>
-                            <li><strong>Tipo</strong> - Tipo de registro (Requisição de Serviço ou Projeção de Gasto)</li>
-                            <li><strong>Descrição</strong> - Descrição do serviço ou gasto</li>
-                            <li><strong>Centro de Atividade</strong> - Código do centro de atividade</li>
-                            <li><strong>Nome Centro de Atividade</strong> - Nome do centro de atividade</li>
-                            <li><strong>Valor Planejado</strong> - Valor planejado (formato brasileiro: 2.982,99)</li>
-                            <li><strong>Valor Realizado</strong> - Valor realizado</li>
-                            <li><strong>Valor Projetado</strong> - Valor projetado</li>
-                            <li><strong>Data Requisição</strong> - Data da requisição (DD/MM/AAAA)</li>
-                            <li><strong>Data Planejada</strong> - Data planejada</li>
-                            <li><strong>Data Realizada</strong> - Data realizada</li>
-                            <li><strong>Mês Referência</strong> - Mês de referência</li>
-                            <li><strong>Ano Referência</strong> - Ano de referência</li>
-                            <li><strong>Fornecedor</strong> - Nome do fornecedor</li>
-                            <li><strong>Número Requisição</strong> - Número da requisição</li>
-                            <li><strong>Número Ordem de Serviço</strong> - Número da ordem de serviço</li>
-                            <li><strong>Status</strong> - Status do registro</li>
-                            <li><strong>Observações</strong> - Observações gerais</li>
+                            <li><strong>SETOR</strong> - Setor responsável</li>
+                            <li><strong>SOLICITANTE</strong> - Nome do solicitante</li>
+                            <li><strong>FORNECEDOR NOME FANTASIA</strong> - Nome fantasia do fornecedor</li>
+                            <li><strong>FORNECEDOR CNPJ</strong> - CNPJ do fornecedor</li>
+                            <li><strong>DESCRIÇÃO DO SERVIÇO</strong> - Descrição do serviço ou gasto</li>
+                            <li><strong>VALOR TOTAL</strong> - Valor total (formato brasileiro: 2.982,99 ou formato americano: 2982.99)</li>
+                            <li><strong>PREVISÃO P/ EXECUÇÃO</strong> - Previsão de execução (ex: "OUTUBRO / 2025")</li>
+                            <li><strong>USO CONTÁBIL</strong> - Código de uso contábil</li>
+                            <li><strong>NÚMERO DA NOTA FISCAL</strong> - Número da nota fiscal</li>
+                            <li><strong>TIPO DE SOLICITAÇÃO</strong> - Tipo de solicitação</li>
+                            <li><strong>ORDEM DE SERVIÇO</strong> - Número da ordem de serviço</li>
+                            <li><strong>DATA DE ABERTURA DA REQUISIÇÃO</strong> - Data de abertura (DD/MM/AAAA ou formato Excel)</li>
+                            <li><strong>NÚMERO DA REQUISIÇÃO DE COMPRA</strong> - Número da requisição de compra</li>
+                            <li><strong>NÚMERO DO PEDIDO DE COMPRA</strong> - Número do pedido de compra</li>
+                            <li><strong>SERVIÇO CONCLUÍDO</strong> - Data de conclusão do serviço (DD/MM/AAAA ou formato Excel)</li>
+                            <li><strong>NF DE SERVIÇO RECEBIDA</strong> - Data de recebimento da NF (DD/MM/AAAA ou formato Excel)</li>
+                            <li><strong>NF ENVIADA PARA LANÇAMENTO</strong> - Data de envio para lançamento (DD/MM/AAAA ou formato Excel)</li>
                         </ul>
                         <h6 class="fw-bold mt-3">Observações:</h6>
                         <ul>
                             <li>A primeira linha do arquivo deve conter os cabeçalhos das colunas</li>
-                            <li>O sistema identifica automaticamente o tipo de registro baseado no nome da planilha ou colunas</li>
+                            <li><strong>O sistema importa apenas a planilha "GASTOS"</strong> - outras planilhas no arquivo serão ignoradas</li>
                             <li>O sistema aceita valores monetários no formato brasileiro (ex: 2.982,99) ou formato americano (ex: 2982.99)</li>
                             <li>Datas podem estar em formato DD/MM/AAAA ou formato Excel nativo</li>
-                            <li>O sistema processa múltiplas planilhas se o arquivo contiver mais de uma planilha</li>
+                            <li>O campo "PREVISÃO P/ EXECUÇÃO" deve estar no formato "MÊS / ANO" (ex: "OUTUBRO / 2025")</li>
+                            <li>O sistema detecta automaticamente os campos corretos baseado nos nomes das colunas</li>
                         </ul>
                         <p class="text-muted mt-2">
                             <i class="fas fa-info-circle me-1"></i>
-                            <strong>Nota:</strong> O sistema suporta arquivos Excel com diferentes estruturas e tenta detectar automaticamente os campos corretos baseado nos nomes das colunas.
+                            <strong>Nota:</strong> Se a planilha "GASTOS" não for encontrada no arquivo, a importação falhará com uma mensagem de erro.
                         </p>
                     </div>
                 </div>

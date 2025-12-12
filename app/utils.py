@@ -2911,7 +2911,7 @@ def upload_requisicoes_almoxarifado_from_file(file, data_requisicao, update_exis
 def upload_projecoes_gastos_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:
     """
     Faz upload de projeções de gastos e requisições de serviço a partir de um arquivo Excel
-    Baseado na estrutura: SETOR, SOLICITANTE, FORNECEDOR NOME FANTASIA, FORNECEDOR CNPJ, etc.
+    Lê apenas a planilha "GASTOS" com a nova estrutura de colunas
     
     Args:
         file: Arquivo Django UploadedFile (Excel)
@@ -3006,144 +3006,156 @@ def upload_projecoes_gastos_from_file(file, update_existing=False) -> Tuple[int,
         else:
             wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
         
-        # Processar cada planilha
-        for sheet_name in wb.sheetnames:
-            ws = wb[sheet_name]
+        # Verificar se a planilha "GASTOS" existe
+        if 'GASTOS' not in wb.sheetnames:
+            raise ValidationError("A planilha 'GASTOS' não foi encontrada no arquivo Excel. Verifique se o arquivo está no formato correto.")
+        
+        # Processar apenas a planilha "GASTOS"
+        ws = wb['GASTOS']
+        
+        # Ler cabeçalhos da primeira linha
+        headers = []
+        for cell in ws[1]:
+            header_value = cell.value if cell.value else f'col_{len(headers)}'
+            if isinstance(header_value, str):
+                header_value = header_value.strip().replace('\xa0', ' ').replace('\u00a0', ' ')
+                header_value = re.sub(r'\s+', ' ', header_value).strip()
+            headers.append(header_value)
+        
+        # Criar mapeamento de colunas normalizadas para índices
+        column_map = {}
+        for idx, header in enumerate(headers):
+            normalized = normalize_column_name(header)
+            column_map[normalized] = idx
+        
+        # Ler dados
+        for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            if not any(cell is not None for cell in row):  # Ignorar linhas vazias
+                continue
             
-            # Ler cabeçalhos da primeira linha
-            headers = []
-            for cell in ws[1]:
-                header_value = cell.value if cell.value else f'col_{len(headers)}'
-                if isinstance(header_value, str):
-                    header_value = header_value.strip().replace('\xa0', ' ').replace('\u00a0', ' ')
-                    header_value = re.sub(r'\s+', ' ', header_value).strip()
-                headers.append(header_value)
-            
-            # Criar mapeamento de colunas normalizadas para índices
-            column_map = {}
-            for idx, header in enumerate(headers):
-                normalized = normalize_column_name(header)
-                column_map[normalized] = idx
-            
-            # Ler dados
-            for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-                if not any(cell is not None for cell in row):  # Ignorar linhas vazias
-                    continue
+            try:
+                # Extrair valores baseado no mapeamento de colunas
+                def get_value(col_patterns):
+                    """Busca valor por padrões de nome de coluna"""
+                    for pattern in col_patterns:
+                        normalized_pattern = normalize_column_name(pattern)
+                        for col_name, idx in column_map.items():
+                            if normalized_pattern in col_name or col_name in normalized_pattern:
+                                if idx < len(row):
+                                    return row[idx]
+                    return None
                 
-                try:
-                    # Extrair valores baseado no mapeamento de colunas
-                    def get_value(col_patterns):
-                        """Busca valor por padrões de nome de coluna"""
-                        for pattern in col_patterns:
-                            normalized_pattern = normalize_column_name(pattern)
-                            for col_name, idx in column_map.items():
-                                if normalized_pattern in col_name or col_name in normalized_pattern:
-                                    if idx < len(row):
-                                        return row[idx]
-                        return None
-                    
-                    # Mapear campos do Excel para o modelo
-                    setor = _safe_str(get_value(['SETOR', 'setor']), max_length=100)
-                    solicitante = _safe_str(get_value(['SOLICITANTE', 'solicitante']), max_length=100)
-                    fornecedor_nome_fantasia = _safe_str(get_value(['FORNECEDOR', 'NOME FANTASIA', 'fornecedor nome fantasia']), max_length=255)
-                    fornecedor_cnpj = _safe_str(get_value(['FORNECEDOR', 'CNPJ', 'fornecedor cnpj']), max_length=20)
-                    descricao = _safe_str(get_value(['DESCRIÇÃO DO SERVIÇO', 'DESCRICAO DO SERVICO', 'descricao', 'servico']), max_length=500)
-                    valor_total = _safe_decimal(get_value(['VALOR TOTAL', 'valor total', 'valor']))
-                    
-                    previsao_execucao = get_value(['PREVISÃO P/ EXECUÇÃO', 'PREVISAO P/ EXECUCAO', 'previsao'])
-                    mes_referencia, ano_referencia = parse_previsao_execucao(previsao_execucao)
-                    previsao_execucao_str = _safe_str(previsao_execucao, max_length=50)
-                    
-                    uso_contabil = _safe_str(get_value(['USO CONTÁBIL', 'USO CONTABIL', 'uso contabil']), max_length=100)
-                    numero_nf = _safe_str(get_value(['NÚMERO DA NF', 'NUMERO DA NF', 'numero nf', 'nf']), max_length=100)
-                    numero_ordem_servico = _safe_str(get_value(['ORDEM DE SERVIÇO', 'ORDEM DE SERVICO', 'ordem servico', 'os']), max_length=100)
-                    
-                    data_abertura_raw = get_value(['DATA DE ABERTURA DA REQUISIÇÃO', 'DATA DE ABERTURA DA REQUISICAO', 'data abertura', 'data requisicao'])
-                    data_abertura_requisicao = excel_date_to_python_date(data_abertura_raw)
-                    
-                    numero_requisicao_compra = _safe_str(get_value(['NÚMERO DA REQUISIÇÃO DE COMPRA', 'NUMERO DA REQUISICAO DE COMPRA', 'numero requisicao compra', 'requisicao compra']), max_length=100)
-                    numero_pedido_compra = _safe_str(get_value(['NÚMERO DO PEDIDO DE COMPRA', 'NUMERO DO PEDIDO DE COMPRA', 'numero pedido compra', 'pedido compra']), max_length=100)
-                    
-                    servico_concluido_raw = get_value(['SERVIÇO CONCLUÍDO', 'SERVICO CONCLUIDO', 'servico concluido'])
-                    servico_concluido = excel_date_to_python_date(servico_concluido_raw)
-                    
-                    nf_servico_recebida_raw = get_value(['NF DE SERVIÇO RECEBIDA', 'NF DE SERVICO RECEBIDA', 'nf servico recebida'])
-                    nf_servico_recebida = excel_date_to_python_date(nf_servico_recebida_raw)
-                    
-                    nf_enviada_lancamento_raw = get_value(['NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA PARA LANCAMENTO', 'nf enviada lancamento'])
-                    nf_enviada_lancamento = excel_date_to_python_date(nf_enviada_lancamento_raw)
-                    
-                    # Validar dados mínimos
-                    if not descricao and not setor and not valor_total:
-                        continue  # Pular linha se não tiver dados relevantes
-                    
-                    # Criar ou atualizar registro
-                    defaults = {
-                        # Novos campos principais
-                        'setor': setor,
-                        'solicitante': solicitante,
-                        'descricao': descricao,
-                        'valor_total': valor_total,
-                        'data_abertura_requisicao': data_abertura_requisicao,
-                        'previsao_execucao': previsao_execucao_str,
-                        'mes_referencia': mes_referencia,
-                        'ano_referencia': ano_referencia,
-                        'fornecedor_nome_fantasia': fornecedor_nome_fantasia,
-                        'fornecedor_cnpj': fornecedor_cnpj,
-                        'uso_contabil': uso_contabil,
-                        'numero_nf': numero_nf,
-                        'numero_ordem_servico': numero_ordem_servico,
-                        'numero_requisicao_compra': numero_requisicao_compra,
-                        'numero_pedido_compra': numero_pedido_compra,
-                        'servico_concluido': servico_concluido,
-                        'nf_servico_recebida': nf_servico_recebida,
-                        'nf_enviada_lancamento': nf_enviada_lancamento,
-                        # Campos legados (para compatibilidade)
-                        'tipo': 'Requisição de Serviço',  # Padrão baseado na estrutura do Excel
-                        'centro_atividade': setor,  # Mapear SETOR para centro_atividade
-                        'nome_centro_atividade': None,
-                        'valor_planejado': valor_total,  # Mapear valor_total para valor_planejado
-                        'valor_realizado': None,
-                        'valor_projetado': None,
-                        'data_requisicao': data_abertura_requisicao,  # Mapear data_abertura_requisicao para data_requisicao
-                        'data_planejada': None,
-                        'data_realizada': None,
-                        'fornecedor': fornecedor_nome_fantasia,  # Mapear fornecedor_nome_fantasia para fornecedor
-                        'numero_requisicao': numero_requisicao_compra,  # Mapear numero_requisicao_compra para numero_requisicao
-                        'status': None,
-                        'observacoes': None,
-                        'dados_adicionais': None,
-                    }
-                    
-                    # Identificador único: numero_requisicao_compra ou setor + descricao + data
-                    if numero_requisicao_compra:
-                        obj, created = ProjecaoGasto.objects.update_or_create(
-                            numero_requisicao_compra=numero_requisicao_compra,
-                            defaults=defaults
-                        )
-                    elif setor and descricao and data_abertura_requisicao:
-                        obj, created = ProjecaoGasto.objects.update_or_create(
-                            setor=setor,
-                            descricao=descricao,
-                            data_abertura_requisicao=data_abertura_requisicao,
-                            defaults=defaults
-                        )
-                    else:
-                        # Criar novo registro
-                        obj = ProjecaoGasto.objects.create(**defaults)
-                        created = True
-                    
-                    if created:
-                        created_count += 1
-                    elif update_existing:
-                        updated_count += 1
+                # Mapear campos do Excel para o modelo (baseado na nova estrutura)
+                setor = _safe_str(get_value(['SETOR', 'setor']), max_length=100)
+                solicitante = _safe_str(get_value(['SOLICITANTE', 'solicitante']), max_length=100)
+                fornecedor_nome_fantasia = _safe_str(get_value(['FORNECEDOR', 'NOME FANTASIA', 'fornecedor nome fantasia', 'fornecedor']), max_length=255)
+                fornecedor_cnpj = _safe_str(get_value(['FORNECEDOR', 'CNPJ', 'fornecedor cnpj']), max_length=20)
+                descricao = _safe_str(get_value(['DESCRIÇÃO DO SERVIÇO', 'DESCRICAO DO SERVICO', 'descricao', 'servico']), max_length=500)
+                valor_total = _safe_decimal(get_value(['VALOR TOTAL', 'valor total', 'valor']))
                 
-                except Exception as e:
-                    error_msg = f"Linha {row_num} (planilha {sheet_name}): {str(e)}"
-                    errors.append(error_msg)
-                    print(f"Erro ao processar linha {row_num}: {e}")
-                    import traceback
-                    traceback.print_exc()
+                previsao_execucao = get_value(['PREVISÃO P/ EXECUÇÃO', 'PREVISÃO', 'PREVISAO P/ EXECUCAO', 'previsao'])
+                mes_referencia, ano_referencia = parse_previsao_execucao(previsao_execucao)
+                previsao_execucao_str = _safe_str(previsao_execucao, max_length=50)
+                
+                uso_contabil = _safe_str(get_value(['USO CONTÁBIL', 'USO CONTABIL', 'uso contabil']), max_length=100)
+                # Nova coluna: "NÚMERO DA NOTA FISCAL" (antes era "NÚMERO DA NF")
+                numero_nf = _safe_str(get_value(['NÚMERO DA NOTA FISCAL', 'NUMERO DA NOTA FISCAL', 'NÚMERO DA NF', 'NUMERO DA NF', 'numero nf', 'nf']), max_length=100)
+                # Nova coluna: "TIPO DE SOLICITAÇÃO"
+                tipo_solicitacao = _safe_str(get_value(['TIPO DE SOLICITAÇÃO', 'TIPO DE SOLICITACAO', 'tipo solicitacao', 'tipo']), max_length=100)
+                numero_ordem_servico = _safe_str(get_value(['ORDEM DE SERVIÇO', 'ORDEM DE SERVICO', 'ordem servico', 'os']), max_length=100)
+                
+                data_abertura_raw = get_value(['DATA DE ABERTURA DA REQUISIÇÃO', 'DATA DE ABERTURA DA REQUISICAO', 'data abertura', 'data requisicao'])
+                data_abertura_requisicao = excel_date_to_python_date(data_abertura_raw)
+                
+                # Nota: A coluna pode ter um typo "NEMRO" no Excel, então buscamos ambas variações
+                numero_requisicao_compra = _safe_str(get_value(['NÚMERO DA REQUISIÇÃO DE COMPRA', 'NUMERO DA REQUISICAO DE COMPRA', 'NEMRO DA REQUISICAO DE COMPRA', 'numero requisicao compra', 'requisicao compra']), max_length=100)
+                numero_pedido_compra = _safe_str(get_value(['NÚMERO DO PEDIDO DE COMPRA', 'NUMERO DO PEDIDO DE COMPRA', 'numero pedido compra', 'pedido compra']), max_length=100)
+                
+                servico_concluido_raw = get_value(['SERVIÇO CONCLUÍDO', 'SERVICO CONCLUIDO', 'servico concluido'])
+                servico_concluido = excel_date_to_python_date(servico_concluido_raw)
+                
+                nf_servico_recebida_raw = get_value(['NF DE SERVIÇO RECEBIDA', 'NF DE SERVICO RECEBIDA', 'nf servico recebida'])
+                nf_servico_recebida = excel_date_to_python_date(nf_servico_recebida_raw)
+                
+                nf_enviada_lancamento_raw = get_value(['NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA PARA LANCAMENTO', 'nf enviada lancamento'])
+                nf_enviada_lancamento = excel_date_to_python_date(nf_enviada_lancamento_raw)
+                
+                # Validar dados mínimos
+                if not descricao and not setor and not valor_total:
+                    continue  # Pular linha se não tiver dados relevantes
+                
+                # Preparar dados adicionais para armazenar campos novos/extras
+                dados_adicionais = {}
+                if tipo_solicitacao:
+                    dados_adicionais['tipo_solicitacao'] = tipo_solicitacao
+                
+                # Criar ou atualizar registro
+                defaults = {
+                    # Novos campos principais
+                    'setor': setor,
+                    'solicitante': solicitante,
+                    'descricao': descricao,
+                    'valor_total': valor_total,
+                    'data_abertura_requisicao': data_abertura_requisicao,
+                    'previsao_execucao': previsao_execucao_str,
+                    'mes_referencia': mes_referencia,
+                    'ano_referencia': ano_referencia,
+                    'fornecedor_nome_fantasia': fornecedor_nome_fantasia,
+                    'fornecedor_cnpj': fornecedor_cnpj,
+                    'uso_contabil': uso_contabil,
+                    'numero_nf': numero_nf,
+                    'numero_ordem_servico': numero_ordem_servico,
+                    'numero_requisicao_compra': numero_requisicao_compra,
+                    'numero_pedido_compra': numero_pedido_compra,
+                    'servico_concluido': servico_concluido,
+                    'nf_servico_recebida': nf_servico_recebida,
+                    'nf_enviada_lancamento': nf_enviada_lancamento,
+                    'dados_adicionais': dados_adicionais if dados_adicionais else None,
+                    # Campos legados (para compatibilidade)
+                    'tipo': tipo_solicitacao or 'Requisição de Serviço',  # Usar TIPO DE SOLICITAÇÃO se disponível
+                    'centro_atividade': setor,  # Mapear SETOR para centro_atividade
+                    'nome_centro_atividade': None,
+                    'valor_planejado': valor_total,  # Mapear valor_total para valor_planejado
+                    'valor_realizado': None,
+                    'valor_projetado': None,
+                    'data_requisicao': data_abertura_requisicao,  # Mapear data_abertura_requisicao para data_requisicao
+                    'data_planejada': None,
+                    'data_realizada': None,
+                    'fornecedor': fornecedor_nome_fantasia,  # Mapear fornecedor_nome_fantasia para fornecedor
+                    'numero_requisicao': numero_requisicao_compra,  # Mapear numero_requisicao_compra para numero_requisicao
+                    'status': None,
+                    'observacoes': None,
+                }
+                
+                # Identificador único: numero_requisicao_compra ou setor + descricao + data
+                if numero_requisicao_compra:
+                    obj, created = ProjecaoGasto.objects.update_or_create(
+                        numero_requisicao_compra=numero_requisicao_compra,
+                        defaults=defaults
+                    )
+                elif setor and descricao and data_abertura_requisicao:
+                    obj, created = ProjecaoGasto.objects.update_or_create(
+                        setor=setor,
+                        descricao=descricao,
+                        data_abertura_requisicao=data_abertura_requisicao,
+                        defaults=defaults
+                    )
+                else:
+                    # Criar novo registro
+                    obj = ProjecaoGasto.objects.create(**defaults)
+                    created = True
+                
+                if created:
+                    created_count += 1
+                elif update_existing:
+                    updated_count += 1
+            
+            except Exception as e:
+                error_msg = f"Linha {row_num} (planilha GASTOS): {str(e)}"
+                errors.append(error_msg)
+                print(f"Erro ao processar linha {row_num}: {e}")
+                import traceback
+                traceback.print_exc()
         
         wb.close()
         

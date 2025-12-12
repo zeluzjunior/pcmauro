@@ -396,8 +396,10 @@
                             </button>
                             <div class="collapse" id="orcamento-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'dados_orcamento' %}" class="link-dark rounded"><i class="fas fa-chart-bar me-2"></i>Dados de Orçamento</a></li>
                                     <li><a href="{% url 'analise_requisicoes' %}" class="link-dark rounded">Análise de Requisições</a></li>
                                     <li><a href="{% url 'analise_projecao_nota_fiscal' %}" class="link-dark rounded">Análise Projeção vs Nota Fiscal</a></li>
+                                    <li><a href="{% url 'relacionar_projecao_nota_fiscal' %}" class="link-dark rounded">Relacionar Projeção e Nota Fiscal</a></li>
                                     <li><a href="{% url 'consultar_requisicoes_almoxarifado' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Requisições Almoxarifado</a></li>
                                     <li><a href="{% url 'consultar_notas_fiscais' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Notas Fiscais</a></li>
                                     <li><a href="{% url 'consultar_projecoes_gastos' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Projeções de Gastos</a></li>

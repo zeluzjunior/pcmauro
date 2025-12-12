@@ -1142,3 +1142,108 @@ class ProjecaoGasto(models.Model):
         tipo_str = self.tipo or 'Sem tipo'
         descricao_str = self.descricao or 'Sem descrição'
         return f"{tipo_str} - {descricao_str[:50]}"
+
+
+class RelacaoProjecaoNotaFiscal(models.Model):
+    """Modelo para armazenar relações confirmadas entre Projeções de Gastos e Notas Fiscais"""
+    projecao = models.ForeignKey(
+        ProjecaoGasto,
+        on_delete=models.CASCADE,
+        related_name='relacoes_notas_fiscais',
+        verbose_name='Projeção de Gasto'
+    )
+    nota_fiscal = models.ForeignKey(
+        NotaFiscal,
+        on_delete=models.CASCADE,
+        related_name='relacoes_projecoes',
+        verbose_name='Nota Fiscal'
+    )
+    
+    # Informações sobre a confirmação
+    score_match = models.DecimalField(
+        'Score do Match',
+        max_digits=5,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text='Score percentual do match quando foi confirmado'
+    )
+    confirmado_por = models.CharField(
+        'Confirmado por',
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text='Usuário que confirmou a relação'
+    )
+    observacoes = models.TextField(
+        'Observações',
+        blank=True,
+        null=True,
+        help_text='Observações sobre a relação confirmada'
+    )
+    
+    # Status da relação
+    STATUS_CHOICES = [
+        ('confirmado', 'Confirmado'),
+        ('rejeitado', 'Rejeitado'),
+        ('pendente', 'Pendente'),
+    ]
+    status = models.CharField(
+        'Status',
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='confirmado',
+        db_index=True
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Relação Projeção vs Nota Fiscal'
+        verbose_name_plural = 'Relações Projeção vs Nota Fiscal'
+        ordering = ['-created_at']
+        # Evitar duplicatas: uma projeção pode ter apenas uma relação confirmada com uma nota fiscal
+        unique_together = [['projecao', 'nota_fiscal']]
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['projecao']),
+            models.Index(fields=['nota_fiscal']),
+            models.Index(fields=['created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.projecao} ↔ {self.nota_fiscal} ({self.get_status_display()})"
+
+
+class DadosOrcamento(models.Model):
+    """Modelo para armazenar dados de orçamento por ano, mês e conta orçamentária"""
+    MES_CHOICES = [
+        (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
+        (5, 'Maio'), (6, 'Junho'), (7, 'Julho'), (8, 'Agosto'),
+        (9, 'Setembro'), (10, 'Outubro'), (11, 'Novembro'), (12, 'Dezembro'),
+    ]
+    
+    ano = models.IntegerField('Ano', db_index=True)
+    mes = models.IntegerField('Mês', choices=MES_CHOICES, db_index=True)
+    conta_orcamentaria = models.CharField('Conta Orçamentária', max_length=255)
+    valor_orcamento = models.DecimalField('Valor do Orçamento', max_digits=15, decimal_places=2, default=0)
+    valor_final_desejado = models.DecimalField('Valor Final Desejado', max_digits=15, decimal_places=2, default=0)
+    
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+    created_by = models.CharField('Criado por', max_length=255, blank=True, null=True)
+    
+    class Meta:
+        verbose_name = 'Dado de Orçamento'
+        verbose_name_plural = 'Dados de Orçamento'
+        ordering = ['ano', 'mes', 'conta_orcamentaria']
+        unique_together = [['ano', 'mes', 'conta_orcamentaria']]
+        indexes = [
+            models.Index(fields=['ano', 'mes']),
+            models.Index(fields=['conta_orcamentaria']),
+        ]
+    
+    def __str__(self):
+        return f"{self.ano}/{self.mes:02d} - {self.conta_orcamentaria}"
