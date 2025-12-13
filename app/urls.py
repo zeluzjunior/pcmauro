@@ -63,6 +63,7 @@ urlpatterns = [
     path('meus-planos-preventiva/consultar/', views.consultar_meu_plano, name="consultar_meu_plano"),
     path('consultar/52-semanas/', views.consultar_52_semanas, name="consultar_52_semanas"),
     path('consultar/requisicoes-almoxarifado/', views.consultar_requisicoes_almoxarifado, name="consultar_requisicoes_almoxarifado"),
+    path('almoxarifado/analise-requisicoes-data-importada/', views.analise_requisicoes_data_importada, name="analise_requisicoes_data_importada"),
     path('consultar/notas-fiscais/', views.consultar_notas_fiscais, name="consultar_notas_fiscais"),
     path('notas-fiscais/visualizar/<int:nota_id>/', views.visualizar_nota_fiscal, name="visualizar_nota_fiscal"),
     path('plano-pcm/visualizar/<int:plano_id>/', views.visualizar_plano_pcm, name="visualizar_plano_pcm"),

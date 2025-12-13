@@ -706,6 +706,24 @@ def analise_requisicoes(request):
     # Requisições recentes (últimas 20)
     requisicoes_recentes_list = queryset_base.order_by('-data_requisicao', '-created_at')[:20]
     
+    # Top 10 usuários que criaram requisições
+    usuarios_dict = defaultdict(lambda: {'count': 0, 'valor': Decimal('0.00')})
+    
+    for req in queryset_base.exclude(cd_usu_criou__isnull=True).exclude(cd_usu_criou=''):
+        usuarios_dict[req.cd_usu_criou]['count'] += 1
+        if req.vlr_movto_estoq:
+            usuarios_dict[req.cd_usu_criou]['valor'] += abs(req.vlr_movto_estoq)
+    
+    sorted_usuarios = sorted(usuarios_dict.items(), key=lambda x: x[1]['count'], reverse=True)[:10]
+    
+    usuarios_labels = []
+    usuarios_data_count = []
+    usuarios_data_valor = []
+    for usuario, dados in sorted_usuarios:
+        usuarios_labels.append(str(usuario) if usuario else 'Não informado')
+        usuarios_data_count.append(dados['count'])
+        usuarios_data_valor.append(float(dados['valor']))
+    
     # Dados diários para o mês selecionado (para o gráfico de evolução diária)
     if ano_selecionado and mes_selecionado:
         try:
@@ -799,6 +817,9 @@ def analise_requisicoes(request):
         'centros_data_valor': json.dumps(centros_data_valor),
         'operacoes_labels': json.dumps(operacoes_labels),
         'operacoes_data': json.dumps(operacoes_data),
+        'usuarios_labels': json.dumps(usuarios_labels),
+        'usuarios_data_count': json.dumps(usuarios_data_count),
+        'usuarios_data_valor': json.dumps(usuarios_data_valor),
         'requisicoes_recentes_list': requisicoes_recentes_list,
         # Filtros
         'anos_disponiveis': list(anos_disponiveis),
@@ -4201,6 +4222,116 @@ def consultar_requisicoes_almoxarifado(request):
         'filter_local': filter_local,
     }
     return render(request, 'consultar/consultar_requisicoes_almoxarifado.html', context)
+
+
+def analise_requisicoes_data_importada(request):
+    """Análise de datas importadas - Verifica quais dias têm dados de requisições"""
+    from app.models import RequisicaoAlmoxarifado
+    from datetime import datetime, date
+    from calendar import monthrange
+    from collections import defaultdict
+    
+    # Obter todas as datas únicas que têm dados
+    datas_com_dados = RequisicaoAlmoxarifado.objects.exclude(
+        data_requisicao__isnull=True
+    ).values_list('data_requisicao', flat=True).distinct()
+    
+    # Converter para set para busca rápida
+    datas_set = set(datas_com_dados)
+    
+    # Obter ano atual e ano anterior (para análise completa)
+    hoje = datetime.now().date()
+    ano_atual = hoje.year
+    mes_atual = hoje.month
+    
+    # Organizar dados por mês
+    meses_dados = defaultdict(dict)
+    
+    # Analisar cada mês do ano atual
+    for mes in range(1, 13):
+        # Obter número de dias no mês
+        num_dias = monthrange(ano_atual, mes)[1]
+        
+        # Para cada dia do mês
+        for dia in range(1, num_dias + 1):
+            data_atual = date(ano_atual, mes, dia)
+            
+            # Verificar se já passou (não verificar dias futuros)
+            if data_atual > hoje:
+                break
+            
+            # Verificar se tem dados para este dia
+            tem_dados = data_atual in datas_set
+            
+            # Traduzir dia da semana para português
+            dias_semana_pt = {
+                'Monday': 'Segunda',
+                'Tuesday': 'Terça',
+                'Wednesday': 'Quarta',
+                'Thursday': 'Quinta',
+                'Friday': 'Sexta',
+                'Saturday': 'Sábado',
+                'Sunday': 'Domingo'
+            }
+            dia_semana_en = data_atual.strftime('%A')
+            dia_semana_pt = dias_semana_pt.get(dia_semana_en, dia_semana_en)
+            
+            # Armazenar informação do dia
+            meses_dados[mes][dia] = {
+                'data': data_atual,
+                'tem_dados': tem_dados,
+                'dia_semana': dia_semana_pt,
+            }
+    
+    # Calcular estatísticas por mês
+    meses_estatisticas = {}
+    for mes, dias in meses_dados.items():
+        total_dias = len(dias)
+        dias_com_dados = sum(1 for dia_info in dias.values() if dia_info['tem_dados'])
+        dias_sem_dados = total_dias - dias_com_dados
+        percentual_completo = (dias_com_dados / total_dias * 100) if total_dias > 0 else 0
+        
+        meses_estatisticas[mes] = {
+            'total_dias': total_dias,
+            'dias_com_dados': dias_com_dados,
+            'dias_sem_dados': dias_sem_dados,
+            'percentual_completo': round(percentual_completo, 2),
+        }
+    
+    # Nomes dos meses em português
+    nomes_meses = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+    
+    # Estatísticas gerais
+    total_dias_ano = sum(stats['total_dias'] for stats in meses_estatisticas.values())
+    total_dias_com_dados = sum(stats['dias_com_dados'] for stats in meses_estatisticas.values())
+    total_dias_sem_dados = sum(stats['dias_sem_dados'] for stats in meses_estatisticas.values())
+    percentual_geral = (total_dias_com_dados / total_dias_ano * 100) if total_dias_ano > 0 else 0
+    
+    # Converter defaultdict para dict regular e ordenar meses
+    meses_dados_dict = {}
+    for mes in sorted(meses_dados.keys()):
+        meses_dados_dict[mes] = dict(sorted(meses_dados[mes].items()))
+    
+    context = {
+        'page_title': 'Análise de Datas Importadas',
+        'active_page': 'analise_requisicoes_data_importada',
+        'ano_atual': ano_atual,
+        'mes_atual': mes_atual,
+        'hoje': hoje,
+        'meses_dados': meses_dados_dict,
+        'meses_estatisticas': meses_estatisticas,
+        'nomes_meses': nomes_meses,
+        'total_dias_ano': total_dias_ano,
+        'total_dias_com_dados': total_dias_com_dados,
+        'total_dias_sem_dados': total_dias_sem_dados,
+        'percentual_geral': round(percentual_geral, 2),
+    }
+    
+    return render(request, 'almoxarifado/analise_requisicoes_data_importada.html', context)
 
 
 def consultar_notas_fiscais(request):
