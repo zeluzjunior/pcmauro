@@ -2,7 +2,6 @@
 Custom middleware to disable caching in development
 """
 from django.conf import settings
-import time
 
 
 class DisableCacheMiddleware:
@@ -17,31 +16,19 @@ class DisableCacheMiddleware:
         
         # Only disable caching in development
         if settings.DEBUG:
-            # Aggressively disable caching for ALL responses
-            # Setting these headers will override any existing cache headers
-            response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0, private'
-            response['Pragma'] = 'no-cache'
-            response['Expires'] = '0'
-            
-            # Add a unique timestamp header to verify middleware is working
-            response['X-Cache-Disabled'] = str(time.time())
-            
-            # For HTML responses, inject a timestamp comment at the end
-            if hasattr(response, 'content') and response.get('Content-Type', '').startswith('text/html'):
-                try:
-                    # Get current timestamp
-                    timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-                    # Add comment before closing body tag if it exists
-                    content = response.content.decode('utf-8')
-                    if '</body>' in content:
-                        comment = f'<!-- Template loaded at {timestamp} -->'
-                        content = content.replace('</body>', f'{comment}\n</body>')
-                        response.content = content.encode('utf-8')
-                        # Update content length
-                        response['Content-Length'] = str(len(response.content))
-                except Exception as e:
-                    # If we can't modify content, just continue
-                    pass
+            # Disable caching for all responses (including HTML templates)
+            # Check if it's an HTML response or if Content-Type is not set (Django templates)
+            content_type = response.get('Content-Type', '')
+            if not content_type or 'text/html' in content_type or 'text/plain' in content_type:
+                response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+                response['Pragma'] = 'no-cache'
+                response['Expires'] = '0'
+                # Also add ETag removal to prevent conditional requests
+                # Check if response supports pop method (HttpResponse does, but some others might not)
+                if hasattr(response, 'pop'):
+                    response.pop('ETag', None)
+                elif 'ETag' in response:
+                    del response['ETag']
         
         return response
 

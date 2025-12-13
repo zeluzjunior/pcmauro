@@ -1,6 +1,5 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load form_extras %}
 
 {% block title %}Consultar Notas Fiscais{% endblock %}
 
@@ -42,6 +41,10 @@
         border-color: #0d6efd;
         box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
     }
+    .filter-header {
+        padding: 8px !important;
+        background-color: #e9ecef;
+    }
     .filter-row th {
         background-color: #e9ecef;
         padding: 4px 8px !important;
@@ -50,35 +53,29 @@
         z-index: 8;
     }
     .col-nota { min-width: 100px; }
-    .col-serie { min-width: 80px; }
-    .col-emitente { min-width: 150px; }
-    .col-nome-fantasia { min-width: 200px; }
+    .col-emitente { min-width: 200px; }
     .col-data { min-width: 120px; }
     .col-valor { min-width: 120px; text-align: right; }
-    .col-uso-contabil { min-width: 120px; }
-    .col-centro { min-width: 100px; }
-    .col-situacao { min-width: 120px; }
-    .col-acoes { min-width: 100px; }
+    .col-unidade { min-width: 150px; }
+    .col-situacao { min-width: 150px; }
 </style>
 {% endblock %}
 
 {% block content %}
 <!-- Page Header -->
-<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 153, 0, 0.171)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
     <div class="container">
         <div class="row">
             <div class="col-12">
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
-                        <li class="breadcrumb-item active text-white" aria-current="page">Orçamento e GMD</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Orçamento</li>
                         <li class="breadcrumb-item active text-white" aria-current="page">Consultar Notas Fiscais</li>
                     </ol>
                 </nav>
-                <h1 class="display-4 fw-bold mt-3">
-                    <i class="fas fa-file-invoice me-2"></i>Consultar Notas Fiscais
-                </h1>
-                <p class="lead">Visualize todas as notas fiscais cadastradas no sistema</p>
+                <h1 class="display-4 fw-bold mt-3">Consultar Notas Fiscais</h1>
+                <p class="lead">Visualize e consulte todas as notas fiscais cadastradas</p>
             </div>
         </div>
     </div>
@@ -86,48 +83,12 @@
 
 <!-- Main Content -->
 <section class="py-5">
-    <div class="container">
-        <!-- Statistics -->
+    <div class="container-fluid px-5">
+        <!-- Search Bar -->
         <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Total de Notas:</h5>
-                        <p class="card-text display-6">{{ total_count }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-success text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Valor Total:</h5>
-                        <p class="card-text display-6">{{ total_valor|currency_br }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-info text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Situações:</h5>
-                        <p class="card-text display-6">{{ situacoes_count }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-warning text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Unidades:</h5>
-                        <p class="card-text display-6">{{ unidades_count }}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Actions Bar -->
-        <div class="row mb-4">
-            <div class="col-md-12">
+            <div class="col-12">
                 <form method="get" action="{% url 'consultar_notas_fiscais' %}" class="d-flex">
-                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por nota, série, emitente, unidade, centro de atividade, situação..." value="{{ search_query }}">
+                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por nota, emitente, unidade, situação..." value="{{ search_query|default:'' }}">
                     <button type="submit" class="btn btn-outline-primary">
                         <i class="fas fa-search"></i> Buscar
                     </button>
@@ -135,218 +96,148 @@
             </div>
         </div>
 
-        <!-- Filtros Avançados -->
+        <!-- Statistics -->
         <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-secondary text-white">
-                        <h6 class="mb-0">
-                            <i class="fas fa-filter me-2"></i>Filtros Avançados
-                        </h6>
-                    </div>
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
                     <div class="card-body">
-                        <form method="get" action="{% url 'consultar_notas_fiscais' %}">
-                            <div class="row">
-                                <div class="col-md-3 mb-3">
-                                    <label for="filtro_emitente" class="form-label">Emitente (CNPJ)</label>
-                                    <input type="text" name="filtro_emitente" id="filtro_emitente" class="form-control" value="{{ filtro_emitente }}" placeholder="CNPJ do emitente">
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <label for="filtro_unidade" class="form-label">Unidade</label>
-                                    <input type="text" name="filtro_unidade" id="filtro_unidade" class="form-control" value="{{ filtro_unidade }}" placeholder="Código da unidade">
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <label for="filtro_situacao" class="form-label">Situação</label>
-                                    <input type="text" name="filtro_situacao" id="filtro_situacao" class="form-control" value="{{ filtro_situacao }}" placeholder="Situação da nota">
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <label for="filtro_total_min" class="form-label">Valor Mínimo</label>
-                                    <input type="number" step="0.01" name="filtro_total_min" id="filtro_total_min" class="form-control" value="{{ filtro_total_min }}" placeholder="0.00">
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <label for="filtro_total_max" class="form-label">Valor Máximo</label>
-                                    <input type="number" step="0.01" name="filtro_total_max" id="filtro_total_max" class="form-control" value="{{ filtro_total_max }}" placeholder="0.00">
-                                </div>
-                                <div class="col-md-3 mb-3 d-flex align-items-end">
-                                    <button type="submit" class="btn btn-primary w-100">
-                                        <i class="fas fa-filter me-2"></i>Filtrar
-                                    </button>
-                                </div>
-                            </div>
-                            {% if filtro_emitente or filtro_unidade or filtro_situacao or filtro_total_min or filtro_total_max %}
-                            <div class="row">
-                                <div class="col-12">
-                                    <a href="{% url 'consultar_notas_fiscais' %}" class="btn btn-sm btn-outline-secondary">
-                                        <i class="fas fa-times me-1"></i>Limpar Filtros
-                                    </a>
-                                </div>
-                            </div>
-                            {% endif %}
-                        </form>
+                        <h5 class="card-title">Total de Notas</h5>
+                        <p class="card-text display-6">{{ total_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Emitentes Únicos</h5>
+                        <p class="card-text display-6">{{ emitentes_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Unidades</h5>
+                        <p class="card-text display-6">{{ unidades_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Valor Total</h5>
+                        <p class="card-text display-6">R$ {{ valor_total|floatformat:2 }}</p>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Messages -->
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                    {{ message|safe }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            {% endfor %}
-        {% endif %}
-
         <!-- Table -->
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">
-                    <i class="fas fa-list me-2"></i>Lista de Notas Fiscais
-                </h5>
-            </div>
-            <div class="card-body p-0">
-                <form method="get" action="{% url 'consultar_notas_fiscais' %}" id="filterForm">
-                    <!-- Preservar busca geral e filtros avançados -->
-                    <input type="hidden" name="search" value="{{ search_query|default:'' }}">
-                    {% if filtro_emitente %}<input type="hidden" name="filtro_emitente" value="{{ filtro_emitente }}">{% endif %}
-                    {% if filtro_unidade %}<input type="hidden" name="filtro_unidade" value="{{ filtro_unidade }}">{% endif %}
-                    {% if filtro_situacao %}<input type="hidden" name="filtro_situacao" value="{{ filtro_situacao }}">{% endif %}
-                    {% if filtro_total_min %}<input type="hidden" name="filtro_total_min" value="{{ filtro_total_min }}">{% endif %}
-                    {% if filtro_total_max %}<input type="hidden" name="filtro_total_max" value="{{ filtro_total_max }}">{% endif %}
-                    
-                    {% if notas %}
-                    <div class="table-container">
-                        <table class="table table-hover table-striped mb-0">
-                            <thead>
-                                <tr>
-                                    <th class="col-nota">Nota</th>
-                                    <th class="col-serie">Série</th>
-                                    <th class="col-emitente">Emitente</th>
-                                    <th class="col-nome-fantasia">Nome Fantasia</th>
-                                    <th class="col-data">Data Emissão</th>
-                                    <th class="col-valor">Total</th>
-                                    <th class="col-uso-contabil">Uso Contábil</th>
-                                    <th class="col-centro">Centro Atividade</th>
-                                    <th class="col-situacao">Situação</th>
-                                    <th class="col-data">Criado em</th>
-                                    <th class="col-acoes">Ações</th>
-                                </tr>
-                                <tr class="filter-row">
-                                    <th>
-                                        <input type="text" name="filter_nota" class="filter-input" value="{{ filter_nota|default:'' }}" placeholder="Nota">
-                                    </th>
-                                    <th>
-                                        <input type="text" name="filter_serie" class="filter-input" value="{{ filter_serie|default:'' }}" placeholder="Série">
-                                    </th>
-                                    <th>
-                                        <input type="text" name="filter_emitente" class="filter-input" value="{{ filter_emitente|default:'' }}" placeholder="Emitente">
-                                    </th>
-                                    <th>
-                                        <input type="text" name="filter_nome_fantasia" class="filter-input" value="{{ filter_nome_fantasia|default:'' }}" placeholder="Nome Fantasia">
-                                    </th>
-                                    <th>
-                                        <input type="text" name="filter_data_emissao" class="filter-input" value="{{ filter_data_emissao|default:'' }}" placeholder="Data Emissão">
-                                    </th>
-                                    <th>
-                                        <input type="text" name="filter_total" class="filter-input" value="{{ filter_total|default:'' }}" placeholder="Total">
-                                    </th>
-                                    <th>
-                                        <input type="text" name="filter_uso_contabil" class="filter-input" value="{{ filter_uso_contabil|default:'' }}" placeholder="Uso Contábil">
-                                    </th>
-                                    <th>
-                                        <input type="text" name="filter_centro_atividade" class="filter-input" value="{{ filter_centro_atividade|default:'' }}" placeholder="Centro">
-                                    </th>
-                                    <th>
-                                        <input type="text" name="filter_situacao" class="filter-input" value="{{ filter_situacao|default:'' }}" placeholder="Situação">
-                                    </th>
-                                    <th></th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            {% for nota in notas %}
-                            <tr>
-                                <td>
-                                    <strong>{{ nota.nota|default:"-" }}</strong>
-                                </td>
-                                <td>{{ nota.serie|default:"-" }}</td>
-                                <td>
-                                    {% if nota.emitente %}
-                                        {{ nota.emitente }}
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if nota.nome_fantasia_emitente %}
-                                        {{ nota.nome_fantasia_emitente|truncatewords:5 }}
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if nota.data_emissao %}
-                                        {{ nota.data_emissao }}
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if nota.total_nota %}
-                                        <strong>{{ nota.total_nota|currency_br }}</strong>
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if nota.uso_contabil %}
-                                        <span class="badge bg-secondary">{{ nota.uso_contabil }}</span>
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if nota.centro_atividade %}
-                                        {{ nota.centro_atividade }}
-                                        {% if nota.nome_centro_atividade %}
-                                            <br><small class="text-muted">{{ nota.nome_centro_atividade|truncatewords:3 }}</small>
-                                        {% endif %}
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if nota.situacao %}
-                                        <span class="badge bg-info">{{ nota.situacao }}</span>
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ nota.created_at|date:"d/m/Y H:i" }}</td>
-                                <td>
-                                    <a href="{% url 'visualizar_nota_fiscal' nota.id %}" class="btn btn-sm btn-primary" title="Visualizar nota fiscal">
-                                        <i class="fas fa-eye me-1"></i>Visualizar
-                                    </a>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="11" class="text-center text-muted py-5">
-                                    <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
-                                    Nenhuma nota fiscal encontrada.
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-invoice me-2"></i>Notas Fiscais
+                            <small class="ms-2">({{ notas.paginator.count }} registro{{ notas.paginator.count|pluralize }})</small>
+                        </h5>
                     </div>
-                    {% else %}
-                    <div class="alert alert-info m-3">
-                        <i class="fas fa-info-circle me-2"></i>Nenhuma nota fiscal encontrada.
+                    <div class="card-body p-0">
+                        <form method="get" action="{% url 'consultar_notas_fiscais' %}" id="filterForm">
+                            <!-- Preservar busca geral -->
+                            <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                            
+                            <div class="table-container">
+                                <table class="table table-hover table-striped mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-nota">Nota</th>
+                                            <th class="col-emitente">Emitente</th>
+                                            <th class="col-data">Data Emissão</th>
+                                            <th class="col-valor">Total</th>
+                                            <th class="col-unidade">Unidade</th>
+                                            <th class="col-situacao">Situação</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                        <tr class="filter-row">
+                                            <th>
+                                                <input type="text" name="filtro_nota" class="filter-input" value="{{ filtro_nota|default:'' }}" placeholder="Nota">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filtro_emitente" class="filter-input" value="{{ filtro_emitente|default:'' }}" placeholder="Emitente">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filtro_data_emissao_inicio" class="filter-input" value="{{ filtro_data_emissao_inicio|default:'' }}" placeholder="Data Início">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filtro_total_min" class="filter-input" value="{{ filtro_total_min|default:'' }}" placeholder="Min">
+                                            </th>
+                                            <th>
+                                                <select name="filtro_unidade" class="filter-input">
+                                                    <option value="">Todas</option>
+                                                    {% for unidade in unidades_unicas %}
+                                                    <option value="{{ unidade }}" {% if filtro_unidade == unidade %}selected{% endif %}>{{ unidade }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </th>
+                                            <th>
+                                                <select name="filtro_situacao" class="filter-input">
+                                                    <option value="">Todas</option>
+                                                    {% for situacao in situacoes_unicas %}
+                                                    <option value="{{ situacao }}" {% if filtro_situacao == situacao %}selected{% endif %}>{{ situacao }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </th>
+                                            <th>
+                                                <button type="submit" class="btn btn-sm btn-primary w-100">
+                                                    <i class="fas fa-filter"></i> Filtrar
+                                                </button>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for nota in notas %}
+                                        <tr>
+                                            <td><span class="badge bg-primary">{{ nota.nota|default:"-" }}</span></td>
+                                            <td>{{ nota.nome_fantasia_emitente|default:nota.emitente|default:"-"|truncatechars:40 }}</td>
+                                            <td>{{ nota.data_emissao|default:"-" }}</td>
+                                            <td class="text-end">
+                                                {% if nota.total_nota %}
+                                                    R$ {{ nota.total_nota|floatformat:2 }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ nota.nome_unidade|default:nota.unidade|default:"-"|truncatechars:30 }}</td>
+                                            <td>
+                                                {% if nota.situacao %}
+                                                    <span class="badge {% if 'AUTORIZADA' in nota.situacao %}bg-success{% elif 'PENDENTE' in nota.situacao %}bg-warning{% elif 'CANCELADA' in nota.situacao %}bg-danger{% else %}bg-secondary{% endif %}">
+                                                        {{ nota.situacao|truncatechars:30 }}
+                                                    </span>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{% url 'visualizar_nota_fiscal' nota.id %}" class="btn btn-sm btn-outline-primary" title="Visualizar">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="7" class="text-center text-muted py-5">
+                                                <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+                                                Nenhuma nota fiscal encontrada.
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </form>
                     </div>
-                    {% endif %}
-                </form>
+                </div>
             </div>
         </div>
 
@@ -358,10 +249,10 @@
                     <ul class="pagination justify-content-center">
                         {% if notas.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filtro_emitente %}filtro_emitente={{ filtro_emitente }}&{% endif %}{% if filtro_unidade %}filtro_unidade={{ filtro_unidade }}&{% endif %}{% if filtro_situacao %}filtro_situacao={{ filtro_situacao }}&{% endif %}{% if filtro_total_min %}filtro_total_min={{ filtro_total_min }}&{% endif %}{% if filtro_total_max %}filtro_total_max={{ filtro_total_max }}&{% endif %}{% if filter_nota %}filter_nota={{ filter_nota }}&{% endif %}{% if filter_serie %}filter_serie={{ filter_serie }}&{% endif %}{% if filter_emitente %}filter_emitente={{ filter_emitente }}&{% endif %}{% if filter_nome_fantasia %}filter_nome_fantasia={{ filter_nome_fantasia }}&{% endif %}{% if filter_data_emissao %}filter_data_emissao={{ filter_data_emissao }}&{% endif %}{% if filter_total %}filter_total={{ filter_total }}&{% endif %}{% if filter_uso_contabil %}filter_uso_contabil={{ filter_uso_contabil }}&{% endif %}{% if filter_centro_atividade %}filter_centro_atividade={{ filter_centro_atividade }}&{% endif %}{% if filter_situacao %}filter_situacao={{ filter_situacao }}&{% endif %}page=1">Primeira</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filtro_nota %}filtro_nota={{ filtro_nota }}&{% endif %}{% if filtro_emitente %}filtro_emitente={{ filtro_emitente }}&{% endif %}{% if filtro_unidade %}filtro_unidade={{ filtro_unidade }}&{% endif %}{% if filtro_situacao %}filtro_situacao={{ filtro_situacao }}&{% endif %}page=1">Primeira</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filtro_emitente %}filtro_emitente={{ filtro_emitente }}&{% endif %}{% if filtro_unidade %}filtro_unidade={{ filtro_unidade }}&{% endif %}{% if filtro_situacao %}filtro_situacao={{ filtro_situacao }}&{% endif %}{% if filtro_total_min %}filtro_total_min={{ filtro_total_min }}&{% endif %}{% if filtro_total_max %}filtro_total_max={{ filtro_total_max }}&{% endif %}{% if filter_nota %}filter_nota={{ filter_nota }}&{% endif %}{% if filter_serie %}filter_serie={{ filter_serie }}&{% endif %}{% if filter_emitente %}filter_emitente={{ filter_emitente }}&{% endif %}{% if filter_nome_fantasia %}filter_nome_fantasia={{ filter_nome_fantasia }}&{% endif %}{% if filter_data_emissao %}filter_data_emissao={{ filter_data_emissao }}&{% endif %}{% if filter_total %}filter_total={{ filter_total }}&{% endif %}{% if filter_uso_contabil %}filter_uso_contabil={{ filter_uso_contabil }}&{% endif %}{% if filter_centro_atividade %}filter_centro_atividade={{ filter_centro_atividade }}&{% endif %}{% if filter_situacao %}filter_situacao={{ filter_situacao }}&{% endif %}page={{ notas.previous_page_number }}">Anterior</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filtro_nota %}filtro_nota={{ filtro_nota }}&{% endif %}{% if filtro_emitente %}filtro_emitente={{ filtro_emitente }}&{% endif %}{% if filtro_unidade %}filtro_unidade={{ filtro_unidade }}&{% endif %}{% if filtro_situacao %}filtro_situacao={{ filtro_situacao }}&{% endif %}page={{ notas.previous_page_number }}">Anterior</a>
                             </li>
                         {% endif %}
                         
@@ -373,10 +264,10 @@
                         
                         {% if notas.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filtro_emitente %}filtro_emitente={{ filtro_emitente }}&{% endif %}{% if filtro_unidade %}filtro_unidade={{ filtro_unidade }}&{% endif %}{% if filtro_situacao %}filtro_situacao={{ filtro_situacao }}&{% endif %}{% if filtro_total_min %}filtro_total_min={{ filtro_total_min }}&{% endif %}{% if filtro_total_max %}filtro_total_max={{ filtro_total_max }}&{% endif %}{% if filter_nota %}filter_nota={{ filter_nota }}&{% endif %}{% if filter_serie %}filter_serie={{ filter_serie }}&{% endif %}{% if filter_emitente %}filter_emitente={{ filter_emitente }}&{% endif %}{% if filter_nome_fantasia %}filter_nome_fantasia={{ filter_nome_fantasia }}&{% endif %}{% if filter_data_emissao %}filter_data_emissao={{ filter_data_emissao }}&{% endif %}{% if filter_total %}filter_total={{ filter_total }}&{% endif %}{% if filter_uso_contabil %}filter_uso_contabil={{ filter_uso_contabil }}&{% endif %}{% if filter_centro_atividade %}filter_centro_atividade={{ filter_centro_atividade }}&{% endif %}{% if filter_situacao %}filter_situacao={{ filter_situacao }}&{% endif %}page={{ notas.next_page_number }}">Próxima</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filtro_nota %}filtro_nota={{ filtro_nota }}&{% endif %}{% if filtro_emitente %}filtro_emitente={{ filtro_emitente }}&{% endif %}{% if filtro_unidade %}filtro_unidade={{ filtro_unidade }}&{% endif %}{% if filtro_situacao %}filtro_situacao={{ filtro_situacao }}&{% endif %}page={{ notas.next_page_number }}">Próxima</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filtro_emitente %}filtro_emitente={{ filtro_emitente }}&{% endif %}{% if filtro_unidade %}filtro_unidade={{ filtro_unidade }}&{% endif %}{% if filtro_situacao %}filtro_situacao={{ filtro_situacao }}&{% endif %}{% if filtro_total_min %}filtro_total_min={{ filtro_total_min }}&{% endif %}{% if filtro_total_max %}filtro_total_max={{ filtro_total_max }}&{% endif %}{% if filter_nota %}filter_nota={{ filter_nota }}&{% endif %}{% if filter_serie %}filter_serie={{ filter_serie }}&{% endif %}{% if filter_emitente %}filter_emitente={{ filter_emitente }}&{% endif %}{% if filter_nome_fantasia %}filter_nome_fantasia={{ filter_nome_fantasia }}&{% endif %}{% if filter_data_emissao %}filter_data_emissao={{ filter_data_emissao }}&{% endif %}{% if filter_total %}filter_total={{ filter_total }}&{% endif %}{% if filter_uso_contabil %}filter_uso_contabil={{ filter_uso_contabil }}&{% endif %}{% if filter_centro_atividade %}filter_centro_atividade={{ filter_centro_atividade }}&{% endif %}{% if filter_situacao %}filter_situacao={{ filter_situacao }}&{% endif %}page={{ notas.paginator.num_pages }}">Última</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filtro_nota %}filtro_nota={{ filtro_nota }}&{% endif %}{% if filtro_emitente %}filtro_emitente={{ filtro_emitente }}&{% endif %}{% if filtro_unidade %}filtro_unidade={{ filtro_unidade }}&{% endif %}{% if filtro_situacao %}filtro_situacao={{ filtro_situacao }}&{% endif %}page={{ notas.paginator.num_pages }}">Última</a>
                             </li>
                         {% endif %}
                     </ul>
@@ -404,7 +295,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 500); // Wait 500ms after user stops typing
         });
     });
+    
+    // Handle select changes immediately
+    const filterSelects = document.querySelectorAll('select.filter-input');
+    filterSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            filterForm.submit();
+        });
+    });
 });
 </script>
 {% endblock %}
-

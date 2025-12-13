@@ -5,7 +5,6 @@ from .models import (
     OrdemServicoCorretiva, 
     OrdemServicoCorretivaFicha,
     CentroAtividade, 
-    LocalCentroAtividade,
     Manutentor, 
     ManutentorMaquina,
     ItemEstoque, 
@@ -101,22 +100,12 @@ class OrdemServicoCorretivaAdmin(admin.ModelAdmin):
     )
 
 
-class LocalCentroAtividadeInline(admin.TabularInline):
-    """Inline admin para Locais do Centro de Atividade"""
-    model = LocalCentroAtividade
-    extra = 1
-    fields = ('local', 'observacoes')
-    verbose_name = 'Local'
-    verbose_name_plural = 'Locais'
-
-
 @admin.register(CentroAtividade)
 class CentroAtividadeAdmin(admin.ModelAdmin):
     """Admin configuration for CentroAtividade model"""
-    inlines = [LocalCentroAtividadeInline]
-    list_display = ('ca', 'sigla', 'descricao', 'indice', 'encarregado_responsavel', 'get_locais', 'created_at')
+    list_display = ('ca', 'sigla', 'descricao', 'indice', 'encarregado_responsavel', 'local', 'created_at')
     list_filter = ('sigla', 'created_at')
-    search_fields = ('ca', 'sigla', 'descricao', 'encarregado_responsavel', 'locais__local')
+    search_fields = ('ca', 'sigla', 'descricao', 'encarregado_responsavel', 'local', 'observacoes')
     readonly_fields = ('created_at', 'updated_at')
     list_per_page = 50
     
@@ -127,33 +116,8 @@ class CentroAtividadeAdmin(admin.ModelAdmin):
         ('Informações Adicionais', {
             'fields': ('indice', 'encarregado_responsavel')
         }),
-        ('Datas', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
-    
-    def get_locais(self, obj):
-        """Retorna os locais do Centro de Atividade como string"""
-        locais = obj.locais.all()
-        if locais:
-            return ', '.join([local.local for local in locais])
-        return '-'
-    get_locais.short_description = 'Locais'
-
-
-@admin.register(LocalCentroAtividade)
-class LocalCentroAtividadeAdmin(admin.ModelAdmin):
-    """Admin configuration for LocalCentroAtividade model"""
-    list_display = ('centro_atividade', 'local', 'observacoes', 'created_at')
-    list_filter = ('centro_atividade', 'created_at')
-    search_fields = ('centro_atividade__ca', 'centro_atividade__sigla', 'local', 'observacoes')
-    readonly_fields = ('created_at', 'updated_at')
-    list_per_page = 50
-    
-    fieldsets = (
-        ('Informações', {
-            'fields': ('centro_atividade', 'local', 'observacoes')
+        ('Local', {
+            'fields': ('local', 'observacoes')
         }),
         ('Datas', {
             'fields': ('created_at', 'updated_at'),

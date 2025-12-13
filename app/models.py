@@ -72,13 +72,14 @@ class Maquina(models.Model):
     arquivo_pdf = models.FileField('Arquivo PDF', upload_to='arquivos_maquinas/', blank=True, null=True, help_text='Upload de arquivo PDF relacionado à máquina')
     diagrama_eletrico = models.FileField('Diagrama Elétrico', upload_to='arquivos_maquinas/', blank=True, null=True, help_text='Upload de arquivo PDF do diagrama elétrico')
     pecas_reposicao = models.FileField('Peças de Reposição', upload_to='arquivos_maquinas/', blank=True, null=True, help_text='Upload de arquivo PDF de peças de reposição')
-    local_centro_atividade = models.ForeignKey(
-        'LocalCentroAtividade',
+    centro_atividade = models.ForeignKey(
+        'CentroAtividade',
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
-        verbose_name='Local do Centro de Atividade',
-        help_text='Local do Centro de Atividade relacionado ao setor de manutenção'
+        verbose_name='Centro de Atividade',
+        help_text='Centro de Atividade relacionado ao setor de manutenção',
+        related_name='maquinas'
     )
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
     updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
@@ -145,7 +146,7 @@ class OrdemServicoCorretiva(models.Model):
     # Ordem de Serviço
     cd_ordemserv = models.BigIntegerField('Código Ordem Serviço', unique=True, db_index=True)
     
-    # Datas de Entrada e Abertura
+    # Datas de Entrada e Abertura 
     dt_entrada = models.CharField('Data Entrada', max_length=50, blank=True, null=True)
     dt_abertura_solicita = models.CharField('Data Abertura Solicitação', max_length=50, blank=True, null=True)
     
@@ -244,6 +245,8 @@ class CentroAtividade(models.Model):
     descricao = models.CharField('Descrição', max_length=500, blank=True, null=True)
     indice = models.IntegerField('Índice', blank=True, null=True)
     encarregado_responsavel = models.CharField('Encarregado Responsável', max_length=255, blank=True, null=True)
+    local = models.CharField('Local', max_length=255, blank=True, null=True, help_text='Local do Centro de Atividade')
+    observacoes = models.TextField('Observações', blank=True, null=True, help_text='Observações sobre o local')
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
     updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
 
@@ -254,27 +257,6 @@ class CentroAtividade(models.Model):
 
     def __str__(self):
         return f"{self.ca} - {self.sigla or self.descricao or 'Sem descrição'}"
-
-class LocalCentroAtividade(models.Model):
-    """Modelo para armazenar múltiplos locais associados a um Centro de Atividade"""
-    centro_atividade = models.ForeignKey(
-        CentroAtividade,
-        on_delete=models.CASCADE,
-        verbose_name='Centro de Atividade',
-        related_name='locais'
-    )
-    local = models.CharField('Local', max_length=255)
-    observacoes = models.TextField('Observações', blank=True, null=True, help_text='Observações sobre o local')
-    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
-    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
-
-    class Meta:
-        verbose_name = 'Local do Centro de Atividade'
-        verbose_name_plural = 'Locais dos Centros de Atividade'
-        ordering = ['local']
-
-    def __str__(self):
-        return f"{self.centro_atividade.ca} - {self.local}"
 
 class Semana52(models.Model):
     """Modelo para armazenar informações das 52 semanas do ano"""
@@ -1142,7 +1124,6 @@ class ProjecaoGasto(models.Model):
         tipo_str = self.tipo or 'Sem tipo'
         descricao_str = self.descricao or 'Sem descrição'
         return f"{tipo_str} - {descricao_str[:50]}"
-
 
 class RelacaoProjecaoNotaFiscal(models.Model):
     """Modelo para armazenar relações confirmadas entre Projeções de Gastos e Notas Fiscais"""

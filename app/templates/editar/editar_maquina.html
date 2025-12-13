@@ -158,12 +158,12 @@
                                     {% endif %}
                                 </div>
                                 <div class="col-md-12 mb-3">
-                                    <label for="{{ form.local_centro_atividade.id_for_label }}" class="form-label">
-                                        {{ form.local_centro_atividade.label }}
+                                    <label for="{{ form.centro_atividade.id_for_label }}" class="form-label">
+                                        {{ form.centro_atividade.label }}
                                     </label>
-                                    {{ form.local_centro_atividade }}
-                                    {% if form.local_centro_atividade.errors %}
-                                        <div class="text-danger small">{{ form.local_centro_atividade.errors }}</div>
+                                    {{ form.centro_atividade }}
+                                    {% if form.centro_atividade.errors %}
+                                        <div class="text-danger small">{{ form.centro_atividade.errors }}</div>
                                     {% endif %}
                                     <div class="form-text">
                                         <i class="fas fa-info-circle me-1"></i>
@@ -492,16 +492,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('editarMaquinaForm');
     const submitBtn = document.getElementById('submitBtn');
     const cdSetormanutInput = document.getElementById('id_cd_setormanut');
-    const localCentroAtividadeSelect = document.getElementById('id_local_centro_atividade');
+    const centroAtividadeSelect = document.getElementById('id_centro_atividade');
     
     console.log('Form:', form);
     console.log('Submit button:', submitBtn);
     console.log('cd_setormanut input:', cdSetormanutInput);
-    console.log('local_centro_atividade select:', localCentroAtividadeSelect);
+    console.log('centro_atividade select:', centroAtividadeSelect);
     
-    // Função para atualizar as opções de local_centro_atividade baseado no cd_setormanut
-    function atualizarLocais() {
-        if (!cdSetormanutInput || !localCentroAtividadeSelect) {
+    // Função para atualizar as opções de centro_atividade baseado no cd_setormanut
+    function atualizarCentrosAtividade() {
+        if (!cdSetormanutInput || !centroAtividadeSelect) {
             return;
         }
         
@@ -509,21 +509,21 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!cdSetormanut) {
             // Se não há cd_setormanut, limpar as opções
-            localCentroAtividadeSelect.innerHTML = '<option value="">---------</option>';
+            centroAtividadeSelect.innerHTML = '<option value="">---------</option>';
             return;
         }
         
         // Mostrar loading
-        localCentroAtividadeSelect.disabled = true;
-        const originalHTML = localCentroAtividadeSelect.innerHTML;
-        localCentroAtividadeSelect.innerHTML = '<option value="">Carregando...</option>';
+        centroAtividadeSelect.disabled = true;
+        const originalHTML = centroAtividadeSelect.innerHTML;
+        centroAtividadeSelect.innerHTML = '<option value="">Carregando...</option>';
         
         // Fazer requisição AJAX
         fetch(`{% url 'filtrar_locais_por_setormanut' %}?cd_setormanut=${encodeURIComponent(cdSetormanut)}`)
             .then(response => response.json())
             .then(data => {
                 // Limpar opções atuais
-                localCentroAtividadeSelect.innerHTML = '<option value="">---------</option>';
+                centroAtividadeSelect.innerHTML = '<option value="">---------</option>';
                 
                 // Adicionar novas opções
                 if (data.locais && data.locais.length > 0) {
@@ -534,39 +534,39 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (local.observacoes) {
                             option.title = local.observacoes;
                         }
-                        localCentroAtividadeSelect.appendChild(option);
+                        centroAtividadeSelect.appendChild(option);
                     });
                 } else {
                     const option = document.createElement('option');
                     option.value = '';
-                    option.textContent = 'Nenhum local encontrado para este setor';
+                    option.textContent = 'Nenhum centro de atividade encontrado para este setor';
                     option.disabled = true;
-                    localCentroAtividadeSelect.appendChild(option);
+                    centroAtividadeSelect.appendChild(option);
                 }
                 
                 // Restaurar valor selecionado se existir
-                const selectedValue = '{{ form.local_centro_atividade.value|default:"" }}';
+                const selectedValue = '{{ form.centro_atividade.value|default:"" }}';
                 if (selectedValue) {
-                    localCentroAtividadeSelect.value = selectedValue;
+                    centroAtividadeSelect.value = selectedValue;
                 }
                 
-                localCentroAtividadeSelect.disabled = false;
+                centroAtividadeSelect.disabled = false;
             })
             .catch(error => {
-                console.error('Erro ao carregar locais:', error);
-                localCentroAtividadeSelect.innerHTML = '<option value="">Erro ao carregar locais</option>';
-                localCentroAtividadeSelect.disabled = false;
+                console.error('Erro ao carregar centros de atividade:', error);
+                centroAtividadeSelect.innerHTML = '<option value="">Erro ao carregar centros de atividade</option>';
+                centroAtividadeSelect.disabled = false;
             });
     }
     
     // Adicionar listener para atualizar quando cd_setormanut mudar
     if (cdSetormanutInput) {
-        cdSetormanutInput.addEventListener('change', atualizarLocais);
-        cdSetormanutInput.addEventListener('blur', atualizarLocais);
+        cdSetormanutInput.addEventListener('change', atualizarCentrosAtividade);
+        cdSetormanutInput.addEventListener('blur', atualizarCentrosAtividade);
         
         // Se já tem valor, atualizar ao carregar
         if (cdSetormanutInput.value) {
-            atualizarLocais();
+            atualizarCentrosAtividade();
         }
     }
     

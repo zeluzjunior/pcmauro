@@ -703,25 +703,6 @@ def analise_requisicoes(request):
         operacoes_labels.append(operacao)
         operacoes_data.append(dados['count'])
     
-    # Distribuição por usuário criou (CD_USU_CRIOU) - top 10
-    usuarios_dict = defaultdict(lambda: {'count': 0, 'valor': Decimal('0.00')})
-    
-    for req in queryset_base.exclude(cd_usu_criou__isnull=True).exclude(cd_usu_criou=''):
-        usuarios_dict[req.cd_usu_criou]['count'] += 1
-        if req.vlr_movto_estoq:
-            # vlr_movto_estoq já representa o valor total da transação
-            usuarios_dict[req.cd_usu_criou]['valor'] += abs(req.vlr_movto_estoq)
-    
-    sorted_usuarios = sorted(usuarios_dict.items(), key=lambda x: x[1]['count'], reverse=True)[:10]
-    
-    usuarios_labels = []
-    usuarios_data_count = []
-    usuarios_data_valor = []
-    for usuario, dados in sorted_usuarios:
-        usuarios_labels.append(usuario)
-        usuarios_data_count.append(dados['count'])
-        usuarios_data_valor.append(float(dados['valor']))
-    
     # Requisições recentes (últimas 20)
     requisicoes_recentes_list = queryset_base.order_by('-data_requisicao', '-created_at')[:20]
     
@@ -818,9 +799,6 @@ def analise_requisicoes(request):
         'centros_data_valor': json.dumps(centros_data_valor),
         'operacoes_labels': json.dumps(operacoes_labels),
         'operacoes_data': json.dumps(operacoes_data),
-        'usuarios_labels': json.dumps(usuarios_labels),
-        'usuarios_data_count': json.dumps(usuarios_data_count),
-        'usuarios_data_valor': json.dumps(usuarios_data_valor),
         'requisicoes_recentes_list': requisicoes_recentes_list,
         # Filtros
         'anos_disponiveis': list(anos_disponiveis),
@@ -833,937 +811,6 @@ def analise_requisicoes(request):
         'mes_selecionado_filtro': mes_selecionado,
     }
     return render(request, 'orcamento/analise_requisicoes.html', context)
-
-
-def analise_projecao_nota_fiscal(request):
-    """Análise das relações confirmadas entre Projeções de Gastos e Notas Fiscais"""
-    from app.models import ProjecaoGasto, NotaFiscal, RelacaoProjecaoNotaFiscal
-    from django.db.models import Q, Sum, Count, Avg
-    from decimal import Decimal
-    from datetime import datetime, timedelta
-    from collections import defaultdict
-    import json
-    
-    # Filtros
-    filtro_status = request.GET.get('filtro_status', '').strip()
-    filtro_centro_atividade = request.GET.get('filtro_centro_atividade', '').strip()
-    filtro_ano = request.GET.get('filtro_ano', '').strip()
-    filtro_valor_min = request.GET.get('filtro_valor_min', '').strip()
-    filtro_valor_max = request.GET.get('filtro_valor_max', '').strip()
-    
-    # Buscar relações confirmadas
-    relacoes = RelacaoProjecaoNotaFiscal.objects.select_related('projecao', 'nota_fiscal').all()
-    
-    # Aplicar filtros
-    if filtro_status:
-        relacoes = relacoes.filter(status=filtro_status)
-    
-    if filtro_centro_atividade:
-        relacoes = relacoes.filter(
-            Q(projecao__centro_atividade__icontains=filtro_centro_atividade) |
-            Q(nota_fiscal__centro_atividade__icontains=filtro_centro_atividade)
-        )
-    
-    if filtro_ano:
-        try:
-            ano = int(filtro_ano)
-            relacoes = relacoes.filter(
-                Q(projecao__ano_referencia=ano) |
-                Q(nota_fiscal__data_emissao__startswith=f"{ano}-") |
-                Q(nota_fiscal__data_emissao__contains=f"/{ano}") |
-                Q(nota_fiscal__data_emissao__contains=f"-{ano}")
-            )
-        except ValueError:
-            pass
-    
-    if filtro_valor_min:
-        try:
-            valor_min = Decimal(filtro_valor_min)
-            relacoes = relacoes.filter(
-                Q(projecao__valor_planejado__gte=valor_min) |
-                Q(projecao__valor_realizado__gte=valor_min) |
-                Q(projecao__valor_projetado__gte=valor_min) |
-                Q(nota_fiscal__total_nota__gte=valor_min)
-            )
-        except (ValueError, TypeError):
-            pass
-    
-    if filtro_valor_max:
-        try:
-            valor_max = Decimal(filtro_valor_max)
-            relacoes = relacoes.filter(
-                Q(projecao__valor_planejado__lte=valor_max) |
-                Q(projecao__valor_realizado__lte=valor_max) |
-                Q(projecao__valor_projetado__lte=valor_max) |
-                Q(nota_fiscal__total_nota__lte=valor_max)
-            )
-        except (ValueError, TypeError):
-            pass
-    
-    # Estatísticas gerais
-    total_relacoes = RelacaoProjecaoNotaFiscal.objects.count()
-    total_confirmadas = RelacaoProjecaoNotaFiscal.objects.filter(status='confirmado').count()
-    total_rejeitadas = RelacaoProjecaoNotaFiscal.objects.filter(status='rejeitado').count()
-    total_pendentes = RelacaoProjecaoNotaFiscal.objects.filter(status='pendente').count()
-    
-    # Estatísticas de valores
-    relacoes_confirmadas = RelacaoProjecaoNotaFiscal.objects.filter(status='confirmado').select_related('projecao', 'nota_fiscal')
-    total_valor_projecoes = sum([
-        (r.projecao.valor_planejado or Decimal('0')) + 
-        (r.projecao.valor_realizado or Decimal('0')) + 
-        (r.projecao.valor_projetado or Decimal('0'))
-        for r in relacoes_confirmadas
-    ])
-    total_valor_notas = sum([
-        (r.nota_fiscal.total_nota or Decimal('0')) for r in relacoes_confirmadas
-    ])
-    
-    # Média de score
-    score_medio_avg = relacoes_confirmadas.aggregate(avg_score=Avg('score_match'))['avg_score'] or Decimal('0')
-    
-    # Distribuição por status (para gráfico)
-    status_distribuicao = {
-        'Confirmadas': total_confirmadas,
-        'Rejeitadas': total_rejeitadas,
-        'Pendentes': total_pendentes,
-    }
-    
-    # Distribuição por mês (para gráfico de linha)
-    relacoes_por_mes = defaultdict(int)
-    for relacao in relacoes_confirmadas:
-        mes_key = relacao.created_at.strftime('%Y-%m')
-        relacoes_por_mes[mes_key] += 1
-    
-    meses_ordenados = sorted(relacoes_por_mes.keys())
-    meses_labels = [datetime.strptime(m, '%Y-%m').strftime('%b/%Y') for m in meses_ordenados]
-    meses_data = [relacoes_por_mes[m] for m in meses_ordenados]
-    
-    # Distribuição por score (para gráfico)
-    score_alto = 0
-    score_medio_count = 0
-    score_baixo = 0
-    for relacao in relacoes_confirmadas:
-        if relacao.score_match:
-            score = float(relacao.score_match)
-            if score >= 70:
-                score_alto += 1
-            elif score >= 50:
-                score_medio_count += 1
-            else:
-                score_baixo += 1
-    
-    # Top centros de atividade (para gráfico)
-    centros_count = defaultdict(int)
-    for relacao in relacoes_confirmadas:
-        centro = relacao.projecao.centro_atividade or relacao.nota_fiscal.centro_atividade
-        if centro:
-            centros_count[centro] += 1
-    
-    top_centros = sorted(centros_count.items(), key=lambda x: x[1], reverse=True)[:10]
-    centros_labels = [c[0] for c in top_centros]
-    centros_data = [c[1] for c in top_centros]
-    
-    # Lista de relações para a tabela
-    relacoes_list = list(relacoes.order_by('-created_at')[:100])  # Limitar a 100 para performance
-    
-    context = {
-        'page_title': 'Análise Projeção vs Nota Fiscal',
-        'active_page': 'analise_projecao_nota_fiscal',
-        'relacoes': relacoes_list,
-        'total_relacoes': total_relacoes,
-        'total_confirmadas': total_confirmadas,
-        'total_rejeitadas': total_rejeitadas,
-        'total_pendentes': total_pendentes,
-        'total_valor_projecoes': total_valor_projecoes,
-        'total_valor_notas': total_valor_notas,
-        'score_medio': score_medio_avg,
-        'status_distribuicao': status_distribuicao,
-        'meses_labels': json.dumps(meses_labels),
-        'meses_data': json.dumps(meses_data),
-        'score_alto': score_alto,
-        'score_medio_count': score_medio_count,
-        'score_baixo': score_baixo,
-        'centros_labels': json.dumps(centros_labels),
-        'centros_data': json.dumps(centros_data),
-        'filtro_status': filtro_status,
-        'filtro_centro_atividade': filtro_centro_atividade,
-        'filtro_ano': filtro_ano,
-        'filtro_valor_min': filtro_valor_min,
-        'filtro_valor_max': filtro_valor_max,
-    }
-    return render(request, 'orcamento/analise_projecao_nota_fiscal.html', context)
-
-
-def dados_orcamento(request):
-    """Página de dados consolidados de orçamento e GMD"""
-    from app.models import ProjecaoGasto, NotaFiscal, RequisicaoAlmoxarifado, RelacaoProjecaoNotaFiscal, DadosOrcamento
-    from django.db.models import Count, Sum
-    from django.contrib import messages
-    from decimal import Decimal
-    import calendar
-    
-    # Processar POST para salvar dados
-    if request.method == 'POST':
-        ano = request.POST.get('ano')
-        mes = request.POST.get('mes')
-        conta_orcamentaria = request.POST.get('conta_orcamentaria', '').strip()
-        valor_orcamento = request.POST.get('valor_orcamento', '0').strip()
-        valor_final_desejado = request.POST.get('valor_final_desejado', '0').strip()
-        
-        if ano and mes and conta_orcamentaria:
-            try:
-                ano_int = int(ano)
-                mes_int = int(mes)
-                valor_orcamento_decimal = Decimal(valor_orcamento.replace(',', '.')) if valor_orcamento else Decimal('0')
-                valor_final_desejado_decimal = Decimal(valor_final_desejado.replace(',', '.')) if valor_final_desejado else Decimal('0')
-                
-                # Criar ou atualizar registro
-                dados_orcamento, created = DadosOrcamento.objects.update_or_create(
-                    ano=ano_int,
-                    mes=mes_int,
-                    conta_orcamentaria=conta_orcamentaria,
-                    defaults={
-                        'valor_orcamento': valor_orcamento_decimal,
-                        'valor_final_desejado': valor_final_desejado_decimal,
-                        'created_by': request.user.username if request.user.is_authenticated else 'Sistema'
-                    }
-                )
-                
-                if created:
-                    messages.success(request, f'Dados de orçamento salvos com sucesso para {ano_int}/{mes_int:02d}!')
-                else:
-                    messages.success(request, f'Dados de orçamento atualizados com sucesso para {ano_int}/{mes_int:02d}!')
-            except ValueError as e:
-                messages.error(request, f'Erro ao processar valores: {str(e)}')
-            except Exception as e:
-                messages.error(request, f'Erro ao salvar dados: {str(e)}')
-        else:
-            messages.error(request, 'Todos os campos obrigatórios devem ser preenchidos.')
-    
-    # Estatísticas gerais
-    total_projecoes = ProjecaoGasto.objects.count()
-    total_notas_fiscais = NotaFiscal.objects.count()
-    total_requisicoes = RequisicaoAlmoxarifado.objects.count()
-    total_relacoes_confirmadas = RelacaoProjecaoNotaFiscal.objects.filter(status='confirmado').count()
-    
-    # Anos para exibir (2025 e 2026)
-    anos = [2025, 2026]
-    meses_nomes = [calendar.month_name[i] for i in range(1, 13)]
-    
-    # Buscar dados existentes organizados por ano e mês
-    # Criar estrutura mais simples para o template
-    anos_dados = []
-    for ano in anos:
-        meses_dados = []
-        for mes in range(1, 13):
-            dados_mes = list(DadosOrcamento.objects.filter(ano=ano, mes=mes).order_by('conta_orcamentaria'))
-            meses_dados.append({
-                'mes': mes,
-                'mes_nome': meses_nomes[mes - 1],
-                'dados': dados_mes
-            })
-        anos_dados.append({
-            'ano': ano,
-            'meses': meses_dados
-        })
-    
-    context = {
-        'page_title': 'Dados de Orçamento',
-        'active_page': 'dados_orcamento',
-        'total_projecoes': total_projecoes,
-        'total_notas_fiscais': total_notas_fiscais,
-        'total_requisicoes': total_requisicoes,
-        'total_relacoes_confirmadas': total_relacoes_confirmadas,
-        'anos_dados': anos_dados,
-        'meses': list(range(1, 13)),
-        'meses_nomes': meses_nomes,
-    }
-    return render(request, 'orcamento/dados_orcamento.html', context)
-
-
-def relacionar_projecao_nota_fiscal(request):
-    """Página para relacionar e confirmar correspondências entre Projeções de Gastos e Notas Fiscais"""
-    from app.models import ProjecaoGasto, NotaFiscal, RelacaoProjecaoNotaFiscal
-    from django.db.models import Q
-    from django.contrib import messages
-    from decimal import Decimal
-    from datetime import datetime
-    
-    # Processar confirmação de relação (POST)
-    if request.method == 'POST':
-        acao = request.POST.get('acao')
-        projecao_id = request.POST.get('projecao_id')
-        nota_id = request.POST.get('nota_id')
-        observacoes = request.POST.get('observacoes', '').strip()
-        score_match = request.POST.get('score_match', '').strip()
-        
-        try:
-            projecao = ProjecaoGasto.objects.get(id=projecao_id)
-            nota = NotaFiscal.objects.get(id=nota_id)
-            
-            # Converter score_match para Decimal de forma segura
-            score_match_decimal = None
-            if score_match:
-                try:
-                    # Normalizar: substituir vírgula por ponto, remover espaços e caracteres não numéricos (exceto ponto)
-                    score_str = str(score_match).replace(',', '.').replace(' ', '').strip()
-                    # Remover qualquer caractere que não seja dígito ou ponto
-                    import re
-                    score_str = re.sub(r'[^\d.]', '', score_str)
-                    # Garantir que há pelo menos um dígito
-                    if score_str and score_str.replace('.', '').isdigit():
-                        # Tentar converter para float primeiro, depois para Decimal
-                        score_float = float(score_str)
-                        # Limitar a 2 casas decimais e garantir que está entre 0 e 100
-                        score_float = max(0, min(100, score_float))
-                        score_match_decimal = Decimal(f"{score_float:.2f}")
-                except (ValueError, TypeError, Exception) as e:
-                    # Se não conseguir converter, calcular o score novamente
-                    try:
-                        # Recalcular score usando a função de cálculo
-                        def parse_date(date_str):
-                            if not date_str:
-                                return None
-                            if isinstance(date_str, datetime):
-                                return date_str.date()
-                            if isinstance(date_str, str):
-                                formats = ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d']
-                                for fmt in formats:
-                                    try:
-                                        return datetime.strptime(date_str[:10], fmt).date()
-                                    except:
-                                        continue
-                            return None
-                        
-                        def valor_similar(valor1, valor2, tolerancia_percentual=5):
-                            if not valor1 or not valor2:
-                                return False
-                            try:
-                                v1 = Decimal(str(valor1))
-                                v2 = Decimal(str(valor2))
-                                if v1 == 0 or v2 == 0:
-                                    return v1 == v2
-                                diff_percent = abs((v1 - v2) / max(abs(v1), abs(v2))) * 100
-                                return diff_percent <= tolerancia_percentual
-                            except:
-                                return False
-                        
-                        def calcular_score_match(projecao, nota):
-                            score = 0
-                            max_score = 0
-                            
-                            max_score += 3
-                            if projecao.centro_atividade and nota.centro_atividade:
-                                if projecao.centro_atividade.strip().upper() == nota.centro_atividade.strip().upper():
-                                    score += 3
-                                elif projecao.centro_atividade.strip().upper() in nota.centro_atividade.strip().upper() or nota.centro_atividade.strip().upper() in projecao.centro_atividade.strip().upper():
-                                    score += 1
-                            
-                            max_score += 5
-                            valores_projecao = [projecao.valor_planejado, projecao.valor_realizado, projecao.valor_projetado]
-                            valores_projecao = [v for v in valores_projecao if v]
-                            if valores_projecao and nota.total_nota:
-                                for vp in valores_projecao:
-                                    if valor_similar(vp, nota.total_nota, tolerancia_percentual=2):
-                                        score += 5
-                                        break
-                                    elif valor_similar(vp, nota.total_nota, tolerancia_percentual=10):
-                                        score += 2
-                                        break
-                            
-                            max_score += 3
-                            data_projecao = projecao.data_requisicao or projecao.data_planejada or projecao.data_realizada
-                            data_nota = parse_date(nota.data_emissao)
-                            if data_projecao and data_nota:
-                                diff_dias = abs((data_projecao - data_nota).days)
-                                if diff_dias == 0:
-                                    score += 3
-                                elif diff_dias <= 7:
-                                    score += 2
-                                elif diff_dias <= 30:
-                                    score += 1
-                            
-                            max_score += 2
-                            if projecao.fornecedor and nota.nome_fantasia_emitente:
-                                fornecedor_norm = projecao.fornecedor.strip().upper()
-                                emitente_norm = nota.nome_fantasia_emitente.strip().upper()
-                                if fornecedor_norm == emitente_norm:
-                                    score += 2
-                                elif fornecedor_norm in emitente_norm or emitente_norm in fornecedor_norm:
-                                    score += 1
-                            
-                            max_score += 2
-                            if projecao.numero_requisicao and nota.nota:
-                                if projecao.numero_requisicao.strip() == nota.nota.strip():
-                                    score += 2
-                                elif projecao.numero_requisicao.strip() in nota.nota.strip() or nota.nota.strip() in projecao.numero_requisicao.strip():
-                                    score += 1
-                            
-                            percentual_match = (score / max_score * 100) if max_score > 0 else 0
-                            return Decimal(f"{percentual_match:.2f}")
-                        
-                        # Chamar a função para calcular o score
-                        score_match_decimal = calcular_score_match(projecao, nota)
-                    except Exception as calc_error:
-                        # Se não conseguir calcular, deixar None
-                        score_match_decimal = None
-            
-            if acao == 'confirmar':
-                # Verificar se já existe relação
-                relacao_existente = RelacaoProjecaoNotaFiscal.objects.filter(
-                    projecao=projecao,
-                    nota_fiscal=nota
-                ).first()
-                
-                if relacao_existente:
-                    # Atualizar relação existente
-                    relacao_existente.status = 'confirmado'
-                    relacao_existente.observacoes = observacoes
-                    if score_match_decimal is not None:
-                        relacao_existente.score_match = score_match_decimal
-                    relacao_existente.save()
-                    messages.success(request, f'Relação atualizada com sucesso!')
-                else:
-                    # Criar nova relação
-                    relacao = RelacaoProjecaoNotaFiscal.objects.create(
-                        projecao=projecao,
-                        nota_fiscal=nota,
-                        status='confirmado',
-                        observacoes=observacoes,
-                        confirmado_por=request.user.username if request.user.is_authenticated else 'Sistema',
-                        score_match=score_match_decimal
-                    )
-                    messages.success(request, f'Relação confirmada com sucesso!')
-            
-            elif acao == 'rejeitar':
-                # Marcar como rejeitado
-                relacao_existente = RelacaoProjecaoNotaFiscal.objects.filter(
-                    projecao=projecao,
-                    nota_fiscal=nota
-                ).first()
-                
-                if relacao_existente:
-                    relacao_existente.status = 'rejeitado'
-                    relacao_existente.observacoes = observacoes
-                    relacao_existente.save()
-                    messages.info(request, f'Relação rejeitada.')
-                else:
-                    RelacaoProjecaoNotaFiscal.objects.create(
-                        projecao=projecao,
-                        nota_fiscal=nota,
-                        status='rejeitado',
-                        observacoes=observacoes,
-                        confirmado_por=request.user.username if request.user.is_authenticated else 'Sistema'
-                    )
-                    messages.info(request, f'Relação rejeitada.')
-            
-            elif acao == 'remover':
-                # Remover relação confirmada
-                RelacaoProjecaoNotaFiscal.objects.filter(
-                    projecao=projecao,
-                    nota_fiscal=nota
-                ).delete()
-                messages.success(request, f'Relação removida com sucesso!')
-        
-        except ProjecaoGasto.DoesNotExist:
-            messages.error(request, 'Projeção não encontrada.')
-        except NotaFiscal.DoesNotExist:
-            messages.error(request, 'Nota Fiscal não encontrada.')
-        except Exception as e:
-            messages.error(request, f'Erro ao processar: {str(e)}')
-        
-        # Redirecionar após POST para evitar renderização duplicada e melhorar UX
-        from django.shortcuts import redirect
-        # Preservar filtros na URL ao redirecionar
-        redirect_url = 'relacionar_projecao_nota_fiscal'
-        query_params = []
-        if request.GET.get('filtro_centro_atividade'):
-            query_params.append(f"filtro_centro_atividade={request.GET.get('filtro_centro_atividade')}")
-        if request.GET.get('filtro_ano'):
-            query_params.append(f"filtro_ano={request.GET.get('filtro_ano')}")
-        if request.GET.get('filtro_tipo'):
-            query_params.append(f"filtro_tipo={request.GET.get('filtro_tipo')}")
-        if request.GET.get('filtro_valor_min'):
-            query_params.append(f"filtro_valor_min={request.GET.get('filtro_valor_min')}")
-        if request.GET.get('filtro_valor_max'):
-            query_params.append(f"filtro_valor_max={request.GET.get('filtro_valor_max')}")
-        if request.GET.get('mostrar_apenas_proximos') == 'on':
-            query_params.append("mostrar_apenas_proximos=on")
-        if request.GET.get('mostrar_apenas_nao_confirmados') == 'on':
-            query_params.append("mostrar_apenas_nao_confirmados=on")
-        
-        if query_params:
-            redirect_url += '?' + '&'.join(query_params)
-        
-        return redirect(redirect_url)
-    
-    # Filtros (GET)
-    filtro_centro_atividade = request.GET.get('filtro_centro_atividade', '').strip()
-    filtro_ano = request.GET.get('filtro_ano', '').strip()
-    filtro_valor_min = request.GET.get('filtro_valor_min', '').strip()
-    filtro_valor_max = request.GET.get('filtro_valor_max', '').strip()
-    filtro_tipo = request.GET.get('filtro_tipo', '').strip()
-    mostrar_apenas_proximos = request.GET.get('mostrar_apenas_proximos', '') == 'on'
-    mostrar_apenas_nao_confirmados = request.GET.get('mostrar_apenas_nao_confirmados', '') == 'on'
-    
-    # Buscar registros
-    projecoes = ProjecaoGasto.objects.all()
-    notas = NotaFiscal.objects.all()
-    
-    # Aplicar filtros (mesma lógica da análise)
-    if filtro_centro_atividade:
-        projecoes = projecoes.filter(centro_atividade__icontains=filtro_centro_atividade)
-        notas = notas.filter(centro_atividade__icontains=filtro_centro_atividade)
-    
-    if filtro_ano:
-        try:
-            ano = int(filtro_ano)
-            projecoes = projecoes.filter(ano_referencia=ano)
-            notas = notas.filter(
-                Q(data_emissao__startswith=f"{ano}-") |
-                Q(data_emissao__contains=f"/{ano}") |
-                Q(data_emissao__contains=f"-{ano}")
-            )
-        except ValueError:
-            pass
-    
-    if filtro_tipo:
-        projecoes = projecoes.filter(tipo__icontains=filtro_tipo)
-    
-    if filtro_valor_min:
-        try:
-            valor_min = Decimal(filtro_valor_min)
-            projecoes = projecoes.filter(
-                Q(valor_planejado__gte=valor_min) |
-                Q(valor_realizado__gte=valor_min) |
-                Q(valor_projetado__gte=valor_min)
-            )
-            notas = notas.filter(total_nota__gte=valor_min)
-        except (ValueError, TypeError):
-            pass
-    
-    if filtro_valor_max:
-        try:
-            valor_max = Decimal(filtro_valor_max)
-            projecoes = projecoes.filter(
-                Q(valor_planejado__lte=valor_max) |
-                Q(valor_realizado__lte=valor_max) |
-                Q(valor_projetado__lte=valor_max)
-            )
-            notas = notas.filter(total_nota__lte=valor_max)
-        except (ValueError, TypeError):
-            pass
-    
-    # Função para parsear data (reutilizar da análise)
-    def parse_date(date_str):
-        if not date_str:
-            return None
-        if isinstance(date_str, datetime):
-            return date_str.date()
-        if isinstance(date_str, str):
-            formats = ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d']
-            for fmt in formats:
-                try:
-                    return datetime.strptime(date_str[:10], fmt).date()
-                except:
-                    continue
-        return None
-    
-    def valor_similar(valor1, valor2, tolerancia_percentual=5):
-        if not valor1 or not valor2:
-            return False
-        try:
-            v1 = Decimal(str(valor1))
-            v2 = Decimal(str(valor2))
-            if v1 == 0 or v2 == 0:
-                return v1 == v2
-            diff_percent = abs((v1 - v2) / max(abs(v1), abs(v2))) * 100
-            return diff_percent <= tolerancia_percentual
-        except:
-            return False
-    
-    def calcular_score_match(projecao, nota):
-        score = 0
-        max_score = 0
-        detalhes = []
-        
-        max_score += 3
-        if projecao.centro_atividade and nota.centro_atividade:
-            if projecao.centro_atividade.strip().upper() == nota.centro_atividade.strip().upper():
-                score += 3
-                detalhes.append("Centro de Atividade: ✓")
-            elif projecao.centro_atividade.strip().upper() in nota.centro_atividade.strip().upper() or nota.centro_atividade.strip().upper() in projecao.centro_atividade.strip().upper():
-                score += 1
-                detalhes.append("Centro de Atividade: ~")
-        
-        max_score += 5
-        valores_projecao = [projecao.valor_planejado, projecao.valor_realizado, projecao.valor_projetado]
-        valores_projecao = [v for v in valores_projecao if v]
-        if valores_projecao and nota.total_nota:
-            melhor_match = False
-            for vp in valores_projecao:
-                if valor_similar(vp, nota.total_nota, tolerancia_percentual=2):
-                    score += 5
-                    melhor_match = True
-                    detalhes.append(f"Valor: ✓ ({vp} ≈ {nota.total_nota})")
-                    break
-                elif valor_similar(vp, nota.total_nota, tolerancia_percentual=10):
-                    score += 2
-                    melhor_match = True
-                    detalhes.append(f"Valor: ~ ({vp} ≈ {nota.total_nota})")
-                    break
-            if not melhor_match:
-                detalhes.append(f"Valor: ✗")
-        
-        max_score += 3
-        data_projecao = projecao.data_requisicao or projecao.data_planejada or projecao.data_realizada
-        data_nota = parse_date(nota.data_emissao)
-        if data_projecao and data_nota:
-            diff_dias = abs((data_projecao - data_nota).days)
-            if diff_dias == 0:
-                score += 3
-                detalhes.append("Data: ✓ (mesma data)")
-            elif diff_dias <= 7:
-                score += 2
-                detalhes.append(f"Data: ~ ({diff_dias} dias de diferença)")
-            elif diff_dias <= 30:
-                score += 1
-                detalhes.append(f"Data: ~ ({diff_dias} dias de diferença)")
-            else:
-                detalhes.append(f"Data: ✗ ({diff_dias} dias de diferença)")
-        
-        max_score += 2
-        if projecao.fornecedor and nota.nome_fantasia_emitente:
-            fornecedor_norm = projecao.fornecedor.strip().upper()
-            emitente_norm = nota.nome_fantasia_emitente.strip().upper()
-            if fornecedor_norm == emitente_norm:
-                score += 2
-                detalhes.append("Fornecedor/Emitente: ✓")
-            elif fornecedor_norm in emitente_norm or emitente_norm in fornecedor_norm:
-                score += 1
-                detalhes.append("Fornecedor/Emitente: ~")
-        
-        max_score += 2
-        if projecao.numero_requisicao and nota.nota:
-            if projecao.numero_requisicao.strip() == nota.nota.strip():
-                score += 2
-                detalhes.append("Número: ✓")
-            elif projecao.numero_requisicao.strip() in nota.nota.strip() or nota.nota.strip() in projecao.numero_requisicao.strip():
-                score += 1
-                detalhes.append("Número: ~")
-        
-        percentual_match = (score / max_score * 100) if max_score > 0 else 0
-        
-        return {
-            'score': score,
-            'max_score': max_score,
-            'percentual': percentual_match,
-            'detalhes': detalhes
-        }
-    
-    # Encontrar possíveis correspondências
-    matches = []
-    projecoes_list = list(projecoes)
-    notas_list = list(notas)
-    
-    # Buscar relações já confirmadas
-    relacoes_confirmadas = RelacaoProjecaoNotaFiscal.objects.filter(status='confirmado').select_related('projecao', 'nota_fiscal')
-    relacoes_dict = {(r.projecao_id, r.nota_fiscal_id): r for r in relacoes_confirmadas}
-    
-    for projecao in projecoes_list:
-        melhor_match = None
-        melhor_score = 0
-        
-        for nota in notas_list:
-            match_info = calcular_score_match(projecao, nota)
-            if match_info['percentual'] > melhor_score:
-                melhor_score = match_info['percentual']
-                melhor_match = {
-                    'projecao': projecao,
-                    'nota': nota,
-                    'match_info': match_info
-                }
-        
-        if melhor_match:
-            # Verificar se já está confirmado
-            key = (projecao.id, melhor_match['nota'].id)
-            relacao_confirmada = relacoes_dict.get(key)
-            melhor_match['relacao_confirmada'] = relacao_confirmada
-            
-            if mostrar_apenas_nao_confirmados and relacao_confirmada:
-                continue
-            
-            if not mostrar_apenas_proximos or melhor_score >= 50:
-                matches.append(melhor_match)
-    
-    # Ordenar por score decrescente
-    matches.sort(key=lambda x: x['match_info']['percentual'], reverse=True)
-    
-    # Estatísticas
-    total_relacoes_confirmadas = RelacaoProjecaoNotaFiscal.objects.filter(status='confirmado').count()
-    total_relacoes_rejeitadas = RelacaoProjecaoNotaFiscal.objects.filter(status='rejeitado').count()
-    
-    context = {
-        'page_title': 'Relacionar Projeção vs Nota Fiscal',
-        'active_page': 'relacionar_projecao_nota_fiscal',
-        'matches': matches,
-        'total_projecoes': len(projecoes_list),
-        'total_notas': len(notas_list),
-        'total_relacoes_confirmadas': total_relacoes_confirmadas,
-        'total_relacoes_rejeitadas': total_relacoes_rejeitadas,
-        'filtro_centro_atividade': filtro_centro_atividade,
-        'filtro_ano': filtro_ano,
-        'filtro_valor_min': filtro_valor_min,
-        'filtro_valor_max': filtro_valor_max,
-        'filtro_tipo': filtro_tipo,
-        'mostrar_apenas_proximos': mostrar_apenas_proximos,
-        'mostrar_apenas_nao_confirmados': mostrar_apenas_nao_confirmados,
-    }
-    return render(request, 'orcamento/relacionar_projecao_nota_fiscal.html', context)
-
-
-def visualizar_relacao_projecao_nota(request, relation_id=None):
-    """Visualizar detalhes da relação entre Projeção de Gasto e Nota Fiscal"""
-    from app.models import ProjecaoGasto, NotaFiscal, RelacaoProjecaoNotaFiscal
-    from django.shortcuts import redirect
-    from django.contrib import messages
-    from decimal import Decimal
-    from datetime import datetime
-    
-    relacao = None
-    projecao = None
-    nota = None
-    match_info = None
-    
-    # Se relation_id foi fornecido, buscar relação confirmada
-    if relation_id:
-        try:
-            relacao = RelacaoProjecaoNotaFiscal.objects.select_related('projecao', 'nota_fiscal').get(id=relation_id)
-            projecao = relacao.projecao
-            nota = relacao.nota_fiscal
-        except RelacaoProjecaoNotaFiscal.DoesNotExist:
-            messages.error(request, 'Relação não encontrada.')
-            return redirect('relacionar_projecao_nota_fiscal')
-    
-    # Se projecao_id e nota_id foram fornecidos via GET, buscar diretamente
-    else:
-        projecao_id = request.GET.get('projecao_id')
-        nota_id = request.GET.get('nota_id')
-        
-        if projecao_id and nota_id:
-            try:
-                projecao = ProjecaoGasto.objects.get(id=projecao_id)
-                nota = NotaFiscal.objects.get(id=nota_id)
-                # Tentar buscar relação existente
-                relacao = RelacaoProjecaoNotaFiscal.objects.filter(
-                    projecao=projecao,
-                    nota_fiscal=nota
-                ).first()
-            except ProjecaoGasto.DoesNotExist:
-                messages.error(request, 'Projeção não encontrada.')
-                return redirect('relacionar_projecao_nota_fiscal')
-            except NotaFiscal.DoesNotExist:
-                messages.error(request, 'Nota Fiscal não encontrada.')
-                return redirect('relacionar_projecao_nota_fiscal')
-        else:
-            messages.error(request, 'Parâmetros inválidos. É necessário fornecer relation_id ou projecao_id e nota_id.')
-            return redirect('relacionar_projecao_nota_fiscal')
-    
-    # Calcular score de match (mesma lógica da análise)
-    def parse_date(date_str):
-        if not date_str:
-            return None
-        if isinstance(date_str, datetime):
-            return date_str.date()
-        if isinstance(date_str, str):
-            formats = ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d']
-            for fmt in formats:
-                try:
-                    return datetime.strptime(date_str[:10], fmt).date()
-                except:
-                    continue
-        return None
-    
-    def valor_similar(valor1, valor2, tolerancia_percentual=5):
-        if not valor1 or not valor2:
-            return False
-        try:
-            v1 = Decimal(str(valor1))
-            v2 = Decimal(str(valor2))
-            if v1 == 0 or v2 == 0:
-                return v1 == v2
-            diff_percent = abs((v1 - v2) / max(abs(v1), abs(v2))) * 100
-            return diff_percent <= tolerancia_percentual
-        except:
-            return False
-    
-    def calcular_score_match(projecao, nota):
-        score = 0
-        max_score = 0
-        detalhes = []
-        comparacoes = {}
-        
-        # 1. Centro de Atividade (peso: 3)
-        max_score += 3
-        if projecao.centro_atividade and nota.centro_atividade:
-            proj_ca = projecao.centro_atividade.strip().upper()
-            nota_ca = nota.centro_atividade.strip().upper()
-            if proj_ca == nota_ca:
-                score += 3
-                detalhes.append("Centro de Atividade: ✓ (Exato)")
-                comparacoes['centro_atividade'] = {'status': 'exato', 'projecao': projecao.centro_atividade, 'nota': nota.centro_atividade}
-            elif proj_ca in nota_ca or nota_ca in proj_ca:
-                score += 1
-                detalhes.append("Centro de Atividade: ~ (Parcial)")
-                comparacoes['centro_atividade'] = {'status': 'parcial', 'projecao': projecao.centro_atividade, 'nota': nota.centro_atividade}
-            else:
-                comparacoes['centro_atividade'] = {'status': 'diferente', 'projecao': projecao.centro_atividade, 'nota': nota.centro_atividade}
-        else:
-            comparacoes['centro_atividade'] = {'status': 'nao_disponivel', 'projecao': projecao.centro_atividade or '-', 'nota': nota.centro_atividade or '-'}
-        
-        # 2. Valor (peso: 5)
-        max_score += 5
-        valores_projecao = [projecao.valor_planejado, projecao.valor_realizado, projecao.valor_projetado]
-        valores_projecao = [v for v in valores_projecao if v]
-        if valores_projecao and nota.total_nota:
-            melhor_match = False
-            melhor_valor = None
-            melhor_tipo = None
-            for idx, vp in enumerate(valores_projecao):
-                tipo_valor = ['Planejado', 'Realizado', 'Projetado'][idx]
-                if valor_similar(vp, nota.total_nota, tolerancia_percentual=2):
-                    score += 5
-                    melhor_match = True
-                    melhor_valor = vp
-                    melhor_tipo = tipo_valor
-                    detalhes.append(f"Valor: ✓ ({tipo_valor}: {vp} ≈ {nota.total_nota})")
-                    break
-                elif valor_similar(vp, nota.total_nota, tolerancia_percentual=10):
-                    score += 2
-                    melhor_match = True
-                    melhor_valor = vp
-                    melhor_tipo = tipo_valor
-                    detalhes.append(f"Valor: ~ ({tipo_valor}: {vp} ≈ {nota.total_nota})")
-                    break
-            
-            if melhor_match:
-                comparacoes['valor'] = {
-                    'status': 'match' if score >= 5 else 'parcial',
-                    'projecao': melhor_valor,
-                    'tipo': melhor_tipo,
-                    'nota': nota.total_nota,
-                    'diferenca': abs(float(melhor_valor) - float(nota.total_nota)),
-                    'diferenca_percent': abs((float(melhor_valor) - float(nota.total_nota)) / float(nota.total_nota) * 100) if nota.total_nota else 0
-                }
-            else:
-                comparacoes['valor'] = {
-                    'status': 'diferente',
-                    'projecao': valores_projecao[0] if valores_projecao else None,
-                    'nota': nota.total_nota
-                }
-        else:
-            comparacoes['valor'] = {
-                'status': 'nao_disponivel',
-                'projecao': valores_projecao[0] if valores_projecao else None,
-                'nota': nota.total_nota
-            }
-        
-        # 3. Data (peso: 3)
-        max_score += 3
-        data_projecao = projecao.data_requisicao or projecao.data_planejada or projecao.data_realizada
-        data_nota = parse_date(nota.data_emissao)
-        if data_projecao and data_nota:
-            diff_dias = abs((data_projecao - data_nota).days)
-            if diff_dias == 0:
-                score += 3
-                detalhes.append("Data: ✓ (mesma data)")
-                comparacoes['data'] = {'status': 'exato', 'projecao': data_projecao, 'nota': data_nota, 'diff_dias': 0}
-            elif diff_dias <= 7:
-                score += 2
-                detalhes.append(f"Data: ~ ({diff_dias} dias de diferença)")
-                comparacoes['data'] = {'status': 'proximo', 'projecao': data_projecao, 'nota': data_nota, 'diff_dias': diff_dias}
-            elif diff_dias <= 30:
-                score += 1
-                detalhes.append(f"Data: ~ ({diff_dias} dias de diferença)")
-                comparacoes['data'] = {'status': 'parcial', 'projecao': data_projecao, 'nota': data_nota, 'diff_dias': diff_dias}
-            else:
-                detalhes.append(f"Data: ✗ ({diff_dias} dias de diferença)")
-                comparacoes['data'] = {'status': 'diferente', 'projecao': data_projecao, 'nota': data_nota, 'diff_dias': diff_dias}
-        else:
-            comparacoes['data'] = {
-                'status': 'nao_disponivel',
-                'projecao': data_projecao,
-                'nota': data_nota
-            }
-        
-        # 4. Fornecedor/Emitente (peso: 2)
-        max_score += 2
-        if projecao.fornecedor and nota.nome_fantasia_emitente:
-            fornecedor_norm = projecao.fornecedor.strip().upper()
-            emitente_norm = nota.nome_fantasia_emitente.strip().upper()
-            if fornecedor_norm == emitente_norm:
-                score += 2
-                detalhes.append("Fornecedor/Emitente: ✓")
-                comparacoes['fornecedor'] = {'status': 'exato', 'projecao': projecao.fornecedor, 'nota': nota.nome_fantasia_emitente}
-            elif fornecedor_norm in emitente_norm or emitente_norm in fornecedor_norm:
-                score += 1
-                detalhes.append("Fornecedor/Emitente: ~")
-                comparacoes['fornecedor'] = {'status': 'parcial', 'projecao': projecao.fornecedor, 'nota': nota.nome_fantasia_emitente}
-            else:
-                comparacoes['fornecedor'] = {'status': 'diferente', 'projecao': projecao.fornecedor, 'nota': nota.nome_fantasia_emitente}
-        else:
-            comparacoes['fornecedor'] = {
-                'status': 'nao_disponivel',
-                'projecao': projecao.fornecedor or '-',
-                'nota': nota.nome_fantasia_emitente or '-'
-            }
-        
-        # 5. Número Requisição vs Nota (peso: 2)
-        max_score += 2
-        if projecao.numero_requisicao and nota.nota:
-            if projecao.numero_requisicao.strip() == nota.nota.strip():
-                score += 2
-                detalhes.append("Número: ✓")
-                comparacoes['numero'] = {'status': 'exato', 'projecao': projecao.numero_requisicao, 'nota': nota.nota}
-            elif projecao.numero_requisicao.strip() in nota.nota.strip() or nota.nota.strip() in projecao.numero_requisicao.strip():
-                score += 1
-                detalhes.append("Número: ~")
-                comparacoes['numero'] = {'status': 'parcial', 'projecao': projecao.numero_requisicao, 'nota': nota.nota}
-            else:
-                comparacoes['numero'] = {'status': 'diferente', 'projecao': projecao.numero_requisicao, 'nota': nota.nota}
-        else:
-            comparacoes['numero'] = {
-                'status': 'nao_disponivel',
-                'projecao': projecao.numero_requisicao or '-',
-                'nota': nota.nota or '-'
-            }
-        
-        percentual_match = (score / max_score * 100) if max_score > 0 else 0
-        
-        return {
-            'score': score,
-            'max_score': max_score,
-            'percentual': percentual_match,
-            'detalhes': detalhes,
-            'comparacoes': comparacoes
-        }
-    
-    # Calcular match info
-    match_info = calcular_score_match(projecao, nota)
-    
-    # Se houver relação confirmada, usar score salvo se disponível
-    if relacao and relacao.score_match:
-        match_info['percentual'] = float(relacao.score_match)
-    
-    context = {
-        'page_title': f'Visualizar Relação Projeção vs Nota Fiscal',
-        'active_page': 'relacionar_projecao_nota_fiscal',
-        'relacao': relacao,
-        'projecao': projecao,
-        'nota': nota,
-        'match_info': match_info,
-    }
-    return render(request, 'visualizar/visualizar_relacao_projecao_nota.html', context)
 
 
 def api_meses_por_ano(request):
@@ -1876,44 +923,6 @@ def api_dados_diarios_requisicoes(request):
         return JsonResponse({'error': f'Formato de data inválido: {str(e)}'}, status=400)
     except Exception as e:
         return JsonResponse({'error': f'Erro ao processar dados: {str(e)}'}, status=500)
-
-
-def template_debug(request):
-    """Debug view to show which template file is being used"""
-    from django.template import loader
-    import os
-    
-    try:
-        template = loader.get_template('base.html')
-        template_path = template.origin.name if hasattr(template.origin, 'name') else str(template.origin)
-        template_exists = os.path.exists(template_path)
-        file_size = os.path.getsize(template_path) if template_exists else 0
-        file_modified = os.path.getmtime(template_path) if template_exists else None
-        
-        from datetime import datetime
-        modified_str = datetime.fromtimestamp(file_modified).strftime('%Y-%m-%d %H:%M:%S') if file_modified else 'N/A'
-        
-        # Read first few lines of the file
-        first_lines = []
-        if template_exists:
-            with open(template_path, 'r', encoding='utf-8') as f:
-                for i, line in enumerate(f):
-                    if i < 10:
-                        first_lines.append(line.strip())
-                    else:
-                        break
-        
-        context = {
-            'template_path': template_path,
-            'template_exists': template_exists,
-            'file_size': file_size,
-            'file_modified': modified_str,
-            'first_lines': first_lines,
-            'debug_mode': settings.DEBUG,
-        }
-        return render(request, 'debug_template.html', context)
-    except Exception as e:
-        return render(request, 'debug_template.html', {'error': str(e)})
 
 
 def testes(request):
@@ -2571,23 +1580,6 @@ def maquina_primaria_secundaria(request):
                 except Exception as e:
                     messages.error(request, f'Erro ao remover relacionamento: {str(e)}')
         
-        elif 'remover_relacionamentos' in request.POST:
-            # Remoção em lote
-            relacionamento_ids = request.POST.getlist('relacionamento_ids')
-            if relacionamento_ids:
-                try:
-                    relacionamentos = MaquinaPrimariaSecundaria.objects.filter(id__in=relacionamento_ids)
-                    count = relacionamentos.count()
-                    if count > 0:
-                        relacionamentos.delete()
-                        messages.success(request, f'{count} relacionamento(s) removido(s) com sucesso.')
-                    else:
-                        messages.warning(request, 'Nenhum relacionamento válido foi encontrado para remover.')
-                except Exception as e:
-                    messages.error(request, f'Erro ao remover relacionamentos: {str(e)}')
-            else:
-                messages.warning(request, 'Nenhum relacionamento foi selecionado para remover.')
-        
         return redirect('maquina_primaria_secundaria')
     
     context = {
@@ -2957,7 +1949,7 @@ def importar_maquinas(request):
                 'page_title': 'Importar Máquinas',
                 'active_page': 'importar_maquinas'
             }
-            return render(request, 'importar/importar_maquinas.html', context)
+            return render(request, 'importar/maquinas.html', context)
         
         file = request.FILES['file']
         
@@ -2974,7 +1966,7 @@ def importar_maquinas(request):
                 'page_title': 'Importar Máquinas',
                 'active_page': 'importar_maquinas'
             }
-            return render(request, 'importar/importar_maquinas.html', context)
+            return render(request, 'importar/maquinas.html', context)
         
         # Verificar se deve apenas adicionar novos registros (ignorar duplicados)
         only_new_records = request.POST.get('only_new_records', 'off') == 'on'
@@ -3035,7 +2027,7 @@ def importar_maquinas(request):
         'page_title': 'Importar Máquinas',
         'active_page': 'importar_maquinas'
     }
-    return render(request, 'importar/importar_maquinas.html', context)
+    return render(request, 'importar/maquinas.html', context)
 
 
 def importar_manutentores(request):
@@ -3608,58 +2600,6 @@ def importar_requisicoes_almoxarifado(request):
     return render(request, 'importar/importar_requisicoes_almoxaridado.html', context)
 
 
-def importar_projecoes_gastos(request):
-    """Importar Projeções de Gastos page view"""
-    from app.utils import upload_projecoes_gastos_from_file
-    from django.contrib import messages
-    
-    if request.method == 'POST':
-        # Verificar se há arquivo enviado
-        if 'file' not in request.FILES:
-            messages.error(request, 'Por favor, selecione um arquivo para importar.')
-            context = {
-                'page_title': 'Importar Projeções de Gastos',
-                'active_page': 'importar_projecoes_gastos'
-            }
-            return render(request, 'importar/importar_projecoes_gastos.html', context)
-        
-        file = request.FILES['file']
-        update_existing = request.POST.get('update_existing') == 'on'
-        only_new_records = request.POST.get('only_new_records') == 'on'
-        
-        # Se "only_new_records" estiver marcado, não atualizar existentes
-        if only_new_records:
-            update_existing = False
-        
-        # Processar arquivo
-        try:
-            created_count, updated_count, errors = upload_projecoes_gastos_from_file(file, update_existing=update_existing)
-            
-            # Mensagens de sucesso
-            if created_count > 0:
-                messages.success(request, f'{created_count} registro(s) de projeção de gastos importado(s) com sucesso!')
-            if updated_count > 0:
-                messages.info(request, f'{updated_count} registro(s) atualizado(s).')
-            if created_count == 0 and updated_count == 0:
-                messages.warning(request, 'Nenhum registro foi importado. Verifique se há novos registros no arquivo.')
-            
-            # Mensagens de erro
-            if errors:
-                for error in errors[:10]:  # Limitar a 10 erros para não sobrecarregar
-                    messages.error(request, error)
-                if len(errors) > 10:
-                    messages.error(request, f'... e mais {len(errors) - 10} erro(s). Verifique o console para mais detalhes.')
-        
-        except Exception as e:
-            messages.error(request, f'Erro ao processar arquivo: {str(e)}')
-    
-    context = {
-        'page_title': 'Importar Projeções de Gastos',
-        'active_page': 'importar_projecoes_gastos'
-    }
-    return render(request, 'importar/importar_projecoes_gastos.html', context)
-
-
 def importar_estoque(request):
     """Importar Estoque page view"""
     if request.method == 'POST':
@@ -3969,36 +2909,28 @@ def importar_locais_e_cas(request):
 
 
 def cadastrar_local_e_cas(request):
-    """Cadastrar novo Centro de Atividade (CA) com múltiplos locais"""
-    from app.forms import CentroAtividadeForm, LocalCentroAtividadeFormSet
+    """Cadastrar novo Centro de Atividade (CA) com local"""
+    from app.forms import CentroAtividadeForm
     
     if request.method == 'POST':
         form = CentroAtividadeForm(request.POST)
-        formset = LocalCentroAtividadeFormSet(request.POST)
         
-        if form.is_valid() and formset.is_valid():
+        if form.is_valid():
             try:
                 centro_atividade = form.save()
-                formset.instance = centro_atividade
-                formset.save()
                 messages.success(request, f'Centro de Atividade {centro_atividade.ca} cadastrado com sucesso!')
                 return redirect('consultar_locais_e_cas')
             except Exception as e:
                 messages.error(request, f'Erro ao cadastrar Centro de Atividade: {str(e)}')
         else:
             handle_form_errors(form, request)
-            if formset.errors:
-                for error in formset.non_form_errors():
-                    messages.error(request, f'Erro no formulário: {error}')
     else:
         form = CentroAtividadeForm()
-        formset = LocalCentroAtividadeFormSet()
     
     context = {
         'page_title': 'Cadastrar Local e CA',
         'active_page': 'cadastrar_local_e_cas',
         'form': form,
-        'formset': formset
     }
     return render(request, 'cadastrar/cadastrar_local_e_cas.html', context)
 
@@ -4028,7 +2960,8 @@ def consultar_locais_e_cas(request):
             Q(sigla__icontains=search_query) |
             Q(descricao__icontains=search_query) |
             Q(encarregado_responsavel__icontains=search_query) |
-            Q(locais__local__icontains=search_query)
+            Q(local__icontains=search_query) |
+            Q(observacoes__icontains=search_query)
         )
         
         cas_list = cas_list.filter(search_conditions).distinct()
@@ -4064,7 +2997,7 @@ def consultar_locais_e_cas(request):
     
     filter_local = request.GET.get('filter_local', '').strip()
     if filter_local:
-        cas_list = cas_list.filter(locais__local__icontains=filter_local).distinct()
+        cas_list = cas_list.filter(local__icontains=filter_local)
     
     # Ordenar por código CA
     cas_list = cas_list.order_by('ca').distinct()
@@ -4111,17 +3044,17 @@ def visualizar_centro_de_atividade(request, ca_id):
     
     # Buscar máquinas relacionadas a este Centro de Atividade
     # Máquinas podem estar relacionadas através de:
-    # 1. LocalCentroAtividade (local_centro_atividade__centro_atividade)
+    # 1. centro_atividade (campo direto na tabela Maquina)
     # 2. cd_tpcentativ (campo direto na tabela Maquina que corresponde ao número do CA)
     from django.db.models import Q
     
     maquinas_do_ca = Maquina.objects.filter(
-        Q(local_centro_atividade__centro_atividade=centro_atividade) |
+        Q(centro_atividade=centro_atividade) |
         Q(cd_tpcentativ=centro_atividade.ca)
     ).distinct()
     
     print(f"DEBUG: Centro de Atividade CA={centro_atividade.ca}, ID={centro_atividade.id}")
-    print(f"DEBUG: Total de máquinas encontradas no CA (via local_centro_atividade): {Maquina.objects.filter(local_centro_atividade__centro_atividade=centro_atividade).count()}")
+    print(f"DEBUG: Total de máquinas encontradas no CA (via centro_atividade): {Maquina.objects.filter(centro_atividade=centro_atividade).count()}")
     print(f"DEBUG: Total de máquinas encontradas no CA (via cd_tpcentativ={centro_atividade.ca}): {Maquina.objects.filter(cd_tpcentativ=centro_atividade.ca).count()}")
     print(f"DEBUG: Total de máquinas encontradas no CA (total combinado): {maquinas_do_ca.count()}")
     
@@ -4209,37 +3142,38 @@ def visualizar_centro_de_atividade(request, ca_id):
     return render(request, 'visualizar/visualizar_centro_de_atividade.html', context)
 
 
-def visualizar_local(request, local_id):
-    """Visualizar detalhes de um Local do Centro de Atividade específico"""
-    from app.models import LocalCentroAtividade, Maquina
+def visualizar_local(request, ca_id):
+    """Visualizar detalhes de um Centro de Atividade específico (anteriormente visualizar_local)"""
+    from app.models import CentroAtividade, Maquina
     
     try:
-        local = LocalCentroAtividade.objects.select_related('centro_atividade').get(id=local_id)
-    except LocalCentroAtividade.DoesNotExist:
-        messages.error(request, 'Local do Centro de Atividade não encontrado.')
+        centro_atividade = CentroAtividade.objects.get(id=ca_id)
+    except CentroAtividade.DoesNotExist:
+        messages.error(request, 'Centro de Atividade não encontrado.')
         return redirect('consultar_locais_e_cas')
     
-    # Buscar todas as máquinas relacionadas a este local com classificação "MÁQUINAS PRINCIPAL"
+    # Buscar todas as máquinas relacionadas a este centro de atividade com classificação "MÁQUINAS PRINCIPAL"
     maquinas = Maquina.objects.filter(
-        local_centro_atividade=local,
+        centro_atividade=centro_atividade,
         descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
     ).order_by('cd_maquina')
     
     context = {
-        'page_title': f'Visualizar Local {local.local}',
+        'page_title': f'Visualizar CA {centro_atividade.ca} - {centro_atividade.local or "Sem local"}',
         'active_page': 'consultar_locais_e_cas',
-        'local': local,
+        'centro_atividade': centro_atividade,
         'maquinas': maquinas,
     }
     return render(request, 'visualizar/visualizar_local.html', context)
 
 
 def consultar_locais(request):
-    """Consultar/listar Locais do Centro de Atividade cadastrados"""
-    from app.models import LocalCentroAtividade
+    """Consultar/listar Centros de Atividade com locais cadastrados"""
+    from app.models import CentroAtividade
+    from django.db.models import Q
     
-    # Buscar todos os locais
-    locais_list = LocalCentroAtividade.objects.select_related('centro_atividade').all()
+    # Buscar todos os centros de atividade que têm local
+    locais_list = CentroAtividade.objects.filter(local__isnull=False).exclude(local='')
     
     # Filtro de busca
     search_query = request.GET.get('search', '').strip()
@@ -4248,9 +3182,9 @@ def consultar_locais(request):
         search_conditions = (
             Q(local__icontains=search_query) |
             Q(observacoes__icontains=search_query) |
-            Q(centro_atividade__ca__icontains=search_query) |
-            Q(centro_atividade__sigla__icontains=search_query) |
-            Q(centro_atividade__descricao__icontains=search_query)
+            Q(ca__icontains=search_query) |
+            Q(sigla__icontains=search_query) |
+            Q(descricao__icontains=search_query)
         )
         locais_list = locais_list.filter(search_conditions)
     
@@ -4263,8 +3197,8 @@ def consultar_locais(request):
     locais = paginator.get_page(page_number)
     
     # Estatísticas
-    total_count = LocalCentroAtividade.objects.count()
-    centros_count = LocalCentroAtividade.objects.values('centro_atividade').distinct().count()
+    total_count = CentroAtividade.objects.filter(local__isnull=False).exclude(local='').count()
+    centros_count = total_count
     
     context = {
         'page_title': 'Consultar Locais',
@@ -4277,8 +3211,8 @@ def consultar_locais(request):
 
 
 def editar_ca_e_locais(request, ca_id):
-    """Editar Centro de Atividade (CA) existente com múltiplos locais"""
-    from app.forms import CentroAtividadeForm, LocalCentroAtividadeFormSet
+    """Editar Centro de Atividade (CA) existente com local"""
+    from app.forms import CentroAtividadeForm
     from app.models import CentroAtividade
     
     try:
@@ -4289,100 +3223,23 @@ def editar_ca_e_locais(request, ca_id):
     
     if request.method == 'POST':
         form = CentroAtividadeForm(request.POST, instance=centro_atividade)
-        formset = LocalCentroAtividadeFormSet(request.POST, instance=centro_atividade)
         
-        # Debug: verificar dados recebidos
-        print(f"\n{'='*60}")
-        print(f"DEBUG - POST recebido para editar CA {centro_atividade.ca}")
-        print(f"{'='*60}")
-        print(f"POST data keys: {list(request.POST.keys())[:20]}...")  # Primeiros 20
-        print(f"Formset prefix: {formset.prefix}")
-        total_forms = request.POST.get(f'{formset.prefix}-TOTAL_FORMS', 'N/A')
-        print(f"Formset total forms: {total_forms}")
-        
-        # Listar todos os campos do formset
-        print(f"\nCampos do formset recebidos:")
-        for key in request.POST.keys():
-            if key.startswith(f'{formset.prefix}-'):
-                print(f"  {key} = {request.POST[key]}")
-        
-        if form.is_valid() and formset.is_valid():
+        if form.is_valid():
             try:
-                print(f"\nFormulário e formset são válidos!")
                 centro_atividade = form.save()
-                print(f"Centro de Atividade salvo: {centro_atividade.ca}")
-                
-                formset.instance = centro_atividade
-                print(f"Processando formset com {len(formset)} formulários...")
-                
-                # Debug: verificar cada formulário do formset
-                print(f"\nDetalhamento dos formulários do formset:")
-                for i, form_item in enumerate(formset):
-                    if form_item.cleaned_data:
-                        print(f"  Form {i}: {form_item.cleaned_data}")
-                        # Verificar se é um novo formulário (sem id) ou existente
-                        if 'id' in form_item.cleaned_data:
-                            if form_item.cleaned_data['id']:
-                                print(f"    -> Formulário existente (ID: {form_item.cleaned_data['id']})")
-                            else:
-                                print(f"    -> NOVO formulário (sem ID)")
-                        else:
-                            print(f"    -> NOVO formulário (campo id ausente)")
-                    elif form_item.errors:
-                        print(f"  Form {i} tem erros: {form_item.errors}")
-                    else:
-                        print(f"  Form {i}: vazio (será ignorado pelo Django)")
-                
-                saved_instances = formset.save()
-                print(f"\nInstâncias salvas: {len(saved_instances)}")
-                for instance in saved_instances:
-                    print(f"  - Local salvo: '{instance.local}' (ID: {instance.id})")
-                
-                # Verificar instâncias deletadas
-                deleted_count = len([f for f in formset.deleted_forms if f.cleaned_data.get('DELETE', False)])
-                if deleted_count > 0:
-                    print(f"  - Locais deletados: {deleted_count}")
-                
                 messages.success(request, f'Centro de Atividade {centro_atividade.ca} atualizado com sucesso!')
-                print(f"{'='*60}\n")
                 return redirect('consultar_locais_e_cas')
             except Exception as e:
-                import traceback
-                error_trace = traceback.format_exc()
-                print(f"\nERRO ao salvar:")
-                print(error_trace)
-                print(f"{'='*60}\n")
                 messages.error(request, f'Erro ao atualizar Centro de Atividade: {str(e)}')
         else:
-            print(f"\nFormulário ou formset inválido!")
-            print(f"Form is_valid: {form.is_valid()}")
-            if not form.is_valid():
-                print(f"Form errors: {form.errors}")
-            print(f"Formset is_valid: {formset.is_valid()}")
-            if not formset.is_valid():
-                print(f"Formset errors: {formset.errors}")
-                print(f"Formset non_form_errors: {formset.non_form_errors()}")
-            print(f"{'='*60}\n")
-            
             handle_form_errors(form, request)
-            if formset.errors:
-                for error in formset.non_form_errors():
-                    messages.error(request, f'Erro no formulário: {error}')
-                # Mostrar erros de cada formulário do formset
-                for i, form_error in enumerate(formset.errors):
-                    if form_error:
-                        for field, errors in form_error.items():
-                            for error in errors:
-                                messages.error(request, f'Erro no local {i+1}, campo {field}: {error}')
     else:
         form = CentroAtividadeForm(instance=centro_atividade)
-        formset = LocalCentroAtividadeFormSet(instance=centro_atividade)
     
     context = {
         'page_title': f'Editar CA {centro_atividade.ca}',
         'active_page': 'consultar_locais_e_cas',
         'form': form,
-        'formset': formset,
         'centro_atividade': centro_atividade,
     }
     return render(request, 'editar/editar_ca_e_locais.html', context)
@@ -5222,54 +4079,10 @@ def consultar_requisicoes_almoxarifado(request):
     """Consultar/listar requisições de almoxarifado com filtros avançados"""
     from app.models import RequisicaoAlmoxarifado
     from decimal import Decimal
-    from datetime import datetime, timedelta
-    from django.db.models import Q
     
     # Busca geral
     search_query = request.GET.get('search', '').strip()
     requisicoes_list = RequisicaoAlmoxarifado.objects.all()
-    
-    # Filtros de data (intervalo de datas ou ano/mês)
-    data_inicio_str = request.GET.get('data_inicio', '').strip()
-    data_fim_str = request.GET.get('data_fim', '').strip()
-    ano_selecionado = request.GET.get('ano', '').strip()
-    mes_selecionado = request.GET.get('mes', '').strip()
-    
-    # Prioridade: Se há filtro de intervalo de datas, usar apenas ele
-    # Caso contrário, usar filtro de ano/mês
-    tem_filtro_data_range = bool(data_inicio_str or data_fim_str)
-    tem_filtro_ano_mes = bool(ano_selecionado)
-    
-    if tem_filtro_data_range:
-        # Aplicar filtro de intervalo de datas
-        if data_inicio_str:
-            try:
-                data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
-                requisicoes_list = requisicoes_list.filter(data_requisicao__gte=data_inicio)
-            except ValueError:
-                pass
-        
-        if data_fim_str:
-            try:
-                data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
-                requisicoes_list = requisicoes_list.filter(data_requisicao__lte=data_fim)
-            except ValueError:
-                pass
-    elif tem_filtro_ano_mes:
-        # Aplicar filtro de ano
-        try:
-            ano = int(ano_selecionado)
-            requisicoes_list = requisicoes_list.filter(data_requisicao__year=ano)
-            
-            # Se há filtro de mês, aplicar também
-            if mes_selecionado:
-                try:
-                    mes = int(mes_selecionado)
-                    requisicoes_list = requisicoes_list.filter(data_requisicao__month=mes)
-                except ValueError:
-                    pass
-        except ValueError:
-            pass
     
     # Aplicar busca geral
     if search_query:
@@ -5283,7 +4096,7 @@ def consultar_requisicoes_almoxarifado(request):
             Q(descr_local_fisic__icontains=search_query)
         )
     
-    # Filtros específicos (inline table filters)
+    # Filtros específicos
     filter_data = request.GET.get('filter_data', '').strip()
     if filter_data:
         try:
@@ -5349,40 +4162,18 @@ def consultar_requisicoes_almoxarifado(request):
     requisicoes_list = requisicoes_list.order_by('-data_requisicao', 'cd_item')
     
     # Paginação
-    from django.core.paginator import Paginator
     paginator = Paginator(requisicoes_list, 100)  # 100 itens por página
     page_number = request.GET.get('page', 1)
     requisicoes = paginator.get_page(page_number)
     
-    # Obter anos e meses disponíveis no banco de dados
-    anos_disponiveis = RequisicaoAlmoxarifado.objects.values_list('data_requisicao__year', flat=True).distinct().order_by('-data_requisicao__year')
-    meses_disponiveis = {}
-    for ano in anos_disponiveis:
-        meses = RequisicaoAlmoxarifado.objects.filter(data_requisicao__year=ano).values_list('data_requisicao__month', flat=True).distinct().order_by('data_requisicao__month')
-        meses_disponiveis[ano] = list(meses)
-    
-    # Meses do ano selecionado
-    meses_ano_selecionado = []
-    meses_nomes = {
-        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
-        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
-        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
-    }
-    if ano_selecionado:
-        try:
-            ano = int(ano_selecionado)
-            meses_ano_selecionado = meses_disponiveis.get(ano, [])
-        except ValueError:
-            pass
-    
-    # Estatísticas (usar lista filtrada)
+    # Estatísticas
     total_count = RequisicaoAlmoxarifado.objects.count()
     itens_count = RequisicaoAlmoxarifado.objects.values('cd_item').distinct().count()
     centros_count = RequisicaoAlmoxarifado.objects.exclude(cd_centro_ativ__isnull=True).values('cd_centro_ativ').distinct().count()
     
     # Calcular valor total (soma de quantidade * valor, usando valores absolutos)
     valor_total = Decimal('0.00')
-    for req in requisicoes_list:
+    for req in RequisicaoAlmoxarifado.objects.all():
         if req.qtde_movto_estoq and req.vlr_movto_estoq:
             # Usar valor absoluto da quantidade (já que geralmente é negativa para saída)
             qtd_abs = abs(req.qtde_movto_estoq)
@@ -5408,17 +4199,159 @@ def consultar_requisicoes_almoxarifado(request):
         'filter_usuario_atend': filter_usuario_atend,
         'filter_operacao': filter_operacao,
         'filter_local': filter_local,
-        # Filtros de data
-        'anos_disponiveis': list(anos_disponiveis),
-        'meses_disponiveis': meses_disponiveis,
-        'meses_nomes': meses_nomes,
-        'meses_ano_selecionado': meses_ano_selecionado,
-        'data_inicio': data_inicio_str,
-        'data_fim': data_fim_str,
-        'ano_selecionado': ano_selecionado,
-        'mes_selecionado_filtro': mes_selecionado,
     }
     return render(request, 'consultar/consultar_requisicoes_almoxarifado.html', context)
+
+
+def consultar_notas_fiscais(request):
+    """Consultar/listar notas fiscais com filtros avançados"""
+    from app.models import NotaFiscal
+    from decimal import Decimal
+    from datetime import datetime
+    
+    # Busca geral
+    search_query = request.GET.get('search', '').strip()
+    notas_list = NotaFiscal.objects.all()
+    
+    # Aplicar busca geral
+    if search_query:
+        # Tentar converter para número para busca exata em campos numéricos
+        try:
+            search_num = int(float(search_query))
+            notas_list = notas_list.filter(
+                Q(nota__icontains=search_query) |
+                Q(emitente__icontains=search_query) |
+                Q(nome_fantasia_emitente__icontains=search_query) |
+                Q(total_nota=search_num)
+            )
+        except (ValueError, TypeError):
+            notas_list = notas_list.filter(
+                Q(nota__icontains=search_query) |
+                Q(emitente__icontains=search_query) |
+                Q(nome_fantasia_emitente__icontains=search_query) |
+                Q(nome_unidade__icontains=search_query) |
+                Q(situacao__icontains=search_query)
+            )
+    
+    # Filtros específicos
+    filtro_nota = request.GET.get('filtro_nota', '').strip()
+    if filtro_nota:
+        notas_list = notas_list.filter(nota__icontains=filtro_nota)
+    
+    filtro_emitente = request.GET.get('filtro_emitente', '').strip()
+    if filtro_emitente:
+        notas_list = notas_list.filter(
+            Q(emitente__icontains=filtro_emitente) |
+            Q(nome_fantasia_emitente__icontains=filtro_emitente)
+        )
+    
+    filtro_unidade = request.GET.get('filtro_unidade', '').strip()
+    if filtro_unidade:
+        notas_list = notas_list.filter(
+            Q(unidade__icontains=filtro_unidade) |
+            Q(nome_unidade__icontains=filtro_unidade)
+        )
+    
+    filtro_situacao = request.GET.get('filtro_situacao', '').strip()
+    if filtro_situacao:
+        notas_list = notas_list.filter(situacao__icontains=filtro_situacao)
+    
+    filtro_data_emissao_inicio = request.GET.get('filtro_data_emissao_inicio', '').strip()
+    if filtro_data_emissao_inicio:
+        notas_list = notas_list.filter(data_emissao__icontains=filtro_data_emissao_inicio)
+    
+    filtro_data_emissao_fim = request.GET.get('filtro_data_emissao_fim', '').strip()
+    if filtro_data_emissao_fim:
+        notas_list = notas_list.filter(data_emissao__icontains=filtro_data_emissao_fim)
+    
+    filtro_total_min = request.GET.get('filtro_total_min', '').strip()
+    if filtro_total_min:
+        try:
+            total_min = Decimal(filtro_total_min)
+            notas_list = notas_list.filter(total_nota__gte=total_min)
+        except (ValueError, TypeError):
+            pass
+    
+    filtro_total_max = request.GET.get('filtro_total_max', '').strip()
+    if filtro_total_max:
+        try:
+            total_max = Decimal(filtro_total_max)
+            notas_list = notas_list.filter(total_nota__lte=total_max)
+        except (ValueError, TypeError):
+            pass
+    
+    # Ordenar por data de emissão (mais recente primeiro)
+    notas_list = notas_list.order_by('-data_emissao', '-created_at')
+    
+    # Paginação
+    paginator = Paginator(notas_list, 100)  # 100 itens por página
+    page_number = request.GET.get('page', 1)
+    notas = paginator.get_page(page_number)
+    
+    # Estatísticas
+    total_count = NotaFiscal.objects.count()
+    emitentes_count = NotaFiscal.objects.exclude(emitente__isnull=True).exclude(emitente='').values('emitente').distinct().count()
+    unidades_count = NotaFiscal.objects.exclude(unidade__isnull=True).exclude(unidade='').values('unidade').distinct().count()
+    
+    # Calcular valor total
+    valor_total = Decimal('0.00')
+    for nota in NotaFiscal.objects.all():
+        if nota.total_nota:
+            valor_total += nota.total_nota
+    
+    # Obter valores únicos para os dropdowns de filtros
+    situacoes_unicas = NotaFiscal.objects.exclude(
+        situacao__isnull=True
+    ).exclude(
+        situacao=''
+    ).values_list('situacao', flat=True).distinct().order_by('situacao')
+    
+    unidades_unicas = NotaFiscal.objects.exclude(
+        nome_unidade__isnull=True
+    ).exclude(
+        nome_unidade=''
+    ).values_list('nome_unidade', flat=True).distinct().order_by('nome_unidade')
+    
+    context = {
+        'page_title': 'Consultar Notas Fiscais',
+        'active_page': 'consultar_notas_fiscais',
+        'notas': notas,
+        'total_count': total_count,
+        'emitentes_count': emitentes_count,
+        'unidades_count': unidades_count,
+        'valor_total': valor_total,
+        'situacoes_unicas': situacoes_unicas,
+        'unidades_unicas': unidades_unicas,
+        # Preservar filtros no contexto
+        'search_query': search_query,
+        'filtro_nota': filtro_nota,
+        'filtro_emitente': filtro_emitente,
+        'filtro_unidade': filtro_unidade,
+        'filtro_situacao': filtro_situacao,
+        'filtro_data_emissao_inicio': filtro_data_emissao_inicio,
+        'filtro_data_emissao_fim': filtro_data_emissao_fim,
+        'filtro_total_min': filtro_total_min,
+        'filtro_total_max': filtro_total_max,
+    }
+    return render(request, 'consultar/consultar_notas_fiscais.html', context)
+
+
+def visualizar_nota_fiscal(request, nota_id):
+    """Visualizar detalhes de uma nota fiscal específica"""
+    from app.models import NotaFiscal
+    
+    try:
+        nota = NotaFiscal.objects.get(id=nota_id)
+    except NotaFiscal.DoesNotExist:
+        messages.error(request, 'Nota fiscal não encontrada.')
+        return redirect('consultar_notas_fiscais')
+    
+    context = {
+        'page_title': f'Visualizar Nota Fiscal {nota.nota or nota.id}',
+        'active_page': 'consultar_notas_fiscais',
+        'nota': nota,
+    }
+    return render(request, 'visualizar/visualizar_nota_fiscal.html', context)
 
 
 def consultar_52_semanas(request):
@@ -5921,6 +4854,123 @@ def analise_ordens_de_servico(request):
     return render(request, 'ordens_de_servico/analise_ordens_de_servico.html', context)
 
 
+def analise_faltantes_pelo_numero(request):
+    """Análise de Faltantes pelo Número - Identifica números sequenciais faltantes em cd_ordemserv usando intervalos fixos de 5000"""
+    from app.models import OrdemServicoCorretiva
+    from django.db.models import Min, Max, Count
+    import json
+    import builtins
+    import math
+    
+    # Obter todos os valores de cd_ordemserv ordenados
+    ordens = OrdemServicoCorretiva.objects.exclude(
+        cd_ordemserv__isnull=True
+    ).values_list('cd_ordemserv', flat=True).order_by('cd_ordemserv')
+    
+    # Estatísticas básicas
+    total_ordens = ordens.count()
+    
+    if total_ordens == 0:
+        context = {
+            'page_title': 'Análise de Faltantes pelo Número',
+            'active_page': 'analise_faltantes_pelo_numero',
+            'total_ordens': 0,
+            'min_numero': None,
+            'max_numero': None,
+            'intervalos_analise': [],
+        }
+        return render(request, 'ordens_de_servico/analise_faltantes_pelo_numero.html', context)
+    
+    # Obter min e max usando aggregate para melhor performance
+    stats = OrdemServicoCorretiva.objects.exclude(
+        cd_ordemserv__isnull=True
+    ).aggregate(
+        min_numero=Min('cd_ordemserv'),
+        max_numero=Max('cd_ordemserv')
+    )
+    
+    min_numero = int(stats['min_numero'])
+    max_numero = int(stats['max_numero'])
+    
+    # Converter para set para busca rápida
+    numeros_existentes = set(ordens)
+    
+    # Criar intervalos fixos de 5000
+    intervalo_tamanho = 5000
+    intervalos_analise = []
+    
+    # Começar do 0 ou do min_numero arredondado para baixo para múltiplo de 5000
+    inicio_geral = (min_numero // intervalo_tamanho) * intervalo_tamanho
+    fim_geral = ((max_numero // intervalo_tamanho) + 1) * intervalo_tamanho
+    
+    # Criar intervalos
+    for intervalo_inicio in range(inicio_geral, fim_geral, intervalo_tamanho):
+        intervalo_fim = intervalo_inicio + intervalo_tamanho - 1
+        
+        # Contar números existentes neste intervalo
+        existentes_no_intervalo = sum(1 for num in numeros_existentes if intervalo_inicio <= num <= intervalo_fim)
+        
+        # Calcular faltantes
+        total_esperado_intervalo = intervalo_tamanho
+        faltantes_no_intervalo = total_esperado_intervalo - existentes_no_intervalo
+        percentual_completo_intervalo = (existentes_no_intervalo / total_esperado_intervalo * 100) if total_esperado_intervalo > 0 else 0
+        percentual_faltantes_intervalo = 100 - percentual_completo_intervalo
+        
+        # Determinar status do intervalo
+        if faltantes_no_intervalo == 0:
+            status = 'completo'
+            status_class = 'success'
+        elif percentual_faltantes_intervalo < 1:
+            status = 'quase_completo'
+            status_class = 'info'
+        elif percentual_faltantes_intervalo < 5:
+            status = 'bom'
+            status_class = 'warning'
+        else:
+            status = 'critico'
+            status_class = 'danger'
+        
+        intervalos_analise.append({
+            'inicio': intervalo_inicio,
+            'fim': intervalo_fim,
+            'existentes': existentes_no_intervalo,
+            'faltantes': faltantes_no_intervalo,
+            'total_esperado': total_esperado_intervalo,
+            'percentual_completo': round(percentual_completo_intervalo, 2),
+            'percentual_faltantes': round(percentual_faltantes_intervalo, 2),
+            'status': status,
+            'status_class': status_class,
+        })
+    
+    # Calcular totais gerais
+    total_faltantes = sum(intervalo['faltantes'] for intervalo in intervalos_analise)
+    total_esperado = sum(intervalo['total_esperado'] for intervalo in intervalos_analise)
+    percentual_faltantes = (total_faltantes / total_esperado * 100) if total_esperado > 0 else 0
+    percentual_completo = 100 - percentual_faltantes
+    
+    # Preparar dados para gráfico de distribuição por intervalo
+    distribuicao_labels = [f"{intervalo['inicio']}-{intervalo['fim']}" for intervalo in intervalos_analise]
+    distribuicao_existentes = [intervalo['existentes'] for intervalo in intervalos_analise]
+    distribuicao_faltantes = [intervalo['faltantes'] for intervalo in intervalos_analise]
+    
+    context = {
+        'page_title': 'Análise de Faltantes pelo Número',
+        'active_page': 'analise_faltantes_pelo_numero',
+        'total_ordens': total_ordens,
+        'min_numero': min_numero,
+        'max_numero': max_numero,
+        'total_faltantes': total_faltantes,
+        'total_esperado': total_esperado,
+        'percentual_faltantes': round(percentual_faltantes, 2),
+        'percentual_completo': round(percentual_completo, 2),
+        'intervalos_analise': intervalos_analise,
+        'distribuicao_labels': json.dumps(distribuicao_labels),
+        'distribuicao_existentes': json.dumps(distribuicao_existentes),
+        'distribuicao_faltantes': json.dumps(distribuicao_faltantes),
+    }
+    return render(request, 'ordens_de_servico/analise_faltantes_pelo_numero.html', context)
+
+
 def config_analise_ordens(request):
     """Configuração de Análise de Ordens de Serviço"""
     from django.contrib import messages
@@ -6098,10 +5148,6 @@ def agrupar_preventiva_por_data(request):
     
     return render(request, 'planejamento/agrupar_preventiva_por_data.html', context)
 
-
-def calendario_de_base(request):
-    """Calendário de Base"""
-    return render(request, 'planejamento/calendario_de_base.html')
 
 def criar_cronograma_planejado_preventiva(request):
     """Criar cronograma planejado de preventivas"""
@@ -8326,41 +7372,36 @@ def editar_maquina(request, maquina_id):
 
 
 def filtrar_locais_por_setormanut(request):
-    """View AJAX para filtrar LocalCentroAtividade baseado no cd_setormanut"""
-    from app.models import CentroAtividade, LocalCentroAtividade
+    """View AJAX para filtrar CentroAtividade baseado no cd_setormanut"""
+    from app.models import CentroAtividade
     
     cd_setormanut = request.GET.get('cd_setormanut', '')
     
     if not cd_setormanut:
-        return JsonResponse({'locais': []})
+        return JsonResponse({'centros': []})
     
     try:
         # Tentar converter cd_setormanut para inteiro para comparar com ca
         if cd_setormanut.isdigit():
             ca_value = int(cd_setormanut)
-            centros = CentroAtividade.objects.filter(ca=ca_value)
-            if centros.exists():
-                locais = LocalCentroAtividade.objects.filter(
-                    centro_atividade__in=centros
-                ).order_by('local')
-                
-                locais_data = [
-                    {
-                        'id': local.id,
-                        'local': local.local,
-                        'centro_atividade': str(local.centro_atividade),
-                        'observacoes': local.observacoes or ''
-                    }
-                    for local in locais
-                ]
-                return JsonResponse({'locais': locais_data})
-            else:
-                return JsonResponse({'locais': []})
+            centros = CentroAtividade.objects.filter(ca=ca_value).order_by('ca')
+            
+            centros_data = [
+                {
+                    'id': centro.id,
+                    'ca': centro.ca,
+                    'sigla': centro.sigla or '',
+                    'local': centro.local or '',
+                    'descricao': centro.descricao or '',
+                    'observacoes': centro.observacoes or ''
+                }
+                for centro in centros
+            ]
+            return JsonResponse({'centros': centros_data})
         else:
-            # Se não é numérico, retornar vazio ou todos (dependendo da lógica de negócio)
-            return JsonResponse({'locais': []})
+            return JsonResponse({'centros': []})
     except (ValueError, AttributeError) as e:
-        return JsonResponse({'error': str(e), 'locais': []})
+        return JsonResponse({'error': str(e), 'centros': []})
 
 
 def cadastrar_corretiva_outros(request):
@@ -8668,14 +7709,14 @@ def analise_corretiva_outros(request):
     
     # Top 10 executores
     top_executores = OrdemServicoCorretiva.objects.exclude(
-        nm_func_exec_os__isnull=True
+        nm_func_exec__isnull=True
     ).exclude(
-        nm_func_exec_os=''
-    ).values('nm_func_exec_os').annotate(
+        nm_func_exec=''
+    ).values('nm_func_exec').annotate(
         total=Count('id')
     ).order_by('-total')[:10]
     
-    executores_labels = [item['nm_func_exec_os'][:30] for item in top_executores]
+    executores_labels = [item['nm_func_exec'][:30] for item in top_executores]
     executores_data = [item['total'] for item in top_executores]
     
     # Distribuição por tipo de ordem de serviço
@@ -8743,159 +7784,340 @@ def analise_corretiva_outros(request):
     return render(request, 'analise/analise_corretiva_outros.html', context)
 
 
-def analise_manutentores(request):
-    """Página de análise de manutentores com gráficos e estatísticas"""
-    from app.models import Manutentor, ManutentorMaquina, ManutencaoTerceiro, Maquina
+def analise_corretiva_outros_com_parada(request):
+    """Análise de Ordens Corretivas com informações de parada"""
+    from app.models import OrdemServicoCorretiva, Maquina, CentroAtividade
     from django.db.models import Count, Q
     from datetime import datetime, timedelta
     from collections import defaultdict
     import json
+    import re
+    
+    # Filtrar apenas ordens com dt_iniparmanu preenchido (não nulo e não vazio)
+    ordens_com_parada_qs = OrdemServicoCorretiva.objects.filter(
+        Q(dt_iniparmanu__isnull=False) & ~Q(dt_iniparmanu='')
+    )
+    
+    # Validar que dt_iniparmanu contém uma data válida
+    # Tentar parsear as datas para garantir que são válidas
+    def is_valid_date(date_str):
+        """Verifica se a string contém uma data válida"""
+        if not date_str or not isinstance(date_str, str):
+            return False
+        
+        date_str = date_str.strip()
+        if not date_str:
+            return False
+        
+        # Tentar diferentes formatos de data comuns
+        formatos_data = [
+            '%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y %H:%M:%S',
+            '%d-%m-%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S', '%d/%m/%y', '%d-%m-%y',
+            '%d/%m/%Y %H:%M', '%d-%m-%Y %H:%M'
+        ]
+        for formato in formatos_data:
+            try:
+                datetime.strptime(date_str, formato)
+                return True
+            except (ValueError, AttributeError):
+                continue
+        
+        # Se não encontrou formato padrão, verificar se contém padrão de data
+        if re.search(r'\d{1,2}[\s\-/]\d{1,2}[\s\-/]\d{2,4}', date_str):
+            return True
+        
+        return False
+    
+    # Filtrar apenas ordens com datas válidas usando values_list para eficiência
+    ordens_validas_ids = [
+        ordem_id for ordem_id, dt_iniparmanu in 
+        ordens_com_parada_qs.values_list('id', 'dt_iniparmanu')
+        if is_valid_date(dt_iniparmanu)
+    ]
+    
+    # Filtrar apenas ordens com datas válidas
+    ordens_com_parada_qs = OrdemServicoCorretiva.objects.filter(id__in=ordens_validas_ids)
+    
+    total_com_parada = ordens_com_parada_qs.count()
+    total_geral = OrdemServicoCorretiva.objects.count()
+    
+    # Ordens com início e fim de parada (ambos preenchidos e válidos)
+    com_inicio_fim = ordens_com_parada_qs.filter(
+        Q(dt_fimparmanu__isnull=False) & ~Q(dt_fimparmanu='')
+    ).count()
+    
+    # Ordens apenas com início de parada (sem fim)
+    apenas_inicio = ordens_com_parada_qs.filter(
+        Q(dt_fimparmanu__isnull=True) | Q(dt_fimparmanu='')
+    ).count()
+    
+    # Percentual de ordens com parada
+    percentual_com_parada = (total_com_parada / total_geral * 100) if total_geral > 0 else 0
     
     # Estatísticas básicas
-    total_count = Manutentor.objects.count()
+    setores_count = ordens_com_parada_qs.exclude(cd_setormanut__isnull=True).exclude(cd_setormanut='').values('cd_setormanut').distinct().count()
+    unidades_count = ordens_com_parada_qs.exclude(nome_unid__isnull=True).exclude(nome_unid='').values('nome_unid').distinct().count()
+    maquinas_count = ordens_com_parada_qs.exclude(cd_maquina__isnull=True).values('cd_maquina').distinct().count()
     
-    # Manutentores por turno
-    manutentores_por_turno = Manutentor.objects.values('turno').annotate(
-        total=Count('Matricula')
-    ).order_by('turno')
-    
-    turnos_labels = [item['turno'] for item in manutentores_por_turno]
-    turnos_data = [item['total'] for item in manutentores_por_turno]
-    
-    # Manutentores por local de trabalho
-    manutentores_por_local = Manutentor.objects.values('local_trab').annotate(
-        total=Count('Matricula')
-    ).order_by('local_trab')
-    
-    locais_labels = [item['local_trab'] for item in manutentores_por_local]
-    locais_data = [item['total'] for item in manutentores_por_local]
-    
-    # Manutentores por cargo (top 10)
-    manutentores_por_cargo = Manutentor.objects.exclude(
-        Cargo__isnull=True
+    # Ordens por setor (top 10)
+    ordens_por_setor = ordens_com_parada_qs.exclude(
+        descr_setormanut__isnull=True
     ).exclude(
-        Cargo=''
-    ).values('Cargo').annotate(
-        total=Count('Matricula')
+        descr_setormanut=''
+    ).values('descr_setormanut').annotate(
+        total=Count('id')
     ).order_by('-total')[:10]
     
-    cargos_labels = [item['Cargo'][:30] for item in manutentores_por_cargo]
-    cargos_data = [item['total'] for item in manutentores_por_cargo]
+    setores_labels = [item['descr_setormanut'][:30] for item in ordens_por_setor]
+    setores_data = [item['total'] for item in ordens_por_setor]
     
-    # Manutentores com máquinas relacionadas
-    manutentores_com_maquinas = Manutentor.objects.filter(
-        maquinas__isnull=False
-    ).distinct().count()
-    
-    manutentores_sem_maquinas = total_count - manutentores_com_maquinas
-    percentual_com_maquinas = (manutentores_com_maquinas / total_count * 100) if total_count > 0 else 0
-    
-    # Manutentores com manutenções de terceiros
-    manutentores_com_manutencoes = Manutentor.objects.filter(
-        manutencaoterceiro__isnull=False
-    ).distinct().count()
-    
-    # Top manutentores por quantidade de máquinas
-    top_manutentores_maquinas = Manutentor.objects.annotate(
-        total_maquinas=Count('maquinas')
-    ).filter(
-        total_maquinas__gt=0
-    ).order_by('-total_maquinas')[:10]
-    
-    top_manutentores_maquinas_list = [
-        {
-            'manutentor': m,
-            'total': m.total_maquinas
-        }
-        for m in top_manutentores_maquinas
-    ]
-    
-    # Top manutentores por quantidade de manutenções de terceiros
-    top_manutentores_manutencoes = Manutentor.objects.annotate(
-        total_manutencoes=Count('manutencaoterceiro')
-    ).filter(
-        total_manutencoes__gt=0
-    ).order_by('-total_manutencoes')[:10]
-    
-    top_manutentores_manutencoes_list = [
-        {
-            'manutentor': m,
-            'total': m.total_manutencoes
-        }
-        for m in top_manutentores_manutencoes
-    ]
-    
-    # Manutentores por mês (últimos 12 meses)
-    manutentores_por_mes = defaultdict(int)
-    manutentores = Manutentor.objects.all().order_by('created_at')
-    for manutentor in manutentores:
-        if manutentor.created_at:
-            mes_ano = manutentor.created_at.strftime('%Y-%m')
-            manutentores_por_mes[mes_ano] += 1
+    # Ordens por mês (últimos 12 meses)
+    ordens_por_mes = defaultdict(int)
+    ordens = ordens_com_parada_qs.all().order_by('created_at')
+    for ordem in ordens:
+        if ordem.created_at:
+            mes_ano = ordem.created_at.strftime('%Y-%m')
+            ordens_por_mes[mes_ano] += 1
     
     # Ordenar por data e pegar últimos 12 meses
-    meses_ordenados = sorted(manutentores_por_mes.keys())[-12:]
+    meses_ordenados = sorted(ordens_por_mes.keys())[-12:]
     meses_labels = [datetime.strptime(m, '%Y-%m').strftime('%b/%Y') for m in meses_ordenados]
-    meses_data = [manutentores_por_mes[m] for m in meses_ordenados]
+    meses_data = [ordens_por_mes[m] for m in meses_ordenados]
     
-    # Manutentores recentes (últimos 30 dias)
-    data_30_dias_atras = datetime.now() - timedelta(days=30)
-    manutentores_recentes = Manutentor.objects.filter(
-        created_at__gte=data_30_dias_atras
-    ).count()
+    # Top 10 máquinas com mais ordens com parada
+    top_maquinas = ordens_com_parada_qs.exclude(
+        descr_maquina__isnull=True
+    ).exclude(
+        descr_maquina=''
+    ).values('cd_maquina', 'descr_maquina').annotate(
+        total=Count('id')
+    ).order_by('-total')[:10]
     
-    # Manutentores do mês atual
-    mes_atual = datetime.now().replace(day=1)
-    manutentores_mes_atual = Manutentor.objects.filter(
-        created_at__gte=mes_atual
-    ).count()
+    maquinas_labels = [f"{item['cd_maquina']} - {item['descr_maquina'][:40]}" for item in top_maquinas]
+    maquinas_data = [item['total'] for item in top_maquinas]
     
-    # Distribuição de máquinas por manutentor
-    distribuicao_maquinas = Manutentor.objects.annotate(
-        total_maquinas=Count('maquinas')
-    ).values('total_maquinas').annotate(
-        count=Count('Matricula')
-    ).order_by('total_maquinas')
+    # Top 10 executores
+    top_executores = ordens_com_parada_qs.exclude(
+        nm_func_exec__isnull=True
+    ).exclude(
+        nm_func_exec=''
+    ).values('nm_func_exec').annotate(
+        total=Count('id')
+    ).order_by('-total')[:10]
     
-    distribuicao_maquinas_labels = [f"{item['total_maquinas']} máquina(s)" for item in distribuicao_maquinas]
-    distribuicao_maquinas_data = [item['count'] for item in distribuicao_maquinas]
+    executores_labels = [item['nm_func_exec'][:30] for item in top_executores]
+    executores_data = [item['total'] for item in top_executores]
     
-    # Total de máquinas relacionadas
-    total_maquinas_relacionadas = ManutentorMaquina.objects.count()
+    # Ordens por dia do mês atual usando dt_entrada
+    hoje = datetime.now()
+    primeiro_dia_mes = hoje.replace(day=1)
+    ultimo_dia_mes = (primeiro_dia_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
     
-    # Total de manutenções de terceiros relacionadas
-    total_manutencoes_relacionadas = ManutencaoTerceiro.objects.exclude(
-        manutentor__isnull=True
-    ).count()
+    # Inicializar contador para todos os dias do mês atual
+    ordens_por_dia = defaultdict(int)
+    for dia in range(1, ultimo_dia_mes.day + 1):
+        ordens_por_dia[dia] = 0
+    
+    # Função para parsear dt_entrada e extrair a data
+    def parse_dt_entrada(dt_entrada_str):
+        """Tenta parsear dt_entrada e retornar o dia do mês se for do mês atual"""
+        if not dt_entrada_str:
+            return None
+        
+        dt_entrada_str = dt_entrada_str.strip()
+        formatos_data = [
+            '%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y %H:%M:%S',
+            '%d-%m-%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S', '%d/%m/%y', '%d-%m-%y',
+            '%d/%m/%Y %H:%M', '%d-%m-%Y %H:%M'
+        ]
+        
+        for formato in formatos_data:
+            try:
+                data_parseada = datetime.strptime(dt_entrada_str, formato)
+                # Verificar se é do mês atual
+                if data_parseada.year == hoje.year and data_parseada.month == hoje.month:
+                    return data_parseada.day
+            except (ValueError, AttributeError):
+                continue
+        
+        # Tentar extrair dia usando regex se os formatos padrão não funcionarem
+        match = re.search(r'(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})', dt_entrada_str)
+        if match:
+            dia_str, mes_str, ano_str = match.groups()
+            try:
+                dia = int(dia_str)
+                mes = int(mes_str)
+                ano = int(ano_str)
+                if ano < 100:
+                    ano += 2000 if ano < 50 else 1900
+                
+                if ano == hoje.year and mes == hoje.month:
+                    return dia
+            except (ValueError, TypeError):
+                pass
+        
+        return None
+    
+    # Contar ordens por dia do mês atual
+    for ordem in ordens_com_parada_qs:
+        if ordem.dt_entrada:
+            dia = parse_dt_entrada(ordem.dt_entrada)
+            if dia and 1 <= dia <= ultimo_dia_mes.day:
+                ordens_por_dia[dia] += 1
+    
+    # Preparar dados para o gráfico
+    daily_labels = [f"{dia:02d}/{hoje.month:02d}" for dia in sorted(ordens_por_dia.keys())]
+    daily_data = [ordens_por_dia[dia] for dia in sorted(ordens_por_dia.keys())]
+    
+    # Classificação por FRIGORÍFICO vs INDÚSTRIA baseado em cd_setormanut
+    # A relação é: cd_setormanut em OrdemServicoCorretiva corresponde a sigla em CentroAtividade
+    # Buscar Centros de Atividade classificados e obter suas siglas
+    centros_frigorifico = CentroAtividade.objects.filter(
+        local__icontains='FRIGORÍFICO'
+    ).exclude(sigla__isnull=True).exclude(sigla='')
+    
+    centros_industria = CentroAtividade.objects.filter(
+        local__icontains='INDÚSTRIA'
+    ).exclude(sigla__isnull=True).exclude(sigla='')
+    
+    # Extrair siglas dos centros FRIGORÍFICO e INDÚSTRIA
+    siglas_frigorifico = [centro.sigla.strip().upper() for centro in centros_frigorifico if centro.sigla]
+    siglas_industria = [centro.sigla.strip().upper() for centro in centros_industria if centro.sigla]
+    
+    # Remover duplicatas
+    siglas_frigorifico = list(set(siglas_frigorifico))
+    siglas_industria = list(set(siglas_industria))
+    
+    # Classificar ordens por tipo baseado em cd_setormanut (que corresponde a sigla)
+    # Usar Q objects para fazer match case-insensitive
+    from django.db.models import Q
+    
+    q_frigorifico = Q()
+    for sigla in siglas_frigorifico:
+        q_frigorifico |= Q(cd_setormanut__iexact=sigla)
+    
+    q_industria = Q()
+    for sigla in siglas_industria:
+        q_industria |= Q(cd_setormanut__iexact=sigla)
+    
+    ordens_frigorifico = ordens_com_parada_qs.filter(q_frigorifico)
+    ordens_industria = ordens_com_parada_qs.filter(q_industria)
+    ordens_outros = ordens_com_parada_qs.exclude(q_frigorifico | q_industria).exclude(
+        cd_setormanut__isnull=True
+    ).exclude(cd_setormanut='')
+    
+    # Estatísticas por classificação
+    total_frigorifico = ordens_frigorifico.count()
+    total_industria = ordens_industria.count()
+    total_outros = ordens_outros.count()
+    
+    # Percentuais
+    percentual_frigorifico = (total_frigorifico / total_com_parada * 100) if total_com_parada > 0 else 0
+    percentual_industria = (total_industria / total_com_parada * 100) if total_com_parada > 0 else 0
+    percentual_outros = (total_outros / total_com_parada * 100) if total_com_parada > 0 else 0
+    
+    # Top máquinas por classificação
+    top_maquinas_frigorifico = ordens_frigorifico.exclude(
+        descr_maquina__isnull=True
+    ).exclude(
+        descr_maquina=''
+    ).values('cd_maquina', 'descr_maquina').annotate(
+        total=Count('id')
+    ).order_by('-total')[:5]
+    
+    top_maquinas_industria = ordens_industria.exclude(
+        descr_maquina__isnull=True
+    ).exclude(
+        descr_maquina=''
+    ).values('cd_maquina', 'descr_maquina').annotate(
+        total=Count('id')
+    ).order_by('-total')[:5]
+    
+    # Ordens por dia separadas por classificação
+    ordens_por_dia_frigorifico = defaultdict(int)
+    ordens_por_dia_industria = defaultdict(int)
+    for dia in range(1, ultimo_dia_mes.day + 1):
+        ordens_por_dia_frigorifico[dia] = 0
+        ordens_por_dia_industria[dia] = 0
+    
+    for ordem in ordens_frigorifico:
+        if ordem.dt_entrada:
+            dia = parse_dt_entrada(ordem.dt_entrada)
+            if dia and 1 <= dia <= ultimo_dia_mes.day:
+                ordens_por_dia_frigorifico[dia] += 1
+    
+    for ordem in ordens_industria:
+        if ordem.dt_entrada:
+            dia = parse_dt_entrada(ordem.dt_entrada)
+            if dia and 1 <= dia <= ultimo_dia_mes.day:
+                ordens_por_dia_industria[dia] += 1
+    
+    daily_labels_classificacao = [f"{dia:02d}/{hoje.month:02d}" for dia in sorted(ordens_por_dia.keys())]
+    daily_data_frigorifico = [ordens_por_dia_frigorifico[dia] for dia in sorted(ordens_por_dia.keys())]
+    daily_data_industria = [ordens_por_dia_industria[dia] for dia in sorted(ordens_por_dia.keys())]
+    
+    # Ordens por mês separadas por classificação (últimos 12 meses)
+    ordens_por_mes_frigorifico = defaultdict(int)
+    ordens_por_mes_industria = defaultdict(int)
+    
+    for ordem in ordens_frigorifico:
+        if ordem.created_at:
+            mes_ano = ordem.created_at.strftime('%Y-%m')
+            ordens_por_mes_frigorifico[mes_ano] += 1
+    
+    for ordem in ordens_industria:
+        if ordem.created_at:
+            mes_ano = ordem.created_at.strftime('%Y-%m')
+            ordens_por_mes_industria[mes_ano] += 1
+    
+    # Garantir que todos os meses tenham dados
+    todos_meses = set(ordens_por_mes.keys()) | set(ordens_por_mes_frigorifico.keys()) | set(ordens_por_mes_industria.keys())
+    meses_ordenados_classificacao = sorted(todos_meses)[-12:]
+    meses_labels_classificacao = [datetime.strptime(m, '%Y-%m').strftime('%b/%Y') for m in meses_ordenados_classificacao]
+    meses_data_frigorifico = [ordens_por_mes_frigorifico.get(m, 0) for m in meses_ordenados_classificacao]
+    meses_data_industria = [ordens_por_mes_industria.get(m, 0) for m in meses_ordenados_classificacao]
     
     context = {
-        'page_title': 'Análise de Manutentores',
-        'active_page': 'analise_manutentores',
-        'total_count': total_count,
-        'manutentores_recentes': manutentores_recentes,
-        'manutentores_mes_atual': manutentores_mes_atual,
-        'manutentores_com_maquinas': manutentores_com_maquinas,
-        'manutentores_sem_maquinas': manutentores_sem_maquinas,
-        'percentual_com_maquinas': round(percentual_com_maquinas, 1),
-        'manutentores_com_manutencoes': manutentores_com_manutencoes,
-        'total_maquinas_relacionadas': total_maquinas_relacionadas,
-        'total_manutencoes_relacionadas': total_manutencoes_relacionadas,
+        'page_title': 'Análise Corretiva com Parada',
+        'active_page': 'analise_corretiva_parada',
+        'total_com_parada': total_com_parada,
+        'com_inicio_fim': com_inicio_fim,
+        'apenas_inicio': apenas_inicio,
+        'percentual_com_parada': round(percentual_com_parada, 1),
+        'setores_count': setores_count,
+        'unidades_count': unidades_count,
+        'maquinas_count': maquinas_count,
         # Dados para gráficos (JSON)
-        'turnos_labels': json.dumps(turnos_labels),
-        'turnos_data': json.dumps(turnos_data),
-        'locais_labels': json.dumps(locais_labels),
-        'locais_data': json.dumps(locais_data),
-        'cargos_labels': json.dumps(cargos_labels),
-        'cargos_data': json.dumps(cargos_data),
+        'setores_labels': json.dumps(setores_labels),
+        'setores_data': json.dumps(setores_data),
         'meses_labels': json.dumps(meses_labels),
         'meses_data': json.dumps(meses_data),
-        'distribuicao_maquinas_labels': json.dumps(distribuicao_maquinas_labels),
-        'distribuicao_maquinas_data': json.dumps(distribuicao_maquinas_data),
+        'maquinas_labels': json.dumps(maquinas_labels),
+        'maquinas_data': json.dumps(maquinas_data),
+        'executores_labels': json.dumps(executores_labels),
+        'executores_data': json.dumps(executores_data),
+        'daily_labels': json.dumps(daily_labels),
+        'daily_data': json.dumps(daily_data),
         # Dados para tabelas
-        'top_manutentores_maquinas': top_manutentores_maquinas_list,
-        'top_manutentores_manutencoes': top_manutentores_manutencoes_list,
+        'top_maquinas': top_maquinas,
+        'top_executores': top_executores,
+        # Dados de classificação FRIGORÍFICO vs INDÚSTRIA
+        'total_frigorifico': total_frigorifico,
+        'total_industria': total_industria,
+        'total_outros': total_outros,
+        'percentual_frigorifico': round(percentual_frigorifico, 1),
+        'percentual_industria': round(percentual_industria, 1),
+        'percentual_outros': round(percentual_outros, 1),
+        'top_maquinas_frigorifico': top_maquinas_frigorifico,
+        'top_maquinas_industria': top_maquinas_industria,
+        'daily_labels_classificacao': json.dumps(daily_labels_classificacao),
+        'daily_data_frigorifico': json.dumps(daily_data_frigorifico),
+        'daily_data_industria': json.dumps(daily_data_industria),
+        'meses_labels_classificacao': json.dumps(meses_labels_classificacao),
+        'meses_data_frigorifico': json.dumps(meses_data_frigorifico),
+        'meses_data_industria': json.dumps(meses_data_industria),
     }
-    return render(request, 'analise/analise_manutentores.html', context)
+    return render(request, 'ordens_de_servico/analise_corretiva_outros_com_parada.html', context)
 
 
 def consultar_manutencao_terceiros(request):
@@ -9188,6 +8410,157 @@ def cadastrar_manutentor(request):
     return render(request, 'cadastrar/cadastrar_manutentor.html', context)
 
 
+def analise_manutentores(request):
+    """Análise de Manutentores - Dashboard com estatísticas"""
+    from app.models import Manutentor, ManutentorMaquina, OrdemServicoCorretiva, OrdemServicoCorretivaFicha
+    from django.db.models import Count, Q
+    from datetime import datetime, timedelta
+    from collections import defaultdict
+    import json
+    
+    # Estatísticas básicas
+    total_count = Manutentor.objects.count()
+    
+    # Manutentores recentes (últimos 30 dias)
+    data_30_dias_atras = datetime.now() - timedelta(days=30)
+    manutentores_recentes = Manutentor.objects.filter(
+        created_at__gte=data_30_dias_atras
+    ).count()
+    
+    # Manutentores do mês atual
+    mes_atual = datetime.now().replace(day=1)
+    manutentores_mes_atual = Manutentor.objects.filter(
+        created_at__gte=mes_atual
+    ).count()
+    
+    # Manutentores com máquinas relacionadas
+    manutentores_com_maquinas = Manutentor.objects.filter(
+        maquinas__isnull=False
+    ).distinct().count()
+    percentual_com_maquinas = (manutentores_com_maquinas / total_count * 100) if total_count > 0 else 0
+    
+    # Total de máquinas relacionadas
+    total_maquinas_relacionadas = ManutentorMaquina.objects.count()
+    
+    # Manutentores com manutenções (via OrdemServicoCorretiva ou Fichas)
+    # Buscar nomes de manutentores e contar ordens/fichas que correspondem
+    manutentores_nomes = Manutentor.objects.values_list('Nome', flat=True).exclude(Nome__isnull=True).exclude(Nome='')
+    manutentores_com_manutencoes = 0
+    total_manutencoes_relacionadas = 0
+    
+    for nome in manutentores_nomes:
+        ordens_count = OrdemServicoCorretiva.objects.filter(
+            Q(nm_func_exec__icontains=nome) | Q(nm_func_exec_os__icontains=nome)
+        ).count()
+        fichas_count = OrdemServicoCorretivaFicha.objects.filter(
+            nm_func_exec_os__icontains=nome
+        ).count()
+        if ordens_count > 0 or fichas_count > 0:
+            manutentores_com_manutencoes += 1
+        total_manutencoes_relacionadas += ordens_count + fichas_count
+    
+    # Distribuição por Turno
+    turnos_data_dict = Manutentor.objects.values('turno').annotate(total=Count('Matricula')).order_by('-total')
+    turnos_labels = [item['turno'] or 'Não informado' for item in turnos_data_dict]
+    turnos_data = [item['total'] for item in turnos_data_dict]
+    
+    # Distribuição por Local de Trabalho
+    locais_data_dict = Manutentor.objects.values('local_trab').annotate(total=Count('Matricula')).order_by('-total')
+    locais_labels = [item['local_trab'] or 'Não informado' for item in locais_data_dict]
+    locais_data = [item['total'] for item in locais_data_dict]
+    
+    # Evolução Temporal (últimos 12 meses)
+    manutentores_por_mes = defaultdict(int)
+    manutentores = Manutentor.objects.all().order_by('created_at')
+    for manutentor in manutentores:
+        if manutentor.created_at:
+            mes_ano = manutentor.created_at.strftime('%Y-%m')
+            manutentores_por_mes[mes_ano] += 1
+    
+    meses_ordenados = sorted(manutentores_por_mes.keys())[-12:]
+    meses_labels = [datetime.strptime(m, '%Y-%m').strftime('%b/%Y') for m in meses_ordenados]
+    meses_data = [manutentores_por_mes[m] for m in meses_ordenados]
+    
+    # Distribuição de Máquinas por Manutentor (0, 1-5, 6-10, 11+)
+    distribuicao_maquinas_labels = ['0 máquinas', '1-5 máquinas', '6-10 máquinas', '11+ máquinas']
+    distribuicao_maquinas_data = [0, 0, 0, 0]
+    
+    for manutentor in Manutentor.objects.all():
+        qtd_maquinas = ManutentorMaquina.objects.filter(manutentor=manutentor).count()
+        if qtd_maquinas == 0:
+            distribuicao_maquinas_data[0] += 1
+        elif qtd_maquinas <= 5:
+            distribuicao_maquinas_data[1] += 1
+        elif qtd_maquinas <= 10:
+            distribuicao_maquinas_data[2] += 1
+        else:
+            distribuicao_maquinas_data[3] += 1
+    
+    # Top 10 Cargos
+    cargos_data_dict = Manutentor.objects.exclude(Cargo__isnull=True).exclude(Cargo='').values('Cargo').annotate(
+        total=Count('Matricula')
+    ).order_by('-total')[:10]
+    cargos_labels = [item['Cargo'][:30] for item in cargos_data_dict]
+    cargos_data = [item['total'] for item in cargos_data_dict]
+    
+    # Top 10 Manutentores por Quantidade de Máquinas
+    top_manutentores_maquinas = []
+    for manutentor in Manutentor.objects.all():
+        qtd_maquinas = ManutentorMaquina.objects.filter(manutentor=manutentor).count()
+        if qtd_maquinas > 0:
+            top_manutentores_maquinas.append({
+                'manutentor': manutentor,
+                'total': qtd_maquinas
+            })
+    top_manutentores_maquinas = sorted(top_manutentores_maquinas, key=lambda x: x['total'], reverse=True)[:10]
+    
+    # Top 10 Manutentores por Quantidade de Manutenções
+    top_manutentores_manutencoes = []
+    for manutentor in Manutentor.objects.all():
+        if manutentor.Nome:
+            ordens_count = OrdemServicoCorretiva.objects.filter(
+                Q(nm_func_exec__icontains=manutentor.Nome) | Q(nm_func_exec_os__icontains=manutentor.Nome)
+            ).count()
+            fichas_count = OrdemServicoCorretivaFicha.objects.filter(
+                nm_func_exec_os__icontains=manutentor.Nome
+            ).count()
+            total_manut = ordens_count + fichas_count
+            if total_manut > 0:
+                top_manutentores_manutencoes.append({
+                    'manutentor': manutentor,
+                    'total': total_manut
+                })
+    top_manutentores_manutencoes = sorted(top_manutentores_manutencoes, key=lambda x: x['total'], reverse=True)[:10]
+    
+    context = {
+        'page_title': 'Análise de Manutentores',
+        'active_page': 'analise_manutentores',
+        'total_count': total_count,
+        'manutentores_recentes': manutentores_recentes,
+        'manutentores_mes_atual': manutentores_mes_atual,
+        'manutentores_com_maquinas': manutentores_com_maquinas,
+        'percentual_com_maquinas': round(percentual_com_maquinas, 1),
+        'manutentores_com_manutencoes': manutentores_com_manutencoes,
+        'total_maquinas_relacionadas': total_maquinas_relacionadas,
+        'total_manutencoes_relacionadas': total_manutencoes_relacionadas,
+        # Dados para gráficos (JSON)
+        'turnos_labels': json.dumps(turnos_labels),
+        'turnos_data': json.dumps(turnos_data),
+        'locais_labels': json.dumps(locais_labels),
+        'locais_data': json.dumps(locais_data),
+        'meses_labels': json.dumps(meses_labels),
+        'meses_data': json.dumps(meses_data),
+        'distribuicao_maquinas_labels': json.dumps(distribuicao_maquinas_labels),
+        'distribuicao_maquinas_data': json.dumps(distribuicao_maquinas_data),
+        'cargos_labels': json.dumps(cargos_labels),
+        'cargos_data': json.dumps(cargos_data),
+        # Dados para tabelas
+        'top_manutentores_maquinas': top_manutentores_maquinas,
+        'top_manutentores_manutencoes': top_manutentores_manutencoes,
+    }
+    return render(request, 'analise/analise_manutentores.html', context)
+
+
 def visualizar_manutentor(request, matricula):
     """Visualizar detalhes de um manutentor específico"""
     from app.models import Manutentor, ManutentorMaquina, Maquina
@@ -9218,26 +8591,13 @@ def visualizar_manutentor(request, matricula):
 def editar_manutentor(request, matricula):
     """Editar um manutentor existente"""
     from app.forms import ManutentorForm
-    from app.models import Manutentor, ManutentorMaquina, Maquina
+    from app.models import Manutentor
     
     try:
         manutentor = Manutentor.objects.get(Matricula=matricula)
     except Manutentor.DoesNotExist:
         messages.error(request, 'Manutentor não encontrado.')
         return redirect('consultar_manutentores')
-    
-    # Buscar máquinas relacionadas
-    maquinas_relacionadas = ManutentorMaquina.objects.filter(manutentor=manutentor).select_related('maquina')
-    
-    # Buscar máquinas já relacionadas para excluir da lista de disponíveis
-    maquinas_ids_relacionadas = maquinas_relacionadas.values_list('maquina_id', flat=True)
-    
-    # Buscar apenas máquinas primárias (MÁQUINAS PRINCIPAL) que ainda não estão relacionadas
-    maquinas_primarias_disponiveis = Maquina.objects.filter(
-        descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
-    ).exclude(
-        id__in=maquinas_ids_relacionadas
-    ).order_by('cd_maquina')
     
     if request.method == 'POST':
         # Garantir que a Matricula não seja alterada (é a primary key)
@@ -9269,10 +8629,8 @@ def editar_manutentor(request, matricula):
         'active_page': 'consultar_manutentores',
         'form': form,
         'manutentor': manutentor,
-        'maquinas_relacionadas': maquinas_relacionadas,
-        'maquinas_primarias_disponiveis': maquinas_primarias_disponiveis,
     }
-    return render(request, 'editar/editar_manutentor.html', context)
+    return render(request, 'visualizar/editar_manutentor.html', context)
 
 
 def consultar_manutentores(request):
@@ -9426,128 +8784,6 @@ def consultar_agendamentos(request):
     return render(request, 'consultar/consultar_agendamentos.html', context)
 
 
-def consultar_projecoes_gastos(request):
-    """Consultar/listar projeções de gastos cadastradas"""
-    from app.models import ProjecaoGasto
-    from django.db.models import Q, Sum
-    from django.core.paginator import Paginator
-    from decimal import Decimal
-    
-    # Buscar todas as projeções de gastos
-    projecoes_list = ProjecaoGasto.objects.all()
-    
-    # Filtro de busca geral (buscar nos novos campos e campos legados)
-    search_query = request.GET.get('search', '').strip()
-    if search_query:
-        projecoes_list = projecoes_list.filter(
-            Q(tipo__icontains=search_query) |
-            Q(descricao__icontains=search_query) |
-            Q(setor__icontains=search_query) |
-            Q(centro_atividade__icontains=search_query) |
-            Q(nome_centro_atividade__icontains=search_query) |
-            Q(fornecedor_nome_fantasia__icontains=search_query) |
-            Q(fornecedor__icontains=search_query) |
-            Q(numero_requisicao_compra__icontains=search_query) |
-            Q(numero_requisicao__icontains=search_query) |
-            Q(numero_ordem_servico__icontains=search_query) |
-            Q(numero_nf__icontains=search_query) |
-            Q(uso_contabil__icontains=search_query) |
-            Q(status__icontains=search_query) |
-            Q(observacoes__icontains=search_query)
-        )
-    
-    # Filtros específicos
-    filtro_tipo = request.GET.get('filtro_tipo', '')
-    if filtro_tipo:
-        projecoes_list = projecoes_list.filter(tipo__icontains=filtro_tipo)
-    
-    filtro_centro_atividade = request.GET.get('filtro_centro_atividade', '')
-    if filtro_centro_atividade:
-        projecoes_list = projecoes_list.filter(
-            Q(setor__icontains=filtro_centro_atividade) |
-            Q(centro_atividade__icontains=filtro_centro_atividade)
-        )
-    
-    filtro_status = request.GET.get('filtro_status', '')
-    if filtro_status:
-        projecoes_list = projecoes_list.filter(status__icontains=filtro_status)
-    
-    filtro_ano = request.GET.get('filtro_ano', '')
-    if filtro_ano:
-        try:
-            ano = int(filtro_ano)
-            projecoes_list = projecoes_list.filter(ano_referencia=ano)
-        except (ValueError, TypeError):
-            pass
-    
-    filtro_valor_min = request.GET.get('filtro_valor_min', '')
-    if filtro_valor_min:
-        try:
-            valor_min = Decimal(filtro_valor_min)
-            projecoes_list = projecoes_list.filter(
-                Q(valor_total__gte=valor_min) |
-                Q(valor_planejado__gte=valor_min) |
-                Q(valor_realizado__gte=valor_min) |
-                Q(valor_projetado__gte=valor_min)
-            )
-        except (ValueError, TypeError):
-            pass
-    
-    filtro_valor_max = request.GET.get('filtro_valor_max', '')
-    if filtro_valor_max:
-        try:
-            valor_max = Decimal(filtro_valor_max)
-            projecoes_list = projecoes_list.filter(
-                Q(valor_total__lte=valor_max) |
-                Q(valor_planejado__lte=valor_max) |
-                Q(valor_realizado__lte=valor_max) |
-                Q(valor_projetado__lte=valor_max)
-            )
-        except (ValueError, TypeError):
-            pass
-    
-    # Ordenar por data (usar novo campo, fallback para legado)
-    projecoes_list = projecoes_list.order_by('-data_abertura_requisicao', '-data_requisicao', '-ano_referencia', '-mes_referencia', '-created_at')
-    
-    # Paginação
-    paginator = Paginator(projecoes_list, 50)  # 50 itens por página
-    page_number = request.GET.get('page', 1)
-    projecoes = paginator.get_page(page_number)
-    
-    # Estatísticas (usar novo campo valor_total, com fallback para campos legados)
-    total_count = ProjecaoGasto.objects.count()
-    total_valor_total = ProjecaoGasto.objects.aggregate(total=Sum('valor_total'))['total'] or Decimal('0.00')
-    total_planejado = ProjecaoGasto.objects.aggregate(total=Sum('valor_planejado'))['total'] or Decimal('0.00')
-    total_realizado = ProjecaoGasto.objects.aggregate(total=Sum('valor_realizado'))['total'] or Decimal('0.00')
-    total_projetado = ProjecaoGasto.objects.aggregate(total=Sum('valor_projetado'))['total'] or Decimal('0.00')
-    # Usar valor_total se disponível, senão somar os outros
-    if total_valor_total > 0:
-        total_planejado = total_valor_total
-    tipos_count = ProjecaoGasto.objects.values('tipo').distinct().count()
-    centros_count = ProjecaoGasto.objects.values('centro_atividade').distinct().count()
-    
-    context = {
-        'page_title': 'Consultar Projeções de Gastos',
-        'active_page': 'consultar_projecoes_gastos',
-        'projecoes': projecoes,
-        'total_count': total_count,
-        'total_planejado': total_planejado,
-        'total_realizado': total_realizado,
-        'total_projetado': total_projetado,
-        'total_valor_total': total_valor_total,
-        'tipos_count': tipos_count,
-        'centros_count': centros_count,
-        'filtro_tipo': filtro_tipo,
-        'filtro_centro_atividade': filtro_centro_atividade,
-        'filtro_status': filtro_status,
-        'filtro_ano': filtro_ano,
-        'filtro_valor_min': filtro_valor_min,
-        'filtro_valor_max': filtro_valor_max,
-        'search_query': search_query,
-    }
-    return render(request, 'consultar/consultar_projecoes_gastos.html', context)
-
-
 def consultar_visitas(request):
     """Consultar/listar visitas cadastradas"""
     from app.models import Visitas
@@ -9610,162 +8846,6 @@ def consultar_visitas(request):
         'search_query': search_query,
     }
     return render(request, 'consultar/consultar_visitas.html', context)
-
-
-def consultar_notas_fiscais(request):
-    """Consultar/listar notas fiscais cadastradas"""
-    from app.models import NotaFiscal
-    from django.db.models import Q, Sum
-    from django.core.paginator import Paginator
-    from decimal import Decimal
-    
-    # Buscar todas as notas fiscais
-    notas_list = NotaFiscal.objects.all()
-    
-    # Filtro de busca geral
-    search_query = request.GET.get('search', '').strip()
-    if search_query:
-        notas_list = notas_list.filter(
-            Q(nota__icontains=search_query) |
-            Q(serie__icontains=search_query) |
-            Q(emitente__icontains=search_query) |
-            Q(nome_fantasia_emitente__icontains=search_query) |
-            Q(unidade__icontains=search_query) |
-            Q(nome_unidade__icontains=search_query) |
-            Q(centro_atividade__icontains=search_query) |
-            Q(nome_centro_atividade__icontains=search_query) |
-            Q(situacao__icontains=search_query) |
-            Q(observacoes__icontains=search_query)
-        )
-    
-    # Filtros específicos (do card de filtros avançados)
-    filtro_emitente = request.GET.get('filtro_emitente', '')
-    if filtro_emitente:
-        notas_list = notas_list.filter(emitente__icontains=filtro_emitente)
-    
-    filtro_unidade = request.GET.get('filtro_unidade', '')
-    if filtro_unidade:
-        notas_list = notas_list.filter(unidade__icontains=filtro_unidade)
-    
-    filtro_situacao = request.GET.get('filtro_situacao', '')
-    if filtro_situacao:
-        notas_list = notas_list.filter(situacao__icontains=filtro_situacao)
-    
-    filtro_total_min = request.GET.get('filtro_total_min', '')
-    if filtro_total_min:
-        try:
-            total_min = Decimal(filtro_total_min)
-            notas_list = notas_list.filter(total_nota__gte=total_min)
-        except (ValueError, TypeError):
-            pass
-    
-    filtro_total_max = request.GET.get('filtro_total_max', '')
-    if filtro_total_max:
-        try:
-            total_max = Decimal(filtro_total_max)
-            notas_list = notas_list.filter(total_nota__lte=total_max)
-        except (ValueError, TypeError):
-            pass
-    
-    # Filtros inline das colunas da tabela
-    filter_nota = request.GET.get('filter_nota', '').strip()
-    if filter_nota:
-        notas_list = notas_list.filter(nota__icontains=filter_nota)
-    
-    filter_serie = request.GET.get('filter_serie', '').strip()
-    if filter_serie:
-        notas_list = notas_list.filter(serie__icontains=filter_serie)
-    
-    filter_emitente_col = request.GET.get('filter_emitente', '').strip()
-    if filter_emitente_col:
-        notas_list = notas_list.filter(emitente__icontains=filter_emitente_col)
-    
-    filter_nome_fantasia = request.GET.get('filter_nome_fantasia', '').strip()
-    if filter_nome_fantasia:
-        notas_list = notas_list.filter(nome_fantasia_emitente__icontains=filter_nome_fantasia)
-    
-    filter_data_emissao = request.GET.get('filter_data_emissao', '').strip()
-    if filter_data_emissao:
-        notas_list = notas_list.filter(data_emissao__icontains=filter_data_emissao)
-    
-    filter_total = request.GET.get('filter_total', '').strip()
-    if filter_total:
-        try:
-            total_val = Decimal(filter_total)
-            notas_list = notas_list.filter(total_nota=total_val)
-        except (ValueError, TypeError):
-            notas_list = notas_list.filter(total_nota__icontains=filter_total)
-    
-    filter_uso_contabil = request.GET.get('filter_uso_contabil', '').strip()
-    if filter_uso_contabil:
-        notas_list = notas_list.filter(uso_contabil__icontains=filter_uso_contabil)
-    
-    filter_centro_atividade = request.GET.get('filter_centro_atividade', '').strip()
-    if filter_centro_atividade:
-        notas_list = notas_list.filter(centro_atividade__icontains=filter_centro_atividade)
-    
-    filter_situacao_col = request.GET.get('filter_situacao', '').strip()
-    if filter_situacao_col:
-        notas_list = notas_list.filter(situacao__icontains=filter_situacao_col)
-    
-    # Ordenar por data de emissão (mais recente primeiro) ou por número da nota
-    notas_list = notas_list.order_by('-data_emissao', '-nota', '-created_at')
-    
-    # Paginação
-    paginator = Paginator(notas_list, 50)  # 50 itens por página
-    page_number = request.GET.get('page', 1)
-    notas = paginator.get_page(page_number)
-    
-    # Estatísticas
-    total_count = NotaFiscal.objects.count()
-    total_valor = NotaFiscal.objects.aggregate(total=Sum('total_nota'))['total'] or Decimal('0.00')
-    situacoes_count = NotaFiscal.objects.values('situacao').distinct().count()
-    unidades_count = NotaFiscal.objects.values('unidade').distinct().count()
-    
-    context = {
-        'page_title': 'Consultar Notas Fiscais',
-        'active_page': 'consultar_notas_fiscais',
-        'notas': notas,
-        'total_count': total_count,
-        'total_valor': total_valor,
-        'situacoes_count': situacoes_count,
-        'unidades_count': unidades_count,
-        'filtro_emitente': filtro_emitente,
-        'filtro_unidade': filtro_unidade,
-        'filtro_situacao': filtro_situacao,
-        'filtro_total_min': filtro_total_min,
-        'filtro_total_max': filtro_total_max,
-        'search_query': search_query,
-        # Filtros inline das colunas
-        'filter_nota': filter_nota,
-        'filter_serie': filter_serie,
-        'filter_emitente': filter_emitente_col,
-        'filter_nome_fantasia': filter_nome_fantasia,
-        'filter_data_emissao': filter_data_emissao,
-        'filter_total': filter_total,
-        'filter_uso_contabil': filter_uso_contabil,
-        'filter_centro_atividade': filter_centro_atividade,
-        'filter_situacao': filter_situacao_col,
-    }
-    return render(request, 'consultar/consultar_notas_fiscais.html', context)
-
-
-def visualizar_nota_fiscal(request, nota_id):
-    """Visualizar detalhes completos de uma Nota Fiscal"""
-    from app.models import NotaFiscal
-    
-    try:
-        nota = NotaFiscal.objects.get(id=nota_id)
-    except NotaFiscal.DoesNotExist:
-        messages.error(request, 'Nota Fiscal não encontrada.')
-        return redirect('consultar_notas_fiscais')
-    
-    context = {
-        'page_title': f'Visualizar Nota Fiscal {nota.nota or nota.id}',
-        'active_page': 'consultar_notas_fiscais',
-        'nota': nota,
-    }
-    return render(request, 'visualizar/visualizar_nota_fiscal.html', context)
 
 
 def cadastrar_visita(request):
@@ -9838,11 +8918,11 @@ def gerenciar_projeto(request):
     """Página de gerenciamento administrativo do projeto"""
     from app.models import (
         Maquina, MaquinaDocumento, OrdemServicoCorretiva, OrdemServicoCorretivaFicha,
-        CentroAtividade, LocalCentroAtividade, Semana52, Manutentor, ManutentorMaquina,
+        CentroAtividade, Semana52, Manutentor, ManutentorMaquina,
         ItemEstoque, ManutencaoCsv, ManutencaoTerceiro, MaquinaPeca,
         MaquinaPrimariaSecundaria, PlanoPreventiva, PlanoPreventivaDocumento,
         MeuPlanoPreventiva, MeuPlanoPreventivaDocumento, AgendamentoCronograma,
-        RoteiroPreventiva, RequisicaoAlmoxarifado, NotaFiscal, Visitas, ProjecaoGasto
+        RoteiroPreventiva, RequisicaoAlmoxarifado
     )
     
     # Definir todos os modelos com suas informações
@@ -9877,15 +8957,7 @@ def gerenciar_projeto(request):
             'key': 'centros',
             'icone': 'fas fa-building',
             'cor': 'success',
-            'descricao': 'Centros de atividade (CA) cadastrados'
-        },
-        {
-            'nome': 'Locais e Centros de Atividade',
-            'modelo': LocalCentroAtividade,
-            'key': 'locais_centros',
-            'icone': 'fas fa-map-marker-alt',
-            'cor': 'success',
-            'descricao': 'Relação entre locais e centros de atividade'
+            'descricao': 'Centros de atividade (CA) cadastrados com seus locais'
         },
         {
             'nome': 'Manutentores',
@@ -10015,30 +9087,6 @@ def gerenciar_projeto(request):
             'cor': 'warning',
             'descricao': 'Requisições de itens retirados do almoxarifado'
         },
-        {
-            'nome': 'Notas Fiscais',
-            'modelo': NotaFiscal,
-            'key': 'nota_fiscal',
-            'icone': 'fas fa-file-invoice-dollar',
-            'cor': 'info',
-            'descricao': 'Notas fiscais cadastradas no sistema'
-        },
-        {
-            'nome': 'Visitas',
-            'modelo': Visitas,
-            'key': 'visitas',
-            'icone': 'fas fa-calendar-check',
-            'cor': 'success',
-            'descricao': 'Visitas e agendamentos cadastrados'
-        },
-        {
-            'nome': 'Projeções de Gastos',
-            'modelo': ProjecaoGasto,
-            'key': 'projecao_gasto',
-            'icone': 'fas fa-chart-line',
-            'cor': 'info',
-            'descricao': 'Projeções de gastos e requisições de serviço'
-        },
     ]
     
     # Contar registros em cada tabela
@@ -10081,11 +9129,11 @@ def limpar_tabela(request):
     
     from app.models import (
         Maquina, MaquinaDocumento, OrdemServicoCorretiva, OrdemServicoCorretivaFicha,
-        CentroAtividade, LocalCentroAtividade, Semana52, Manutentor, ManutentorMaquina,
+        CentroAtividade, Semana52, Manutentor, ManutentorMaquina,
         ItemEstoque, ManutencaoCsv, ManutencaoTerceiro, MaquinaPeca,
         MaquinaPrimariaSecundaria, PlanoPreventiva, PlanoPreventivaDocumento,
         MeuPlanoPreventiva, MeuPlanoPreventivaDocumento, AgendamentoCronograma,
-        RoteiroPreventiva, RequisicaoAlmoxarifado, NotaFiscal, Visitas, ProjecaoGasto
+        RoteiroPreventiva, RequisicaoAlmoxarifado
     )
     
     # Mapeamento de tabelas para modelos
@@ -10094,7 +9142,6 @@ def limpar_tabela(request):
         'ordens': {'modelo': OrdemServicoCorretiva, 'nome': 'Ordens Corretivas'},
         'ordens_ficha': {'modelo': OrdemServicoCorretivaFicha, 'nome': 'Fichas de Ordens Corretivas'},
         'centros': {'modelo': CentroAtividade, 'nome': 'Centros de Atividade'},
-        'locais_centros': {'modelo': LocalCentroAtividade, 'nome': 'Locais e Centros de Atividade'},
         'manutentores': {'modelo': Manutentor, 'nome': 'Manutentores'},
         'manutentor_maquina': {'modelo': ManutentorMaquina, 'nome': 'Máquinas dos Manutentores'},
         'estoque': {'modelo': ItemEstoque, 'nome': 'Itens de Estoque'},
@@ -10111,9 +9158,6 @@ def limpar_tabela(request):
         'meu_plano_preventiva_documento': {'modelo': MeuPlanoPreventivaDocumento, 'nome': 'Documentos Meus Planos Preventiva'},
         'agendamento_cronograma': {'modelo': AgendamentoCronograma, 'nome': 'Agendamentos Cronograma'},
         'requisicao_almoxarifado': {'modelo': RequisicaoAlmoxarifado, 'nome': 'Requisições Almoxarifado'},
-        'nota_fiscal': {'modelo': NotaFiscal, 'nome': 'Notas Fiscais'},
-        'visitas': {'modelo': Visitas, 'nome': 'Visitas'},
-        'projecao_gasto': {'modelo': ProjecaoGasto, 'nome': 'Projeções de Gastos'},
     }
     
     tabela = request.POST.get('tabela', '')
@@ -10141,14 +9185,25 @@ def limpar_tabela(request):
             # Limpar tabela específica
             info = tabelas_map[tabela]
             count = info['modelo'].objects.count()
-            info['modelo'].objects.all().delete()
-            messages.success(request, f'{count} registro(s) de {info["nome"]} foram removidos com sucesso.')
+            
+            if count > 0:
+                try:
+                    deleted_count, deleted_details = info['modelo'].objects.all().delete()
+                    messages.success(request, f'{count} registro(s) de {info["nome"]} foram removidos com sucesso.')
+                except Exception as delete_error:
+                    import traceback
+                    error_details = traceback.format_exc()
+                    messages.error(request, f'Erro ao deletar registros de {info["nome"]}: {str(delete_error)}<br><br>Detalhes: <pre>{error_details}</pre>')
+            else:
+                messages.info(request, f'Não há registros para limpar em {info["nome"]}.')
         
         else:
-            messages.error(request, 'Tabela não reconhecida.')
+            messages.error(request, f'Tabela "{tabela}" não reconhecida.')
     
     except Exception as e:
-        messages.error(request, f'Erro ao limpar tabela: {str(e)}')
+        import traceback
+        error_details = traceback.format_exc()
+        messages.error(request, f'Erro ao limpar tabela: {str(e)}<br><br>Detalhes: <pre>{error_details}</pre>')
     
     return redirect('gerenciar_projeto')
 
@@ -10233,185 +9288,61 @@ def adicionar_peca_maquina(request, maquina_id):
 
 
 def adicionar_maquina_manutentor(request, matricula):
-    """Adicionar uma ou múltiplas máquinas a um manutentor"""
+    """Adicionar uma máquina a um manutentor"""
     from app.models import Manutentor, ManutentorMaquina, Maquina
-    from django.db import IntegrityError, transaction
+    from django.db import IntegrityError
     
-    print(f"=== ADICIONAR MAQUINA MANUTENTOR ===")
-    print(f"Method: {request.method}")
-    print(f"Matricula: {matricula}")
+    print(f"=== ADICIONAR MAQUINA MANUTENTOR === Method: {request.method}, Cadastro: {cadastro}")
     print(f"POST data: {request.POST}")
-    print(f"POST keys: {list(request.POST.keys())}")
+    print(f"GET data: {request.GET}")
     
     if request.method != 'POST':
         messages.error(request, 'Método não permitido.')
-        return redirect('editar_manutentor', matricula=matricula)
+        return redirect('visualizar_manutentor', cadastro=cadastro)
     
     try:
-        manutentor = Manutentor.objects.get(Matricula=matricula)
+        manutentor = Manutentor.objects.get(Cadastro=cadastro)
     except Manutentor.DoesNotExist:
         messages.error(request, 'Manutentor não encontrado.')
         return redirect('consultar_manutentores')
     
-    # Obter máquina primária e máquinas secundárias selecionadas
-    maquina_primaria_id = request.POST.get('maquina_primaria')
-    maquinas_secundarias_ids = request.POST.getlist('maquinas_secundarias')
-    observacoes = request.POST.get('observacoes', '').strip()
+    maquina_id = request.POST.get('maquina_id')
+    observacoes = request.POST.get('observacoes', '')
     
-    print(f"maquina_primaria_id: {maquina_primaria_id}")
-    print(f"maquinas_secundarias_ids: {maquinas_secundarias_ids}")
-    print(f"observacoes: {observacoes}")
-    
-    if not maquina_primaria_id:
-        messages.error(request, 'Por favor, selecione uma máquina primária.')
-        return redirect('editar_manutentor', matricula=matricula)
-    
-    if not maquinas_secundarias_ids:
-        messages.error(request, 'Por favor, selecione pelo menos uma máquina secundária.')
-        return redirect('editar_manutentor', matricula=matricula)
-    
-    # Processar todas as máquinas em uma transação
-    sucesso_count = 0
-    ja_existente_count = 0
-    erro_count = 0
-    maquinas_nao_encontradas = []
+    if not maquina_id:
+        messages.error(request, 'Por favor, selecione uma máquina.')
+        return redirect('visualizar_manutentor', cadastro=cadastro)
     
     try:
-        with transaction.atomic():
-            # Primeiro, adicionar a máquina primária
+        maquina = Maquina.objects.get(id=maquina_id)
+        
+        # Verificar se já existe relação
+        if ManutentorMaquina.objects.filter(manutentor=manutentor, maquina=maquina).exists():
+            messages.warning(request, f'Esta máquina já está relacionada ao manutentor {manutentor.Cadastro}.')
+        else:
+            # Criar relação
             try:
-                maquina_primaria = Maquina.objects.get(id=maquina_primaria_id)
-                
-                # Verificar se já existe relação com a primária
-                if ManutentorMaquina.objects.filter(manutentor=manutentor, maquina=maquina_primaria).exists():
-                    ja_existente_count += 1
+                ManutentorMaquina.objects.create(
+                    manutentor=manutentor,
+                    maquina=maquina,
+                    observacoes=observacoes if observacoes else None
+                )
+                messages.success(request, f'Máquina "{maquina.cd_maquina}" adicionada com sucesso ao manutentor {manutentor.Matricula}.')
+            except Exception as create_error:
+                if isinstance(create_error, IntegrityError):
+                    messages.warning(request, f'Esta máquina já está relacionada ao manutentor {manutentor.Matricula}.')
                 else:
-                    # Criar relação com a máquina primária
-                    try:
-                        relacionamento = ManutentorMaquina.objects.create(
-                            manutentor=manutentor,
-                            maquina=maquina_primaria,
-                            observacoes=observacoes if observacoes else None
-                        )
-                        print(f"Relacionamento criado (primária): {relacionamento}")
-                        sucesso_count += 1
-                    except IntegrityError as ie:
-                        print(f"IntegrityError ao criar relacionamento (primária): {ie}")
-                        ja_existente_count += 1
-                    except Exception as create_error:
-                        print(f"Erro ao criar relacionamento (primária): {create_error}")
-                        raise create_error
-            except Maquina.DoesNotExist:
-                maquinas_nao_encontradas.append(maquina_primaria_id)
-                erro_count += 1
-                messages.error(request, 'Máquina primária não encontrada.')
-                return redirect('editar_manutentor', matricula=matricula)
-            
-            # Depois, adicionar todas as máquinas secundárias
-            for maquina_secundaria_id in maquinas_secundarias_ids:
-                try:
-                    maquina_secundaria = Maquina.objects.get(id=maquina_secundaria_id)
-                    
-                    # Verificar se já existe relação
-                    if ManutentorMaquina.objects.filter(manutentor=manutentor, maquina=maquina_secundaria).exists():
-                        ja_existente_count += 1
-                    else:
-                        # Criar relação
-                        try:
-                            relacionamento = ManutentorMaquina.objects.create(
-                                manutentor=manutentor,
-                                maquina=maquina_secundaria,
-                                observacoes=observacoes if observacoes else None
-                            )
-                            print(f"Relacionamento criado (secundária): {relacionamento}")
-                            sucesso_count += 1
-                        except IntegrityError as ie:
-                            print(f"IntegrityError ao criar relacionamento (secundária): {ie}")
-                            ja_existente_count += 1
-                        except Exception as create_error:
-                            print(f"Erro ao criar relacionamento (secundária): {create_error}")
-                            raise create_error
-                
-                except Maquina.DoesNotExist:
-                    maquinas_nao_encontradas.append(maquina_secundaria_id)
-                    erro_count += 1
-                except Exception as e:
-                    erro_count += 1
-                    print(f"Erro ao adicionar máquina secundária {maquina_secundaria_id}: {str(e)}")
-        
-        # Mensagens de resultado
-        if sucesso_count > 0:
-            messages.success(request, f'{sucesso_count} máquina(s) adicionada(s) com sucesso ao manutentor {manutentor.Matricula}.')
-        
-        if ja_existente_count > 0:
-            messages.warning(request, f'{ja_existente_count} máquina(s) já estavam relacionadas ao manutentor.')
-        
-        if erro_count > 0 and maquinas_nao_encontradas:
-            messages.error(request, f'{erro_count} máquina(s) não foram encontradas.')
-        elif erro_count > 0:
-            messages.error(request, f'Erro ao adicionar {erro_count} máquina(s).')
+                    raise create_error
     
+    except Maquina.DoesNotExist:
+        messages.error(request, 'Máquina não encontrada.')
     except Exception as e:
         import traceback
         error_detail = traceback.format_exc()
-        messages.error(request, f'Erro ao adicionar máquinas: {str(e)}')
-        print(f"Erro ao adicionar máquinas: {error_detail}")  # Debug
+        messages.error(request, f'Erro ao adicionar máquina: {str(e)}')
+        print(f"Erro ao adicionar máquina: {error_detail}")  # Debug
     
-    return redirect('editar_manutentor', matricula=matricula)
-
-
-def get_maquinas_secundarias(request, maquina_primaria_id):
-    """AJAX endpoint para obter máquinas secundárias de uma máquina primária"""
-    from app.models import Maquina, MaquinaPrimariaSecundaria, Manutentor, ManutentorMaquina
-    from django.http import JsonResponse
-    
-    try:
-        maquina_primaria = Maquina.objects.get(id=maquina_primaria_id)
-        
-        # Verificar se é realmente uma máquina primária
-        if not maquina_primaria.descr_gerenc or 'MÁQUINAS PRINCIPAL' not in maquina_primaria.descr_gerenc.upper():
-            return JsonResponse({'error': 'Máquina não é uma máquina primária'}, status=400)
-        
-        # Buscar máquinas secundárias relacionadas
-        relacionamentos = MaquinaPrimariaSecundaria.objects.filter(
-            maquina_primaria=maquina_primaria
-        ).select_related('maquina_secundaria')
-        
-        # Se houver matricula na query string, excluir máquinas já relacionadas ao manutentor
-        matricula = request.GET.get('matricula')
-        maquinas_secundarias_ids_relacionadas = []
-        if matricula:
-            try:
-                manutentor = Manutentor.objects.get(Matricula=matricula)
-                maquinas_secundarias_ids_relacionadas = ManutentorMaquina.objects.filter(
-                    manutentor=manutentor
-                ).values_list('maquina_id', flat=True)
-            except Manutentor.DoesNotExist:
-                pass
-        
-        # Montar lista de máquinas secundárias
-        maquinas_secundarias = []
-        for rel in relacionamentos:
-            maquina_sec = rel.maquina_secundaria
-            # Excluir se já estiver relacionada ao manutentor
-            if maquina_sec.id not in maquinas_secundarias_ids_relacionadas:
-                maquinas_secundarias.append({
-                    'id': maquina_sec.id,
-                    'cd_maquina': maquina_sec.cd_maquina,
-                    'descr_maquina': maquina_sec.descr_maquina or '',
-                    'descr_setormanut': maquina_sec.descr_setormanut or '',
-                    'texto': f"{maquina_sec.cd_maquina} - {maquina_sec.descr_maquina or 'Sem descrição'}{' (' + maquina_sec.descr_setormanut + ')' if maquina_sec.descr_setormanut else ''}"
-                })
-        
-        return JsonResponse({
-            'maquinas_secundarias': maquinas_secundarias,
-            'total': len(maquinas_secundarias)
-        })
-        
-    except Maquina.DoesNotExist:
-        return JsonResponse({'error': 'Máquina primária não encontrada'}, status=404)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+    return redirect('visualizar_manutentor', matricula=matricula)
 
 
 def remover_maquina_manutentor(request, matricula, manutentor_maquina_id):

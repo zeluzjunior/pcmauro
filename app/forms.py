@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Maquina, MaquinaDocumento, OrdemServicoCorretiva, OrdemServicoCorretivaFicha, CentroAtividade, LocalCentroAtividade, Manutentor, ManutencaoTerceiro, PlanoPreventivaDocumento, MeuPlanoPreventiva, AgendamentoCronograma, Visitas
+from .models import Maquina, MaquinaDocumento, OrdemServicoCorretiva, OrdemServicoCorretivaFicha, CentroAtividade, Manutentor, ManutencaoTerceiro, PlanoPreventivaDocumento, MeuPlanoPreventiva, AgendamentoCronograma, Visitas
 
 
 class MaquinaForm(forms.ModelForm):
@@ -27,7 +27,7 @@ class MaquinaForm(forms.ModelForm):
             'arquivo_pdf',
             'diagrama_eletrico',
             'pecas_reposicao',
-            'local_centro_atividade',
+            'centro_atividade',
         ]
         widgets = {
             'cd_maquina': forms.NumberInput(attrs={
@@ -110,7 +110,7 @@ class MaquinaForm(forms.ModelForm):
                 'class': 'form-control',
                 'accept': '.pdf',
             }),
-            'local_centro_atividade': forms.Select(attrs={
+            'centro_atividade': forms.Select(attrs={
                 'class': 'form-control',
                 'data-setormanut-filter': 'true',
             }),
@@ -134,7 +134,7 @@ class MaquinaForm(forms.ModelForm):
             'arquivo_pdf': 'Arquivo PDF',
             'diagrama_eletrico': 'Diagrama Elétrico',
             'pecas_reposicao': 'Peças de Reposição',
-            'local_centro_atividade': 'Local do Centro de Atividade',
+            'centro_atividade': 'Centro de Atividade',
         }
     
     def __init__(self, *args, **kwargs):
@@ -148,7 +148,7 @@ class MaquinaForm(forms.ModelForm):
         self.fields['diagrama_eletrico'].required = False
         self.fields['pecas_reposicao'].required = False
         
-        # Filtrar LocalCentroAtividade baseado no cd_setormanut
+        # Filtrar CentroAtividade baseado no cd_setormanut
         # Assumindo que cd_setormanut corresponde ao ca do CentroAtividade
         if self.instance and self.instance.pk and self.instance.cd_setormanut:
             try:
@@ -157,22 +157,18 @@ class MaquinaForm(forms.ModelForm):
                 # Se cd_setormanut é numérico, usar como CA
                 if cd_setormanut.isdigit():
                     ca_value = int(cd_setormanut)
-                    centros = CentroAtividade.objects.filter(ca=ca_value)
-                    if centros.exists():
-                        self.fields['local_centro_atividade'].queryset = LocalCentroAtividade.objects.filter(
-                            centro_atividade__in=centros
-                        ).order_by('local')
-                    else:
-                        self.fields['local_centro_atividade'].queryset = LocalCentroAtividade.objects.none()
+                    self.fields['centro_atividade'].queryset = CentroAtividade.objects.filter(
+                        ca=ca_value
+                    ).order_by('ca')
                 else:
                     # Se não é numérico, não filtrar (mostrar todos)
-                    self.fields['local_centro_atividade'].queryset = LocalCentroAtividade.objects.all().order_by('local')
+                    self.fields['centro_atividade'].queryset = CentroAtividade.objects.all().order_by('ca')
             except (ValueError, AttributeError):
                 # Se houver erro, mostrar todos
-                self.fields['local_centro_atividade'].queryset = LocalCentroAtividade.objects.all().order_by('local')
+                self.fields['centro_atividade'].queryset = CentroAtividade.objects.all().order_by('ca')
         else:
             # Se não há instância ou cd_setormanut, mostrar todos
-            self.fields['local_centro_atividade'].queryset = LocalCentroAtividade.objects.all().order_by('local')
+            self.fields['centro_atividade'].queryset = CentroAtividade.objects.all().order_by('ca')
 
 
 class OrdemServicoCorretivaForm(forms.ModelForm):
@@ -326,6 +322,8 @@ class CentroAtividadeForm(forms.ModelForm):
             'descricao',
             'indice',
             'encarregado_responsavel',
+            'local',
+            'observacoes',
         ]
         widgets = {
             'ca': forms.NumberInput(attrs={
@@ -353,28 +351,6 @@ class CentroAtividadeForm(forms.ModelForm):
                 'maxlength': '255',
                 'placeholder': 'Nome do Encarregado Responsável'
             }),
-        }
-        labels = {
-            'ca': 'CA *',
-            'sigla': 'Sigla',
-            'descricao': 'Descrição',
-            'indice': 'Índice',
-            'encarregado_responsavel': 'Encarregado Responsável',
-        }
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Torna ca obrigatório
-        self.fields['ca'].required = True
-
-
-class LocalCentroAtividadeForm(forms.ModelForm):
-    """Formulário para cadastro de Locais do Centro de Atividade"""
-    
-    class Meta:
-        model = LocalCentroAtividade
-        fields = ['local', 'observacoes']
-        widgets = {
             'local': forms.TextInput(attrs={
                 'class': 'form-control',
                 'maxlength': '255',
@@ -387,27 +363,21 @@ class LocalCentroAtividadeForm(forms.ModelForm):
             }),
         }
         labels = {
+            'ca': 'CA *',
+            'sigla': 'Sigla',
+            'descricao': 'Descrição',
+            'indice': 'Índice',
+            'encarregado_responsavel': 'Encarregado Responsável',
             'local': 'Local',
             'observacoes': 'Observações',
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['local'].required = True
+        # Torna ca obrigatório
+        self.fields['ca'].required = True
 
 
-# Formset factory para múltiplos locais
-LocalCentroAtividadeFormSet = inlineformset_factory(
-    CentroAtividade,
-    LocalCentroAtividade,
-    form=LocalCentroAtividadeForm,
-    extra=1,
-    can_delete=True,
-    min_num=0,
-    validate_min=False,
-    can_order=False,
-    fk_name='centro_atividade'
-)
 
 
 class ManutentorForm(forms.ModelForm):
