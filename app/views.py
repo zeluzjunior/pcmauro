@@ -1610,7 +1610,7 @@ def maquina_primaria_secundaria(request):
         'maquinas_secundarias': maquinas_secundarias,
         'relacionamentos': relacionamentos
     }
-    return render(request, 'planejamento/maquina_primaria_secundaria.html', context)
+    return render(request, 'maquinas/maquina_primaria_secundaria.html', context)
 
 
 def contact(request):
@@ -3457,11 +3457,11 @@ def analise_maquinas(request):
     # Buscar Centros de Atividade filtrados por local (INDÚSTRIA ou FRIGORÍFICO)
     from app.models import CentroAtividade
     centros_industria = list(CentroAtividade.objects.filter(
-        locais__local__iexact='INDÚSTRIA'
+        local__iexact='INDÚSTRIA'
     ).distinct().order_by('ca'))
     
     centros_frigorifico = list(CentroAtividade.objects.filter(
-        locais__local__iexact='FRIGORÍFICO'
+        local__iexact='FRIGORÍFICO'
     ).distinct().order_by('ca'))
     
     # Preparar dados para o organograma (OrgChartJS)
@@ -3544,7 +3544,7 @@ def analise_maquinas(request):
         'total_primarias_org': maquinas_primarias_org.count(),
         'total_relacionamentos_org': relacionamentos_org.count(),
     }
-    return render(request, 'analise/analise_maquinas.html', context)
+    return render(request, 'maquinas/analise_geral_maquinas.html', context)
 
 
 def analise_maquinas_importadas(request):

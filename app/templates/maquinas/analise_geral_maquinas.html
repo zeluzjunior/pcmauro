@@ -842,174 +842,161 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.error('Canvas setoresChart não encontrado!');
     }
-});
-
-// Gráfico de Barras: Máquinas por Unidade
-const unidadesCtx = document.getElementById('unidadesChart').getContext('2d');
-new Chart(unidadesCtx, {
-    type: 'bar',
-    data: {
-        labels: {{ unidades_labels|safe }},
-        datasets: [{
-            label: 'Máquinas',
-            data: {{ unidades_data|safe }},
-            backgroundColor: '#0dcaf0'
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: false
+    
+    // Gráfico de Linha: Evolução Temporal
+    const temporalCanvas = document.getElementById('temporalChart');
+    if (temporalCanvas) {
+        const temporalCtx = temporalCanvas.getContext('2d');
+        new Chart(temporalCtx, {
+            type: 'line',
+            data: {
+                labels: {{ meses_labels|safe }},
+                datasets: [{
+                    label: 'Máquinas Cadastradas',
+                    data: {{ meses_data|safe }},
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
             }
-        },
-        scales: {
-            y: {
-                beginAtZero: true
-            }
-        }
+        });
     }
-});
-
-// Gráfico de Linha: Evolução Temporal
-const temporalCtx = document.getElementById('temporalChart').getContext('2d');
-new Chart(temporalCtx, {
-    type: 'line',
-    data: {
-        labels: {{ meses_labels|safe }},
-        datasets: [{
-            label: 'Máquinas Cadastradas',
-            data: {{ meses_data|safe }},
-            borderColor: '#198754',
-            backgroundColor: 'rgba(25, 135, 84, 0.1)',
-            tension: 0.4,
-            fill: true
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: true
+    
+    // Gráfico de Doughnut: Distribuição por Prioridade
+    const prioridadesCanvas = document.getElementById('prioridadesChart');
+    if (prioridadesCanvas) {
+        const prioridadesCtx = prioridadesCanvas.getContext('2d');
+        new Chart(prioridadesCtx, {
+            type: 'doughnut',
+            data: {
+                labels: {{ prioridades_labels|safe }},
+                datasets: [{
+                    data: {{ prioridades_data|safe }},
+                    backgroundColor: [
+                        '#ffc107', '#0d6efd', '#198754', '#dc3545', '#0dcaf0',
+                        '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
             }
-        },
-        scales: {
-            y: {
-                beginAtZero: true
-            }
-        }
+        });
     }
-});
-
-// Gráfico de Doughnut: Distribuição por Prioridade
-const prioridadesCtx = document.getElementById('prioridadesChart').getContext('2d');
-new Chart(prioridadesCtx, {
-    type: 'doughnut',
-    data: {
-        labels: {{ prioridades_labels|safe }},
-        datasets: [{
-            data: {{ prioridades_data|safe }},
-            backgroundColor: [
-                '#ffc107', '#0d6efd', '#198754', '#dc3545', '#0dcaf0',
-                '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d'
-            ]
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'bottom'
+    
+    // Gráfico de Barras Horizontal: Top Máquinas com OS
+    const maquinasOsCanvas = document.getElementById('maquinasOsChart');
+    if (maquinasOsCanvas) {
+        const maquinasOsCtx = maquinasOsCanvas.getContext('2d');
+        new Chart(maquinasOsCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ maquinas_os_labels|safe }},
+                datasets: [{
+                    label: 'Ordens de Serviço',
+                    data: {{ maquinas_os_data|safe }},
+                    backgroundColor: '#dc3545'
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true
+                    }
+                }
             }
-        }
+        });
     }
-});
-
-// Gráfico de Barras Horizontal: Top Máquinas com OS
-const maquinasOsCtx = document.getElementById('maquinasOsChart').getContext('2d');
-new Chart(maquinasOsCtx, {
-    type: 'bar',
-    data: {
-        labels: {{ maquinas_os_labels|safe }},
-        datasets: [{
-            label: 'Ordens de Serviço',
-            data: {{ maquinas_os_data|safe }},
-            backgroundColor: '#dc3545'
-        }]
-    },
-    options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: false
+    
+    // Gráfico de Barras: Distribuição por Grupo
+    const gruposCanvas = document.getElementById('gruposChart');
+    if (gruposCanvas) {
+        const gruposCtx = gruposCanvas.getContext('2d');
+        new Chart(gruposCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ grupos_labels|safe }},
+                datasets: [{
+                    label: 'Máquinas',
+                    data: {{ grupos_data|safe }},
+                    backgroundColor: '#6c757d'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
             }
-        },
-        scales: {
-            x: {
-                beginAtZero: true
-            }
-        }
+        });
     }
-});
-
-// Gráfico de Barras: Distribuição por Grupo
-const gruposCtx = document.getElementById('gruposChart').getContext('2d');
-new Chart(gruposCtx, {
-    type: 'bar',
-    data: {
-        labels: {{ grupos_labels|safe }},
-        datasets: [{
-            label: 'Máquinas',
-            data: {{ grupos_data|safe }},
-            backgroundColor: '#6c757d'
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: false
+    
+    // Gráfico de Barras: Distribuição por Gerência
+    const gerenciasCanvas = document.getElementById('gerenciasChart');
+    if (gerenciasCanvas) {
+        const gerenciasCtx = gerenciasCanvas.getContext('2d');
+        new Chart(gerenciasCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ gerencias_labels|safe }},
+                datasets: [{
+                    label: 'Máquinas',
+                    data: {{ gerencias_data|safe }},
+                    backgroundColor: '#6f42c1'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
             }
-        },
-        scales: {
-            y: {
-                beginAtZero: true
-            }
-        }
-    }
-});
-
-// Gráfico de Barras: Distribuição por Gerência
-const gerenciasCtx = document.getElementById('gerenciasChart').getContext('2d');
-new Chart(gerenciasCtx, {
-    type: 'bar',
-    data: {
-        labels: {{ gerencias_labels|safe }},
-        datasets: [{
-            label: 'Máquinas',
-            data: {{ gerencias_data|safe }},
-            backgroundColor: '#6f42c1'
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: false
-            }
-        },
-        scales: {
-            y: {
-                beginAtZero: true
-            }
-        }
+        });
     }
 });
 

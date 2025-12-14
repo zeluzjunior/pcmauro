@@ -311,7 +311,6 @@
                                     <li><a href="{% url 'agrupar_acoes_do_plano_por_data' %}" class="link-dark rounded">Agrupar Ações do Plano por Data</a></li>
                                     <li><a href="{% url 'agrupar_preventiva_por_data' %}" class="link-dark rounded">Agrupar Preventiva por Data</a></li>
                                     <li><a href="{% url 'analise_roteiro_plano_preventiva' %}" class="link-dark rounded">Análise de Roteiro e Plano de Preventiva</a></li>  <!-- Função limpa - recriar do zero -->
-                                    <li><a href="{% url 'maquina_primaria_secundaria' %}" class="link-dark rounded">Agrupar Máquinas Primárias e Secundárias</a></li>
                                 </ul>
                             </div>
                         </li>
@@ -424,6 +423,18 @@
                                             <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
                                                 <li><a href="{% url 'analise_maquinas' %}" class="link-dark rounded">Análise Geral</a></li>
                                                 <li><a href="{% url 'analise_maquinas_importadas' %}" class="link-dark rounded">Análise de Importadas</a></li>
+                                            </ul>
+                                        </div>
+                                    </li>
+                                    <!-- Level 2: Configurações das Máquinas -->
+                                    <li>
+                                        <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#maquinas-configuracoes-collapse" aria-expanded="false">
+                                            <i class="bi bi-sliders2-vertical"></i>
+                                            Configurações das Máquinas
+                                        </button>
+                                        <div class="collapse" id="maquinas-configuracoes-collapse">
+                                            <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
+                                                <li><a href="{% url 'maquina_primaria_secundaria' %}" class="link-dark rounded">Agrupar Máquinas Primárias e Secundárias</a></li>
                                             </ul>
                                         </div>
                                     </li>
