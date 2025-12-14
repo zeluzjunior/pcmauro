@@ -1,0 +1,682 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Manutenção Preventiva - Análise{% endblock %}
+
+{% block extra_css %}
+<!-- Chart.js CSS -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 30px;
+    }
+    .chart-container-large {
+        position: relative;
+        height: 400px;
+        margin-bottom: 30px;
+    }
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .kpi-card {
+        border-left: 4px solid;
+    }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Manutenção Preventiva</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Análise de Manutenção Preventiva</h1>
+                <p class="lead">Dashboard com análises e estatísticas das ordens de serviço preventivas</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Filtro de Ano e Mês (Accordion) -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button {% if not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                                <i class="fas fa-filter me-2"></i>
+                                <strong>Filtros</strong>
+                                {% if meses_filtro or ano_filtro %}
+                                    <span class="badge bg-info ms-2">
+                                        {% if meses_filtro %}
+                                            {% if meses_filtro|length == 1 %}
+                                                {{ meses_nomes|get_item:meses_filtro.0 }} de {{ ano_filtro }}
+                                            {% else %}
+                                                {{ meses_filtro|length }} meses de {{ ano_filtro }}
+                                            {% endif %}
+                                        {% else %}
+                                            Todos os meses de {{ ano_filtro }}
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'analise_ordens_preventivas' %}" class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="ano" class="form-label">Ano</label>
+                                        <select class="form-select" id="ano" name="ano" required>
+                                            {% for ano in anos_disponiveis %}
+                                                <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Meses (Selecione múltiplos meses ou deixe todos desmarcados para todos os meses)</label>
+                                        <div class="row g-2">
+                                            {% for i in "123456789012" %}
+                                                {% with mes_num=forloop.counter %}
+                                                    <div class="col-md-3 col-sm-4 col-6">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="mes" value="{{ mes_num }}" id="mes{{ mes_num }}" {% if mes_num in meses_filtro %}checked{% endif %}>
+                                                            <label class="form-check-label" for="mes{{ mes_num }}">{{ meses_nomes|get_item:mes_num }}</label>
+                                                        </div>
+                                                    </div>
+                                                {% endwith %}
+                                            {% endfor %}
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosMeses()">Selecionar Todos</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">Desmarcar Todos</button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="fas fa-search me-2"></i>Filtrar
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- KPI Cards -->
+        <div class="row mb-5">
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total de Roteiros</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_count }}</h2>
+                            </div>
+                            <i class="fas fa-clipboard-list fa-3x text-primary opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Com Funcionário</h6>
+                                <h2 class="mb-0 fw-bold">{{ percentual_com_funcionario }}%</h2>
+                                <small class="text-muted">{{ ordens_com_funcionario }} com / {{ ordens_sem_funcionario }} sem</small>
+                            </div>
+                            <i class="fas fa-user-check fa-3x text-success opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Setores Únicos</h6>
+                                <h2 class="mb-0 fw-bold">{{ setores_count }}</h2>
+                            </div>
+                            <i class="fas fa-building fa-3x text-warning opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Unidades Únicas</h6>
+                                <h2 class="mb-0 fw-bold">{{ unidades_count }}</h2>
+                            </div>
+                            <i class="fas fa-industry fa-3x text-info opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 1 -->
+        <div class="row mb-5">
+            <!-- Gráfico de Pizza: Distribuição por Setor -->
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>Distribuição por Setor (Top 10)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="setoresChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráfico de Pizza: Distribuição por Tipo de Plano -->
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-warning text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>Por Tipo de Plano
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="tiposChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Gráfico de Pizza: Distribuição por Local -->
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>Distribuição por Local
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="localChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 2 -->
+        <div class="row mb-5">
+            <!-- Gráfico de Linha: Evolução Temporal -->
+            <div class="col-md-12 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Evolução Temporal (Ano Completo)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="temporalChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 3 -->
+        <div class="row mb-5">
+            <!-- Gráfico de Barras Horizontal: Top Máquinas -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-cogs me-2"></i>Top 10 Máquinas com Mais Roteiros
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="maquinasChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráfico de Barras: Top Funcionários -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-users me-2"></i>Top 10 Funcionários
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="funcionariosChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Statistics -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Resumo Estatístico
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3 mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <h4 class="text-primary mb-1">{{ setores_count }}</h4>
+                                    <p class="text-muted mb-0">Setores Únicos</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <h4 class="text-info mb-1">{{ unidades_count }}</h4>
+                                    <p class="text-muted mb-0">Unidades Únicas</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <h4 class="text-success mb-1">{{ maquinas_count }}</h4>
+                                    <p class="text-muted mb-0">Máquinas Cadastradas</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <h4 class="text-warning mb-1">{{ percentual_com_funcionario }}%</h4>
+                                    <p class="text-muted mb-0">Taxa com Funcionário</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+// Função para formatar números no padrão brasileiro (1.234,56)
+function formatarNumeroBR(numero, decimais = 0) {
+    if (numero === null || numero === undefined || isNaN(numero)) {
+        return '0';
+    }
+    const num = typeof numero === 'string' ? parseFloat(numero) : numero;
+    return num.toLocaleString('pt-BR', {
+        minimumFractionDigits: decimais,
+        maximumFractionDigits: decimais
+    });
+}
+
+// Formatar números na página após carregamento
+document.addEventListener('DOMContentLoaded', function() {
+    // Formatar números nos KPI cards
+    const kpiNumbers = document.querySelectorAll('.kpi-card h2');
+    kpiNumbers.forEach(el => {
+        const text = el.textContent.trim();
+        if (text.includes('%')) {
+            const num = parseFloat(text.replace('%', '').replace(/\./g, '').replace(',', '.'));
+            if (!isNaN(num)) {
+                el.textContent = formatarNumeroBR(num, 1) + '%';
+            }
+        } else {
+            const num = parseInt(text.replace(/\D/g, ''));
+            if (!isNaN(num)) {
+                el.textContent = formatarNumeroBR(num);
+            }
+        }
+    });
+    
+    // Formatar números nos small texts dos KPI cards
+    const kpiSmallTexts = document.querySelectorAll('.kpi-card small.text-muted');
+    kpiSmallTexts.forEach(el => {
+        const text = el.textContent;
+        const match = text.match(/(\d+)\s+com\s+\/\s+(\d+)\s+sem/);
+        if (match) {
+            const num1 = parseInt(match[1]);
+            const num2 = parseInt(match[2]);
+            if (!isNaN(num1) && !isNaN(num2)) {
+                el.textContent = formatarNumeroBR(num1) + ' com / ' + formatarNumeroBR(num2) + ' sem';
+            }
+        }
+    });
+    
+    // Formatar números no resumo estatístico
+    const summaryNumbers = document.querySelectorAll('.bg-light h4');
+    summaryNumbers.forEach(el => {
+        const text = el.textContent;
+        if (text.includes('%')) {
+            const num = parseFloat(text.replace('%', '').replace(/\./g, '').replace(',', '.'));
+            if (!isNaN(num)) {
+                el.textContent = formatarNumeroBR(num, 1) + '%';
+            }
+        } else {
+            const num = parseInt(text.replace(/\D/g, ''));
+            if (!isNaN(num)) {
+                el.textContent = formatarNumeroBR(num);
+            }
+        }
+    });
+});
+
+// Gráfico de Pizza: Distribuição por Setor
+const setoresEl = document.getElementById('setoresChart');
+if (setoresEl) {
+    const setoresCtx = setoresEl.getContext('2d');
+    new Chart(setoresCtx, {
+        type: 'pie',
+        data: {
+            labels: {{ setores_labels|safe }},
+            datasets: [{
+                data: {{ setores_data|safe }},
+                backgroundColor: [
+                    '#0d6efd', '#198754', '#ffc107', '#dc3545', '#0dcaf0',
+                    '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += formatarNumeroBR(context.parsed);
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Gráfico de Linha: Evolução Temporal
+const temporalEl = document.getElementById('temporalChart');
+if (temporalEl) {
+    const temporalCtx = temporalEl.getContext('2d');
+    const mesesLabels = {{ meses_labels|safe }};
+    const mesesData = {{ meses_data|safe }};
+    
+    if (mesesLabels && mesesLabels.length > 0 && mesesData && mesesData.length > 0) {
+        new Chart(temporalCtx, {
+            type: 'line',
+            data: {
+                labels: mesesLabels,
+                datasets: [{
+                    label: 'Roteiros de Serviço',
+                    data: mesesData,
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Roteiros de Serviço: ' + formatarNumeroBR(context.parsed.y);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return formatarNumeroBR(value);
+                            }
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    }
+                }
+            }
+        });
+    } else {
+        temporalCtx.fillStyle = '#999';
+        temporalCtx.font = '16px Arial';
+        temporalCtx.textAlign = 'center';
+        temporalCtx.fillText('Nenhum dado disponível', temporalEl.width / 2, temporalEl.height / 2);
+    }
+}
+
+// Gráfico de Barras Horizontal: Top Máquinas
+const maquinasEl = document.getElementById('maquinasChart');
+if (maquinasEl) {
+    const maquinasCtx = maquinasEl.getContext('2d');
+    new Chart(maquinasCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ maquinas_labels|safe }},
+            datasets: [{
+                label: 'Roteiros',
+                data: {{ maquinas_data|safe }},
+                backgroundColor: '#dc3545'
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Roteiros: ' + formatarNumeroBR(context.parsed.x);
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return formatarNumeroBR(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Gráfico de Barras: Top Funcionários
+const funcionariosEl = document.getElementById('funcionariosChart');
+if (funcionariosEl) {
+    const funcionariosCtx = funcionariosEl.getContext('2d');
+    new Chart(funcionariosCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ funcionarios_labels|safe }},
+            datasets: [{
+                label: 'Roteiros Executados',
+                data: {{ funcionarios_data|safe }},
+                backgroundColor: '#6c757d'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Roteiros Executados: ' + formatarNumeroBR(context.parsed.y);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return formatarNumeroBR(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Gráfico de Pizza: Distribuição por Tipo
+const tiposEl = document.getElementById('tiposChart');
+if (tiposEl) {
+    const tiposCtx = tiposEl.getContext('2d');
+    new Chart(tiposCtx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ tipos_labels|safe }},
+            datasets: [{
+                data: {{ tipos_data|safe }},
+                backgroundColor: [
+                    '#ffc107', '#0d6efd', '#198754', '#dc3545', '#0dcaf0',
+                    '#6f42c1', '#fd7e14', '#20c997'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += formatarNumeroBR(context.parsed);
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Gráfico de Pizza: Distribuição por Local
+const localEl = document.getElementById('localChart');
+if (localEl) {
+    const localCtx = localEl.getContext('2d');
+    const localPercentages = {{ local_percentages|safe }};
+    new Chart(localCtx, {
+        type: 'pie',
+        data: {
+            labels: {{ local_labels|safe }},
+            datasets: [{
+                data: {{ local_data|safe }},
+                backgroundColor: [
+                    '#0d6efd', '#198754', '#ffc107', '#dc3545', '#0dcaf0',
+                    '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            const percentage = localPercentages[context.dataIndex] || 0;
+                            label += formatarNumeroBR(context.parsed) + ' (' + formatarNumeroBR(percentage, 1) + '%)';
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Funções para selecionar/desmarcar todos os meses
+function selecionarTodosMeses() {
+    const checkboxes = document.querySelectorAll('input[name="mes"]');
+    checkboxes.forEach(cb => cb.checked = true);
+}
+
+function desmarcarTodosMeses() {
+    const checkboxes = document.querySelectorAll('input[name="mes"]');
+    checkboxes.forEach(cb => cb.checked = false);
+}
+</script>
+{% endblock %}
+

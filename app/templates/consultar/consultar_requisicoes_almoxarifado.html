@@ -1,6 +1,5 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load form_extras %}
 
 {% block title %}Consultar Requisições Almoxarifado{% endblock %}
 
@@ -98,125 +97,9 @@
             </div>
         </div>
 
-        <!-- Filtros -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i class="fas fa-filter me-2"></i>Filtros de Análise
-                        </h5>
-                        {% if data_inicio or data_fim or ano_selecionado %}
-                        <span class="badge bg-light text-primary">
-                            <i class="fas fa-check-circle me-1"></i>Filtros Ativos ({{ requisicoes.paginator.count }} registros)
-                        </span>
-                        {% endif %}
-                    </div>
-                    <div class="card-body">
-                        <form method="get" action="{% url 'consultar_requisicoes_almoxarifado' %}" id="filtrosForm">
-                            <!-- Preservar busca geral -->
-                            <input type="hidden" name="search" value="{{ search_query|default:'' }}">
-                            
-                            <div class="row g-3">
-                                <!-- Filtro 1: Intervalo de Datas -->
-                                <div class="col-md-6">
-                                    <label class="form-label fw-bold">Intervalo de Datas</label>
-                                    <div class="row g-2">
-                                        <div class="col-6">
-                                            <label class="form-label small">Data Inicial</label>
-                                            <input type="date" 
-                                                   class="form-control" 
-                                                   name="data_inicio" 
-                                                   id="dataInicio"
-                                                   value="{{ data_inicio }}">
-                                        </div>
-                                        <div class="col-6">
-                                            <label class="form-label small">Data Final</label>
-                                            <input type="date" 
-                                                   class="form-control" 
-                                                   name="data_fim" 
-                                                   id="dataFim"
-                                                   value="{{ data_fim }}">
-                                        </div>
-                                    </div>
-                                    <small class="text-muted">
-                                        <i class="fas fa-info-circle me-1"></i>
-                                        Selecione um intervalo de datas para filtrar as requisições
-                                    </small>
-                                </div>
-                                
-                                <!-- Filtro 2: Ano e Mês -->
-                                <div class="col-md-6">
-                                    <label class="form-label fw-bold">Ano e Mês</label>
-                                    <div class="row g-2">
-                                        <div class="col-6">
-                                            <label class="form-label small">Ano</label>
-                                            <select class="form-select" 
-                                                    name="ano" 
-                                                    id="anoSelecionado">
-                                                <option value="">Todos os anos</option>
-                                                {% for ano in anos_disponiveis %}
-                                                <option value="{{ ano }}" {% if ano_selecionado == ano|stringformat:"s" %}selected{% endif %}>
-                                                    {{ ano }}
-                                                </option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        <div class="col-6">
-                                            <label class="form-label small">Mês</label>
-                                            <select class="form-select" 
-                                                    name="mes" 
-                                                    id="mesSelecionadoFiltro"
-                                                    {% if not ano_selecionado %}disabled{% endif %}>
-                                                <option value="">Todos os meses</option>
-                                                {% if ano_selecionado %}
-                                                    {% for mes_num in meses_ano_selecionado %}
-                                                    <option value="{{ mes_num }}" {% if mes_selecionado_filtro == mes_num|stringformat:"s" %}selected{% endif %}>
-                                                        {{ meses_nomes|get_item:mes_num }}
-                                                    </option>
-                                                    {% endfor %}
-                                                {% endif %}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <small class="text-muted">
-                                        <i class="fas fa-info-circle me-1"></i>
-                                        Selecione um ano e opcionalmente um mês específico
-                                    </small>
-                                </div>
-                            </div>
-                            
-                            <div class="row mt-3">
-                                <div class="col-12">
-                                    <button type="submit" class="btn btn-primary me-2" id="aplicarFiltrosBtn">
-                                        <i class="fas fa-search me-2"></i>Aplicar Filtros
-                                    </button>
-                                    <a href="{% url 'consultar_requisicoes_almoxarifado' %}{% if search_query %}?search={{ search_query }}{% endif %}" class="btn btn-outline-secondary">
-                                        <i class="fas fa-times me-2"></i>Limpar Filtros
-                                    </a>
-                                    {% if data_inicio or data_fim or ano_selecionado %}
-                                    <div class="mt-2">
-                                        <small class="text-muted">
-                                            <i class="fas fa-info-circle me-1"></i>
-                                            {% if data_inicio or data_fim %}
-                                                Filtro de intervalo de datas ativo
-                                            {% elif ano_selecionado %}
-                                                Filtro de ano{% if mes_selecionado_filtro %} e mês{% endif %} ativo
-                                            {% endif %}
-                                        </small>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Statistics -->
         <div class="row mb-4">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card bg-primary text-white">
                     <div class="card-body">
                         <h5 class="card-title">Total de Requisições</h5>
@@ -224,7 +107,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card bg-success text-white">
                     <div class="card-body">
                         <h5 class="card-title">Itens Únicos</h5>
@@ -232,11 +115,19 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card bg-info text-white">
                     <div class="card-body">
                         <h5 class="card-title">Centros de Atividade</h5>
                         <p class="card-text display-6">{{ centros_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Valor Total</h5>
+                        <p class="card-text display-6">R$ {{ valor_total|floatformat:2 }}</p>
                     </div>
                 </div>
             </div>
@@ -254,12 +145,8 @@
                     </div>
                     <div class="card-body p-0">
                         <form method="get" action="{% url 'consultar_requisicoes_almoxarifado' %}" id="filterForm">
-                            <!-- Preservar busca geral e filtros de data -->
+                            <!-- Preservar busca geral -->
                             <input type="hidden" name="search" value="{{ search_query|default:'' }}">
-                            {% if data_inicio %}<input type="hidden" name="data_inicio" value="{{ data_inicio }}">{% endif %}
-                            {% if data_fim %}<input type="hidden" name="data_fim" value="{{ data_fim }}">{% endif %}
-                            {% if ano_selecionado %}<input type="hidden" name="ano" value="{{ ano_selecionado }}">{% endif %}
-                            {% if mes_selecionado_filtro %}<input type="hidden" name="mes" value="{{ mes_selecionado_filtro }}">{% endif %}
                             
                             <div class="table-container">
                                 <table class="table table-hover table-striped mb-0">
@@ -369,10 +256,10 @@
                     <ul class="pagination justify-content-center">
                         {% if requisicoes.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if data_inicio %}data_inicio={{ data_inicio }}&{% endif %}{% if data_fim %}data_fim={{ data_fim }}&{% endif %}{% if ano_selecionado %}ano={{ ano_selecionado }}&{% endif %}{% if mes_selecionado_filtro %}mes={{ mes_selecionado_filtro }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_item %}filter_item={{ filter_item }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_quantidade %}filter_quantidade={{ filter_quantidade }}&{% endif %}{% if filter_valor %}filter_valor={{ filter_valor }}&{% endif %}{% if filter_centro %}filter_centro={{ filter_centro }}&{% endif %}{% if filter_usuario_criou %}filter_usuario_criou={{ filter_usuario_criou }}&{% endif %}{% if filter_usuario_atend %}filter_usuario_atend={{ filter_usuario_atend }}&{% endif %}{% if filter_operacao %}filter_operacao={{ filter_operacao }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page=1">Primeira</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_item %}filter_item={{ filter_item }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_quantidade %}filter_quantidade={{ filter_quantidade }}&{% endif %}{% if filter_valor %}filter_valor={{ filter_valor }}&{% endif %}{% if filter_centro %}filter_centro={{ filter_centro }}&{% endif %}{% if filter_usuario_criou %}filter_usuario_criou={{ filter_usuario_criou }}&{% endif %}{% if filter_usuario_atend %}filter_usuario_atend={{ filter_usuario_atend }}&{% endif %}{% if filter_operacao %}filter_operacao={{ filter_operacao }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page=1">Primeira</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if data_inicio %}data_inicio={{ data_inicio }}&{% endif %}{% if data_fim %}data_fim={{ data_fim }}&{% endif %}{% if ano_selecionado %}ano={{ ano_selecionado }}&{% endif %}{% if mes_selecionado_filtro %}mes={{ mes_selecionado_filtro }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_item %}filter_item={{ filter_item }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_quantidade %}filter_quantidade={{ filter_quantidade }}&{% endif %}{% if filter_valor %}filter_valor={{ filter_valor }}&{% endif %}{% if filter_centro %}filter_centro={{ filter_centro }}&{% endif %}{% if filter_usuario_criou %}filter_usuario_criou={{ filter_usuario_criou }}&{% endif %}{% if filter_usuario_atend %}filter_usuario_atend={{ filter_usuario_atend }}&{% endif %}{% if filter_operacao %}filter_operacao={{ filter_operacao }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page={{ requisicoes.previous_page_number }}">Anterior</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_item %}filter_item={{ filter_item }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_quantidade %}filter_quantidade={{ filter_quantidade }}&{% endif %}{% if filter_valor %}filter_valor={{ filter_valor }}&{% endif %}{% if filter_centro %}filter_centro={{ filter_centro }}&{% endif %}{% if filter_usuario_criou %}filter_usuario_criou={{ filter_usuario_criou }}&{% endif %}{% if filter_usuario_atend %}filter_usuario_atend={{ filter_usuario_atend }}&{% endif %}{% if filter_operacao %}filter_operacao={{ filter_operacao }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page={{ requisicoes.previous_page_number }}">Anterior</a>
                             </li>
                         {% endif %}
                         
@@ -384,10 +271,10 @@
                         
                         {% if requisicoes.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if data_inicio %}data_inicio={{ data_inicio }}&{% endif %}{% if data_fim %}data_fim={{ data_fim }}&{% endif %}{% if ano_selecionado %}ano={{ ano_selecionado }}&{% endif %}{% if mes_selecionado_filtro %}mes={{ mes_selecionado_filtro }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_item %}filter_item={{ filter_item }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_quantidade %}filter_quantidade={{ filter_quantidade }}&{% endif %}{% if filter_valor %}filter_valor={{ filter_valor }}&{% endif %}{% if filter_centro %}filter_centro={{ filter_centro }}&{% endif %}{% if filter_usuario_criou %}filter_usuario_criou={{ filter_usuario_criou }}&{% endif %}{% if filter_usuario_atend %}filter_usuario_atend={{ filter_usuario_atend }}&{% endif %}{% if filter_operacao %}filter_operacao={{ filter_operacao }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page={{ requisicoes.next_page_number }}">Próxima</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_item %}filter_item={{ filter_item }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_quantidade %}filter_quantidade={{ filter_quantidade }}&{% endif %}{% if filter_valor %}filter_valor={{ filter_valor }}&{% endif %}{% if filter_centro %}filter_centro={{ filter_centro }}&{% endif %}{% if filter_usuario_criou %}filter_usuario_criou={{ filter_usuario_criou }}&{% endif %}{% if filter_usuario_atend %}filter_usuario_atend={{ filter_usuario_atend }}&{% endif %}{% if filter_operacao %}filter_operacao={{ filter_operacao }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page={{ requisicoes.next_page_number }}">Próxima</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if data_inicio %}data_inicio={{ data_inicio }}&{% endif %}{% if data_fim %}data_fim={{ data_fim }}&{% endif %}{% if ano_selecionado %}ano={{ ano_selecionado }}&{% endif %}{% if mes_selecionado_filtro %}mes={{ mes_selecionado_filtro }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_item %}filter_item={{ filter_item }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_quantidade %}filter_quantidade={{ filter_quantidade }}&{% endif %}{% if filter_valor %}filter_valor={{ filter_valor }}&{% endif %}{% if filter_centro %}filter_centro={{ filter_centro }}&{% endif %}{% if filter_usuario_criou %}filter_usuario_criou={{ filter_usuario_criou }}&{% endif %}{% if filter_usuario_atend %}filter_usuario_atend={{ filter_usuario_atend }}&{% endif %}{% if filter_operacao %}filter_operacao={{ filter_operacao }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page={{ requisicoes.paginator.num_pages }}">Última</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_item %}filter_item={{ filter_item }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_quantidade %}filter_quantidade={{ filter_quantidade }}&{% endif %}{% if filter_valor %}filter_valor={{ filter_valor }}&{% endif %}{% if filter_centro %}filter_centro={{ filter_centro }}&{% endif %}{% if filter_usuario_criou %}filter_usuario_criou={{ filter_usuario_criou }}&{% endif %}{% if filter_usuario_atend %}filter_usuario_atend={{ filter_usuario_atend }}&{% endif %}{% if filter_operacao %}filter_operacao={{ filter_operacao }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page={{ requisicoes.paginator.num_pages }}">Última</a>
                             </li>
                         {% endif %}
                     </ul>

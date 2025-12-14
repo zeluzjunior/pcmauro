@@ -1,0 +1,567 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Visualizar Relação Projeção vs Nota Fiscal{% endblock %}
+
+{% block extra_css %}
+<style>
+    .match-score {
+        font-size: 2rem;
+        font-weight: bold;
+    }
+    .match-high { color: #198754; }
+    .match-medium { color: #ffc107; }
+    .match-low { color: #dc3545; }
+    .comparison-card {
+        border-left: 4px solid #0d6efd;
+    }
+    .match-exact {
+        color: #198754;
+        font-weight: bold;
+    }
+    .match-partial {
+        color: #ffc107;
+        font-weight: bold;
+    }
+    .match-different {
+        color: #dc3545;
+    }
+    .comparison-item {
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+        background-color: #f8f9fa;
+    }
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'relacionar_projecao_nota_fiscal' %}" class="text-white">Relacionar Projeção vs Nota Fiscal</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Visualizar Relação</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-link me-2"></i>Visualizar Relação Projeção vs Nota Fiscal
+                </h1>
+                <p class="lead">Análise detalhada da correspondência entre Projeção de Gasto e Nota Fiscal</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Score Summary -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Score de Correspondência
+                        </h5>
+                    </div>
+                    <div class="card-body text-center">
+                        {% if match_info.percentual >= 70 %}
+                            <div class="match-score match-high">{{ match_info.percentual|floatformat:1 }}%</div>
+                        {% elif match_info.percentual >= 50 %}
+                            <div class="match-score match-medium">{{ match_info.percentual|floatformat:1 }}%</div>
+                        {% else %}
+                            <div class="match-score match-low">{{ match_info.percentual|floatformat:1 }}%</div>
+                        {% endif %}
+                        <p class="text-muted mt-2">
+                            Score: {{ match_info.score }} / {{ match_info.max_score }} pontos
+                        </p>
+                        {% if relacao %}
+                            <div class="mt-3">
+                                <span class="status-badge {% if relacao.status == 'confirmado' %}bg-success{% elif relacao.status == 'rejeitado' %}bg-danger{% else %}bg-warning{% endif %} text-white">
+                                    Status: {{ relacao.get_status_display }}
+                                </span>
+                                {% if relacao.confirmado_por %}
+                                    <span class="badge bg-secondary ms-2">Confirmado por: {{ relacao.confirmado_por }}</span>
+                                {% endif %}
+                                {% if relacao.created_at %}
+                                    <span class="badge bg-info ms-2">Criado em: {{ relacao.created_at|date:"d/m/Y H:i" }}</span>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison Details -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm comparison-card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-balance-scale me-2"></i>Detalhes da Comparação
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if match_info.comparacoes %}
+                            <!-- Centro de Atividade -->
+                            <div class="comparison-item">
+                                <h6 class="fw-bold">Centro de Atividade</h6>
+                                <div class="row">
+                                    <div class="col-md-5">
+                                        <strong>Projeção:</strong> {{ match_info.comparacoes.centro_atividade.projecao|default:"-" }}
+                                    </div>
+                                    <div class="col-md-5">
+                                        <strong>Nota Fiscal:</strong> {{ match_info.comparacoes.centro_atividade.nota|default:"-" }}
+                                    </div>
+                                    <div class="col-md-2 text-end">
+                                        {% if match_info.comparacoes.centro_atividade.status == 'exato' %}
+                                            <span class="match-exact">✓ Exato</span>
+                                        {% elif match_info.comparacoes.centro_atividade.status == 'parcial' %}
+                                            <span class="match-partial">~ Parcial</span>
+                                        {% elif match_info.comparacoes.centro_atividade.status == 'diferente' %}
+                                            <span class="match-different">✗ Diferente</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Valor -->
+                            <div class="comparison-item">
+                                <h6 class="fw-bold">Valor</h6>
+                                <div class="row">
+                                    <div class="col-md-5">
+                                        <strong>Projeção:</strong>
+                                        {% if match_info.comparacoes.valor.tipo %}
+                                            {{ match_info.comparacoes.valor.tipo }}: R$ {{ match_info.comparacoes.valor.projecao|floatformat:2 }}
+                                        {% else %}
+                                            {% if projecao.valor_planejado %}Planejado: R$ {{ projecao.valor_planejado|floatformat:2 }}<br>{% endif %}
+                                            {% if projecao.valor_realizado %}Realizado: R$ {{ projecao.valor_realizado|floatformat:2 }}<br>{% endif %}
+                                            {% if projecao.valor_projetado %}Projetado: R$ {{ projecao.valor_projetado|floatformat:2 }}{% endif %}
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-5">
+                                        <strong>Nota Fiscal:</strong> R$ {{ match_info.comparacoes.valor.nota|floatformat:2|default:"-" }}
+                                        {% if match_info.comparacoes.valor.diferenca %}
+                                            <br><small class="text-muted">
+                                                Diferença: R$ {{ match_info.comparacoes.valor.diferenca|floatformat:2 }}
+                                                ({{ match_info.comparacoes.valor.diferenca_percent|floatformat:2 }}%)
+                                            </small>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-2 text-end">
+                                        {% if match_info.comparacoes.valor.status == 'match' %}
+                                            <span class="match-exact">✓ Match</span>
+                                        {% elif match_info.comparacoes.valor.status == 'parcial' %}
+                                            <span class="match-partial">~ Parcial</span>
+                                        {% elif match_info.comparacoes.valor.status == 'diferente' %}
+                                            <span class="match-different">✗ Diferente</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Data -->
+                            <div class="comparison-item">
+                                <h6 class="fw-bold">Data</h6>
+                                <div class="row">
+                                    <div class="col-md-5">
+                                        <strong>Projeção:</strong>
+                                        {% if match_info.comparacoes.data.projecao %}
+                                            {{ match_info.comparacoes.data.projecao|date:"d/m/Y" }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-5">
+                                        <strong>Nota Fiscal:</strong>
+                                        {% if match_info.comparacoes.data.nota %}
+                                            {{ match_info.comparacoes.data.nota|date:"d/m/Y" }}
+                                        {% else %}
+                                            {{ nota.data_emissao|default:"-" }}
+                                        {% endif %}
+                                        {% if match_info.comparacoes.data.diff_dias is not None %}
+                                            <br><small class="text-muted">
+                                                Diferença: {{ match_info.comparacoes.data.diff_dias }} dia(s)
+                                            </small>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-2 text-end">
+                                        {% if match_info.comparacoes.data.status == 'exato' %}
+                                            <span class="match-exact">✓ Exato</span>
+                                        {% elif match_info.comparacoes.data.status == 'proximo' %}
+                                            <span class="match-partial">~ Próximo</span>
+                                        {% elif match_info.comparacoes.data.status == 'parcial' %}
+                                            <span class="match-partial">~ Parcial</span>
+                                        {% elif match_info.comparacoes.data.status == 'diferente' %}
+                                            <span class="match-different">✗ Diferente</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Fornecedor/Emitente -->
+                            <div class="comparison-item">
+                                <h6 class="fw-bold">Fornecedor/Emitente</h6>
+                                <div class="row">
+                                    <div class="col-md-5">
+                                        <strong>Projeção:</strong> {{ match_info.comparacoes.fornecedor.projecao|default:"-" }}
+                                    </div>
+                                    <div class="col-md-5">
+                                        <strong>Nota Fiscal:</strong> {{ match_info.comparacoes.fornecedor.nota|default:"-" }}
+                                    </div>
+                                    <div class="col-md-2 text-end">
+                                        {% if match_info.comparacoes.fornecedor.status == 'exato' %}
+                                            <span class="match-exact">✓ Exato</span>
+                                        {% elif match_info.comparacoes.fornecedor.status == 'parcial' %}
+                                            <span class="match-partial">~ Parcial</span>
+                                        {% elif match_info.comparacoes.fornecedor.status == 'diferente' %}
+                                            <span class="match-different">✗ Diferente</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Número -->
+                            <div class="comparison-item">
+                                <h6 class="fw-bold">Número</h6>
+                                <div class="row">
+                                    <div class="col-md-5">
+                                        <strong>Projeção (Req.):</strong> {{ match_info.comparacoes.numero.projecao|default:"-" }}
+                                    </div>
+                                    <div class="col-md-5">
+                                        <strong>Nota Fiscal:</strong> {{ match_info.comparacoes.numero.nota|default:"-" }}
+                                    </div>
+                                    <div class="col-md-2 text-end">
+                                        {% if match_info.comparacoes.numero.status == 'exato' %}
+                                            <span class="match-exact">✓ Exato</span>
+                                        {% elif match_info.comparacoes.numero.status == 'parcial' %}
+                                            <span class="match-partial">~ Parcial</span>
+                                        {% elif match_info.comparacoes.numero.status == 'diferente' %}
+                                            <span class="match-different">✗ Diferente</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Projeção de Gasto Details -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Projeção de Gasto
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Tipo</label>
+                            <p class="form-control-plaintext">{{ projecao.tipo|default:"-" }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Descrição</label>
+                            <p class="form-control-plaintext">{{ projecao.descricao|default:"-" }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Setor</label>
+                            <p class="form-control-plaintext">{{ projecao.setor|default:"-" }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Solicitante</label>
+                            <p class="form-control-plaintext">{{ projecao.solicitante|default:"-" }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Centro de Atividade</label>
+                            <p class="form-control-plaintext">
+                                {{ projecao.centro_atividade|default:"-" }}
+                                {% if projecao.nome_centro_atividade %}
+                                    <br><small class="text-muted">{{ projecao.nome_centro_atividade }}</small>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Valores</label>
+                            <p class="form-control-plaintext">
+                                {% if projecao.valor_planejado %}
+                                    <strong>Planejado:</strong> R$ {{ projecao.valor_planejado|floatformat:2 }}<br>
+                                {% endif %}
+                                {% if projecao.valor_realizado %}
+                                    <strong>Realizado:</strong> R$ {{ projecao.valor_realizado|floatformat:2 }}<br>
+                                {% endif %}
+                                {% if projecao.valor_projetado %}
+                                    <strong>Projetado:</strong> R$ {{ projecao.valor_projetado|floatformat:2 }}<br>
+                                {% endif %}
+                                {% if projecao.valor_total %}
+                                    <strong>Total:</strong> R$ {{ projecao.valor_total|floatformat:2 }}
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Datas</label>
+                            <p class="form-control-plaintext">
+                                {% if projecao.data_requisicao %}
+                                    <strong>Requisição:</strong> {{ projecao.data_requisicao|date:"d/m/Y" }}<br>
+                                {% endif %}
+                                {% if projecao.data_abertura_requisicao %}
+                                    <strong>Abertura:</strong> {{ projecao.data_abertura_requisicao|date:"d/m/Y" }}<br>
+                                {% endif %}
+                                {% if projecao.data_planejada %}
+                                    <strong>Planejada:</strong> {{ projecao.data_planejada|date:"d/m/Y" }}<br>
+                                {% endif %}
+                                {% if projecao.data_realizada %}
+                                    <strong>Realizada:</strong> {{ projecao.data_realizada|date:"d/m/Y" }}
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Fornecedor</label>
+                            <p class="form-control-plaintext">
+                                {{ projecao.fornecedor|default:projecao.fornecedor_nome_fantasia|default:"-" }}
+                                {% if projecao.fornecedor_cnpj %}
+                                    <br><small class="text-muted">CNPJ: {{ projecao.fornecedor_cnpj }}</small>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Números</label>
+                            <p class="form-control-plaintext">
+                                {% if projecao.numero_requisicao %}
+                                    <strong>Requisição:</strong> {{ projecao.numero_requisicao }}<br>
+                                {% endif %}
+                                {% if projecao.numero_requisicao_compra %}
+                                    <strong>Req. Compra:</strong> {{ projecao.numero_requisicao_compra }}<br>
+                                {% endif %}
+                                {% if projecao.numero_pedido_compra %}
+                                    <strong>Pedido Compra:</strong> {{ projecao.numero_pedido_compra }}<br>
+                                {% endif %}
+                                {% if projecao.numero_ordem_servico %}
+                                    <strong>Ordem Serviço:</strong> {{ projecao.numero_ordem_servico }}<br>
+                                {% endif %}
+                                {% if projecao.numero_nf %}
+                                    <strong>NF:</strong> {{ projecao.numero_nf }}
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Previsão de Execução</label>
+                            <p class="form-control-plaintext">
+                                {{ projecao.previsao_execucao|default:"-" }}
+                                {% if projecao.mes_referencia and projecao.ano_referencia %}
+                                    <br><small class="text-muted">{{ projecao.mes_referencia }}/{{ projecao.ano_referencia }}</small>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Uso Contábil</label>
+                            <p class="form-control-plaintext">{{ projecao.uso_contabil|default:"-" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nota Fiscal Details -->
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-invoice me-2"></i>Nota Fiscal
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Número da Nota</label>
+                            <p class="form-control-plaintext">{{ nota.nota|default:"-" }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Série</label>
+                            <p class="form-control-plaintext">{{ nota.serie|default:"-" }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Modelo</label>
+                            <p class="form-control-plaintext">{{ nota.modelo|default:"-" }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Total da Nota</label>
+                            <p class="form-control-plaintext fs-5 text-success fw-bold">
+                                {% if nota.total_nota %}
+                                    R$ {{ nota.total_nota|floatformat:2 }}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Emitente (CNPJ)</label>
+                            <p class="form-control-plaintext">{{ nota.emitente|default:"-" }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Nome Fantasia Emitente</label>
+                            <p class="form-control-plaintext">{{ nota.nome_fantasia_emitente|default:"-" }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Centro de Atividade</label>
+                            <p class="form-control-plaintext">
+                                {{ nota.centro_atividade|default:"-" }}
+                                {% if nota.nome_centro_atividade %}
+                                    <br><small class="text-muted">{{ nota.nome_centro_atividade }}</small>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Datas</label>
+                            <p class="form-control-plaintext">
+                                {% if nota.data_emissao %}
+                                    <strong>Emissão:</strong> {{ nota.data_emissao }}<br>
+                                {% endif %}
+                                {% if nota.data_vencimento %}
+                                    <strong>Vencimento:</strong> {{ nota.data_vencimento }}<br>
+                                {% endif %}
+                                {% if nota.data_autorizacao %}
+                                    <strong>Autorização:</strong> {{ nota.data_autorizacao }}<br>
+                                {% endif %}
+                                {% if nota.data_inclusao %}
+                                    <strong>Inclusão:</strong> {{ nota.data_inclusao }}
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Uso Contábil</label>
+                            <p class="form-control-plaintext">
+                                {% if nota.uso_contabil %}
+                                    <span class="badge bg-secondary">{{ nota.uso_contabil }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Situação</label>
+                            <p class="form-control-plaintext">
+                                {% if nota.situacao %}
+                                    <span class="badge bg-info">{{ nota.situacao }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Unidade</label>
+                            <p class="form-control-plaintext">
+                                {{ nota.unidade|default:"-" }}
+                                {% if nota.nome_unidade %}
+                                    <br><small class="text-muted">{{ nota.nome_unidade }}</small>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Observações da Relação -->
+        {% if relacao and relacao.observacoes %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-comment me-2"></i>Observações da Relação
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p>{{ relacao.observacoes }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Detalhes do Match -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list me-2"></i>Detalhes do Match
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled">
+                            {% for detalhe in match_info.detalhes %}
+                                <li class="mb-2">
+                                    {% if '✓' in detalhe %}
+                                        <i class="fas fa-check-circle text-success me-2"></i>
+                                    {% elif '~' in detalhe %}
+                                        <i class="fas fa-exclamation-circle text-warning me-2"></i>
+                                    {% elif '✗' in detalhe %}
+                                        <i class="fas fa-times-circle text-danger me-2"></i>
+                                    {% else %}
+                                        <i class="fas fa-circle text-secondary me-2"></i>
+                                    {% endif %}
+                                    {{ detalhe }}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row">
+            <div class="col-12 text-center">
+                <a href="{% url 'relacionar_projecao_nota_fiscal' %}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-arrow-left me-2"></i>Voltar para Relacionar
+                </a>
+                {% if projecao %}
+                <a href="{% url 'consultar_projecoes_gastos' %}?search={{ projecao.id }}" class="btn btn-outline-success btn-lg">
+                    <i class="fas fa-search me-2"></i>Ver Projeção
+                </a>
+                {% endif %}
+                {% if nota %}
+                <a href="{% url 'visualizar_nota_fiscal' nota.id %}" class="btn btn-outline-info btn-lg">
+                    <i class="fas fa-file-invoice me-2"></i>Ver Nota Fiscal
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+

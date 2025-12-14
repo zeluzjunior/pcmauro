@@ -1,0 +1,545 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Relacionar Projeção vs Nota Fiscal{% endblock %}
+
+{% block extra_css %}
+<style>
+    .match-score {
+        font-size: 1.2rem;
+        font-weight: bold;
+    }
+    .match-high { color: #198754; }
+    .match-medium { color: #ffc107; }
+    .match-low { color: #dc3545; }
+    .comparison-table {
+        font-size: 0.9rem;
+    }
+    .match-details {
+        font-size: 0.85rem;
+    }
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .confirmed-badge {
+        background-color: #198754;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: bold;
+    }
+    .rejected-badge {
+        background-color: #dc3545;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: bold;
+    }
+    .action-buttons {
+        white-space: nowrap;
+    }
+    /* Prevent modal flickering */
+    .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 1040;
+        width: 100vw;
+        height: 100vh;
+        background-color: #000;
+        transition: opacity 0.15s linear;
+    }
+    .modal-backdrop.show {
+        opacity: 0.5;
+    }
+    /* Ensure smooth modal transitions */
+    .modal.fade {
+        transition: opacity 0.15s linear;
+    }
+    .modal.fade:not(.show) {
+        opacity: 0;
+    }
+    .modal.show {
+        display: block;
+    }
+    /* Prevent body scroll issues */
+    body.modal-open {
+        overflow: hidden;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Orçamento e GMD</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Relacionar Projeção vs Nota Fiscal</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-link me-2"></i>Relacionar Projeção vs Nota Fiscal
+                </h1>
+                <p class="lead">Confirme ou rejeite correspondências entre projeções de gastos e notas fiscais</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white stat-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Projeções:</h5>
+                        <p class="card-text display-6">{{ total_projecoes }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white stat-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Notas:</h5>
+                        <p class="card-text display-6">{{ total_notas }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white stat-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Confirmadas:</h5>
+                        <p class="card-text display-6">{{ total_relacoes_confirmadas }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white stat-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Possíveis Matches:</h5>
+                        <p class="card-text display-6">{{ matches|length }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filtros -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-secondary text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-filter me-2"></i>Filtros de Análise
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <form method="get" action="{% url 'relacionar_projecao_nota_fiscal' %}">
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <label for="filtro_centro_atividade" class="form-label">Centro de Atividade</label>
+                                    <input type="text" name="filtro_centro_atividade" id="filtro_centro_atividade" class="form-control" value="{{ filtro_centro_atividade }}" placeholder="Código do centro">
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <label for="filtro_ano" class="form-label">Ano</label>
+                                    <input type="number" name="filtro_ano" id="filtro_ano" class="form-control" value="{{ filtro_ano }}" placeholder="Ex: 2024">
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <label for="filtro_tipo" class="form-label">Tipo</label>
+                                    <input type="text" name="filtro_tipo" id="filtro_tipo" class="form-control" value="{{ filtro_tipo }}" placeholder="Tipo">
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <label for="filtro_valor_min" class="form-label">Valor Mín.</label>
+                                    <input type="number" step="0.01" name="filtro_valor_min" id="filtro_valor_min" class="form-control" value="{{ filtro_valor_min }}" placeholder="0.00">
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <label for="filtro_valor_max" class="form-label">Valor Máx.</label>
+                                    <input type="number" step="0.01" name="filtro_valor_max" id="filtro_valor_max" class="form-control" value="{{ filtro_valor_max }}" placeholder="0.00">
+                                </div>
+                                <div class="col-md-1 mb-3 d-flex align-items-end">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="mostrar_apenas_proximos" id="mostrar_apenas_proximos" {% if mostrar_apenas_proximos %}checked{% endif %}>
+                                        <label class="form-check-label" for="mostrar_apenas_proximos" title="Mostrar apenas matches com score ≥ 50%">
+                                            ≥50%
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="mostrar_apenas_nao_confirmados" id="mostrar_apenas_nao_confirmados" {% if mostrar_apenas_nao_confirmados %}checked{% endif %}>
+                                        <label class="form-check-label" for="mostrar_apenas_nao_confirmados">
+                                            Apenas não confirmados
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-9">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-filter me-2"></i>Filtrar
+                                    </button>
+                                    {% if filtro_centro_atividade or filtro_ano or filtro_tipo or filtro_valor_min or filtro_valor_max %}
+                                    <a href="{% url 'relacionar_projecao_nota_fiscal' %}" class="btn btn-outline-secondary">
+                                        <i class="fas fa-times me-1"></i>Limpar Filtros
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Possíveis Correspondências -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-link me-2"></i>Possíveis Correspondências ({{ matches|length }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if matches %}
+                        <div class="table-responsive">
+                            <table class="table table-hover comparison-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 6%;">Score</th>
+                                        <th style="width: 12%;">Projeção</th>
+                                        <th style="width: 12%;">Nota Fiscal</th>
+                                        <th style="width: 8%;">Centro Atividade</th>
+                                        <th style="width: 8%;">Valor</th>
+                                        <th style="width: 8%;">Data</th>
+                                        <th style="width: 10%;">Fornecedor/Emitente</th>
+                                        <th style="width: 9%;">Uso Contábil</th>
+                                        <th style="width: 15%;">Detalhes do Match</th>
+                                        <th style="width: 12%;">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for match in matches %}
+                                    <tr {% if match.relacao_confirmada %}class="table-success"{% endif %}>
+                                        <td>
+                                            {% if match.match_info.percentual >= 70 %}
+                                                <span class="match-score match-high">{{ match.match_info.percentual|floatformat:0 }}%</span>
+                                            {% elif match.match_info.percentual >= 50 %}
+                                                <span class="match-score match-medium">{{ match.match_info.percentual|floatformat:0 }}%</span>
+                                            {% else %}
+                                                <span class="match-score match-low">{{ match.match_info.percentual|floatformat:0 }}%</span>
+                                            {% endif %}
+                                            {% if match.relacao_confirmada %}
+                                                <br><span class="confirmed-badge">✓ Confirmado</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <strong>{{ match.projecao.tipo|default:"-" }}</strong><br>
+                                            <small class="text-muted">{{ match.projecao.descricao|truncatewords:5|default:"-" }}</small><br>
+                                            {% if match.projecao.numero_requisicao %}
+                                                <small><strong>Req:</strong> {{ match.projecao.numero_requisicao }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <strong>Nota: {{ match.nota.nota|default:"-" }}</strong><br>
+                                            <small class="text-muted">Série: {{ match.nota.serie|default:"-" }}</small><br>
+                                            <small class="text-muted">Modelo: {{ match.nota.modelo|default:"-" }}</small>
+                                        </td>
+                                        <td>
+                                            {% if match.projecao.centro_atividade %}
+                                                {{ match.projecao.centro_atividade }}
+                                                {% if match.projecao.nome_centro_atividade %}
+                                                    <br><small class="text-muted">{{ match.projecao.nome_centro_atividade|truncatewords:2 }}</small>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <strong>Proj:</strong>
+                                            {% if match.projecao.valor_planejado %}
+                                                R$ {{ match.projecao.valor_planejado|floatformat:2 }}<br>
+                                            {% endif %}
+                                            {% if match.projecao.valor_realizado %}
+                                                <small>Real: R$ {{ match.projecao.valor_realizado|floatformat:2 }}</small><br>
+                                            {% endif %}
+                                            <strong>Nota:</strong>
+                                            {% if match.nota.total_nota %}
+                                                R$ {{ match.nota.total_nota|floatformat:2 }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if match.projecao.data_requisicao %}
+                                                <strong>Proj:</strong> {{ match.projecao.data_requisicao|date:"d/m/Y" }}<br>
+                                            {% endif %}
+                                            {% if match.nota.data_emissao %}
+                                                <strong>Nota:</strong> {{ match.nota.data_emissao|truncatewords:1 }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if match.projecao.fornecedor %}
+                                                <strong>Fornec:</strong> {{ match.projecao.fornecedor|truncatewords:2 }}<br>
+                                            {% endif %}
+                                            {% if match.nota.nome_fantasia_emitente %}
+                                                <strong>Emit:</strong> {{ match.nota.nome_fantasia_emitente|truncatewords:2 }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if match.nota.uso_contabil %}
+                                                <span class="badge bg-secondary">{{ match.nota.uso_contabil }}</span>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="match-details">
+                                                {% for detalhe in match.match_info.detalhes %}
+                                                    <div>{{ detalhe }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                <a href="{% url 'visualizar_relacao_projecao_nota' %}?projecao_id={{ match.projecao.id }}&nota_id={{ match.nota.id }}" class="btn btn-sm btn-info mb-1" title="Visualizar detalhes da relação" style="display: block; width: 100%;">
+                                                    <i class="fas fa-eye"></i> Ver Detalhes
+                                                </a>
+                                                {% if match.relacao_confirmada %}
+                                                    <form method="post" action="{% url 'relacionar_projecao_nota_fiscal' %}" style="display: inline;" onsubmit="return confirm('Deseja realmente remover esta relação confirmada?');">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="acao" value="remover">
+                                                        <input type="hidden" name="projecao_id" value="{{ match.projecao.id }}">
+                                                        <input type="hidden" name="nota_id" value="{{ match.nota.id }}">
+                                                        <button type="submit" class="btn btn-sm btn-danger" title="Remover relação" style="width: 100%;">
+                                                            <i class="fas fa-trash"></i> Remover
+                                                        </button>
+                                                    </form>
+                                                {% else %}
+                                                    <button type="button" class="btn btn-sm btn-success mb-1" data-bs-toggle="modal" data-bs-target="#confirmModal{{ match.projecao.id }}_{{ match.nota.id }}" title="Confirmar relação" style="width: 100%;">
+                                                        <i class="fas fa-check"></i> Confirmar
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ match.projecao.id }}_{{ match.nota.id }}" title="Rejeitar relação" style="width: 100%;">
+                                                        <i class="fas fa-times"></i> Rejeitar
+                                                    </button>
+                                                    
+                                                    <!-- Modal Confirmar -->
+                                                    <div class="modal fade" id="confirmModal{{ match.projecao.id }}_{{ match.nota.id }}" tabindex="-1" aria-labelledby="confirmModalLabel{{ match.projecao.id }}_{{ match.nota.id }}" aria-hidden="true">
+                                                        <div class="modal-dialog">
+                                                            <div class="modal-content">
+                                                                <div class="modal-header">
+                                                                    <h5 class="modal-title" id="confirmModalLabel{{ match.projecao.id }}_{{ match.nota.id }}">Confirmar Relação</h5>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                                </div>
+                                                                <form method="post" action="{% url 'relacionar_projecao_nota_fiscal' %}" id="confirmForm{{ match.projecao.id }}_{{ match.nota.id }}">
+                                                                    {% csrf_token %}
+                                                                    <input type="hidden" name="acao" value="confirmar">
+                                                                    <input type="hidden" name="projecao_id" value="{{ match.projecao.id }}">
+                                                                    <input type="hidden" name="nota_id" value="{{ match.nota.id }}">
+                                                                    <input type="hidden" name="score_match" value="{{ match.match_info.percentual|floatformat:2 }}">
+                                                                    <div class="modal-body">
+                                                                        <p>Deseja confirmar a relação entre:</p>
+                                                                        <ul>
+                                                                            <li><strong>Projeção:</strong> {{ match.projecao.tipo|default:"-" }} - {{ match.projecao.descricao|truncatewords:10|default:"-" }}</li>
+                                                                            <li><strong>Nota Fiscal:</strong> {{ match.nota.nota|default:"-" }} - {{ match.nota.nome_fantasia_emitente|truncatewords:5|default:"-" }}</li>
+                                                                        </ul>
+                                                                        <div class="mb-3">
+                                                                            <label for="observacoes_confirm_{{ match.projecao.id }}_{{ match.nota.id }}" class="form-label">Observações (opcional):</label>
+                                                                            <textarea class="form-control" id="observacoes_confirm_{{ match.projecao.id }}_{{ match.nota.id }}" name="observacoes" rows="3"></textarea>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="modal-footer">
+                                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                                        <button type="submit" class="btn btn-success">
+                                                                            <i class="fas fa-check me-2"></i>Confirmar
+                                                                        </button>
+                                                                    </div>
+                                                                </form>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <!-- Modal Rejeitar -->
+                                                    <div class="modal fade" id="rejectModal{{ match.projecao.id }}_{{ match.nota.id }}" tabindex="-1" aria-labelledby="rejectModalLabel{{ match.projecao.id }}_{{ match.nota.id }}" aria-hidden="true">
+                                                        <div class="modal-dialog">
+                                                            <div class="modal-content">
+                                                                <div class="modal-header">
+                                                                    <h5 class="modal-title" id="rejectModalLabel{{ match.projecao.id }}_{{ match.nota.id }}">Rejeitar Relação</h5>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                                </div>
+                                                                <form method="post" action="{% url 'relacionar_projecao_nota_fiscal' %}" id="rejectForm{{ match.projecao.id }}_{{ match.nota.id }}">
+                                                                    {% csrf_token %}
+                                                                    <input type="hidden" name="acao" value="rejeitar">
+                                                                    <input type="hidden" name="projecao_id" value="{{ match.projecao.id }}">
+                                                                    <input type="hidden" name="nota_id" value="{{ match.nota.id }}">
+                                                                    <div class="modal-body">
+                                                                        <p>Deseja rejeitar a relação entre:</p>
+                                                                        <ul>
+                                                                            <li><strong>Projeção:</strong> {{ match.projecao.tipo|default:"-" }} - {{ match.projecao.descricao|truncatewords:10|default:"-" }}</li>
+                                                                            <li><strong>Nota Fiscal:</strong> {{ match.nota.nota|default:"-" }} - {{ match.nota.nome_fantasia_emitente|truncatewords:5|default:"-" }}</li>
+                                                                        </ul>
+                                                                        <div class="mb-3">
+                                                                            <label for="observacoes_reject_{{ match.projecao.id }}_{{ match.nota.id }}" class="form-label">Motivo da rejeição (opcional):</label>
+                                                                            <textarea class="form-control" id="observacoes_reject_{{ match.projecao.id }}_{{ match.nota.id }}" name="observacoes" rows="3"></textarea>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="modal-footer">
+                                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                                        <button type="submit" class="btn btn-danger">
+                                                                            <i class="fas fa-times me-2"></i>Rejeitar
+                                                                        </button>
+                                                                    </div>
+                                                                </form>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>Nenhuma correspondência encontrada com os filtros aplicados.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Ensure modals work properly and prevent flickering
+(function() {
+    'use strict';
+    
+    function closeModal(modalElement) {
+        if (!modalElement) return;
+        
+        const modal = bootstrap.Modal.getInstance(modalElement);
+        if (modal) {
+            modal.hide();
+        } else {
+            // Create instance and hide
+            const newModal = new bootstrap.Modal(modalElement);
+            newModal.hide();
+        }
+        
+        // Force cleanup
+        setTimeout(() => {
+            const backdrop = document.querySelector('.modal-backdrop');
+            if (backdrop) {
+                backdrop.remove();
+            }
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+        }, 100);
+    }
+    
+    function cleanupModals() {
+        // Remove all backdrops
+        document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
+        
+        // Clean body classes
+        if (!document.querySelector('.modal.show')) {
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+        }
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle form submissions in modals
+        document.querySelectorAll('[id^="confirmForm"], [id^="rejectForm"]').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                const modalElement = this.closest('.modal');
+                
+                // Show loading state
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    const originalText = submitBtn.innerHTML;
+                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processando...';
+                }
+                
+                // Close modal immediately to prevent flickering
+                if (modalElement) {
+                    closeModal(modalElement);
+                }
+                
+                // Allow form to submit normally
+                return true;
+            });
+        });
+        
+        // Ensure modals are properly initialized and prevent flickering
+        document.querySelectorAll('.modal').forEach(modal => {
+            // Clean up on show
+            modal.addEventListener('show.bs.modal', function(e) {
+                cleanupModals();
+            });
+            
+            // Clean up on hide
+            modal.addEventListener('hide.bs.modal', function() {
+                cleanupModals();
+            });
+            
+            // Final cleanup after hidden
+            modal.addEventListener('hidden.bs.modal', function() {
+                cleanupModals();
+                
+                // Reset form
+                const form = this.querySelector('form');
+                if (form) {
+                    form.reset();
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                    }
+                }
+            });
+        });
+        
+        // Global cleanup on page load/unload
+        window.addEventListener('beforeunload', cleanupModals);
+        
+        // Periodic cleanup (in case of issues)
+        setInterval(cleanupModals, 1000);
+    });
+})();
+</script>
+{% endblock %}
+

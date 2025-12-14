@@ -240,12 +240,15 @@
                         <!-- Análise de Ordens de Serviço -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#analise-ordens-collapse" aria-expanded="false">
-                                <i class="bi bi-file-earmark-bar-graph me-2"></i>
+                                <i class="fas fa-chart-line me-2"></i>
                                 <span class="btn-toggle-text">Análise de Ordens</span>
                             </button>
                             <div class="collapse" id="analise-ordens-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'analise_ordens_de_servico' %}" class="link-dark rounded">Análise Geral</a></li>
+                                    <li><a href="{% url 'analise_corretiva_outros_com_parada' %}" class="link-dark rounded">Análise Corretiva com Parada</a></li>
+                                    <li><a href="{% url 'analise_faltantes_pelo_numero' %}" class="link-dark rounded">Análise Faltantes pelo Número</a></li>
+                                    <li><a href="{% url 'analise_ordens_importadas_com_erro' %}" class="link-dark rounded">Análise Ordens Importadas com Erro</a></li>
                                     <li><a href="{% url 'config_analise_ordens' %}" class="link-dark rounded">Configuração</a></li>
                                 </ul>
                             </div>
@@ -259,20 +262,10 @@
                             </button>
                             <div class="collapse" id="preventiva-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <!-- Level 2: Análise -->
                                     <li>
-                                        <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#preventiva-analise-collapse" aria-expanded="false">
-                                            <i class="fas fa-chart-line"></i>
-                                            Análise
-                                        </button>
-                                        <div class="collapse" id="preventiva-analise-collapse">
-                                            <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
-                                                <li><a href="{% url 'em_desenvolvimento' %}" class="link-dark rounded">Análise Ordens Preventivas</a></li>
-                                                <li><a href="{% url 'analise_geral_plano_preventiva_pcm' %}" class="link-dark rounded">Análise Geral</a></li>
-                                            </ul>
-                                        </div>
-                                    </li>
-                                    <!-- Level 2: Consultas -->
+                                        <a href="{% url 'analise_ordens_preventivas' %}" class="link-dark rounded">
+                                            <i class="bi bi-bar-chart-steps"></i>
+                                            Análise Ordens Preventivas</a></li>
                                     <li>
                                         <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#preventiva-consultas-collapse" aria-expanded="false">
                                             <i class="fas fa-search"></i>
@@ -298,7 +291,10 @@
                             </button>
                             <div class="collapse" id="corretiva-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'analise_corretiva_outros' %}" class="link-dark rounded">Análise Ordens Corretivas</a></li>
+                                    <li>
+                                        <a href="{% url 'analise_corretiva_outros' %}" class="link-dark rounded">
+                                            <i class="bi bi-bar-chart-steps"></i>
+                                            Análise Ordens Corretivas</a></li>
                                     <li><a href="{% url 'consultar_corretivas_outros' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Corretiva</a></li>
                                 </ul>
                             </div>
@@ -330,15 +326,12 @@
                                     <li><a href="{% url 'analise_geral_plano_preventiva_pcm' %}" class="link-dark rounded">Análise Geral PCM</a></li>
                                     <li><a href="{% url 'consultar_meu_plano' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Meus Planos Preventiva do PCM</a></li>
                                     <li><a href="{% url 'criar_cronograma_planejado_preventiva' %}" class="link-dark rounded">Criar Calendário Plenejado de Preventivas</a></li>
-                                    <li><a href="{% url 'calendario_de_base' %}" class="link-dark rounded">Calendário de Base</a></li>
                                 </ul>
                             </div>
                         </li>
 
-
-
-
                         <li class="border-top my-3"></li>
+                        
                         <!-- manutenção de terceiros -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#terceiro-collapse" aria-expanded="false">
@@ -367,9 +360,6 @@
                         </li>
                         <li class="border-top my-3"></li>
 
-
-
-
                         <!-- Estoque Almoxarifado -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#estoque-collapse" aria-expanded="false">
@@ -385,7 +375,22 @@
                             </div>
                         </li>
 
-                        
+                        <li class="border-top my-3"></li>
+                        <!-- Requisições - Almoxarifado -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#requisicoes-almoxarifado-collapse" aria-expanded="false">
+                                <i class="bi bi-clipboard-check me-2"></i>
+                                <span class="btn-toggle-text">Requisições - Almoxarifado</span>
+                            </button>
+                            <div class="collapse" id="requisicoes-almoxarifado-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'analise_requisicoes' %}" class="link-dark rounded">Análise de Requisições</a></li>
+                                    <li><a href="{% url 'analise_requisicoes_data_importada' %}" class="link-dark rounded"><i class="fas fa-chart-line me-2"></i>Análise de Datas Importadas</a></li>
+                                    <li><a href="{% url 'consultar_requisicoes_almoxarifado' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Requisições</a></li>
+                                    <li><a href="{% url 'importar_requisicoes_almoxarifado' %}" class="link-dark rounded"><i class="fas fa-upload me-2"></i>Importar Requisições</a></li>
+                                </ul>
+                            </div>
+                        </li>
                         
                         <li class="border-top my-3"></li>
                         <!-- Orçamento -->
@@ -396,11 +401,7 @@
                             </button>
                             <div class="collapse" id="orcamento-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'analise_requisicoes' %}" class="link-dark rounded">Análise de Requisições</a></li>
-                                    <li><a href="{% url 'analise_projecao_nota_fiscal' %}" class="link-dark rounded">Análise Projeção vs Nota Fiscal</a></li>
-                                    <li><a href="{% url 'consultar_requisicoes_almoxarifado' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Requisições Almoxarifado</a></li>
                                     <li><a href="{% url 'consultar_notas_fiscais' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Notas Fiscais</a></li>
-                                    <li><a href="{% url 'consultar_projecoes_gastos' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Projeções de Gastos</a></li>
                                 </ul>
                             </div>
                         </li>
@@ -493,7 +494,6 @@
                                     <li><a href="{% url 'importar_52_semanas' %}" class="link-dark rounded">52 Semanas</a></li>
                                     <li><a href="{% url 'importar_requisicoes_almoxarifado' %}" class="link-dark rounded">Requisições Almoxarifado</a></li>
                                     <li><a href="{% url 'importar_notas_fiscais' %}" class="link-dark rounded">Notas Fiscais</a></li>
-                                    <li><a href="{% url 'importar_projecoes_gastos' %}" class="link-dark rounded">Projeções de Gastos</a></li>
                                 </ul>
                             </div>
                         </li>

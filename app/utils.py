@@ -1006,7 +1006,7 @@ def upload_cas_from_file(file, update_existing=False) -> Tuple[int, int, List[st
     Returns:
         Tupla (created_count, updated_count, errors)
     """
-    from app.models import CentroAtividade, LocalCentroAtividade
+    from app.models import CentroAtividade
     
     errors = []
     created_count = 0
@@ -1111,28 +1111,14 @@ def upload_cas_from_file(file, update_existing=False) -> Tuple[int, int, List[st
                         if ca_created:
                             created_count += 1
                     
-                    # Criar LocalCentroAtividade se houver valor de local
+                    # Atualizar campo local do CentroAtividade se houver valor de local
                     if local_value:
                         local_str = _safe_str(local_value, max_length=255)
-                        if local_str:
-                            if update_existing:
-                                local_obj, local_created = LocalCentroAtividade.objects.update_or_create(
-                                    centro_atividade=ca_obj,
-                                    local=local_str,
-                                    defaults={}
-                                )
-                                if local_created:
-                                    created_count += 1
-                                else:
-                                    updated_count += 1
-                            else:
-                                local_obj, local_created = LocalCentroAtividade.objects.get_or_create(
-                                    centro_atividade=ca_obj,
-                                    local=local_str,
-                                    defaults={}
-                                )
-                                if local_created:
-                                    created_count += 1
+                        if local_str and local_str != ca_obj.local:
+                            ca_obj.local = local_str
+                            ca_obj.save()
+                            if not ca_created:
+                                updated_count += 1
                     
                 except Exception as e:
                     error_msg = f"Linha {row_num}: Erro ao processar registro - {str(e)}"
@@ -2906,287 +2892,6 @@ def upload_requisicoes_almoxarifado_from_file(file, data_requisicao, update_exis
         import traceback
         traceback.print_exc()
         return 0, 0, errors
-
-
-def upload_projecoes_gastos_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:
-    """
-    Faz upload de projeções de gastos e requisições de serviço a partir de um arquivo Excel
-    Baseado na estrutura: SETOR, SOLICITANTE, FORNECEDOR NOME FANTASIA, FORNECEDOR CNPJ, etc.
-    
-    Args:
-        file: Arquivo Django UploadedFile (Excel)
-        update_existing: Se True, atualiza registros existentes. Se False, ignora duplicados.
-    
-    Returns:
-        Tupla (created_count, updated_count, errors)
-    """
-    from app.models import ProjecaoGasto
-    from datetime import datetime, date, timedelta
-    import re
-    
-    errors = []
-    created_count = 0
-    updated_count = 0
-    
-    # Função auxiliar para converter número Excel para data
-    def excel_date_to_python_date(excel_date):
-        """Converte número Excel (ex: 45959) para objeto date Python
-        Excel usa 1 de janeiro de 1900 como data base (dia 1)
-        """
-        try:
-            if isinstance(excel_date, (int, float)):
-                # Excel date: número de dias desde 1 de janeiro de 1900
-                # Mas Excel considera 1900 como ano bissexto (bug), então subtraímos 2 dias
-                excel_epoch = date(1899, 12, 30)
-                return excel_epoch + timedelta(days=int(excel_date))
-            elif isinstance(excel_date, (datetime, date)):
-                return excel_date.date() if isinstance(excel_date, datetime) else excel_date
-            elif isinstance(excel_date, str) and excel_date.strip():
-                return _parse_date(excel_date)
-        except Exception as e:
-            print(f"Erro ao converter data Excel: {excel_date}, erro: {e}")
-        return None
-    
-    # Função auxiliar para extrair mês e ano de PREVISÃO P/ EXECUÇÃO
-    def parse_previsao_execucao(previsao_str):
-        """Extrai mês e ano de string como 'DEZEMBRO / 2025'"""
-        if not previsao_str:
-            return None, None
-        
-        previsao_str = str(previsao_str).strip().upper()
-        
-        # Mapeamento de meses em português
-        meses_map = {
-            'JANEIRO': '01', 'FEVEREIRO': '02', 'MARÇO': '03', 'MARCO': '03',
-            'ABRIL': '04', 'MAIO': '05', 'JUNHO': '06', 'JULHO': '07',
-            'AGOSTO': '08', 'SETEMBRO': '09', 'OUTUBRO': '10', 'NOVEMBRO': '11', 'DEZEMBRO': '12'
-        }
-        
-        mes_ref = None
-        ano_ref = None
-        
-        # Procurar por padrão "MÊS / ANO" ou "MÊS/ANO"
-        match = re.search(r'([A-ZÇ]+)\s*/\s*(\d{4})', previsao_str)
-        if match:
-            mes_nome = match.group(1).strip()
-            ano_str = match.group(2).strip()
-            mes_ref = meses_map.get(mes_nome)
-            try:
-                ano_ref = int(ano_str)
-            except:
-                pass
-        
-        return mes_ref, ano_ref
-    
-    # Normalizar nomes de colunas para facilitar mapeamento
-    def normalize_column_name(name):
-        if not name:
-            return ''
-        name = str(name).lower().strip()
-        # Remover quebras de linha e espaços extras
-        name = name.replace('\n', ' ').replace('\r', ' ')
-        name = re.sub(r'\s+', ' ', name).strip()
-        # Remover acentos e caracteres especiais
-        name = name.replace('ç', 'c').replace('ã', 'a').replace('á', 'a').replace('à', 'a')
-        name = name.replace('â', 'a').replace('é', 'e').replace('ê', 'e').replace('í', 'i')
-        name = name.replace('ó', 'o').replace('ô', 'o').replace('õ', 'o').replace('ú', 'u')
-        name = name.replace('ç', 'c').replace('Ç', 'c')
-        return name
-    
-    try:
-        # Validar extensão
-        file_name = file.name.lower()
-        if not file_name.endswith(('.xlsx', '.xls', '.xlsm')):
-            raise ValidationError("Formato de arquivo não suportado. Use .xlsx, .xls ou .xlsm")
-        
-        # Ler arquivo Excel
-        if hasattr(file, 'read'):
-            file.seek(0)
-            wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
-        else:
-            wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
-        
-        # Processar cada planilha
-        for sheet_name in wb.sheetnames:
-            ws = wb[sheet_name]
-            
-            # Ler cabeçalhos da primeira linha
-            headers = []
-            for cell in ws[1]:
-                header_value = cell.value if cell.value else f'col_{len(headers)}'
-                if isinstance(header_value, str):
-                    header_value = header_value.strip().replace('\xa0', ' ').replace('\u00a0', ' ')
-                    header_value = re.sub(r'\s+', ' ', header_value).strip()
-                headers.append(header_value)
-            
-            # Criar mapeamento de colunas normalizadas para índices
-            column_map = {}
-            for idx, header in enumerate(headers):
-                normalized = normalize_column_name(header)
-                column_map[normalized] = idx
-            
-            # Ler dados
-            for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-                if not any(cell is not None for cell in row):  # Ignorar linhas vazias
-                    continue
-                
-                try:
-                    # Extrair valores baseado no mapeamento de colunas
-                    def get_value(col_patterns):
-                        """Busca valor por padrões de nome de coluna"""
-                        for pattern in col_patterns:
-                            normalized_pattern = normalize_column_name(pattern)
-                            for col_name, idx in column_map.items():
-                                if normalized_pattern in col_name or col_name in normalized_pattern:
-                                    if idx < len(row):
-                                        return row[idx]
-                        return None
-                    
-                    # Mapear campos do Excel para o modelo
-                    setor = _safe_str(get_value(['SETOR', 'setor']), max_length=100)
-                    solicitante = _safe_str(get_value(['SOLICITANTE', 'solicitante']), max_length=100)
-                    fornecedor_nome_fantasia = _safe_str(get_value(['FORNECEDOR', 'NOME FANTASIA', 'fornecedor nome fantasia']), max_length=255)
-                    fornecedor_cnpj = _safe_str(get_value(['FORNECEDOR', 'CNPJ', 'fornecedor cnpj']), max_length=20)
-                    descricao = _safe_str(get_value(['DESCRIÇÃO DO SERVIÇO', 'DESCRICAO DO SERVICO', 'descricao', 'servico']), max_length=500)
-                    valor_total = _safe_decimal(get_value(['VALOR TOTAL', 'valor total', 'valor']))
-                    
-                    previsao_execucao = get_value(['PREVISÃO P/ EXECUÇÃO', 'PREVISAO P/ EXECUCAO', 'previsao'])
-                    mes_referencia, ano_referencia = parse_previsao_execucao(previsao_execucao)
-                    previsao_execucao_str = _safe_str(previsao_execucao, max_length=50)
-                    
-                    uso_contabil = _safe_str(get_value(['USO CONTÁBIL', 'USO CONTABIL', 'uso contabil']), max_length=100)
-                    numero_nf = _safe_str(get_value(['NÚMERO DA NF', 'NUMERO DA NF', 'numero nf', 'nf']), max_length=100)
-                    numero_ordem_servico = _safe_str(get_value(['ORDEM DE SERVIÇO', 'ORDEM DE SERVICO', 'ordem servico', 'os']), max_length=100)
-                    
-                    data_abertura_raw = get_value(['DATA DE ABERTURA DA REQUISIÇÃO', 'DATA DE ABERTURA DA REQUISICAO', 'data abertura', 'data requisicao'])
-                    data_abertura_requisicao = excel_date_to_python_date(data_abertura_raw)
-                    
-                    numero_requisicao_compra = _safe_str(get_value(['NÚMERO DA REQUISIÇÃO DE COMPRA', 'NUMERO DA REQUISICAO DE COMPRA', 'numero requisicao compra', 'requisicao compra']), max_length=100)
-                    numero_pedido_compra = _safe_str(get_value(['NÚMERO DO PEDIDO DE COMPRA', 'NUMERO DO PEDIDO DE COMPRA', 'numero pedido compra', 'pedido compra']), max_length=100)
-                    
-                    servico_concluido_raw = get_value(['SERVIÇO CONCLUÍDO', 'SERVICO CONCLUIDO', 'servico concluido'])
-                    servico_concluido = excel_date_to_python_date(servico_concluido_raw)
-                    
-                    nf_servico_recebida_raw = get_value(['NF DE SERVIÇO RECEBIDA', 'NF DE SERVICO RECEBIDA', 'nf servico recebida'])
-                    nf_servico_recebida = excel_date_to_python_date(nf_servico_recebida_raw)
-                    
-                    nf_enviada_lancamento_raw = get_value(['NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA PARA LANCAMENTO', 'nf enviada lancamento'])
-                    nf_enviada_lancamento = excel_date_to_python_date(nf_enviada_lancamento_raw)
-                    
-                    # Validar dados mínimos
-                    if not descricao and not setor and not valor_total:
-                        continue  # Pular linha se não tiver dados relevantes
-                    
-                    # Criar ou atualizar registro
-                    defaults = {
-                        # Novos campos principais
-                        'setor': setor,
-                        'solicitante': solicitante,
-                        'descricao': descricao,
-                        'valor_total': valor_total,
-                        'data_abertura_requisicao': data_abertura_requisicao,
-                        'previsao_execucao': previsao_execucao_str,
-                        'mes_referencia': mes_referencia,
-                        'ano_referencia': ano_referencia,
-                        'fornecedor_nome_fantasia': fornecedor_nome_fantasia,
-                        'fornecedor_cnpj': fornecedor_cnpj,
-                        'uso_contabil': uso_contabil,
-                        'numero_nf': numero_nf,
-                        'numero_ordem_servico': numero_ordem_servico,
-                        'numero_requisicao_compra': numero_requisicao_compra,
-                        'numero_pedido_compra': numero_pedido_compra,
-                        'servico_concluido': servico_concluido,
-                        'nf_servico_recebida': nf_servico_recebida,
-                        'nf_enviada_lancamento': nf_enviada_lancamento,
-                        # Campos legados (para compatibilidade)
-                        'tipo': 'Requisição de Serviço',  # Padrão baseado na estrutura do Excel
-                        'centro_atividade': setor,  # Mapear SETOR para centro_atividade
-                        'nome_centro_atividade': None,
-                        'valor_planejado': valor_total,  # Mapear valor_total para valor_planejado
-                        'valor_realizado': None,
-                        'valor_projetado': None,
-                        'data_requisicao': data_abertura_requisicao,  # Mapear data_abertura_requisicao para data_requisicao
-                        'data_planejada': None,
-                        'data_realizada': None,
-                        'fornecedor': fornecedor_nome_fantasia,  # Mapear fornecedor_nome_fantasia para fornecedor
-                        'numero_requisicao': numero_requisicao_compra,  # Mapear numero_requisicao_compra para numero_requisicao
-                        'status': None,
-                        'observacoes': None,
-                        'dados_adicionais': None,
-                    }
-                    
-                    # Identificador único: numero_requisicao_compra ou setor + descricao + data
-                    if numero_requisicao_compra:
-                        obj, created = ProjecaoGasto.objects.update_or_create(
-                            numero_requisicao_compra=numero_requisicao_compra,
-                            defaults=defaults
-                        )
-                    elif setor and descricao and data_abertura_requisicao:
-                        obj, created = ProjecaoGasto.objects.update_or_create(
-                            setor=setor,
-                            descricao=descricao,
-                            data_abertura_requisicao=data_abertura_requisicao,
-                            defaults=defaults
-                        )
-                    else:
-                        # Criar novo registro
-                        obj = ProjecaoGasto.objects.create(**defaults)
-                        created = True
-                    
-                    if created:
-                        created_count += 1
-                    elif update_existing:
-                        updated_count += 1
-                
-                except Exception as e:
-                    error_msg = f"Linha {row_num} (planilha {sheet_name}): {str(e)}"
-                    errors.append(error_msg)
-                    print(f"Erro ao processar linha {row_num}: {e}")
-                    import traceback
-                    traceback.print_exc()
-        
-        wb.close()
-        
-    except Exception as e:
-        error_msg = f"Erro ao processar arquivo: {str(e)}"
-        errors.append(error_msg)
-        print(f"Erro geral: {error_msg}")
-        import traceback
-        traceback.print_exc()
-        return 0, 0, errors
-    
-    return created_count, updated_count, errors
-
-
-def _parse_date(date_str):
-    """Tenta parsear uma string de data em vários formatos"""
-    from datetime import datetime
-    if not date_str or not isinstance(date_str, str):
-        return None
-    
-    date_str = date_str.strip()
-    if not date_str:
-        return None
-    
-    # Formatos comuns
-    formats = [
-        '%d/%m/%Y',
-        '%Y-%m-%d',
-        '%d-%m-%Y',
-        '%Y/%m/%d',
-        '%d/%m/%y',
-        '%d-%m-%y',
-    ]
-    
-    for fmt in formats:
-        try:
-            return datetime.strptime(date_str, fmt).date()
-        except:
-            continue
-    
-    return None
-
-
 def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:
     """
     Faz upload de notas fiscais a partir de um arquivo CSV
@@ -3310,21 +3015,6 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
                     total_nota_str = row_data.get('Total Nota') or row_data.get('total nota') or row_data.get('TOTAL NOTA') or row_data.get('Total nota')
                     total_nota = _safe_decimal(total_nota_str)
                     
-                    # Uso Contábil - Priorizar coluna "uso contabil" do CSV
-                    uso_contabil = _safe_str(
-                        row_data.get('uso contabil') or 
-                        row_data.get('Uso contabil') or 
-                        row_data.get('USO CONTABIL') or 
-                        row_data.get('uso contábil') or 
-                        row_data.get('Uso contábil') or 
-                        row_data.get('USO CONTÁBIL') or
-                        # Fallback para "centro de custo" (compatibilidade com arquivos antigos)
-                        row_data.get('centro de custo') or 
-                        row_data.get('Centro de custo') or 
-                        row_data.get('CENTRO DE CUSTO'),
-                        max_length=100
-                    )
-                    
                     # Validar que temos pelo menos emitente e nota
                     if not emitente or not nota:
                         errors.append(f"Linha {row_num}: Emitente e Nota são obrigatórios")
@@ -3392,7 +3082,6 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
                         'serie': serie,
                         'modelo': modelo,
                         'total_nota': total_nota,
-                        'uso_contabil': uso_contabil,
                         'data_emissao': data_emissao,
                         'data_vencimento': data_vencimento,
                         'data_inclusao': data_inclusao,

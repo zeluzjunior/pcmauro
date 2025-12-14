@@ -1,0 +1,411 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Análise de Ordens Importadas com Erro{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .stat-card.border-primary { border-left-color: #0d6efd; }
+    .stat-card.border-success { border-left-color: #198754; }
+    .stat-card.border-info { border-left-color: #0dcaf0; }
+    .stat-card.border-warning { border-left-color: #ffc107; }
+    .stat-card.border-danger { border-left-color: #dc3545; }
+    
+    .section-header {
+        border-bottom: 3px solid;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .summary-box {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 25px;
+        text-align: center;
+    }
+    
+    .summary-box h3 {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+    
+    .summary-box p {
+        margin: 0;
+        font-size: 1.1rem;
+        opacity: 0.9;
+    }
+    
+    .problema-badge {
+        font-size: 0.75rem;
+        padding: 2px 6px;
+        margin: 2px;
+    }
+    
+    .intervalo-card {
+        margin-bottom: 30px;
+    }
+    
+    .problemas-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise de Ordens Importadas com Erro</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Análise de Ordens Importadas com Erro
+                </h1>
+                <p class="lead">Detecção de padrões inconsistentes nos dados importados</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Info Box -->
+        <div class="alert alert-info" role="alert">
+            <h4 class="alert-heading">
+                <i class="fas fa-info-circle me-2"></i>Como funciona esta análise
+            </h4>
+            <p class="mb-0">
+                Esta página analisa cada coluna da tabela <code>OrdemServicoCorretiva</code> para detectar padrões inconsistentes.
+                Registros que não seguem o padrão da maioria são identificados como possíveis erros de importação.
+                A análise é dividida em intervalos de 5000 registros para facilitar a visualização.
+            </p>
+        </div>
+
+        <!-- Resumo Visual -->
+        <div class="row mb-4">
+            <div class="col-md-4 mb-3">
+                <div class="summary-box" style="background: linear-gradient(135deg, #198754 0%, #20c997 100%);">
+                    <h3 class="format-number">{{ total_sem_problemas|default:0 }}</h3>
+                    <p><i class="fas fa-check-circle me-2"></i>Registros sem Problemas</p>
+                    <small style="opacity: 0.8;" class="format-number-small">{{ total_ordens|default:0 }} total de registros</small>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="summary-box" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
+                    <h3 class="format-number">{{ total_com_problemas|default:0 }}</h3>
+                    <p><i class="fas fa-exclamation-triangle me-2"></i>Registros com Possíveis Problemas</p>
+                    <small style="opacity: 0.8;" class="format-percent">{{ percentual_problemas|default:0 }}% do total</small>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="summary-box" style="background: linear-gradient(135deg, #0dcaf0 0%, #0aa2c0 100%);">
+                    <h3 class="format-number">{{ intervalos_analise|length|default:0 }}</h3>
+                    <p><i class="fas fa-ruler me-2"></i>Intervalos Analisados</p>
+                    <small style="opacity: 0.8;" class="format-number-small">5.000 registros por intervalo</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estatísticas Detalhadas -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card border-primary h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-database fa-2x text-primary mb-2"></i>
+                        <h6 class="card-title text-muted">Total de Registros</h6>
+                        <h2 class="text-primary mb-0 format-number">{{ total_ordens|default:0 }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card border-success h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                        <h6 class="card-title text-muted">Sem Problemas</h6>
+                        <h2 class="text-success mb-0 format-number">{{ total_sem_problemas|default:0 }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card border-danger h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i>
+                        <h6 class="card-title text-muted">Com Problemas</h6>
+                        <h2 class="text-danger mb-0 format-number">{{ total_com_problemas|default:0 }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card border-warning h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-percentage fa-2x text-warning mb-2"></i>
+                        <h6 class="card-title text-muted">Taxa de Problemas</h6>
+                        <h2 class="text-warning mb-0 format-percent">{{ percentual_problemas|default:0 }}%</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Análise por Intervalos de 5000 -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0 section-header border-white">
+                    <i class="fas fa-table me-2"></i>Análise por Intervalos de 5000 Registros
+                </h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-4">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Análise dividida em intervalos de 5000 registros. Cada seção mostra os registros com possíveis problemas e links para visualização.
+                </p>
+                
+                {% for intervalo in intervalos_analise %}
+                <div class="card intervalo-card shadow-sm">
+                    <div class="card-header {% if intervalo.status == 'alto' %}bg-danger{% elif intervalo.status == 'medio' %}bg-warning{% elif intervalo.status == 'baixo' %}bg-info{% else %}bg-success{% endif %} text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-layer-group me-2"></i>
+                            Intervalo {{ intervalo.inicio_idx }}
+                            {% if intervalo.inicio_numero is not None and intervalo.fim_numero is not None %}
+                                - OS: <span class="format-number">{{ intervalo.inicio_numero }}</span> até <span class="format-number">{{ intervalo.fim_numero }}</span>
+                                {% if intervalo.primeira_os and intervalo.ultima_os %}
+                                    (Primeira: <span class="format-number">{{ intervalo.primeira_os }}</span>, Última: <span class="format-number">{{ intervalo.ultima_os }}</span>)
+                                {% endif %}
+                            {% endif %}
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <div class="p-3 bg-light rounded text-center">
+                                    <h4 class="text-primary mb-1 format-number">{{ intervalo.total }}</h4>
+                                    <p class="text-muted mb-0">Total no Intervalo</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="p-3 bg-light rounded text-center">
+                                    <h4 class="text-success mb-1 format-number">{{ intervalo.sem_problemas }}</h4>
+                                    <p class="text-muted mb-0">Sem Problemas</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="p-3 bg-light rounded text-center">
+                                    <h4 class="text-danger mb-1 format-number">{{ intervalo.com_problemas }}</h4>
+                                    <p class="text-muted mb-0">Com Problemas</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="p-3 bg-light rounded text-center">
+                                    <h4 class="text-warning mb-1 format-percent">{{ intervalo.percentual_problemas }}%</h4>
+                                    <p class="text-muted mb-0">Taxa de Problemas</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {% if intervalo.com_problemas > 0 %}
+                        <div class="mt-4">
+                            <h6 class="mb-3">
+                                <i class="fas fa-list me-2"></i>Registros com Possíveis Problemas (mostrando até 100)
+                            </h6>
+                            <div class="problemas-list">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th width="10%">OS</th>
+                                                <th width="20%">Máquina</th>
+                                                <th width="15%">Data Abertura</th>
+                                                <th width="10%">Problemas</th>
+                                                <th width="45%">Detalhes dos Problemas</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in intervalo.ordens_problemas %}
+                                            <tr>
+                                                <td>
+                                                    <a href="{% url 'visualizar_corretiva_outros' item.ordem.id %}" class="btn btn-sm btn-primary" target="_blank">
+                                                        <i class="fas fa-external-link-alt me-1"></i>{{ item.ordem.cd_ordemserv }}
+                                                    </a>
+                                                </td>
+                                                <td>
+                                                    <small>{{ item.ordem.descr_maquina|truncatechars:40|default:"-" }}</small>
+                                                </td>
+                                                <td>
+                                                    <small>{{ item.ordem.dt_abertura_solicita|default:"-" }}</small>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-danger">{{ item.total_problemas }}</span>
+                                                </td>
+                                                <td>
+                                                    {% for problema in item.problemas %}
+                                                    <span class="badge bg-warning text-dark problema-badge" title="{{ problema }}">
+                                                        {{ problema|truncatechars:50 }}
+                                                    </span>
+                                                    {% endfor %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            {% if intervalo.com_problemas > 100 %}
+                            <div class="alert alert-warning mt-3">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Mostrando apenas os primeiros 100 registros com problemas. Total: <span class="format-number">{{ intervalo.com_problemas }}</span> registros.
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <div class="alert alert-success mt-3">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Nenhum problema detectado neste intervalo!
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Informações Adicionais -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0 section-header border-white">
+                    <i class="fas fa-info-circle me-2"></i>Informações sobre a Análise
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-primary mb-3"><i class="fas fa-question-circle me-2"></i>Como funciona?</h6>
+                        <p class="mb-3">
+                            Esta análise verifica cada coluna da tabela <code>OrdemServicoCorretiva</code> para detectar:
+                        </p>
+                        <ul>
+                            <li><strong>Formatos de data inconsistentes:</strong> Detecta quando uma data não segue o padrão da maioria</li>
+                            <li><strong>Campos vazios:</strong> Identifica campos vazios quando a maioria dos registros tem valores</li>
+                            <li><strong>Comprimento anormal:</strong> Detecta valores com comprimento muito diferente da média</li>
+                            <li><strong>Caracteres suspeitos:</strong> Identifica caracteres especiais que podem indicar problemas de encoding</li>
+                            <li><strong>Lógica de datas:</strong> Verifica se datas de abertura são anteriores às datas de entrada</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-warning mb-3"><i class="fas fa-lightbulb me-2"></i>Interpretação</h6>
+                        <div class="mb-3">
+                            <span class="badge bg-success me-2">Sem Problemas</span>
+                            <small>Nenhum problema detectado no intervalo</small>
+                        </div>
+                        <div class="mb-3">
+                            <span class="badge bg-info me-2">Baixo</span>
+                            <small>Menos de 5% dos registros têm problemas</small>
+                        </div>
+                        <div class="mb-3">
+                            <span class="badge bg-warning me-2">Médio</span>
+                            <small>Entre 5% e 15% dos registros têm problemas</small>
+                        </div>
+                        <div class="mb-3">
+                            <span class="badge bg-danger me-2">Alto</span>
+                            <small>Mais de 15% dos registros têm problemas - requer atenção</small>
+                        </div>
+                        <p class="text-muted small mt-3">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Clique no número da OS para visualizar os detalhes do registro e verificar os problemas identificados.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+// Função para formatar números no padrão brasileiro (1.234,56)
+function formatarNumeroBR(numero, decimais = 0) {
+    if (numero === null || numero === undefined || isNaN(numero)) {
+        return '0';
+    }
+    const num = typeof numero === 'string' ? parseFloat(numero.replace(/\./g, '').replace(',', '.')) : numero;
+    return num.toLocaleString('pt-BR', {
+        minimumFractionDigits: decimais,
+        maximumFractionDigits: decimais
+    });
+}
+
+// Formatar números na página após carregamento
+document.addEventListener('DOMContentLoaded', function() {
+    // Formatar números inteiros
+    document.querySelectorAll('.format-number').forEach(el => {
+        const text = el.textContent.trim();
+        const num = parseInt(text.replace(/\D/g, ''));
+        if (!isNaN(num)) {
+            el.textContent = formatarNumeroBR(num);
+        }
+    });
+    
+    // Formatar números com percentual
+    document.querySelectorAll('.format-percent').forEach(el => {
+        const text = el.textContent.trim();
+        const match = text.match(/([\d,\.]+)\s*%/);
+        if (match) {
+            const num = parseFloat(match[1].replace(/\./g, '').replace(',', '.'));
+            if (!isNaN(num)) {
+                el.textContent = formatarNumeroBR(num, 2) + '%';
+            }
+        }
+    });
+    
+    // Formatar números em textos pequenos
+    document.querySelectorAll('.format-number-small').forEach(el => {
+        const text = el.textContent;
+        // Procurar por padrões como "X total de registros" ou "X registros"
+        const match = text.match(/(\d+)\s+(total|registros?)/i);
+        if (match) {
+            const num = parseInt(match[1]);
+            if (!isNaN(num)) {
+                el.textContent = text.replace(match[1], formatarNumeroBR(num));
+            }
+        }
+    });
+    
+    // Formatar números nos badges
+    document.querySelectorAll('.badge.bg-danger').forEach(el => {
+        const text = el.textContent.trim();
+        const num = parseInt(text);
+        if (!isNaN(num) && text === num.toString()) {
+            el.textContent = formatarNumeroBR(num);
+        }
+    });
+    
+    // Formatar números de OS (cd_ordemserv) se necessário
+    document.querySelectorAll('a.btn-sm.btn-primary').forEach(el => {
+        const text = el.textContent.trim();
+        const match = text.match(/(\d+)/);
+        if (match) {
+            const num = parseInt(match[1]);
+            if (!isNaN(num) && num > 1000) { // Só formatar se for um número grande
+                const formatted = formatarNumeroBR(num);
+                el.innerHTML = el.innerHTML.replace(match[1], formatted);
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
