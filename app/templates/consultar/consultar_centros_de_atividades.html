@@ -179,10 +179,13 @@
                                     </td>
                                     <td>{{ ca_item.encarregado_responsavel|default:"-" }}</td>
                                     <td>
-                                        {% if ca_item.locais.all %}
-                                            {% for local in ca_item.locais.all %}
-                                                <span class="badge bg-primary me-1">{{ local.local }}</span>
-                                            {% endfor %}
+                                        {% if ca_item.local %}
+                                            <span class="badge bg-primary me-1">{{ ca_item.local }}</span>
+                                            {% if ca_item.observacoes %}
+                                                <span class="text-muted small" title="{{ ca_item.observacoes }}">
+                                                    <i class="fas fa-info-circle"></i>
+                                                </span>
+                                            {% endif %}
                                         {% else %}
                                             -
                                         {% endif %}

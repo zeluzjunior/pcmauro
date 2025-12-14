@@ -354,24 +354,7 @@
             </div>
         </div>
 
-        <!-- Charts Row 1 -->
-        <div class="row mb-5">
-            <!-- Gráfico de Linha: Evolução Temporal -->
-            <div class="col-md-12 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-line me-2"></i>Evolução Temporal das Requisições (Últimos 12 Meses)
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="temporalChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+
 
         <!-- Charts Row 1.5: Daily Chart -->
         <div class="row mb-5">
@@ -476,6 +459,25 @@
             </div>
         </div>
 
+        <!-- Charts Row 4 -->
+        <div class="row mb-5">
+            <!-- Gráfico de Barras: Distribuição por Usuário Criou -->
+            <div class="col-md-12 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-user-chart me-2"></i>Top 10 Usuários que Criaram Requisições
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="usuariosChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Data Tables -->
         <div class="row mb-5">
             <!-- Tabela: Requisições Recentes -->
@@ -543,16 +545,97 @@
                 </div>
             </div>
         </div>
+
+        <!-- Charts Row 1 -->
+        <div class="row mb-5">
+            <!-- Gráfico de Linha: Evolução Temporal -->
+            <div class="col-md-12 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Evolução Temporal das Requisições (Últimos 12 Meses)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="temporalChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </section>
 {% endblock %}
 
 {% block extra_js %}
-<!-- Chart.js -->
+<!-- Chart.js - Load synchronously -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
+// Verificar imediatamente se Chart.js carregou
+console.log('Verificando Chart.js...');
+console.log('Chart disponível?', typeof Chart !== 'undefined');
+if (typeof Chart !== 'undefined') {
+    console.log('Chart.js versão:', Chart.version || 'desconhecida');
+} else {
+    console.error('Chart.js NÃO está disponível!');
+}
+
+// Função para aguardar Chart.js carregar
+function waitForChartJS(callback, maxAttempts) {
+    maxAttempts = maxAttempts || 100; // Aumentado para 10 segundos
+    var attempts = 0;
+    
+    function check() {
+        attempts++;
+        if (typeof Chart !== 'undefined') {
+            console.log('Chart.js detectado após', attempts * 100, 'ms');
+            callback();
+        } else if (attempts < maxAttempts) {
+            setTimeout(check, 100);
+        } else {
+            console.error('Chart.js não carregou após ' + (maxAttempts * 100) + 'ms. Verifique sua conexão com a internet.');
+            // Mostrar mensagem de erro na página
+            var errorMsg = document.createElement('div');
+            errorMsg.className = 'alert alert-danger m-3';
+            errorMsg.innerHTML = '<strong>Erro:</strong> Não foi possível carregar Chart.js. Verifique sua conexão com a internet.';
+            var container = document.querySelector('.container');
+            if (container) {
+                container.insertBefore(errorMsg, container.firstChild);
+            }
+        }
+    }
+    
+    check();
+}
+
+// Aguardar DOM e Chart.js estarem prontos
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Bootstrap tooltips
+    console.log('DOM carregado, aguardando Chart.js...');
+    // Aguardar Chart.js carregar antes de inicializar gráficos
+    waitForChartJS(function() {
+        console.log('=== INICIANDO CRIAÇÃO DE GRÁFICOS ===');
+        console.log('Chart.js carregado, inicializando gráficos...');
+        console.log('Chart object:', typeof Chart !== 'undefined' ? Chart : 'UNDEFINED');
+        console.log('Chart version:', typeof Chart !== 'undefined' && Chart.version ? Chart.version : 'UNKNOWN');
+        
+        // Verificar se Chart.js está realmente disponível
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js não está disponível mesmo após waitForChartJS!');
+            const chartContainers = document.querySelectorAll('.chart-container, .chart-container-large');
+            chartContainers.forEach(container => {
+                const canvas = container.querySelector('canvas');
+                if (canvas) {
+                    canvas.parentElement.innerHTML = '<div class="alert alert-danger m-3"><strong>Erro:</strong> Chart.js não foi carregado. Verifique sua conexão com a internet.</div>';
+                }
+            });
+            return;
+        }
+        
+        console.log('Chart.js carregado com sucesso! Versão:', Chart.version || 'desconhecida');
+        
+        // Initialize Bootstrap tooltips
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
@@ -690,182 +773,269 @@ document.addEventListener('DOMContentLoaded', function() {
     // Gráfico de Linha: Evolução Temporal
     const temporalCtx = document.getElementById('temporalChart');
     if (temporalCtx) {
-        new Chart(temporalCtx.getContext('2d'), {
-            type: 'line',
-            data: {
-                labels: {{ meses_labels|safe }},
-                datasets: [{
-                    label: 'Quantidade de Requisições',
-                    data: {{ meses_data|safe }},
-                    borderColor: '#198754',
-                    backgroundColor: 'rgba(25, 135, 84, 0.1)',
-                    tension: 0.4,
-                    fill: true,
-                    yAxisID: 'y'
-                }, {
-                    label: 'Valor Total (R$)',
-                    data: {{ meses_valor|safe }},
-                    borderColor: '#dc3545',
-                    backgroundColor: 'rgba(220, 53, 69, 0.1)',
-                    tension: 0.4,
-                    fill: true,
-                    yAxisID: 'y1'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: true
-                    }
+        try {
+            // Data já vem como array do Django (json.dumps produz array literal)
+            const mesesLabels = {{ meses_labels|safe }};
+            const mesesData = {{ meses_data|safe }};
+            const mesesValor = {{ meses_valor|safe }};
+            
+            console.log('Temporal Chart - Labels:', mesesLabels);
+            console.log('Temporal Chart - Data:', mesesData);
+            console.log('Temporal Chart - Valor:', mesesValor);
+            console.log('Temporal Chart - Labels type:', typeof mesesLabels);
+            console.log('Temporal Chart - Labels length:', Array.isArray(mesesLabels) ? mesesLabels.length : 'not array');
+            
+            // Verificar se há dados
+            if (!mesesLabels || !Array.isArray(mesesLabels) || mesesLabels.length === 0) {
+                console.warn('Temporal Chart: Sem dados para exibir');
+                temporalCtx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis para o período selecionado.</div>';
+            } else {
+                new Chart(temporalCtx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: mesesLabels,
+                    datasets: [{
+                        label: 'Quantidade de Requisições',
+                        data: mesesData,
+                        borderColor: '#198754',
+                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Valor Total (R$)',
+                        data: mesesValor,
+                        borderColor: '#dc3545',
+                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y1'
+                    }]
                 },
-                scales: {
-                    y: {
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Quantidade'
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true
                         }
                     },
-                    y1: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        beginAtZero: true,
-                        title: {
+                    scales: {
+                        y: {
+                            type: 'linear',
                             display: true,
-                            text: 'Valor (R$)'
+                            position: 'left',
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Quantidade'
+                            }
                         },
-                        grid: {
-                            drawOnChartArea: false
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Valor (R$)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
                         }
                     }
                 }
+            });
             }
-        });
+        } catch (error) {
+            console.error('Erro ao criar gráfico temporal:', error);
+        }
+    } else {
+        console.warn('Canvas temporalChart não encontrado');
     }
 
     // Gráfico de Barras: Top 10 Itens por Quantidade
     const itensQtdCtx = document.getElementById('itensQtdChart');
     if (itensQtdCtx) {
-        new Chart(itensQtdCtx.getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: {{ top_itens_labels|safe }},
-                datasets: [{
-                    label: 'Quantidade',
-                    data: {{ top_itens_data|safe }},
-                    backgroundColor: '#0d6efd'
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
+        try {
+            const topItensLabels = {{ top_itens_labels|safe }};
+            const topItensData = {{ top_itens_data|safe }};
+            
+            console.log('Itens Qtd Chart - Labels:', topItensLabels);
+            console.log('Itens Qtd Chart - Data:', topItensData);
+            
+            // Verificar se há dados
+            if (!topItensLabels || !Array.isArray(topItensLabels) || topItensLabels.length === 0) {
+                console.warn('Itens Qtd Chart: Sem dados para exibir');
+                itensQtdCtx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis.</div>';
+            } else {
+                new Chart(itensQtdCtx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: topItensLabels,
+                    datasets: [{
+                        label: 'Quantidade',
+                        data: topItensData,
+                        backgroundColor: '#0d6efd'
+                    }]
                 },
-                scales: {
-                    x: {
-                        beginAtZero: true
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true
+                        }
                     }
                 }
+            });
             }
-        });
+        } catch (error) {
+            console.error('Erro ao criar gráfico de itens por quantidade:', error);
+        }
+    } else {
+        console.warn('Canvas itensQtdChart não encontrado');
     }
 
     // Gráfico de Barras: Top 10 Itens por Valor
     const itensValorCtx = document.getElementById('itensValorChart');
     if (itensValorCtx) {
-        new Chart(itensValorCtx.getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: {{ top_itens_valor_labels|safe }},
-                datasets: [{
-                    label: 'Valor Total (R$)',
-                    data: {{ top_itens_valor_data|safe }},
-                    backgroundColor: '#dc3545'
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
+        try {
+            const topItensValorLabels = {{ top_itens_valor_labels|safe }};
+            const topItensValorData = {{ top_itens_valor_data|safe }};
+            
+            console.log('Itens Valor Chart - Labels:', topItensValorLabels);
+            console.log('Itens Valor Chart - Data:', topItensValorData);
+            
+            // Verificar se há dados
+            if (!topItensValorLabels || !Array.isArray(topItensValorLabels) || topItensValorLabels.length === 0) {
+                console.warn('Itens Valor Chart: Sem dados para exibir');
+                itensValorCtx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis.</div>';
+            } else {
+                new Chart(itensValorCtx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: topItensValorLabels,
+                    datasets: [{
+                        label: 'Valor Total (R$)',
+                        data: topItensValorData,
+                        backgroundColor: '#dc3545'
+                    }]
                 },
-                scales: {
-                    x: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                                }
                             }
                         }
                     }
                 }
+            });
             }
-        });
+        } catch (error) {
+            console.error('Erro ao criar gráfico de itens por valor:', error);
+        }
+    } else {
+        console.warn('Canvas itensValorChart não encontrado');
     }
 
     // Gráfico de Barras: Top 10 Centros de Atividade
     const centrosCtx = document.getElementById('centrosChart');
     if (centrosCtx) {
-        new Chart(centrosCtx.getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: {{ centros_labels|safe }},
-                datasets: [{
-                    label: 'Valor Total (R$)',
-                    data: {{ centros_data_valor|safe }},
-                    backgroundColor: '#0dcaf0'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
+        try {
+            const centrosLabels = {{ centros_labels|safe }};
+            const centrosDataValor = {{ centros_data_valor|safe }};
+            
+            console.log('Centros Chart - Labels:', centrosLabels);
+            console.log('Centros Chart - Data:', centrosDataValor);
+            
+            // Verificar se há dados
+            if (!centrosLabels || !Array.isArray(centrosLabels) || centrosLabels.length === 0) {
+                console.warn('Centros Chart: Sem dados para exibir');
+                centrosCtx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis.</div>';
+            } else {
+                new Chart(centrosCtx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: centrosLabels,
+                    datasets: [{
+                        label: 'Valor Total (R$)',
+                        data: centrosDataValor,
+                        backgroundColor: '#0dcaf0'
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                                }
                             }
                         }
                     }
                 }
+            });
             }
-        });
+        } catch (error) {
+            console.error('Erro ao criar gráfico de centros:', error);
+        }
+    } else {
+        console.warn('Canvas centrosChart não encontrado');
     }
 
     // Gráfico de Pizza: Top 10 Operações
     const operacoesCtx = document.getElementById('operacoesChart');
     if (operacoesCtx) {
-        const colors = [
-            '#ffc107', '#0d6efd', '#198754', '#dc3545', '#0dcaf0',
-            '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d'
-        ];
-        
-        const operacoesLabels = {{ operacoes_labels|safe }};
-        const operacoesData = {{ operacoes_data|safe }};
-        const backgroundColors = operacoesLabels.map(function(_, index) {
-            return colors[index % colors.length];
-        });
+        try {
+            const colors = [
+                '#ffc107', '#0d6efd', '#198754', '#dc3545', '#0dcaf0',
+                '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d'
+            ];
+            
+            const operacoesLabels = {{ operacoes_labels|safe }};
+            const operacoesData = {{ operacoes_data|safe }};
+            
+            console.log('Operacoes Chart - Labels:', operacoesLabels);
+            console.log('Operacoes Chart - Data:', operacoesData);
+            
+            // Verificar se há dados
+            if (!operacoesLabels || !Array.isArray(operacoesLabels) || operacoesLabels.length === 0) {
+                console.warn('Operacoes Chart: Sem dados para exibir');
+                operacoesCtx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis.</div>';
+            } else {
+                const backgroundColors = operacoesLabels.map(function(_, index) {
+                    return colors[index % colors.length];
+                });
 
-        new Chart(operacoesCtx.getContext('2d'), {
+                new Chart(operacoesCtx.getContext('2d'), {
             type: 'pie',
             data: {
                 labels: operacoesLabels,
@@ -877,16 +1047,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     borderColor: '#ffffff'
                 }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'right'
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
                     }
                 }
+            });
             }
-        });
+        } catch (error) {
+            console.error('Erro ao criar gráfico de operações:', error);
+        }
+    } else {
+        console.warn('Canvas operacoesChart não encontrado');
     }
 
     // Gráfico de Linha: Evolução Diária do Mês
@@ -894,9 +1070,28 @@ document.addEventListener('DOMContentLoaded', function() {
     let dailyChart = null;
     
     function updateDailyChart(mesAno) {
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js não está carregado!');
+            return;
+        }
         // Mostrar loading
         if (dailyChart) {
             dailyChart.destroy();
+        }
+        
+        // Limpar mensagem de erro anterior se existir
+        const parent = dailyCtx.parentElement;
+        const existingAlert = parent.querySelector('.alert');
+        if (existingAlert) {
+            existingAlert.remove();
+        }
+        
+        // Restaurar canvas se foi removido
+        if (!dailyCtx.parentElement.querySelector('canvas')) {
+            const canvas = document.createElement('canvas');
+            canvas.id = 'dailyChart';
+            parent.innerHTML = '';
+            parent.appendChild(canvas);
         }
         
         // Fazer requisição AJAX
@@ -906,6 +1101,14 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.error) {
                     console.error('Erro ao carregar dados:', data.error);
+                    dailyCtx.parentElement.innerHTML = '<div class="alert alert-warning m-3">Erro ao carregar dados: ' + data.error + '</div>';
+                    return;
+                }
+                
+                // Verificar se há dados
+                if (!data.labels || data.labels.length === 0) {
+                    console.warn('Daily Chart: Sem dados para exibir');
+                    dailyCtx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis para o mês selecionado.</div>';
                     return;
                 }
                 
@@ -976,14 +1179,24 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Inicializar gráfico com dados iniciais
     if (dailyCtx) {
-        const mesSelecionado = document.getElementById('mesSelecionado');
-        const mesInicial = mesSelecionado ? mesSelecionado.value : '{{ mes_selecionado }}';
-        
-        const diasLabels = {{ dias_labels|safe }};
-        const diasData = {{ dias_data|safe }};
-        const diasValor = {{ dias_valor|safe }};
-        
-        dailyChart = new Chart(dailyCtx.getContext('2d'), {
+        try {
+            const mesSelecionado = document.getElementById('mesSelecionado');
+            const mesInicial = mesSelecionado ? mesSelecionado.value : '{{ mes_selecionado }}';
+            
+            const diasLabels = {{ dias_labels|safe }};
+            const diasData = {{ dias_data|safe }};
+            const diasValor = {{ dias_valor|safe }};
+            
+            console.log('Daily Chart - Labels:', diasLabels);
+            console.log('Daily Chart - Data:', diasData);
+            console.log('Daily Chart - Valor:', diasValor);
+            
+            // Verificar se há dados
+            if (!diasLabels || !Array.isArray(diasLabels) || diasLabels.length === 0) {
+                console.warn('Daily Chart: Sem dados para exibir');
+                dailyCtx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis para o mês selecionado.</div>';
+            } else {
+                dailyChart = new Chart(dailyCtx.getContext('2d'), {
             type: 'line',
             data: {
                 labels: diasLabels,
@@ -1038,16 +1251,103 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 }
+            });
+            }
+            
+            // Listener para mudança de mês
+            if (mesSelecionado) {
+                mesSelecionado.addEventListener('change', function() {
+                    updateDailyChart(this.value);
+                });
+            }
+        } catch (error) {
+            console.error('Erro ao criar gráfico diário:', error);
+        }
+    } else {
+        console.warn('Canvas dailyChart não encontrado');
+    }
+
+    // Gráfico de Barras: Top 10 Usuários que Criaram Requisições
+    const usuariosCtx = document.getElementById('usuariosChart');
+    if (usuariosCtx) {
+        try {
+            const usuariosLabels = {{ usuarios_labels|safe }};
+            const usuariosDataCount = {{ usuarios_data_count|safe }};
+            const usuariosDataValor = {{ usuarios_data_valor|safe }};
+            
+            console.log('Usuarios Chart - Labels:', usuariosLabels);
+            console.log('Usuarios Chart - Data Count:', usuariosDataCount);
+            console.log('Usuarios Chart - Data Valor:', usuariosDataValor);
+            
+            // Verificar se há dados
+            if (!usuariosLabels || !Array.isArray(usuariosLabels) || usuariosLabels.length === 0) {
+                console.warn('Usuarios Chart: Sem dados para exibir');
+                usuariosCtx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis.</div>';
+            } else {
+                new Chart(usuariosCtx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: usuariosLabels,
+                    datasets: [{
+                        label: 'Quantidade de Requisições',
+                        data: usuariosDataCount,
+                        backgroundColor: '#6c757d',
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Valor Total (R$)',
+                        data: usuariosDataValor,
+                        backgroundColor: '#495057',
+                        yAxisID: 'y1'
+                    }]
+                },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Quantidade'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Valor (R$)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                            }
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                }
             }
         });
-        
-        // Listener para mudança de mês
-        if (mesSelecionado) {
-            mesSelecionado.addEventListener('change', function() {
-                updateDailyChart(this.value);
-            });
+            }
+        } catch (error) {
+            console.error('Erro ao criar gráfico de usuários:', error);
         }
+    } else {
+        console.warn('Canvas usuariosChart não encontrado');
     }
-});
+    }); // Fim do waitForChartJS callback
+}); // Fim do DOMContentLoaded
 </script>
 {% endblock %}

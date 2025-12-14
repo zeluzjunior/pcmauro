@@ -1006,7 +1006,7 @@ def upload_cas_from_file(file, update_existing=False) -> Tuple[int, int, List[st
     Returns:
         Tupla (created_count, updated_count, errors)
     """
-    from app.models import CentroAtividade, LocalCentroAtividade
+    from app.models import CentroAtividade
     
     errors = []
     created_count = 0
@@ -1111,28 +1111,14 @@ def upload_cas_from_file(file, update_existing=False) -> Tuple[int, int, List[st
                         if ca_created:
                             created_count += 1
                     
-                    # Criar LocalCentroAtividade se houver valor de local
+                    # Atualizar campo local do CentroAtividade se houver valor de local
                     if local_value:
                         local_str = _safe_str(local_value, max_length=255)
-                        if local_str:
-                            if update_existing:
-                                local_obj, local_created = LocalCentroAtividade.objects.update_or_create(
-                                    centro_atividade=ca_obj,
-                                    local=local_str,
-                                    defaults={}
-                                )
-                                if local_created:
-                                    created_count += 1
-                                else:
-                                    updated_count += 1
-                            else:
-                                local_obj, local_created = LocalCentroAtividade.objects.get_or_create(
-                                    centro_atividade=ca_obj,
-                                    local=local_str,
-                                    defaults={}
-                                )
-                                if local_created:
-                                    created_count += 1
+                        if local_str and local_str != ca_obj.local:
+                            ca_obj.local = local_str
+                            ca_obj.save()
+                            if not ca_created:
+                                updated_count += 1
                     
                 except Exception as e:
                     error_msg = f"Linha {row_num}: Erro ao processar registro - {str(e)}"
@@ -3029,21 +3015,6 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
                     total_nota_str = row_data.get('Total Nota') or row_data.get('total nota') or row_data.get('TOTAL NOTA') or row_data.get('Total nota')
                     total_nota = _safe_decimal(total_nota_str)
                     
-                    # Uso Contábil - Priorizar coluna "uso contabil" do CSV
-                    uso_contabil = _safe_str(
-                        row_data.get('uso contabil') or 
-                        row_data.get('Uso contabil') or 
-                        row_data.get('USO CONTABIL') or 
-                        row_data.get('uso contábil') or 
-                        row_data.get('Uso contábil') or 
-                        row_data.get('USO CONTÁBIL') or
-                        # Fallback para "centro de custo" (compatibilidade com arquivos antigos)
-                        row_data.get('centro de custo') or 
-                        row_data.get('Centro de custo') or 
-                        row_data.get('CENTRO DE CUSTO'),
-                        max_length=100
-                    )
-                    
                     # Validar que temos pelo menos emitente e nota
                     if not emitente or not nota:
                         errors.append(f"Linha {row_num}: Emitente e Nota são obrigatórios")
@@ -3111,7 +3082,6 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
                         'serie': serie,
                         'modelo': modelo,
                         'total_nota': total_nota,
-                        'uso_contabil': uso_contabil,
                         'data_emissao': data_emissao,
                         'data_vencimento': data_vencimento,
                         'data_inclusao': data_inclusao,

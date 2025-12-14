@@ -61,6 +61,44 @@
 <!-- Main Content -->
 <section class="py-5">
     <div class="container">
+
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total</h5>
+                        <p class="card-text display-6">{{ total_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Mostrando</h5>
+                        <p class="card-text display-6">{{ ordens|length }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Setores</h5>
+                        <p class="card-text display-6">{{ setores_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Unidades</h5>
+                        <p class="card-text display-6">{{ unidades_count }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Actions Bar -->
         <div class="row mb-4">
             <div class="col-md-12">
@@ -72,7 +110,6 @@
                 </form>
             </div>
         </div>
-
         <!-- Filtros Avançados -->
         <div class="row mb-4">
             <div class="col-12">
@@ -203,41 +240,6 @@
             </div>
         </div>
 
-        <!-- Statistics -->
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Total</h5>
-                        <p class="card-text display-6">{{ total_count }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-info text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Mostrando</h5>
-                        <p class="card-text display-6">{{ ordens|length }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-success text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Setores</h5>
-                        <p class="card-text display-6">{{ setores_count }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-warning text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Unidades</h5>
-                        <p class="card-text display-6">{{ unidades_count }}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <!-- Table -->
         <div class="card shadow-sm">

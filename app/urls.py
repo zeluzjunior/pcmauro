@@ -8,7 +8,6 @@ urlpatterns = [
     path('em-desenvolvimento/', views.em_desenvolvimento, name="em_desenvolvimento"),
     path('orcamento/analise-requisicoes/', views.analise_requisicoes, name="analise_requisicoes"),
     path('testes/', views.testes, name="testes"),
-    path('debug-template/', views.template_debug, name="template_debug"),
     path('analise/plano-preventiva/', views.analise_plano_preventiva, name="analise_plano_preventiva"),
     path('planejamento/maquina-primaria-secundaria/', views.maquina_primaria_secundaria, name="maquina_primaria_secundaria"),
     path('planejamento/analise-roteiro-plano-preventiva/', views.analise_roteiro_plano_preventiva, name="analise_roteiro_plano_preventiva"),  # Função limpa - recriar do zero
@@ -64,8 +63,9 @@ urlpatterns = [
     path('meus-planos-preventiva/consultar/', views.consultar_meu_plano, name="consultar_meu_plano"),
     path('consultar/52-semanas/', views.consultar_52_semanas, name="consultar_52_semanas"),
     path('consultar/requisicoes-almoxarifado/', views.consultar_requisicoes_almoxarifado, name="consultar_requisicoes_almoxarifado"),
+    path('almoxarifado/analise-requisicoes-data-importada/', views.analise_requisicoes_data_importada, name="analise_requisicoes_data_importada"),
     path('consultar/notas-fiscais/', views.consultar_notas_fiscais, name="consultar_notas_fiscais"),
-    path('visualizar/nota-fiscal/<int:nota_id>/', views.visualizar_nota_fiscal, name="visualizar_nota_fiscal"),
+    path('notas-fiscais/visualizar/<int:nota_id>/', views.visualizar_nota_fiscal, name="visualizar_nota_fiscal"),
     path('plano-pcm/visualizar/<int:plano_id>/', views.visualizar_plano_pcm, name="visualizar_plano_pcm"),
     path('plano-pcm/editar/<int:plano_id>/', views.editar_plano_pcm, name="editar_plano_pcm"),
     path('plano-pcm/<int:plano_id>/gerar-pdf/', views.gerar_pdf_plano_pcm, name="gerar_pdf_plano_pcm"),
@@ -94,7 +94,7 @@ urlpatterns = [
     path('locais-e-cas/consultar/', views.consultar_locais_e_cas, name="consultar_locais_e_cas"),
     path('locais-e-cas/visualizar/<int:ca_id>/', views.visualizar_centro_de_atividade, name="visualizar_centro_de_atividade"),
     path('locais-e-cas/editar/<int:ca_id>/', views.editar_ca_e_locais, name="editar_ca_e_locais"),
-    path('locais-e-cas/local/visualizar/<int:local_id>/', views.visualizar_local, name="visualizar_local"),
+    path('locais-e-cas/local/visualizar/<int:ca_id>/', views.visualizar_local, name="visualizar_local"),
     path('locais/consultar/', views.consultar_locais, name="consultar_locais"),
     
     # Máquinas
@@ -118,13 +118,19 @@ urlpatterns = [
    
     # Manutenção Corretiva
     path('analise/corretiva-outros/', views.analise_corretiva_outros, name="analise_corretiva_outros"),
+    # Manutenção Preventiva
+    path('ordens-de-servico/analise-preventivas/', views.analise_ordens_preventivas, name="analise_ordens_preventivas"),
     path('ordens-de-servico/analise/', views.analise_ordens_de_servico, name="analise_ordens_de_servico"),
+    path('ordens-de-servico/analise-importadas-com-erro/', views.analise_ordens_importadas_com_erro, name="analise_ordens_importadas_com_erro"),
     path('ordens-de-servico/config-analise/', views.config_analise_ordens, name="config_analise_ordens"),
+    path('ordens-de-servico/analise-corretiva-com-parada/', views.analise_corretiva_outros_com_parada, name="analise_corretiva_outros_com_parada"),
+    path('ordens-de-servico/analise-faltantes-pelo-numero/', views.analise_faltantes_pelo_numero, name="analise_faltantes_pelo_numero"),
     path('manutencao-corretiva/cadastrar/', views.cadastrar_corretiva_outros, name="cadastrar_corretiva_outros"),
     path('manutencao-corretiva/consultar/', views.consultar_corretivas_outros, name="consultar_corretivas_outros"),
     path('manutencao-corretiva/visualizar/<int:ordem_id>/', views.visualizar_corretiva_outros, name="visualizar_corretiva_outros"),
    
     # Manutentores
+    path('manutentor/analise/', views.analise_manutentores, name="analise_manutentores"),
     path('manutentor/cadastrar/', views.cadastrar_manutentor, name="cadastrar_manutentor"),
     path('manutentor/consultar/', views.consultar_manutentores, name="consultar_manutentores"),
     path('manutentor/visualizar/<str:matricula>/', views.visualizar_manutentor, name="visualizar_manutentor"),

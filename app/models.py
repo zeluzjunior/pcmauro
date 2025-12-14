@@ -72,13 +72,14 @@ class Maquina(models.Model):
     arquivo_pdf = models.FileField('Arquivo PDF', upload_to='arquivos_maquinas/', blank=True, null=True, help_text='Upload de arquivo PDF relacionado à máquina')
     diagrama_eletrico = models.FileField('Diagrama Elétrico', upload_to='arquivos_maquinas/', blank=True, null=True, help_text='Upload de arquivo PDF do diagrama elétrico')
     pecas_reposicao = models.FileField('Peças de Reposição', upload_to='arquivos_maquinas/', blank=True, null=True, help_text='Upload de arquivo PDF de peças de reposição')
-    local_centro_atividade = models.ForeignKey(
-        'LocalCentroAtividade',
+    centro_atividade = models.ForeignKey(
+        'CentroAtividade',
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
-        verbose_name='Local do Centro de Atividade',
-        help_text='Local do Centro de Atividade relacionado ao setor de manutenção'
+        verbose_name='Centro de Atividade',
+        help_text='Centro de Atividade relacionado ao setor de manutenção',
+        related_name='maquinas'
     )
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
     updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
@@ -145,7 +146,7 @@ class OrdemServicoCorretiva(models.Model):
     # Ordem de Serviço
     cd_ordemserv = models.BigIntegerField('Código Ordem Serviço', unique=True, db_index=True)
     
-    # Datas de Entrada e Abertura
+    # Datas de Entrada e Abertura 
     dt_entrada = models.CharField('Data Entrada', max_length=50, blank=True, null=True)
     dt_abertura_solicita = models.CharField('Data Abertura Solicitação', max_length=50, blank=True, null=True)
     
@@ -244,6 +245,8 @@ class CentroAtividade(models.Model):
     descricao = models.CharField('Descrição', max_length=500, blank=True, null=True)
     indice = models.IntegerField('Índice', blank=True, null=True)
     encarregado_responsavel = models.CharField('Encarregado Responsável', max_length=255, blank=True, null=True)
+    local = models.CharField('Local', max_length=255, blank=True, null=True, help_text='Local do Centro de Atividade')
+    observacoes = models.TextField('Observações', blank=True, null=True, help_text='Observações sobre o local')
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
     updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
 
@@ -254,27 +257,6 @@ class CentroAtividade(models.Model):
 
     def __str__(self):
         return f"{self.ca} - {self.sigla or self.descricao or 'Sem descrição'}"
-
-class LocalCentroAtividade(models.Model):
-    """Modelo para armazenar múltiplos locais associados a um Centro de Atividade"""
-    centro_atividade = models.ForeignKey(
-        CentroAtividade,
-        on_delete=models.CASCADE,
-        verbose_name='Centro de Atividade',
-        related_name='locais'
-    )
-    local = models.CharField('Local', max_length=255)
-    observacoes = models.TextField('Observações', blank=True, null=True, help_text='Observações sobre o local')
-    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
-    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
-
-    class Meta:
-        verbose_name = 'Local do Centro de Atividade'
-        verbose_name_plural = 'Locais dos Centros de Atividade'
-        ordering = ['local']
-
-    def __str__(self):
-        return f"{self.centro_atividade.ca} - {self.local}"
 
 class Semana52(models.Model):
     """Modelo para armazenar informações das 52 semanas do ano"""
@@ -1072,3 +1054,176 @@ class Visitas(models.Model):
     
     def __str__(self):
         return f"{self.titulo} - {self.data.strftime('%d/%m/%Y') if self.data else 'Sem data'}"
+
+class ProjecaoGasto(models.Model):
+    """Modelo para armazenar informações de projeções de gastos e requisições de serviço"""
+    # Dados básicos
+    setor = models.CharField('Setor', max_length=100, blank=True, null=True, db_index=True)  # SETOR do Excel
+    solicitante = models.CharField('Solicitante', max_length=100, blank=True, null=True)  # SOLICITANTE (CNPJ)
+    descricao = models.CharField('Descrição do Serviço', max_length=500, blank=True, null=True)  # DESCRIÇÃO DO SERVIÇO
+    
+    # Dados financeiros
+    valor_total = models.DecimalField('Valor Total', max_digits=15, decimal_places=2, blank=True, null=True)  # VALOR TOTAL
+    
+    # Datas
+    data_abertura_requisicao = models.DateField('Data de Abertura da Requisição', blank=True, null=True, db_index=True)  # DATA DE ABERTURA DA REQUISIÇÃO
+    previsao_execucao = models.CharField('Previsão para Execução', max_length=50, blank=True, null=True)  # PREVISÃO P/ EXECUÇÃO (ex: "DEZEMBRO / 2025")
+    mes_referencia = models.CharField('Mês Referência', max_length=20, blank=True, null=True, db_index=True)  # Extraído de PREVISÃO
+    ano_referencia = models.IntegerField('Ano Referência', blank=True, null=True, db_index=True)  # Extraído de PREVISÃO
+    
+    # Fornecedor
+    fornecedor_nome_fantasia = models.CharField('Fornecedor Nome Fantasia', max_length=255, blank=True, null=True)  # FORNECEDOR\nNOME FANTASIA
+    fornecedor_cnpj = models.CharField('Fornecedor CNPJ', max_length=20, blank=True, null=True)  # FORNECEDOR\nCNPJ
+    
+    # Dados adicionais
+    uso_contabil = models.CharField('Uso Contábil', max_length=100, blank=True, null=True)  # USO CONTÁBIL
+    numero_nf = models.CharField('Número da NF', max_length=100, blank=True, null=True)  # NÚMERO DA NF
+    numero_ordem_servico = models.CharField('Número Ordem de Serviço', max_length=100, blank=True, null=True, db_index=True)  # ORDEM DE SERVIÇO
+    numero_requisicao_compra = models.CharField('Número da Requisição de Compra', max_length=100, blank=True, null=True, db_index=True)  # NÚMERO DA REQUISIÇÃO DE COMPRA
+    numero_pedido_compra = models.CharField('Número do Pedido de Compra', max_length=100, blank=True, null=True)  # NÚMERO DO PEDIDO DE COMPRA
+    servico_concluido = models.DateField('Serviço Concluído', blank=True, null=True)  # SERVIÇO CONCLUÍDO
+    nf_servico_recebida = models.DateField('NF de Serviço Recebida', blank=True, null=True)  # NF DE SERVIÇO RECEBIDA
+    nf_enviada_lancamento = models.DateField('NF Enviada para Lançamento', blank=True, null=True)  # NF ENVIADA PARA LANÇAMENTO
+    
+    # Campos legados (mantidos para compatibilidade, mas não mais usados)
+    tipo = models.CharField('Tipo', max_length=100, blank=True, null=True, db_index=True)  # Mantido para compatibilidade
+    centro_atividade = models.CharField('Centro de Atividade', max_length=100, blank=True, null=True, db_index=True)  # Mantido para compatibilidade (mapeado de SETOR)
+    nome_centro_atividade = models.CharField('Nome Centro de Atividade', max_length=255, blank=True, null=True)  # Mantido para compatibilidade
+    valor_planejado = models.DecimalField('Valor Planejado', max_digits=15, decimal_places=2, blank=True, null=True)  # Mantido para compatibilidade
+    valor_realizado = models.DecimalField('Valor Realizado', max_digits=15, decimal_places=2, blank=True, null=True)  # Mantido para compatibilidade
+    valor_projetado = models.DecimalField('Valor Projetado', max_digits=15, decimal_places=2, blank=True, null=True)  # Mantido para compatibilidade
+    data_requisicao = models.DateField('Data Requisição', blank=True, null=True, db_index=True)  # Mantido para compatibilidade (mapeado de data_abertura_requisicao)
+    data_planejada = models.DateField('Data Planejada', blank=True, null=True)  # Mantido para compatibilidade
+    data_realizada = models.DateField('Data Realizada', blank=True, null=True)  # Mantido para compatibilidade
+    fornecedor = models.CharField('Fornecedor', max_length=255, blank=True, null=True)  # Mantido para compatibilidade (mapeado de fornecedor_nome_fantasia)
+    numero_requisicao = models.CharField('Número Requisição', max_length=100, blank=True, null=True, db_index=True)  # Mantido para compatibilidade (mapeado de numero_requisicao_compra)
+    status = models.CharField('Status', max_length=100, blank=True, null=True)  # Mantido para compatibilidade
+    observacoes = models.TextField('Observações', blank=True, null=True)  # Mantido para compatibilidade
+    
+    # Campos flexíveis para armazenar dados adicionais do Excel
+    dados_adicionais = models.JSONField('Dados Adicionais', blank=True, null=True, default=dict)
+    
+    # Timestamps
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Projeção de Gasto'
+        verbose_name_plural = 'Projeções de Gastos'
+        ordering = ['-ano_referencia', '-mes_referencia', '-data_abertura_requisicao', '-created_at']
+        indexes = [
+            models.Index(fields=['tipo']),
+            models.Index(fields=['setor']),
+            models.Index(fields=['centro_atividade']),
+            models.Index(fields=['mes_referencia', 'ano_referencia']),
+            models.Index(fields=['data_abertura_requisicao']),
+            models.Index(fields=['numero_requisicao_compra']),
+        ]
+    
+    def __str__(self):
+        tipo_str = self.tipo or 'Sem tipo'
+        descricao_str = self.descricao or 'Sem descrição'
+        return f"{tipo_str} - {descricao_str[:50]}"
+
+class RelacaoProjecaoNotaFiscal(models.Model):
+    """Modelo para armazenar relações confirmadas entre Projeções de Gastos e Notas Fiscais"""
+    projecao = models.ForeignKey(
+        ProjecaoGasto,
+        on_delete=models.CASCADE,
+        related_name='relacoes_notas_fiscais',
+        verbose_name='Projeção de Gasto'
+    )
+    nota_fiscal = models.ForeignKey(
+        NotaFiscal,
+        on_delete=models.CASCADE,
+        related_name='relacoes_projecoes',
+        verbose_name='Nota Fiscal'
+    )
+    
+    # Informações sobre a confirmação
+    score_match = models.DecimalField(
+        'Score do Match',
+        max_digits=5,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text='Score percentual do match quando foi confirmado'
+    )
+    confirmado_por = models.CharField(
+        'Confirmado por',
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text='Usuário que confirmou a relação'
+    )
+    observacoes = models.TextField(
+        'Observações',
+        blank=True,
+        null=True,
+        help_text='Observações sobre a relação confirmada'
+    )
+    
+    # Status da relação
+    STATUS_CHOICES = [
+        ('confirmado', 'Confirmado'),
+        ('rejeitado', 'Rejeitado'),
+        ('pendente', 'Pendente'),
+    ]
+    status = models.CharField(
+        'Status',
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='confirmado',
+        db_index=True
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Relação Projeção vs Nota Fiscal'
+        verbose_name_plural = 'Relações Projeção vs Nota Fiscal'
+        ordering = ['-created_at']
+        # Evitar duplicatas: uma projeção pode ter apenas uma relação confirmada com uma nota fiscal
+        unique_together = [['projecao', 'nota_fiscal']]
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['projecao']),
+            models.Index(fields=['nota_fiscal']),
+            models.Index(fields=['created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.projecao} ↔ {self.nota_fiscal} ({self.get_status_display()})"
+
+class DadosOrcamento(models.Model):
+    """Modelo para armazenar dados de orçamento por ano, mês e conta orçamentária"""
+    MES_CHOICES = [
+        (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
+        (5, 'Maio'), (6, 'Junho'), (7, 'Julho'), (8, 'Agosto'),
+        (9, 'Setembro'), (10, 'Outubro'), (11, 'Novembro'), (12, 'Dezembro'),
+    ]
+    
+    ano = models.IntegerField('Ano', db_index=True)
+    mes = models.IntegerField('Mês', choices=MES_CHOICES, db_index=True)
+    conta_orcamentaria = models.CharField('Conta Orçamentária', max_length=255)
+    valor_orcamento = models.DecimalField('Valor do Orçamento', max_digits=15, decimal_places=2, default=0)
+    valor_final_desejado = models.DecimalField('Valor Final Desejado', max_digits=15, decimal_places=2, default=0)
+    
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+    created_by = models.CharField('Criado por', max_length=255, blank=True, null=True)
+    
+    class Meta:
+        verbose_name = 'Dado de Orçamento'
+        verbose_name_plural = 'Dados de Orçamento'
+        ordering = ['ano', 'mes', 'conta_orcamentaria']
+        unique_together = [['ano', 'mes', 'conta_orcamentaria']]
+        indexes = [
+            models.Index(fields=['ano', 'mes']),
+            models.Index(fields=['conta_orcamentaria']),
+        ]
+    
+    def __str__(self):
+        return f"{self.ano}/{self.mes:02d} - {self.conta_orcamentaria}"

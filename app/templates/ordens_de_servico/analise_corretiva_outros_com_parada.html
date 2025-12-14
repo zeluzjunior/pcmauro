@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Manutenção Corretiva - Análise{% endblock %}
+{% block title %}Análise Corretiva com Parada{% endblock %}
 
 {% block extra_css %}
 <!-- Chart.js CSS -->
@@ -43,11 +43,11 @@
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
-                        <li class="breadcrumb-item active text-white" aria-current="page">Manutenção Corretiva</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise Corretiva com Parada</li>
                     </ol>
                 </nav>
-                <h1 class="display-4 fw-bold mt-3">Análise de Manutenção Corretiva</h1>
-                <p class="lead">Dashboard com análises e estatísticas das ordens de serviço corretivas</p>
+                <h1 class="display-4 fw-bold mt-3">Análise de Ordens Corretivas com Parada</h1>
+                <p class="lead">Dashboard com análises e estatísticas das ordens de serviço corretivas que possuem informações de parada</p>
             </div>
         </div>
     </div>
@@ -63,36 +63,10 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="text-muted mb-2">Total de Ordens</h6>
-                                <h2 class="mb-0 fw-bold">{{ total_count }}</h2>
+                                <h6 class="text-muted mb-2">Total com Parada</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_com_parada }}</h2>
                             </div>
-                            <i class="fas fa-clipboard-list fa-3x text-primary opacity-25"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3 mb-4">
-                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="text-muted mb-2">Últimos 30 Dias</h6>
-                                <h2 class="mb-0 fw-bold">{{ ordens_recentes }}</h2>
-                            </div>
-                            <i class="fas fa-calendar-day fa-3x text-success opacity-25"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3 mb-4">
-                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="text-muted mb-2">Mês Atual</h6>
-                                <h2 class="mb-0 fw-bold">{{ ordens_mes_atual }}</h2>
-                            </div>
-                            <i class="fas fa-calendar-alt fa-3x text-warning opacity-25"></i>
+                            <i class="fas fa-clock fa-3x text-primary opacity-25"></i>
                         </div>
                     </div>
                 </div>
@@ -102,11 +76,118 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="text-muted mb-2">Com Queixa</h6>
-                                <h2 class="mb-0 fw-bold">{{ ordens_com_queixa }}</h2>
-                                <small class="text-muted">{{ percentual_queixa }}% do total</small>
+                                <h6 class="text-muted mb-2">FRIGORÍFICO</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_frigorifico }}</h2>
+                                <small class="text-muted">{{ percentual_frigorifico }}%</small>
                             </div>
-                            <i class="fas fa-exclamation-triangle fa-3x text-info opacity-25"></i>
+                            <i class="fas fa-snowflake fa-3x text-info opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">INDÚSTRIA</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_industria }}</h2>
+                                <small class="text-muted">{{ percentual_industria }}%</small>
+                            </div>
+                            <i class="fas fa-industry fa-3x text-warning opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Com Início e Fim</h6>
+                                <h2 class="mb-0 fw-bold">{{ com_inicio_fim }}</h2>
+                            </div>
+                            <i class="fas fa-check-circle fa-3x text-success opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Apenas Início</h6>
+                                <h2 class="mb-0 fw-bold">{{ apenas_inicio }}</h2>
+                            </div>
+                            <i class="fas fa-exclamation-triangle fa-3x text-warning opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Percentual</h6>
+                                <h2 class="mb-0 fw-bold">{{ percentual_com_parada|floatformat:1 }}%</h2>
+                                <small class="text-muted">do total de ordens</small>
+                            </div>
+                            <i class="fas fa-percentage fa-3x text-success opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Classification Charts Row -->
+        <div class="row mb-5">
+            <!-- Gráfico de Pizza: Distribuição FRIGORÍFICO vs INDÚSTRIA -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>Distribuição por Classificação
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="classificacaoChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráfico de Linha: Evolução Temporal por Classificação -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Evolução Temporal por Classificação (12 Meses)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="temporalClassificacaoChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Daily Orders by Classification -->
+        <div class="row mb-5">
+            <div class="col-md-12 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-warning text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Ordens por Dia - Mês Atual por Classificação
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="dailyClassificacaoChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -116,7 +197,7 @@
         <!-- Charts Row 1 -->
         <div class="row mb-5">
             <!-- Gráfico de Pizza: Distribuição por Setor -->
-            <div class="col-md-6 mb-4">
+            <div class="col-md-12 mb-4">
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
@@ -130,53 +211,21 @@
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Gráfico de Barras: Ordens por Unidade -->
-            <div class="col-md-6 mb-4">
+        <!-- Charts Row 2.5: Daily Orders Current Month -->
+        <div class="row mb-5">
+            <!-- Gráfico de Barras: Ordens por Dia do Mês Atual -->
+            <div class="col-md-12 mb-4">
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-info text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-chart-bar me-2"></i>Ordens por Unidade (Top 10)
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container">
-                            <canvas id="unidadesChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Charts Row 2 -->
-        <div class="row mb-5">
-            <!-- Gráfico de Linha: Evolução Temporal -->
-            <div class="col-md-8 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-line me-2"></i>Evolução Temporal (Últimos 12 Meses)
+                            <i class="fas fa-chart-bar me-2"></i>Ordens por Dia - Mês Atual (dt_entrada)
                         </h5>
                     </div>
                     <div class="card-body">
                         <div class="chart-container-large">
-                            <canvas id="temporalChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Gráfico de Pizza: Distribuição por Tipo -->
-            <div class="col-md-4 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-warning text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-pie me-2"></i>Por Tipo de OS
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container">
-                            <canvas id="tiposChart"></canvas>
+                            <canvas id="dailyChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -190,7 +239,7 @@
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-danger text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-cogs me-2"></i>Top 10 Máquinas com Mais Ordens
+                            <i class="fas fa-cogs me-2"></i>Top 10 Máquinas com Mais Paradas
                         </h5>
                     </div>
                     <div class="card-body">
@@ -218,6 +267,87 @@
             </div>
         </div>
 
+        <!-- Classification Tables -->
+        <div class="row mb-5">
+            <!-- Tabela: Top Máquinas FRIGORÍFICO -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>Top 5 Máquinas - FRIGORÍFICO
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Código</th>
+                                        <th>Descrição</th>
+                                        <th class="text-center">Qtd</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in top_maquinas_frigorifico %}
+                                    <tr>
+                                        <td><strong>{{ forloop.counter }}</strong></td>
+                                        <td><span class="badge bg-info">{{ item.cd_maquina }}</span></td>
+                                        <td>{{ item.descr_maquina|truncatewords:8 }}</td>
+                                        <td class="text-center"><span class="badge bg-info">{{ item.total }}</span></td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">Nenhum dado disponível</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela: Top Máquinas INDÚSTRIA -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-warning text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>Top 5 Máquinas - INDÚSTRIA
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Código</th>
+                                        <th>Descrição</th>
+                                        <th class="text-center">Qtd</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in top_maquinas_industria %}
+                                    <tr>
+                                        <td><strong>{{ forloop.counter }}</strong></td>
+                                        <td><span class="badge bg-warning text-dark">{{ item.cd_maquina }}</span></td>
+                                        <td>{{ item.descr_maquina|truncatewords:8 }}</td>
+                                        <td class="text-center"><span class="badge bg-warning text-dark">{{ item.total }}</span></td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">Nenhum dado disponível</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Data Tables -->
         <div class="row mb-5">
             <!-- Tabela: Top Máquinas -->
@@ -225,7 +355,7 @@
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-table me-2"></i>Ranking de Máquinas
+                            <i class="fas fa-table me-2"></i>Ranking de Máquinas com Parada
                         </h5>
                     </div>
                     <div class="card-body p-0">
@@ -323,15 +453,34 @@
                             <div class="col-md-3 mb-3">
                                 <div class="p-3 bg-light rounded">
                                     <h4 class="text-success mb-1">{{ maquinas_count }}</h4>
-                                    <p class="text-muted mb-0">Máquinas Cadastradas</p>
+                                    <p class="text-muted mb-0">Máquinas Únicas</p>
                                 </div>
                             </div>
                             <div class="col-md-3 mb-3">
                                 <div class="p-3 bg-light rounded">
-                                    <h4 class="text-warning mb-1">{{ percentual_queixa }}%</h4>
-                                    <p class="text-muted mb-0">Taxa de Queixas</p>
+                                    <h4 class="text-warning mb-1">{{ percentual_com_parada|floatformat:1 }}%</h4>
+                                    <p class="text-muted mb-0">Taxa de Paradas</p>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row Last: Evolução Temporal -->
+        <div class="row mb-5">
+            <!-- Gráfico de Linha: Evolução Temporal -->
+            <div class="col-md-12 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Evolução Temporal (Últimos 12 Meses)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="temporalChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -366,34 +515,6 @@ new Chart(setoresCtx, {
     }
 });
 
-// Gráfico de Barras: Ordens por Unidade
-const unidadesCtx = document.getElementById('unidadesChart').getContext('2d');
-new Chart(unidadesCtx, {
-    type: 'bar',
-    data: {
-        labels: {{ unidades_labels|safe }},
-        datasets: [{
-            label: 'Ordens',
-            data: {{ unidades_data|safe }},
-            backgroundColor: '#0dcaf0'
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: false
-            }
-        },
-        scales: {
-            y: {
-                beginAtZero: true
-            }
-        }
-    }
-});
-
 // Gráfico de Linha: Evolução Temporal
 const temporalCtx = document.getElementById('temporalChart').getContext('2d');
 new Chart(temporalCtx, {
@@ -401,7 +522,7 @@ new Chart(temporalCtx, {
     data: {
         labels: {{ meses_labels|safe }},
         datasets: [{
-            label: 'Ordens de Serviço',
+            label: 'Ordens com Parada',
             data: {{ meses_data|safe }},
             borderColor: '#198754',
             backgroundColor: 'rgba(25, 135, 84, 0.1)',
@@ -482,18 +603,48 @@ new Chart(executoresCtx, {
     }
 });
 
-// Gráfico de Pizza: Distribuição por Tipo
-const tiposCtx = document.getElementById('tiposChart').getContext('2d');
-new Chart(tiposCtx, {
-    type: 'doughnut',
+// Gráfico de Barras: Ordens por Dia do Mês Atual
+const dailyCtx = document.getElementById('dailyChart').getContext('2d');
+new Chart(dailyCtx, {
+    type: 'bar',
     data: {
-        labels: {{ tipos_labels|safe }},
+        labels: {{ daily_labels|safe }},
         datasets: [{
-            data: {{ tipos_data|safe }},
-            backgroundColor: [
-                '#ffc107', '#0d6efd', '#198754', '#dc3545', '#0dcaf0',
-                '#6f42c1', '#fd7e14', '#20c997'
-            ]
+            label: 'Ordens de Serviço',
+            data: {{ daily_data|safe }},
+            backgroundColor: '#0dcaf0',
+            borderColor: '#0aa2c0',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: true
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    stepSize: 1
+                }
+            }
+        }
+    }
+});
+
+// Gráfico de Pizza: Distribuição por Classificação
+const classificacaoCtx = document.getElementById('classificacaoChart').getContext('2d');
+new Chart(classificacaoCtx, {
+    type: 'pie',
+    data: {
+        labels: ['FRIGORÍFICO', 'INDÚSTRIA', 'OUTROS'],
+        datasets: [{
+            data: [{{ total_frigorifico }}, {{ total_industria }}, {{ total_outros }}],
+            backgroundColor: ['#0dcaf0', '#ffc107', '#6c757d']
         }]
     },
     options: {
@@ -502,6 +653,97 @@ new Chart(tiposCtx, {
         plugins: {
             legend: {
                 position: 'bottom'
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        let label = context.label || '';
+                        if (label) {
+                            label += ': ';
+                        }
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const percentage = ((context.parsed / total) * 100).toFixed(1);
+                        label += context.parsed + ' (' + percentage + '%)';
+                        return label;
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Gráfico de Linha: Evolução Temporal por Classificação
+const temporalClassificacaoCtx = document.getElementById('temporalClassificacaoChart').getContext('2d');
+new Chart(temporalClassificacaoCtx, {
+    type: 'line',
+    data: {
+        labels: {{ meses_labels_classificacao|safe }},
+        datasets: [{
+            label: 'FRIGORÍFICO',
+            data: {{ meses_data_frigorifico|safe }},
+            borderColor: '#0dcaf0',
+            backgroundColor: 'rgba(13, 202, 240, 0.1)',
+            tension: 0.4,
+            fill: true
+        }, {
+            label: 'INDÚSTRIA',
+            data: {{ meses_data_industria|safe }},
+            borderColor: '#ffc107',
+            backgroundColor: 'rgba(255, 193, 7, 0.1)',
+            tension: 0.4,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: true
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Gráfico de Barras: Ordens por Dia por Classificação
+const dailyClassificacaoCtx = document.getElementById('dailyClassificacaoChart').getContext('2d');
+new Chart(dailyClassificacaoCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ daily_labels_classificacao|safe }},
+        datasets: [{
+            label: 'FRIGORÍFICO',
+            data: {{ daily_data_frigorifico|safe }},
+            backgroundColor: '#0dcaf0',
+            borderColor: '#0aa2c0',
+            borderWidth: 1
+        }, {
+            label: 'INDÚSTRIA',
+            data: {{ daily_data_industria|safe }},
+            backgroundColor: '#ffc107',
+            borderColor: '#e0a800',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: true
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    stepSize: 1
+                }
             }
         }
     }

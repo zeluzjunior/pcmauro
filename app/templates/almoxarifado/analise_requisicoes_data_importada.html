@@ -1,0 +1,318 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Análise de Datas Importadas{% endblock %}
+
+{% block extra_css %}
+<style>
+    .month-section {
+        margin-bottom: 30px;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .month-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px 20px;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+    .accordion-button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-weight: bold;
+        border: none;
+        box-shadow: none;
+    }
+    .accordion-button:not(.collapsed) {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: none;
+    }
+    .accordion-button:focus {
+        box-shadow: none;
+        border-color: transparent;
+    }
+    .accordion-button::after {
+        filter: brightness(0) invert(1);
+    }
+    .accordion-item {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .month-stats {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .days-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 8px;
+        padding: 15px;
+        background: white;
+    }
+    .day-cell {
+        padding: 10px;
+        border-radius: 4px;
+        text-align: center;
+        font-weight: 500;
+        min-height: 50px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        transition: transform 0.2s;
+    }
+    .day-cell:hover {
+        transform: scale(1.05);
+    }
+    .day-cell.has-data {
+        background: #d4edda;
+        border: 2px solid #28a745;
+        color: #155724;
+    }
+    .day-cell.no-data {
+        background: #f8d7da;
+        border: 2px solid #dc3545;
+        color: #721c24;
+    }
+    .day-cell.future {
+        background: #e9ecef;
+        border: 1px solid #ced4da;
+        color: #6c757d;
+        opacity: 0.6;
+    }
+    .day-number {
+        font-size: 1.1rem;
+        font-weight: bold;
+    }
+    .day-weekday {
+        font-size: 0.75rem;
+        opacity: 0.8;
+        margin-top: 4px;
+    }
+    .day-status {
+        font-size: 0.7rem;
+        margin-top: 4px;
+    }
+    .stat-card {
+        border-left: 4px solid;
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .stat-card.border-success { border-left-color: #28a745; }
+    .stat-card.border-danger { border-left-color: #dc3545; }
+    .stat-card.border-info { border-left-color: #17a2b8; }
+    .stat-card.border-warning { border-left-color: #ffc107; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise de Datas Importadas</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-chart-line me-2"></i>Análise de Datas Importadas
+                </h1>
+                <p class="lead">Verificação de dados de requisições por dia do ano {{ ano_atual }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Summary Statistics -->
+        <div class="row mb-5">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card border-info shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-calendar-alt fa-2x text-info mb-2"></i>
+                        <h6 class="card-title text-muted">Total de Dias</h6>
+                        <h2 class="text-info mb-0">{{ total_dias_ano }}</h2>
+                        <small class="text-muted">Ano {{ ano_atual }}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card border-success shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                        <h6 class="card-title text-muted">Dias com Dados</h6>
+                        <h2 class="text-success mb-0">{{ total_dias_com_dados }}</h2>
+                        <small class="text-muted">{{ percentual_geral }}% completo</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card border-danger shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i>
+                        <h6 class="card-title text-muted">Dias sem Dados</h6>
+                        <h2 class="text-danger mb-0">{{ total_dias_sem_dados }}</h2>
+                        <small class="text-muted">{% widthratio total_dias_sem_dados total_dias_ano 100 %}% faltando</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card border-warning shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-percentage fa-2x text-warning mb-2"></i>
+                        <h6 class="card-title text-muted">Percentual</h6>
+                        <h2 class="text-warning mb-0">{{ percentual_geral }}%</h2>
+                        <small class="text-muted">de completude</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h6 class="mb-3"><i class="fas fa-info-circle me-2"></i>Legenda</h6>
+                        <div class="d-flex flex-wrap gap-3">
+                            <div class="d-flex align-items-center">
+                                <div class="day-cell has-data me-2" style="min-width: 60px; min-height: 40px;">
+                                    <div class="day-number">15</div>
+                                </div>
+                                <span>Dia com dados importados</span>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <div class="day-cell no-data me-2" style="min-width: 60px; min-height: 40px;">
+                                    <div class="day-number">20</div>
+                                </div>
+                                <span>Dia sem dados (faltante)</span>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <div class="day-cell future me-2" style="min-width: 60px; min-height: 40px;">
+                                    <div class="day-number">25</div>
+                                </div>
+                                <span>Dia futuro (não analisado)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Months Analysis - Accordion -->
+        <div class="accordion" id="mesesAccordion">
+            {% for mes_num, dias in meses_dados.items %}
+            <div class="accordion-item month-section shadow-sm mb-3">
+                <h2 class="accordion-header" id="heading{{ mes_num }}">
+                    <button class="accordion-button {% if forloop.first %}{% else %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ mes_num }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse{{ mes_num }}">
+                        <div class="w-100 d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-calendar me-2"></i><strong>{{ nomes_meses|get_item:mes_num }} {{ ano_atual }}</strong>
+                            </div>
+                            <div class="ms-3">
+                                <span class="badge bg-success me-2">{{ meses_estatisticas|get_item:mes_num|get_item:"dias_com_dados" }} com dados</span>
+                                <span class="badge bg-danger me-2">{{ meses_estatisticas|get_item:mes_num|get_item:"dias_sem_dados" }} sem dados</span>
+                                <span class="badge bg-info">{{ meses_estatisticas|get_item:mes_num|get_item:"percentual_completo" }}%</span>
+                            </div>
+                        </div>
+                    </button>
+                </h2>
+                <div id="collapse{{ mes_num }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading{{ mes_num }}" data-bs-parent="#mesesAccordion">
+                    <div class="accordion-body p-0">
+                        <div class="month-stats">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <strong>Total de dias:</strong> {{ meses_estatisticas|get_item:mes_num|get_item:"total_dias" }}
+                                </div>
+                                <div class="col-md-3">
+                                    <span class="text-success"><strong>Com dados:</strong> {{ meses_estatisticas|get_item:mes_num|get_item:"dias_com_dados" }}</span>
+                                </div>
+                                <div class="col-md-3">
+                                    <span class="text-danger"><strong>Sem dados:</strong> {{ meses_estatisticas|get_item:mes_num|get_item:"dias_sem_dados" }}</span>
+                                </div>
+                                <div class="col-md-3">
+                                    <strong>Percentual:</strong> {{ meses_estatisticas|get_item:mes_num|get_item:"percentual_completo" }}%
+                                </div>
+                            </div>
+                        </div>
+                        <div class="days-grid">
+                            {% for dia_num, dia_info in dias.items %}
+                            <div class="day-cell {% if dia_info.tem_dados %}has-data{% else %}no-data{% endif %}">
+                                <div class="day-number">{{ dia_num }}</div>
+                                <div class="day-weekday">{{ dia_info.dia_semana|slice:":3" }}</div>
+                                <div class="day-status">
+                                    {% if dia_info.tem_dados %}
+                                        <i class="fas fa-check text-success"></i>
+                                    {% else %}
+                                        <i class="fas fa-times text-danger"></i>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Info Box -->
+        <div class="row mt-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Informações sobre a Análise
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p>
+                            Esta página verifica se existem dados de requisições importados para cada dia do ano {{ ano_atual }}.
+                            A análise é baseada no campo <code>data_requisicao</code> do modelo <code>RequisicaoAlmoxarifado</code>.
+                        </p>
+                        <p class="mb-0">
+                            <strong>Nota:</strong> Dias futuros não são analisados, pois ainda não ocorreram. Apenas dias até hoje são verificados.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Adicionar tooltips para os dias
+document.addEventListener('DOMContentLoaded', function() {
+    const dayCells = document.querySelectorAll('.day-cell');
+    dayCells.forEach(cell => {
+        const dayNumber = cell.querySelector('.day-number').textContent;
+        const hasData = cell.classList.contains('has-data');
+        const isFuture = cell.classList.contains('future');
+        
+        if (isFuture) {
+            cell.title = `Dia ${dayNumber} - Data futura (não analisado)`;
+        } else if (hasData) {
+            cell.title = `Dia ${dayNumber} - Dados importados ✓`;
+        } else {
+            cell.title = `Dia ${dayNumber} - Sem dados importados ✗`;
+        }
+    });
+});
+</script>
+{% endblock %}
+
