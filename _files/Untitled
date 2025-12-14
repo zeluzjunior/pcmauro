@@ -1,0 +1,1 @@
+@app/templates/importar/importar_centro_de_atividade.html now we need to ajust the process of importing data in this page to be able to import files like this:  . Right now their is information missing in the table associated with this file. 

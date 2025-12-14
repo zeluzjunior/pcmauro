@@ -127,11 +127,6 @@
                             <i class="fas fa-home me-1"></i>Página Principal
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'centros_de_atividade' %}active{% endif %}" href="{% url 'centros_de_atividade' %}">
-                            <i class="fas fa-calendar-alt me-1"></i>Planejamento
-                        </a>
-                    </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="manutencaoDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fas fa-tools me-1"></i>Manutenção
@@ -500,7 +495,7 @@
                                     <li><a href="{% url 'importar_ordens_preventivas' %}" class="link-dark rounded">Ordens Preventivas</a></li>
                                     <li><a href="{% url 'importar_plano_preventiva' %}" class="link-dark rounded">Plano Preventiva</a></li>
                                     <li><a href="{% url 'importar_roteiro_preventiva' %}" class="link-dark rounded">Roteiro Preventiva</a></li>
-                                    <li><a href="{% url 'importar_locais_e_cas' %}" class="link-dark rounded">Locais e CAs</a></li>
+                                    <li><a href="{% url 'importar_locais_e_cas' %}" class="link-dark rounded">Centro de Atividade</a></li>
                                     <li><a href="{% url 'importar_estoque' %}" class="link-dark rounded">Estoque</a></li>
                                     <li><a href="{% url 'importar_52_semanas' %}" class="link-dark rounded">52 Semanas</a></li>
                                     <li><a href="{% url 'importar_requisicoes_almoxarifado' %}" class="link-dark rounded">Requisições Almoxarifado</a></li>
