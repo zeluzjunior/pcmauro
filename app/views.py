@@ -412,10 +412,31 @@ def home(request):
 
 
 def centros_de_atividade(request):
-    """Centros de Atividade listing page view"""
+    """Centros de Atividade listing page view - filtered by FRIGORÍFICO and INDÚSTRIA"""
+    from app.models import CentroAtividade
+    from django.db.models import Q
+    
+    # Buscar Centros de Atividade filtrados por local FRIGORÍFICO ou INDÚSTRIA
+    centros_frigorifico = CentroAtividade.objects.filter(
+        Q(local__iexact='FRIGORÍFICO') | Q(local__icontains='FRIGOR')
+    ).distinct().order_by('ca')
+    
+    centros_industria = CentroAtividade.objects.filter(
+        Q(local__iexact='INDÚSTRIA') | Q(local__icontains='IND')
+    ).distinct().order_by('ca')
+    
+    total_frigorifico = centros_frigorifico.count()
+    total_industria = centros_industria.count()
+    total_geral = total_frigorifico + total_industria
+    
     context = {
         'page_title': 'Centros de Atividade',
-        'active_page': 'centros_de_atividade'
+        'active_page': 'centros_de_atividade',
+        'centros_frigorifico': centros_frigorifico,
+        'centros_industria': centros_industria,
+        'total_frigorifico': total_frigorifico,
+        'total_industria': total_industria,
+        'total_geral': total_geral,
     }
     return render(request, 'analise/analise_centro_de_atividade.html', context)
 
@@ -1610,7 +1631,7 @@ def maquina_primaria_secundaria(request):
         'maquinas_secundarias': maquinas_secundarias,
         'relacionamentos': relacionamentos
     }
-    return render(request, 'planejamento/maquina_primaria_secundaria.html', context)
+    return render(request, 'maquinas/maquina_primaria_secundaria.html', context)
 
 
 def contact(request):
@@ -1661,303 +1682,6 @@ def services(request):
         'active_page': 'services'
     }
     return render(request, 'services.html', context)
-
-
-def abate_area_suja(request):
-    """ABT - 2488 - Abate e Resfriamento - Área Suja page view"""
-    context = {
-        'page_title': 'ABT - 2488 - Abate e Resfriamento - Área Suja',
-        'active_page': 'abate_area_suja'
-    }
-    return render(request, 'centros_de_atividade/abate_area_suja.html', context)
-
-
-def recepcao(request):
-    """REC - 2216 - Recepção de Suínos page view"""
-    context = {
-        'page_title': 'REC - 2216 - Recepção de Suínos',
-        'active_page': 'recepcao'
-    }
-    return render(request, 'centros_de_atividade/recepcao.html', context)
-
-
-def area_limpa(request):
-    """ABT - 2488 - Abate e Resfriamento - Área Limpa page view"""
-    context = {
-        'page_title': 'ABT - 2488 - Abate e Resfriamento - Área Limpa',
-        'active_page': 'area_limpa'
-    }
-    return render(request, 'centros_de_atividade/area_limpa.html', context)
-
-
-def camaras(request):
-    """ABT - 2488 - Abate e Resfriamento - Câmaras de Resfriamento page view"""
-    context = {
-        'page_title': 'ABT - 2488 - Abate e Resfriamento - Câmaras de Resfriamento',
-        'active_page': 'camaras'
-    }
-    return render(request, 'centros_de_atividade/camaras.html', context)
-
-
-def bet(request):
-    """BET - 2232 - Beneficiamento de Tripas page view"""
-    context = {
-        'page_title': 'BET - 2232 - Beneficiamento de Tripas',
-        'active_page': 'bet'
-    }
-    return render(request, 'centros_de_atividade/bet.html', context)
-
-
-def salga(request):
-    """SLG - 2241 - Salga page view"""
-    context = {
-        'page_title': 'SLG - 2241 - Salga',
-        'active_page': 'salga'
-    }
-    return render(request, 'centros_de_atividade/salga.html', context)
-
-
-def min(request):
-    """MIN - 2721 - Miúdos Internos page view"""
-    context = {
-        'page_title': 'MIN - 2721 - Miúdos Internos',
-        'active_page': 'min'
-    }
-    return render(request, 'centros_de_atividade/min.html', context)
-
-
-def mex(request):
-    """MEX - 2729 - Miúdos Externos page view"""
-    context = {
-        'page_title': 'MEX - 2729 - Miúdos Externos',
-        'active_page': 'mex'
-    }
-    return render(request, 'centros_de_atividade/mex.html', context)
-
-
-def epj(request):
-    """EPJ - 2224 - Espostejamento page view"""
-    from .models import Maquina, MaquinaPrimariaSecundaria
-    
-    # Buscar máquinas primárias com cd_tpcentativ = 2224 e descr_setormanut = "MÁQUINAS PRINCIPAL"
-    maquinas_primarias = Maquina.objects.filter(
-        cd_tpcentativ=2224,
-        descr_setormanut__iexact='MÁQUINAS PRINCIPAL'
-    ).order_by('cd_maquina')
-    
-    # Para cada máquina primária, buscar suas máquinas secundárias relacionadas
-    maquinas_com_relacionamentos = []
-    for maquina_primaria in maquinas_primarias:
-        relacionamentos = MaquinaPrimariaSecundaria.objects.filter(
-            maquina_primaria=maquina_primaria
-        ).select_related('maquina_secundaria').order_by('maquina_secundaria__cd_maquina')
-        
-        maquinas_secundarias = [rel.maquina_secundaria for rel in relacionamentos]
-        
-        maquinas_com_relacionamentos.append({
-            'primaria': maquina_primaria,
-            'secundarias': maquinas_secundarias,
-            'relacionamentos': relacionamentos
-        })
-    
-    context = {
-        'page_title': 'EPJ - 2224 - Espostejamento',
-        'active_page': 'epj',
-        'maquinas_com_relacionamentos': maquinas_com_relacionamentos
-    }
-    return render(request, 'centros_de_atividade/epj.html', context)
-
-
-def epj_maquinas(request):
-    """EPJ - Máquinas do Centro de Atividade 2224 page view"""
-    from .models import Maquina
-    
-    # Buscar todas as máquinas com cd_tpcentativ = 2224
-    # Forçar avaliação do QuerySet para garantir dados atualizados a cada requisição
-    maquinas_ca_2224 = list(Maquina.objects.filter(cd_tpcentativ=2224).order_by('cd_maquina'))
-    
-    # Buscar máquinas primárias com cd_tpcentativ = 2224 e descr_gerenc = "MÁQUINAS PRINCIPAL"
-    # Forçar avaliação do QuerySet para garantir dados atualizados a cada requisição
-    maquinas_primarias = list(Maquina.objects.filter(
-        cd_tpcentativ=2224,
-        descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
-    ).order_by('cd_maquina'))
-    
-    context = {
-        'page_title': 'EPJ - Máquinas do Centro de Atividade 2224',
-        'active_page': 'epj_maquinas',
-        'maquinas_ca_2224': maquinas_ca_2224,
-        'maquinas_primarias': maquinas_primarias
-    }
-    
-    response = render(request, 'ca_maquinas/epj_maquinas.html', context)
-    # Adicionar headers para evitar cache do navegador
-    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response['Pragma'] = 'no-cache'
-    response['Expires'] = '0'
-    return response
-
-
-def cms(request):
-    """CMS - 4120 - Produção CMS page view"""
-    context = {
-        'page_title': 'CMS - 4120 - Produção CMS',
-        'active_page': 'cms'
-    }
-    return render(request, 'centros_de_atividade/cms.html', context)
-
-
-def lbm(request):
-    """LBM - 2470 - Lavagem Bacias / Monoblocos page view"""
-    context = {
-        'page_title': 'LBM - 2470 - Lavagem Bacias / Monoblocos',
-        'active_page': 'lbm'
-    }
-    return render(request, 'centros_de_atividade/lbm.html', context)
-
-
-def dpe(request):
-    """DPE - 2461 - Depósito e Preparação de Embalagens page view"""
-    context = {
-        'page_title': 'DPE - 2461 - Depósito e Preparação de Embalagens',
-        'active_page': 'dpe'
-    }
-    return render(request, 'centros_de_atividade/dpe.html', context)
-
-
-def secundaria(request):
-    """EMB - 4138 - Embalagem Secundária page view"""
-    context = {
-        'page_title': 'EMB - 4138 - Embalagem Secundária',
-        'active_page': 'secundaria'
-    }
-    return render(request, 'centros_de_atividade/secundaria.html', context)
-
-
-def tca(request):
-    """TCA - 2313 - Túneis e Câmaras page view"""
-    context = {
-        'page_title': 'TCA - 2313 - Túneis e Câmaras',
-        'active_page': 'tca'
-    }
-    return render(request, 'centros_de_atividade/tca.html', context)
-
-
-def tca_gea(request):
-    """TCA - 2313 - Túneis e Câmaras - Túnel GEA page view"""
-    context = {
-        'page_title': 'TCA - 2313 - Túneis e Câmaras - Túnel GEA',
-        'active_page': 'tca_gea'
-    }
-    return render(request, 'centros_de_atividade/tca_gea.html', context)
-
-
-def expedicao(request):
-    """EXD - 2348 - Expedição page view"""
-    context = {
-        'page_title': 'EXD - 2348 - Expedição',
-        'active_page': 'expedicao'
-    }
-    return render(request, 'centros_de_atividade/expedicao.html', context)
-
-
-def frescal(request):
-    """SFR - 4057 - Embutideos Frescais page view"""
-    context = {
-        'page_title': 'SFR - 4057 - Embutideos Frescais',
-        'active_page': 'frescal'
-    }
-    return render(request, 'centros_de_atividade/frescal.html', context)
-
-
-def presunto(request):
-    """PRU - 2291 - Presuntaria page view"""
-    context = {
-        'page_title': 'PRU - 2291 - Presuntaria',
-        'active_page': 'presunto'
-    }
-    return render(request, 'centros_de_atividade/presunto.html', context)
-
-
-def estufa(request):
-    """EST - 4588 - Estufas page view"""
-    context = {
-        'page_title': 'EST - 4588 - Estufas',
-        'active_page': 'estufa'
-    }
-    return render(request, 'centros_de_atividade/estufa.html', context)
-
-
-def fatiados(request):
-    """SFT - 4600 - Fatiados page view"""
-    context = {
-        'page_title': 'SFT - 4600 - Fatiados',
-        'active_page': 'fatiados'
-    }
-    return render(request, 'centros_de_atividade/fatiados.html', context)
-
-
-def condimentaria(request):
-    """COD - 4472 - Condimentaria page view"""
-    context = {
-        'page_title': 'COD - 4472 - Condimentaria',
-        'active_page': 'condimentaria'
-    }
-    return render(request, 'centros_de_atividade/condimentaria.html', context)
-
-
-def defumados(request):
-    """DEF - 2496 - Defumados page view"""
-    context = {
-        'page_title': 'DEF - 2496 - Defumados',
-        'active_page': 'defumados'
-    }
-    return render(request, 'centros_de_atividade/defumados.html', context)
-
-
-def marinados(request):
-    """SMR - 2267 - Marinados page view"""
-    context = {
-        'page_title': 'SMR - 2267 - Marinados',
-        'active_page': 'marinados'
-    }
-    return render(request, 'centros_de_atividade/marinados.html', context)
-
-
-def cozidos(request):
-    """2283 - CEB - Embutidos Cozidos page view"""
-    context = {
-        'page_title': '2283 - CEB - Embutidos Cozidos',
-        'active_page': 'cozidos'
-    }
-    return render(request, 'centros_de_atividade/cozidos.html', context)
-
-
-def preparo_de_massa(request):
-    """2276 - SPM - Preparo de Massa page view"""
-    context = {
-        'page_title': '2276 - SPM - Preparo de Massa',
-        'active_page': 'preparo_de_massa'
-    }
-    return render(request, 'centros_de_atividade/preparo_de_massa.html', context)
-
-
-def curados(request):
-    """CUR - 2267 - Embutidos Curados page view"""
-    context = {
-        'page_title': 'CUR - 2267 - Embutidos Curados',
-        'active_page': 'curados'
-    }
-    return render(request, 'centros_de_atividade/curados.html', context)
-
-
-def embalagem_industrializados(request):
-    """5345 - SEI - Embalagem Industrializados page view"""
-    context = {
-        'page_title': '5345 - SEI - Embalagem Industrializados',
-        'active_page': 'embalagem_industrializados'
-    }
-    return render(request, 'centros_de_atividade/embalagem_industrializados.html', context)
 
 
 def importar_maquinas(request):
@@ -2858,7 +2582,7 @@ def importar_locais_e_cas(request):
                 'page_title': 'Importar Locais e CAs',
                 'active_page': 'importar_locais_e_cas'
             }
-            return render(request, 'importar/locais_e_cas.html', context)
+            return render(request, 'importar/importar_centro_de_atividade.html', context)
         
         file = request.FILES['file']
         
@@ -2875,7 +2599,7 @@ def importar_locais_e_cas(request):
                 'page_title': 'Importar Locais e CAs',
                 'active_page': 'importar_locais_e_cas'
             }
-            return render(request, 'importar/locais_e_cas.html', context)
+            return render(request, 'importar/importar_centro_de_atividade.html', context)
         
         # Verificar se deve apenas adicionar novos registros (ignorar duplicados)
         only_new_records = request.POST.get('only_new_records', 'off') == 'on'
@@ -2926,7 +2650,7 @@ def importar_locais_e_cas(request):
         'page_title': 'Importar Locais e CAs',
         'active_page': 'importar_locais_e_cas'
     }
-    return render(request, 'importar/locais_e_cas.html', context)
+    return render(request, 'importar/importar_centro_de_atividade.html', context)
 
 
 def cadastrar_local_e_cas(request):
@@ -3457,11 +3181,11 @@ def analise_maquinas(request):
     # Buscar Centros de Atividade filtrados por local (INDÚSTRIA ou FRIGORÍFICO)
     from app.models import CentroAtividade
     centros_industria = list(CentroAtividade.objects.filter(
-        locais__local__iexact='INDÚSTRIA'
+        local__iexact='INDÚSTRIA'
     ).distinct().order_by('ca'))
     
     centros_frigorifico = list(CentroAtividade.objects.filter(
-        locais__local__iexact='FRIGORÍFICO'
+        local__iexact='FRIGORÍFICO'
     ).distinct().order_by('ca'))
     
     # Preparar dados para o organograma (OrgChartJS)
@@ -3544,7 +3268,7 @@ def analise_maquinas(request):
         'total_primarias_org': maquinas_primarias_org.count(),
         'total_relacionamentos_org': relacionamentos_org.count(),
     }
-    return render(request, 'analise/analise_maquinas.html', context)
+    return render(request, 'maquinas/analise_geral_maquinas.html', context)
 
 
 def analise_maquinas_importadas(request):

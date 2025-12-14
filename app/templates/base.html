@@ -127,11 +127,6 @@
                             <i class="fas fa-home me-1"></i>Página Principal
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'centros_de_atividade' %}active{% endif %}" href="{% url 'centros_de_atividade' %}">
-                            <i class="fas fa-calendar-alt me-1"></i>Planejamento
-                        </a>
-                    </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="manutencaoDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fas fa-tools me-1"></i>Manutenção
@@ -311,7 +306,6 @@
                                     <li><a href="{% url 'agrupar_acoes_do_plano_por_data' %}" class="link-dark rounded">Agrupar Ações do Plano por Data</a></li>
                                     <li><a href="{% url 'agrupar_preventiva_por_data' %}" class="link-dark rounded">Agrupar Preventiva por Data</a></li>
                                     <li><a href="{% url 'analise_roteiro_plano_preventiva' %}" class="link-dark rounded">Análise de Roteiro e Plano de Preventiva</a></li>  <!-- Função limpa - recriar do zero -->
-                                    <li><a href="{% url 'maquina_primaria_secundaria' %}" class="link-dark rounded">Agrupar Máquinas Primárias e Secundárias</a></li>
                                 </ul>
                             </div>
                         </li>
@@ -427,6 +421,18 @@
                                             </ul>
                                         </div>
                                     </li>
+                                    <!-- Level 2: Configurações das Máquinas -->
+                                    <li>
+                                        <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#maquinas-configuracoes-collapse" aria-expanded="false">
+                                            <i class="bi bi-sliders2-vertical"></i>
+                                            Configurações das Máquinas
+                                        </button>
+                                        <div class="collapse" id="maquinas-configuracoes-collapse">
+                                            <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
+                                                <li><a href="{% url 'maquina_primaria_secundaria' %}" class="link-dark rounded">Agrupar Máquinas Primárias e Secundárias</a></li>
+                                            </ul>
+                                        </div>
+                                    </li>
                                     <!-- Level 2: Consultas -->
                                     <li>
                                         <a href="{% url 'consultar_maquinas' %}" class="link-dark rounded">
@@ -489,7 +495,7 @@
                                     <li><a href="{% url 'importar_ordens_preventivas' %}" class="link-dark rounded">Ordens Preventivas</a></li>
                                     <li><a href="{% url 'importar_plano_preventiva' %}" class="link-dark rounded">Plano Preventiva</a></li>
                                     <li><a href="{% url 'importar_roteiro_preventiva' %}" class="link-dark rounded">Roteiro Preventiva</a></li>
-                                    <li><a href="{% url 'importar_locais_e_cas' %}" class="link-dark rounded">Locais e CAs</a></li>
+                                    <li><a href="{% url 'importar_locais_e_cas' %}" class="link-dark rounded">Centro de Atividade</a></li>
                                     <li><a href="{% url 'importar_estoque' %}" class="link-dark rounded">Estoque</a></li>
                                     <li><a href="{% url 'importar_52_semanas' %}" class="link-dark rounded">52 Semanas</a></li>
                                     <li><a href="{% url 'importar_requisicoes_almoxarifado' %}" class="link-dark rounded">Requisições Almoxarifado</a></li>

@@ -1050,6 +1050,7 @@ def upload_cas_from_file(file, update_existing=False) -> Tuple[int, int, List[st
                     indice_value = _find_column_by_partial_match(row_data, ['indice', 'ndice'])
                     encarregado_value = _find_column_by_partial_match(row_data, ['encarregado', 'responsavel', 'responsvel'])
                     local_value = _find_column_by_partial_match(row_data, ['local'])
+                    imagem_value = _find_column_by_partial_match(row_data, ['imagem', 'image'])
                     
                     # Se nÃ£o encontrou pelo mÃ©todo parcial, tentar nomes diretos
                     if not ca_value:
@@ -1064,6 +1065,8 @@ def upload_cas_from_file(file, update_existing=False) -> Tuple[int, int, List[st
                         encarregado_value = row_data.get('ENCARREGADO RESPONSÃVEL') or row_data.get('ENCARREGADO RESPONSVEL') or row_data.get('Encarregado ResponsÃ¡vel') or row_data.get('Encarregado Responsavel') or row_data.get('encarregado responsÃ¡vel') or row_data.get('encarregado responsavel')
                     if not local_value:
                         local_value = row_data.get('LOCAL') or row_data.get('local') or row_data.get('Local')
+                    if not imagem_value:
+                        imagem_value = row_data.get('IMAGEM') or row_data.get('imagem') or row_data.get('Imagem') or row_data.get('IMAGE') or row_data.get('image')
                     
                     # Validar que temos pelo menos o cÃ³digo CA
                     if not ca_value:
@@ -1086,12 +1089,25 @@ def upload_cas_from_file(file, update_existing=False) -> Tuple[int, int, List[st
                             pass  # Ãndice Ã© opcional
                     
                     # Preparar dados para criaÃ§Ã£o/atualizaÃ§Ã£o do CA
+                    local_str = _safe_str(local_value, max_length=255) if local_value else None
+                    imagem_str = _safe_str(imagem_value) if imagem_value else None
+                    
+                    # Preparar observacoes com imagem se houver
+                    observacoes_str = None
+                    if imagem_str:
+                        observacoes_str = f"Imagem: {imagem_str}"
+                    
                     ca_data = {
                         'sigla': _safe_str(sigla_value, max_length=50),
                         'descricao': _safe_str(descricao_value, max_length=500),
                         'indice': indice_int,
                         'encarregado_responsavel': _safe_str(encarregado_value, max_length=255),
+                        'local': local_str,
                     }
+                    
+                    # Adicionar observacoes se houver imagem
+                    if observacoes_str:
+                        ca_data['observacoes'] = observacoes_str
                     
                     # Criar ou atualizar CA
                     if update_existing:
@@ -1110,15 +1126,6 @@ def upload_cas_from_file(file, update_existing=False) -> Tuple[int, int, List[st
                         )
                         if ca_created:
                             created_count += 1
-                    
-                    # Atualizar campo local do CentroAtividade se houver valor de local
-                    if local_value:
-                        local_str = _safe_str(local_value, max_length=255)
-                        if local_str and local_str != ca_obj.local:
-                            ca_obj.local = local_str
-                            ca_obj.save()
-                            if not ca_created:
-                                updated_count += 1
                     
                 except Exception as e:
                     error_msg = f"Linha {row_num}: Erro ao processar registro - {str(e)}"
