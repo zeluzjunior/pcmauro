@@ -248,6 +248,7 @@
                                     <li><a href="{% url 'analise_ordens_de_servico' %}" class="link-dark rounded">Análise Geral</a></li>
                                     <li><a href="{% url 'analise_corretiva_outros_com_parada' %}" class="link-dark rounded">Análise Corretiva com Parada</a></li>
                                     <li><a href="{% url 'analise_faltantes_pelo_numero' %}" class="link-dark rounded">Análise Faltantes pelo Número</a></li>
+                                    <li><a href="{% url 'analise_ordens_importadas_com_erro' %}" class="link-dark rounded">Análise Ordens Importadas com Erro</a></li>
                                     <li><a href="{% url 'config_analise_ordens' %}" class="link-dark rounded">Configuração</a></li>
                                 </ul>
                             </div>
@@ -261,14 +262,10 @@
                             </button>
                             <div class="collapse" id="preventiva-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <!-- Level 2: Análise -->
                                     <li>
-                                        <a href="{% url 'analise_ordens_de_servico' %}" class="btn-toggle-sub link-dark rounded">
-                                            <i class="fas fa-chart-line me-2"></i>
-                                            Analise Ordens Corretivas
-                                        </a>
-                                    </li>
-                                    <!-- Level 2: Consultas -->
+                                        <a href="{% url 'analise_ordens_preventivas' %}" class="link-dark rounded">
+                                            <i class="bi bi-bar-chart-steps"></i>
+                                            Análise Ordens Preventivas</a></li>
                                     <li>
                                         <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#preventiva-consultas-collapse" aria-expanded="false">
                                             <i class="fas fa-search"></i>
@@ -294,7 +291,10 @@
                             </button>
                             <div class="collapse" id="corretiva-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'analise_corretiva_outros' %}" class="link-dark rounded">Análise Ordens Corretivas</a></li>
+                                    <li>
+                                        <a href="{% url 'analise_corretiva_outros' %}" class="link-dark rounded">
+                                            <i class="bi bi-bar-chart-steps"></i>
+                                            Análise Ordens Corretivas</a></li>
                                     <li><a href="{% url 'consultar_corretivas_outros' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Corretiva</a></li>
                                 </ul>
                             </div>
@@ -330,10 +330,8 @@
                             </div>
                         </li>
 
-
-
-
                         <li class="border-top my-3"></li>
+                        
                         <!-- manutenção de terceiros -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#terceiro-collapse" aria-expanded="false">

@@ -1197,7 +1197,6 @@ class RelacaoProjecaoNotaFiscal(models.Model):
     def __str__(self):
         return f"{self.projecao} ↔ {self.nota_fiscal} ({self.get_status_display()})"
 
-
 class DadosOrcamento(models.Model):
     """Modelo para armazenar dados de orçamento por ano, mês e conta orçamentária"""
     MES_CHOICES = [

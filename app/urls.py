@@ -118,7 +118,10 @@ urlpatterns = [
    
     # Manutenção Corretiva
     path('analise/corretiva-outros/', views.analise_corretiva_outros, name="analise_corretiva_outros"),
+    # Manutenção Preventiva
+    path('ordens-de-servico/analise-preventivas/', views.analise_ordens_preventivas, name="analise_ordens_preventivas"),
     path('ordens-de-servico/analise/', views.analise_ordens_de_servico, name="analise_ordens_de_servico"),
+    path('ordens-de-servico/analise-importadas-com-erro/', views.analise_ordens_importadas_com_erro, name="analise_ordens_importadas_com_erro"),
     path('ordens-de-servico/config-analise/', views.config_analise_ordens, name="config_analise_ordens"),
     path('ordens-de-servico/analise-corretiva-com-parada/', views.analise_corretiva_outros_com_parada, name="analise_corretiva_outros_com_parada"),
     path('ordens-de-servico/analise-faltantes-pelo-numero/', views.analise_faltantes_pelo_numero, name="analise_faltantes_pelo_numero"),
