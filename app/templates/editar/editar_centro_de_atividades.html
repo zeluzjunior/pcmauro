@@ -1,0 +1,327 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Editar CA {{ centro_atividade.ca }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_locais_e_cas' %}" class="text-white">Locais e CAs</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Editar CA {{ centro_atividade.ca }}</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Editar Centro de Atividade</h1>
+                <p class="lead">Atualize os dados do CA {{ centro_atividade.ca }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-edit me-2"></i>Editar Dados do Centro de Atividade
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Aviso sobre campos obrigatórios -->
+                        <div class="alert alert-info mb-4">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Campos obrigatórios:</strong> Os campos marcados com <span class="text-danger">*</span> são obrigatórios e devem ser preenchidos.
+                        </div>
+                        
+                        <form method="post" action="" id="edit-ca-form" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            
+                            <!-- Informações Principais -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-info-circle me-2"></i>Informações Principais
+                                    </h6>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.ca.id_for_label }}" class="form-label">
+                                        {{ form.ca.label }}
+                                        {% if form.ca|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    <input type="number" value="{{ form.ca.value }}" class="form-control" readonly>
+                                    <input type="hidden" name="ca" value="{{ form.ca.value }}">
+                                    <div class="form-text">
+                                        Código único identificador do Centro de Atividade
+                                        <span class="text-muted">(não pode ser alterado)</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.sigla.id_for_label }}" class="form-label">
+                                        {{ form.sigla.label }}
+                                        {% if form.sigla|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.sigla }}
+                                    {% if form.sigla.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.sigla.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Sigla ou abreviação do CA{% if not form.sigla|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label for="{{ form.descricao.id_for_label }}" class="form-label">
+                                        {{ form.descricao.label }}
+                                        {% if form.descricao|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.descricao }}
+                                    {% if form.descricao.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.descricao.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Descrição completa do Centro de Atividade{% if not form.descricao|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
+                                </div>
+                            </div>
+
+                            <!-- Informações Adicionais -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-info me-2"></i>Informações Adicionais
+                                    </h6>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.indice.id_for_label }}" class="form-label">
+                                        {{ form.indice.label }}
+                                    </label>
+                                    {{ form.indice }}
+                                    {% if form.indice.errors %}
+                                        <div class="text-danger small">{{ form.indice.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Índice do Centro de Atividade</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.encarregado_responsavel.id_for_label }}" class="form-label">
+                                        {{ form.encarregado_responsavel.label }}
+                                    </label>
+                                    {{ form.encarregado_responsavel }}
+                                    {% if form.encarregado_responsavel.errors %}
+                                        <div class="text-danger small">{{ form.encarregado_responsavel.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Nome do encarregado responsável pelo CA</div>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label for="{{ form.local.id_for_label }}" class="form-label">
+                                        {{ form.local.label }}
+                                        {% if form.local|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.local }}
+                                    {% if form.local.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.local.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        Local do Centro de Atividade (ex: FRIGORÍFICO, INDÚSTRIA, UTILIDADES, EXTERNA, APOIO)
+                                        {% if not form.local|is_required %} <span class="text-muted">(opcional)</span>{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Foto do Centro de Atividade -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-image me-2"></i>Foto do Centro de Atividade
+                                    </h6>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.imagem_upload.id_for_label }}" class="form-label">
+                                        {{ form.imagem_upload.label }}
+                                    </label>
+                                    {{ form.imagem_upload }}
+                                    {% if form.imagem_upload.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.imagem_upload.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">{{ form.imagem_upload.help_text }}</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.imagem.id_for_label }}" class="form-label">
+                                        {{ form.imagem.label }}
+                                    </label>
+                                    {{ form.imagem }}
+                                    {% if form.imagem.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.imagem.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Caminho da imagem (relativo a static/, ex: fotos_home/imagem.jpg)</div>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    {% if centro_atividade.imagem %}
+                                        <label class="form-label">Preview da Foto Atual</label>
+                                        <div class="mb-2">
+                                            <img src="{% static centro_atividade.imagem %}" alt="Foto do CA {{ centro_atividade.ca }}" class="img-thumbnail" style="max-width: 300px; max-height: 200px; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                            <div class="alert alert-warning" style="display: none;">
+                                                <i class="fas fa-exclamation-triangle me-2"></i>Imagem não encontrada no caminho especificado.
+                                            </div>
+                                        </div>
+                                    {% else %}
+                                        <div class="alert alert-info mb-0">
+                                            <i class="fas fa-info-circle me-2"></i>Nenhuma foto cadastrada. Use o campo de upload acima ou informe o caminho manualmente.
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Observações -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3">
+                                        <i class="fas fa-info me-2"></i>Observações
+                                    </h6>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label for="{{ form.observacoes.id_for_label }}" class="form-label">
+                                        {{ form.observacoes.label }}
+                                    </label>
+                                    {{ form.observacoes }}
+                                    {% if form.observacoes.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.observacoes.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Observações sobre o Centro de Atividade{% if not form.observacoes|is_required %} <span class="text-muted">(opcional)</span>{% endif %}</div>
+                                </div>
+                            </div>
+
+                            <!-- Botões -->
+                            <div class="d-flex justify-content-between mt-4">
+                                <a href="{% url 'consultar_locais_e_cas' %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>Cancelar
+                                </a>
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="fas fa-save me-2"></i>Atualizar Centro de Atividade
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Modal de Aviso -->
+<div class="modal fade" id="avisoModal" tabindex="-1" aria-labelledby="avisoModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="avisoModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Aviso Importante
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Atenção:</strong> Você não deveria cadastrar Centros de Atividades novos. Está ciente disso e deseja continuar assim mesmo? Centros de Atividade são pré-definidos e não deveriam ser criados, apenas em último caso.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-warning" data-bs-dismiss="modal">
+                    <i class="fas fa-check me-2"></i>Entendi, desejo continuar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Aguardar o carregamento completo da página
+window.addEventListener('load', function() {
+    console.log('=== JavaScript carregado para editar_centro_de_atividades ===');
+    
+    // Função para mostrar o modal
+    function mostrarModal() {
+        var avisoModalElement = document.getElementById('avisoModal');
+        if (!avisoModalElement) {
+            console.error('Elemento avisoModal não encontrado');
+            return;
+        }
+        
+        // Verificar se Bootstrap está disponível
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            try {
+                var avisoModal = new bootstrap.Modal(avisoModalElement, {
+                    backdrop: 'static',
+                    keyboard: false
+                });
+                avisoModal.show();
+                console.log('Modal exibido usando Bootstrap');
+            } catch (e) {
+                console.error('Erro ao criar modal Bootstrap:', e);
+                mostrarModalFallback();
+            }
+        } else {
+            console.warn('Bootstrap não encontrado, usando método alternativo');
+            mostrarModalFallback();
+        }
+    }
+    
+    // Método alternativo caso Bootstrap não esteja disponível
+    function mostrarModalFallback() {
+        var avisoModalElement = document.getElementById('avisoModal');
+        if (!avisoModalElement) return;
+        
+        // Remover classe fade inicialmente
+        avisoModalElement.classList.remove('fade');
+        avisoModalElement.style.display = 'block';
+        avisoModalElement.classList.add('show');
+        document.body.classList.add('modal-open');
+        
+        // Criar backdrop
+        var backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop fade show';
+        backdrop.id = 'modalBackdrop';
+        document.body.appendChild(backdrop);
+        
+        // Adicionar evento de fechar
+        var closeBtn = avisoModalElement.querySelector('[data-bs-dismiss="modal"]');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function() {
+                avisoModalElement.classList.remove('show');
+                avisoModalElement.style.display = 'none';
+                document.body.classList.remove('modal-open');
+                var backdropEl = document.getElementById('modalBackdrop');
+                if (backdropEl) {
+                    backdropEl.remove();
+                }
+            });
+        }
+        
+        // Também fechar ao clicar no backdrop
+        backdrop.addEventListener('click', function() {
+            // Não fechar ao clicar no backdrop (backdrop estático)
+        });
+    }
+    
+    // Mostrar modal após um pequeno delay para garantir que tudo está carregado
+    setTimeout(mostrarModal, 200);
+});
+</script>
+{% endblock %}
+

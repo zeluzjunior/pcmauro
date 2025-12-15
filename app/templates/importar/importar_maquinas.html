@@ -224,6 +224,87 @@
             {% endfor %}
         {% endif %}
 
+        <!-- Seção de Confirmação de Máquinas Não Encontradas -->
+        {% if missing_machines %}
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Máquinas Não Encontradas no Arquivo
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-4">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Atenção:</strong> As seguintes máquinas estão cadastradas no banco de dados mas não foram encontradas no arquivo importado. 
+                            Selecione quais deseja marcar como inativas (elas não aparecerão mais no sistema, mas permanecerão no banco de dados).
+                        </div>
+                        
+                        <form method="post" action="{% url 'importar_maquinas' %}" id="confirmInactivateForm">
+                            {% csrf_token %}
+                            <input type="hidden" name="confirm_inactivate" value="1">
+                            
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div>
+                                        <strong>Total: {{ missing_machines|length }} máquina(s) não encontrada(s)</strong>
+                                    </div>
+                                    <div>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllMissing">
+                                            <i class="fas fa-check-double me-1"></i>Marcar Todas
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="deselectAllMissing">
+                                            <i class="fas fa-times me-1"></i>Desmarcar Todas
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-bordered">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 50px;">
+                                                    <input type="checkbox" id="selectAllCheckbox" title="Selecionar todas">
+                                                </th>
+                                                <th>Código Máquina</th>
+                                                <th>Descrição</th>
+                                                <th>Código Setor</th>
+                                                <th>Descrição Setor</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for maquina in missing_machines %}
+                                            <tr>
+                                                <td>
+                                                    <input type="checkbox" name="inactivate_machines" value="{{ maquina.id }}" class="maquina-checkbox" id="maquina_{{ maquina.id }}">
+                                                </td>
+                                                <td><strong>{{ maquina.cd_maquina }}</strong></td>
+                                                <td>{{ maquina.descr_maquina|default:"-" }}</td>
+                                                <td>{{ maquina.cd_setormanut|default:"-" }}</td>
+                                                <td>{{ maquina.descr_setormanut|default:"-" }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <button type="button" class="btn btn-secondary" onclick="window.location.reload();">
+                                    <i class="fas fa-times me-2"></i>Cancelar
+                                </button>
+                                <button type="submit" class="btn btn-warning" id="confirmInactivateBtn">
+                                    <i class="fas fa-check me-2"></i>Confirmar Inativação das Selecionadas
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Back to Home Button -->
         <div class="row mt-5">
             <div class="col-12 text-center">
@@ -301,6 +382,83 @@ window.addEventListener('load', function() {
     
     // Verificar estado inicial
     toggleFieldSelection();
+    
+    // Funcionalidade para seleção de máquinas não encontradas
+    const selectAllMissingBtn = document.getElementById('selectAllMissing');
+    const deselectAllMissingBtn = document.getElementById('deselectAllMissing');
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const maquinaCheckboxes = document.querySelectorAll('.maquina-checkbox');
+    
+    if (selectAllMissingBtn && maquinaCheckboxes.length > 0) {
+        selectAllMissingBtn.addEventListener('click', function() {
+            maquinaCheckboxes.forEach(function(checkbox) {
+                checkbox.checked = true;
+            });
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = true;
+            }
+        });
+    }
+    
+    if (deselectAllMissingBtn && maquinaCheckboxes.length > 0) {
+        deselectAllMissingBtn.addEventListener('click', function() {
+            maquinaCheckboxes.forEach(function(checkbox) {
+                checkbox.checked = false;
+            });
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = false;
+            }
+        });
+    }
+    
+    if (selectAllCheckbox && maquinaCheckboxes.length > 0) {
+        selectAllCheckbox.addEventListener('change', function() {
+            maquinaCheckboxes.forEach(function(checkbox) {
+                checkbox.checked = this.checked;
+            }.bind(this));
+        });
+    }
+    
+    // Atualizar checkbox "selecionar todas" quando checkboxes individuais mudarem
+    if (maquinaCheckboxes.length > 0 && selectAllCheckbox) {
+        maquinaCheckboxes.forEach(function(checkbox) {
+            checkbox.addEventListener('change', function() {
+                const allChecked = Array.from(maquinaCheckboxes).every(function(cb) { return cb.checked; });
+                const someChecked = Array.from(maquinaCheckboxes).some(function(cb) { return cb.checked; });
+                selectAllCheckbox.checked = allChecked;
+                selectAllCheckbox.indeterminate = someChecked && !allChecked;
+            });
+        });
+    }
+    
+    // Validação do formulário de confirmação
+    const confirmInactivateForm = document.getElementById('confirmInactivateForm');
+    if (confirmInactivateForm) {
+        confirmInactivateForm.addEventListener('submit', function(e) {
+            const checkedBoxes = document.querySelectorAll('.maquina-checkbox:checked');
+            console.log('DEBUG - Checkboxes selecionados:', checkedBoxes.length);
+            
+            if (checkedBoxes.length === 0) {
+                e.preventDefault();
+                alert('Por favor, selecione pelo menos uma máquina para inativar.');
+                return false;
+            }
+            
+            // Verificar valores dos checkboxes
+            const selectedIds = Array.from(checkedBoxes).map(function(cb) {
+                return cb.value;
+            });
+            console.log('DEBUG - IDs selecionados:', selectedIds);
+            
+            const confirmMsg = `Tem certeza que deseja marcar ${checkedBoxes.length} máquina(s) como inativa(s)?`;
+            if (!confirm(confirmMsg)) {
+                e.preventDefault();
+                return false;
+            }
+            
+            console.log('DEBUG - Formulário sendo enviado com IDs:', selectedIds);
+        });
+    }
     
     // Remover qualquer listener do main.js que possa estar interferindo
     const newSubmitBtn = submitBtn.cloneNode(true);

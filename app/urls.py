@@ -62,16 +62,17 @@ urlpatterns = [
     path('estoque/<int:item_id>/atualizar-foto-detalhada/', views.atualizar_foto_detalhada, name="atualizar_foto_detalhada"),
     
     # Locais e CAs
-    path('locais-e-cas/cadastrar/', views.cadastrar_local_e_cas, name="cadastrar_local_e_cas"),
+    path('locais-e-cas/cadastrar/', views.cadastrar_local_e_cas, name="cadastrar_centro_de_atividade"),
     path('locais-e-cas/consultar/', views.consultar_locais_e_cas, name="consultar_locais_e_cas"),
     path('locais-e-cas/visualizar/<int:ca_id>/', views.visualizar_centro_de_atividade, name="visualizar_centro_de_atividade"),
-    path('locais-e-cas/editar/<int:ca_id>/', views.editar_ca_e_locais, name="editar_ca_e_locais"),
+    path('locais-e-cas/editar/<int:ca_id>/', views.editar_ca_e_locais, name="editar_centro_de_atividades"),
     path('locais-e-cas/local/visualizar/<int:ca_id>/', views.visualizar_local, name="visualizar_local"),
     path('locais/consultar/', views.consultar_locais, name="consultar_locais"),
     
     # Máquinas
-    path('maquinas/analise/', views.analise_maquinas, name="analise_maquinas"),
+    path('maquinas/analise-geral/', views.analise_maquinas, name="analise_maquinas"),
     path('maquinas/analise-importadas/', views.analise_maquinas_importadas, name="analise_maquinas_importadas"),
+    path('maquinas/ajustar-outros/', views.ajustar_maquinas_outros, name="ajustar_maquinas_outros"),
     path('maquinas/cadastrar/', views.cadastrar_maquina, name="cadastrar_maquina"),
     path('maquinas/consultar/', views.consultar_maquinas, name="consultar_maquinas"),
     path('maquinas/deletar/<int:maquina_id>/', views.deletar_maquina, name="deletar_maquina"),

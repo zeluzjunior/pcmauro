@@ -1,0 +1,595 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Centros de Atividade - Meu Projeto Django{% endblock %}
+
+{% block content %}
+
+<!-- Statistics Section -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row text-center">
+            <div class="col-md-4 col-lg-2 mb-4">
+                <div class="card border-0 bg-primary text-white">
+                    <div class="card-body">
+                        <i class="fas fa-building fa-2x mb-2"></i>
+                        <h3 class="display-4 fw-bold">{{ total_frigorifico|default:0 }}</h3>
+                        <p class="mb-0">Frigorífico</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4 col-lg-2 mb-4">
+                <div class="card border-0 bg-success text-white">
+                    <div class="card-body">
+                        <i class="fas fa-industry fa-2x mb-2"></i>
+                        <h3 class="display-4 fw-bold">{{ total_industria|default:0 }}</h3>
+                        <p class="mb-0">Indústria</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4 col-lg-2 mb-4">
+                <div class="card border-0 bg-warning text-white">
+                    <div class="card-body">
+                        <i class="fas fa-bolt fa-2x mb-2"></i>
+                        <h3 class="display-4 fw-bold">{{ total_utilidades|default:0 }}</h3>
+                        <p class="mb-0">Utilidades</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4 col-lg-2 mb-4">
+                <div class="card border-0 bg-danger text-white">
+                    <div class="card-body">
+                        <i class="fas fa-building fa-2x mb-2"></i>
+                        <h3 class="display-4 fw-bold">{{ total_externa|default:0 }}</h3>
+                        <p class="mb-0">Externa</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4 col-lg-2 mb-4">
+                <div class="card border-0 bg-secondary text-white">
+                    <div class="card-body">
+                        <i class="fas fa-handshake fa-2x mb-2"></i>
+                        <h3 class="display-4 fw-bold">{{ total_apoio|default:0 }}</h3>
+                        <p class="mb-0">Apoio</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4 col-lg-2 mb-4">
+                <div class="card border-0 bg-info text-white">
+                    <div class="card-body">
+                        <i class="fas fa-chart-pie fa-2x mb-2"></i>
+                        <h3 class="display-4 fw-bold">{{ total_geral|default:0 }}</h3>
+                        <p class="mb-0">Total</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Photo Gallery Section -->
+<section class="py-5">
+    <div class="container">
+        <!-- Frigorífico -->
+        {% if centros_frigorifico %}
+        <div class="row text-center mb-5">
+            <div class="col-12">
+                <h2 class="display-5 fw-bold text-gradient">Centro de Atividades e Setores: Frigorífico</h2>
+                <p class="lead">Total de Centros: {{ centros_frigorifico|length }}</p>
+            </div>
+            <div class="col-12">
+                <div class="centros-grid">
+                    <div class="row g-4">
+                        {% for centro in centros_frigorifico %}
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="centro-card-link">
+                                <div class="centro-card">
+                                    <div class="centro-card-image-wrapper">
+                                        {% if centro.imagem %}
+                                            <img src="{% static centro.imagem %}" alt="CA {{ centro.ca }}" class="centro-card-image" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'centro-card-icon\'><i class=\'fas fa-industry\'></i></div>';">
+                                        {% else %}
+                                            <div class="centro-card-icon">
+                                                <i class="fas fa-industry"></i>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="centro-card-content">
+                                        <div class="centro-card-header">
+                                            <span class="centro-card-ca">CA {{ centro.ca }}</span>
+                                            {% if centro.sigla %}
+                                            <span class="centro-card-sigla">{{ centro.sigla }}</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if centro.descricao %}
+                                        <h6 class="centro-card-title">{{ centro.descricao }}</h6>
+                                        {% endif %}
+                                        {% if centro.encarregado_responsavel %}
+                                        <div class="centro-card-footer">
+                                            <i class="fas fa-user-circle"></i>
+                                            <span><strong>Responsável:</strong> {{ centro.encarregado_responsavel }}</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if centros_frigorifico and centros_industria %}
+        <hr><br>
+        {% endif %}
+        
+        <!-- Indústria -->
+        {% if centros_industria %}
+        <div class="row text-center mb-5">
+            <div class="col-12">
+                <h2 class="display-5 fw-bold text-gradient">Centro de Atividades e Setores: Indústria</h2>
+                <p class="lead">Total de Centros: {{ centros_industria|length }}</p>
+            </div>
+            <div class="col-12">
+                <div class="centros-grid">
+                    <div class="row g-4">
+                        {% for centro in centros_industria %}
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="centro-card-link">
+                                <div class="centro-card centro-card-industria">
+                                    <div class="centro-card-image-wrapper">
+                                        {% if centro.imagem %}
+                                            <img src="{% static centro.imagem %}" alt="CA {{ centro.ca }}" class="centro-card-image" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'centro-card-icon\'><i class=\'fas fa-cogs\'></i></div>';">
+                                        {% else %}
+                                            <div class="centro-card-icon">
+                                                <i class="fas fa-cogs"></i>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="centro-card-content">
+                                        <div class="centro-card-header">
+                                            <span class="centro-card-ca">CA {{ centro.ca }}</span>
+                                            {% if centro.sigla %}
+                                            <span class="centro-card-sigla">{{ centro.sigla }}</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if centro.descricao %}
+                                        <h6 class="centro-card-title">{{ centro.descricao }}</h6>
+                                        {% endif %}
+                                        {% if centro.encarregado_responsavel %}
+                                        <div class="centro-card-footer">
+                                            <i class="fas fa-user-circle"></i>
+                                            <span><strong>Responsável:</strong> {{ centro.encarregado_responsavel }}</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if centros_frigorifico or centros_industria %}
+        {% if centros_utilidades or centros_externa %}
+        <hr><br>
+        {% endif %}
+        {% endif %}
+        
+        <!-- Utilidades -->
+        {% if centros_utilidades %}
+        <div class="row text-center mb-5">
+            <div class="col-12">
+                <h2 class="display-5 fw-bold text-gradient">Centro de Atividades e Setores: Utilidades</h2>
+                <p class="lead">Total de Centros: {{ centros_utilidades|length }}</p>
+            </div>
+            <div class="col-12">
+                <div class="centros-grid">
+                    <div class="row g-4">
+                        {% for centro in centros_utilidades %}
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="centro-card-link">
+                                <div class="centro-card centro-card-utilidades">
+                                    <div class="centro-card-image-wrapper">
+                                        {% if centro.imagem %}
+                                            <img src="{% static centro.imagem %}" alt="CA {{ centro.ca }}" class="centro-card-image" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'centro-card-icon\'><i class=\'fas fa-bolt\'></i></div>';">
+                                        {% else %}
+                                            <div class="centro-card-icon">
+                                                <i class="fas fa-bolt"></i>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="centro-card-content">
+                                        <div class="centro-card-header">
+                                            <span class="centro-card-ca">CA {{ centro.ca }}</span>
+                                            {% if centro.sigla %}
+                                            <span class="centro-card-sigla">{{ centro.sigla }}</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if centro.descricao %}
+                                        <h6 class="centro-card-title">{{ centro.descricao }}</h6>
+                                        {% endif %}
+                                        {% if centro.encarregado_responsavel %}
+                                        <div class="centro-card-footer">
+                                            <i class="fas fa-user-circle"></i>
+                                            <span><strong>Responsável:</strong> {{ centro.encarregado_responsavel }}</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if centros_utilidades and centros_externa %}
+        <hr><br>
+        {% endif %}
+        
+        <!-- Externa -->
+        {% if centros_externa %}
+        <div class="row text-center mb-5">
+            <div class="col-12">
+                <h2 class="display-5 fw-bold text-gradient">Centro de Atividades e Setores: Externa</h2>
+                <p class="lead">Total de Centros: {{ centros_externa|length }}</p>
+            </div>
+            <div class="col-12">
+                <div class="centros-grid">
+                    <div class="row g-4">
+                        {% for centro in centros_externa %}
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="centro-card-link">
+                                <div class="centro-card centro-card-externa">
+                                    <div class="centro-card-image-wrapper">
+                                        {% if centro.imagem %}
+                                            <img src="{% static centro.imagem %}" alt="CA {{ centro.ca }}" class="centro-card-image" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'centro-card-icon\'><i class=\'fas fa-building\'></i></div>';">
+                                        {% else %}
+                                            <div class="centro-card-icon">
+                                                <i class="fas fa-building"></i>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="centro-card-content">
+                                        <div class="centro-card-header">
+                                            <span class="centro-card-ca">CA {{ centro.ca }}</span>
+                                            {% if centro.sigla %}
+                                            <span class="centro-card-sigla">{{ centro.sigla }}</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if centro.descricao %}
+                                        <h6 class="centro-card-title">{{ centro.descricao }}</h6>
+                                        {% endif %}
+                                        {% if centro.encarregado_responsavel %}
+                                        <div class="centro-card-footer">
+                                            <i class="fas fa-user-circle"></i>
+                                            <span><strong>Responsável:</strong> {{ centro.encarregado_responsavel }}</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if centros_externa or centros_utilidades or centros_frigorifico or centros_industria %}
+        {% if centros_apoio %}
+        <hr><br>
+        {% endif %}
+        {% endif %}
+        
+        <!-- Apoio -->
+        {% if centros_apoio %}
+        <div class="row text-center mb-5">
+            <div class="col-12">
+                <h2 class="display-5 fw-bold text-gradient">Centro de Atividades e Setores: Apoio</h2>
+                <p class="lead">Total de Centros: {{ centros_apoio|length }}</p>
+            </div>
+            <div class="col-12">
+                <div class="centros-grid">
+                    <div class="row g-4">
+                        {% for centro in centros_apoio %}
+                        <div class="col-6 col-sm-4 col-md-2 col-lg-2">
+                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="centro-card-link">
+                                <div class="centro-card centro-card-apoio">
+                                    <div class="centro-card-image-wrapper">
+                                        {% if centro.imagem %}
+                                            <img src="{% static centro.imagem %}" alt="CA {{ centro.ca }}" class="centro-card-image" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'centro-card-icon\'><i class=\'fas fa-handshake\'></i></div>';">
+                                        {% else %}
+                                            <div class="centro-card-icon">
+                                                <i class="fas fa-handshake"></i>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="centro-card-content">
+                                        <div class="centro-card-header">
+                                            <span class="centro-card-ca">CA {{ centro.ca }}</span>
+                                            {% if centro.sigla %}
+                                            <span class="centro-card-sigla">{{ centro.sigla }}</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if centro.descricao %}
+                                        <h6 class="centro-card-title">{{ centro.descricao }}</h6>
+                                        {% endif %}
+                                        {% if centro.encarregado_responsavel %}
+                                        <div class="centro-card-footer">
+                                            <i class="fas fa-user-circle"></i>
+                                            <span><strong>Responsável:</strong> {{ centro.encarregado_responsavel }}</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<style>
+.centros-grid {
+    margin-top: 2rem;
+}
+
+.centro-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    height: 100%;
+}
+
+.centro-card-link:hover {
+    text-decoration: none;
+    color: inherit;
+}
+
+.centro-card {
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #e9ecef;
+}
+
+.centro-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    border-color: #667eea;
+}
+
+.centro-card-image-wrapper {
+    width: 100%;
+    height: 180px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.centro-card-industria .centro-card-image-wrapper {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.centro-card-utilidades .centro-card-image-wrapper {
+    background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+}
+
+.centro-card-externa .centro-card-image-wrapper {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+.centro-card-apoio .centro-card-image-wrapper {
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+}
+
+.centro-card-utilidades .centro-card-ca {
+    background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+}
+
+.centro-card-externa .centro-card-ca {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+.centro-card-apoio .centro-card-ca {
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+}
+
+.centro-card-utilidades .centro-card-footer i {
+    color: #fda085;
+}
+
+.centro-card-externa .centro-card-footer i {
+    color: #fee140;
+}
+
+.centro-card-apoio .centro-card-footer i {
+    color: #fed6e3;
+}
+
+/* Smaller cards for Apoio section */
+.centro-card-apoio .centro-card-image-wrapper {
+    height: 140px;
+}
+
+.centro-card-apoio .centro-card-content {
+    padding: 1rem;
+}
+
+.centro-card-apoio .centro-card-title {
+    font-size: 0.85rem;
+    -webkit-line-clamp: 2;
+}
+
+.centro-card-apoio .centro-card-ca {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.7rem;
+}
+
+.centro-card-apoio .centro-card-sigla {
+    font-size: 0.7rem;
+    padding: 0.3rem 0.7rem;
+}
+
+.centro-card-apoio .centro-card-footer {
+    font-size: 0.75rem;
+    padding-top: 0.5rem;
+}
+
+.centro-card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.centro-card:hover .centro-card-image {
+    transform: scale(1.05);
+}
+
+.centro-card-icon {
+    font-size: 3.5rem;
+    color: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.centro-card-content {
+    padding: 1.25rem;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.centro-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.centro-card-ca {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 0.4rem 0.9rem;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.875rem;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.centro-card-industria .centro-card-ca {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.centro-card-sigla {
+    background: #f8f9fa;
+    color: #495057;
+    padding: 0.4rem 0.9rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    border: 1px solid #dee2e6;
+    white-space: nowrap;
+}
+
+.centro-card-title {
+    color: #212529;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.5;
+    margin: 0 0 1rem 0;
+    flex-grow: 1;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.centro-card-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e9ecef;
+    margin-top: auto;
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.centro-card-footer i {
+    color: #667eea;
+    font-size: 1rem;
+}
+
+.centro-card-industria .centro-card-footer i {
+    color: #f5576c;
+}
+
+.centro-card-footer span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+    .centro-card-image-wrapper {
+        height: 160px;
+    }
+    
+    .centro-card-content {
+        padding: 1rem;
+    }
+    
+    .centro-card-title {
+        font-size: 0.9rem;
+        -webkit-line-clamp: 2;
+    }
+}
+
+@media (min-width: 1200px) {
+    .centro-card-image-wrapper {
+        height: 200px;
+    }
+}
+</style>
+
+
+
+{% endblock %}
+

@@ -314,6 +314,16 @@ class OrdemServicoCorretivaFichaForm(forms.ModelForm):
 class CentroAtividadeForm(forms.ModelForm):
     """Formulário para cadastro de Centros de Atividade (CA)"""
     
+    imagem_upload = forms.ImageField(
+        required=False,
+        label='Foto do Centro de Atividade',
+        help_text='Envie uma imagem para o Centro de Atividade (formato: JPG, PNG, etc.)',
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': 'image/*'
+        })
+    )
+    
     class Meta:
         model = CentroAtividade
         fields = [
@@ -323,6 +333,7 @@ class CentroAtividadeForm(forms.ModelForm):
             'indice',
             'encarregado_responsavel',
             'local',
+            'imagem',
             'observacoes',
         ]
         widgets = {
@@ -354,7 +365,12 @@ class CentroAtividadeForm(forms.ModelForm):
             'local': forms.TextInput(attrs={
                 'class': 'form-control',
                 'maxlength': '255',
-                'placeholder': 'Local do Centro de Atividade'
+                'placeholder': 'Local do Centro de Atividade (ex: FRIGORÍFICO, INDÚSTRIA, UTILIDADES, EXTERNA, APOIO)'
+            }),
+            'imagem': forms.TextInput(attrs={
+                'class': 'form-control',
+                'maxlength': '500',
+                'placeholder': 'Caminho da imagem (ex: fotos_home/imagem.jpg)'
             }),
             'observacoes': forms.Textarea(attrs={
                 'class': 'form-control',
@@ -369,6 +385,7 @@ class CentroAtividadeForm(forms.ModelForm):
             'indice': 'Índice',
             'encarregado_responsavel': 'Encarregado Responsável',
             'local': 'Local',
+            'imagem': 'Caminho da Imagem',
             'observacoes': 'Observações',
         }
     

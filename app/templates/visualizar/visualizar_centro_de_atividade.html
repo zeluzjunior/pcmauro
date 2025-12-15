@@ -247,6 +247,9 @@
                         <i class="fas fa-arrow-left me-2"></i>Voltar para Lista
                     </a>
                     <div>
+                        <a href="{% url 'editar_centro_de_atividades' ca.id %}" class="btn btn-warning me-2">
+                            <i class="fas fa-edit me-2"></i>Editar
+                        </a>
                         <a href="{% url 'consultar_locais_e_cas' %}?search={{ ca.ca }}" class="btn btn-info">
                             <i class="fas fa-search me-2"></i>Buscar Similar
                         </a>

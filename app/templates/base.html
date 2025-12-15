@@ -296,6 +296,19 @@
                         </li>
             
                         <li class="border-top my-3"></li>
+                        <!-- Planejamento de Manutenção -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#planejamento-manutencao-collapse" aria-expanded="false">
+                                <i class="fas fa-calendar-alt me-2"></i>
+                                <span class="btn-toggle-text">Planejamento de Manutenção</span>
+                            </button>
+                            <div class="collapse" id="planejamento-manutencao-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'centros_de_atividade' %}" class="link-dark rounded"><i class="fas fa-building me-2"></i>Centros de Atividade</a></li>
+                                </ul>
+                            </div>
+                        </li>
+            
                         <!-- Configurar Plano De Preventiva PCM -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#configurar-plano-pcm-collapse" aria-expanded="false">
@@ -430,6 +443,7 @@
                                         <div class="collapse" id="maquinas-configuracoes-collapse">
                                             <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
                                                 <li><a href="{% url 'maquina_primaria_secundaria' %}" class="link-dark rounded">Agrupar Máquinas Primárias e Secundárias</a></li>
+                                                <li><a href="{% url 'ajustar_maquinas_outros' %}" class="link-dark rounded">Ajustar Máquinas OUTROS</a></li>
                                             </ul>
                                         </div>
                                     </li>
@@ -472,7 +486,8 @@
                             </button>
                             <div class="collapse" id="local-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'cadastrar_local_e_cas' %}" class="link-dark rounded">Cadastrar Centros de Atividade</a></li>
+                                    <li><a href="{% url 'centros_de_atividade' %}" class="link-dark rounded"><i class="fas fa-building me-2"></i>Análise de Centros de Atividade</a></li>
+                                    <li><a href="{% url 'cadastrar_centro_de_atividade' %}" class="link-dark rounded"><i class="bi bi-building-add me-2"></i>Cadastrar Centros de Atividade</a></li>
                                     <li><a href="{% url 'consultar_locais_e_cas' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Local ou CA</a></li>
                                     <li><a href="{% url 'consultar_locais' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Locais ou Salas</a></li>
                                 </ul>

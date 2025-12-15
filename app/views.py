@@ -412,11 +412,11 @@ def home(request):
 
 
 def centros_de_atividade(request):
-    """Centros de Atividade listing page view - filtered by FRIGORÍFICO and INDÚSTRIA"""
+    """Centros de Atividade listing page view - filtered by FRIGORÍFICO, INDÚSTRIA, UTILIDADES, EXTERNA, and APOIO"""
     from app.models import CentroAtividade
     from django.db.models import Q
     
-    # Buscar Centros de Atividade filtrados por local FRIGORÍFICO ou INDÚSTRIA
+    # Buscar Centros de Atividade filtrados por local
     centros_frigorifico = CentroAtividade.objects.filter(
         Q(local__iexact='FRIGORÍFICO') | Q(local__icontains='FRIGOR')
     ).distinct().order_by('ca')
@@ -425,20 +425,41 @@ def centros_de_atividade(request):
         Q(local__iexact='INDÚSTRIA') | Q(local__icontains='IND')
     ).distinct().order_by('ca')
     
+    centros_utilidades = CentroAtividade.objects.filter(
+        Q(local__iexact='UTILIDADES') | Q(local__icontains='UTILIDADE')
+    ).distinct().order_by('ca')
+    
+    centros_externa = CentroAtividade.objects.filter(
+        Q(local__iexact='EXTERNA') | Q(local__icontains='EXTERN')
+    ).distinct().order_by('ca')
+    
+    centros_apoio = CentroAtividade.objects.filter(
+        Q(local__iexact='APOIO') | Q(local__icontains='APOIO')
+    ).distinct().order_by('ca')
+    
     total_frigorifico = centros_frigorifico.count()
     total_industria = centros_industria.count()
-    total_geral = total_frigorifico + total_industria
+    total_utilidades = centros_utilidades.count()
+    total_externa = centros_externa.count()
+    total_apoio = centros_apoio.count()
+    total_geral = total_frigorifico + total_industria + total_utilidades + total_externa + total_apoio
     
     context = {
         'page_title': 'Centros de Atividade',
         'active_page': 'centros_de_atividade',
         'centros_frigorifico': centros_frigorifico,
         'centros_industria': centros_industria,
+        'centros_utilidades': centros_utilidades,
+        'centros_externa': centros_externa,
+        'centros_apoio': centros_apoio,
         'total_frigorifico': total_frigorifico,
         'total_industria': total_industria,
+        'total_utilidades': total_utilidades,
+        'total_externa': total_externa,
+        'total_apoio': total_apoio,
         'total_geral': total_geral,
     }
-    return render(request, 'analise/analise_centro_de_atividade.html', context)
+    return render(request, 'centro_de_atividades/analise_centro_de_atividade.html', context)
 
 
 def about(request):
@@ -1529,18 +1550,120 @@ def analise_roteiro_plano_preventiva(request):
     return render(request, 'planejamento/analise_roteiro_plano_preventiva.html', context)
 
 
+def ajustar_maquinas_outros(request):
+    """Página para análise e ajuste de máquinas com descr_gerenc = OUTROS"""
+    from .models import Maquina
+    from django.db.models import Count, Q
+    from django.core.paginator import Paginator
+    
+    # Buscar todos os valores únicos de descr_gerenc
+    valores_gerenc = Maquina.objects.filter(
+        ativo=True
+    ).exclude(
+        descr_gerenc__isnull=True
+    ).exclude(
+        descr_gerenc=''
+    ).values('descr_gerenc').annotate(
+        total=Count('id')
+    ).order_by('descr_gerenc')
+    
+    # Agrupar máquinas por descr_gerenc
+    maquinas_por_gerenc = {}
+    maquinas_outros = []
+    
+    for item in valores_gerenc:
+        gerenc = item['descr_gerenc']
+        total = item['total']
+        
+        # Verificar se descr_gerenc é "OUTROS" (case-insensitive)
+        if gerenc and gerenc.upper().strip() == 'OUTROS':
+            # É "OUTROS" - foco principal
+            maquinas_outros.append({
+                'descr_gerenc': gerenc,
+                'total': total,
+                'maquinas': Maquina.objects.filter(
+                    ativo=True,
+                    descr_gerenc__iexact='OUTROS'
+                ).order_by('cd_maquina')
+            })
+        else:
+            # Outros valores de descr_gerenc (para resumo)
+            maquinas_por_gerenc[gerenc] = {
+                'descr_gerenc': gerenc,
+                'total': total,
+                'maquinas': Maquina.objects.filter(
+                    ativo=True,
+                    descr_gerenc=gerenc
+                ).order_by('cd_maquina')[:10]  # Limitar a 10 para preview
+            }
+    
+    # Máquinas com descr_gerenc NULL ou vazio também podem ser consideradas "OUTROS"
+    maquinas_null = Maquina.objects.filter(
+        ativo=True
+    ).filter(
+        Q(descr_gerenc__isnull=True) | Q(descr_gerenc='')
+    ).count()
+    
+    if maquinas_null > 0:
+        maquinas_outros.append({
+            'descr_gerenc': None,
+            'total': maquinas_null,
+            'maquinas': Maquina.objects.filter(
+                ativo=True
+            ).filter(
+                Q(descr_gerenc__isnull=True) | Q(descr_gerenc='')
+            ).order_by('cd_maquina')
+        })
+    
+    # Estatísticas
+    total_maquinas = Maquina.objects.filter(ativo=True).count()
+    total_outros = sum(item['total'] for item in maquinas_outros)
+    total_com_gerenc_valida = total_maquinas - total_outros
+    
+    # Paginação para máquinas OUTROS (se houver muitas)
+    todas_maquinas_outros = []
+    for grupo in maquinas_outros:
+        todas_maquinas_outros.extend(list(grupo['maquinas']))
+    
+    paginator = Paginator(todas_maquinas_outros, 50)
+    page_number = request.GET.get('page', 1)
+    maquinas_outros_paginated = paginator.get_page(page_number)
+    
+    # Obter lista de valores únicos de descr_gerenc para referência
+    gerenc_choices = sorted(set(maquinas_por_gerenc.keys()))
+    
+    context = {
+        'page_title': 'Ajustar Máquinas - OUTROS',
+        'active_page': 'ajustar_maquinas_outros',
+        'maquinas_outros': maquinas_outros,
+        'maquinas_outros_paginated': maquinas_outros_paginated,
+        'maquinas_por_gerenc': maquinas_por_gerenc,
+        'total_maquinas': total_maquinas,
+        'total_outros': total_outros,
+        'total_com_gerenc_valida': total_com_gerenc_valida,
+        'percentual_outros': round((total_outros / total_maquinas * 100) if total_maquinas > 0 else 0, 1),
+        'gerenc_choices': gerenc_choices,
+    }
+    return render(request, 'maquinas/ajustar_maquinas_outros.html', context)
+
+
 def maquina_primaria_secundaria(request):
     """Agrupar Máquinas Primárias e Secundárias"""
     from .models import Maquina, MaquinaPrimariaSecundaria
     from django.contrib import messages
     
-    # Buscar máquinas primárias (descr_gerenc = "MÁQUINAS PRINCIPAL")
-    maquinas_primarias = Maquina.objects.filter(descr_gerenc__iexact='MÁQUINAS PRINCIPAL').order_by('cd_maquina')
+    # Buscar máquinas primárias (descr_gerenc = "MÁQUINAS PRINCIPAL") - apenas ativas
+    maquinas_primarias = Maquina.objects.filter(
+        descr_gerenc__iexact='MÁQUINAS PRINCIPAL',
+        ativo=True
+    ).order_by('cd_maquina')
     
-    # Buscar máquinas secundárias que ainda não estão relacionadas
+    # Buscar máquinas secundárias que ainda não estão relacionadas - apenas ativas
     # Excluir máquinas que já são primárias E máquinas que já estão relacionadas como secundárias
     maquinas_secundarias_relacionadas = MaquinaPrimariaSecundaria.objects.values_list('maquina_secundaria_id', flat=True)
-    maquinas_secundarias = Maquina.objects.exclude(
+    maquinas_secundarias = Maquina.objects.filter(
+        ativo=True
+    ).exclude(
         descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
     ).exclude(
         id__in=maquinas_secundarias_relacionadas
@@ -1687,14 +1810,63 @@ def services(request):
 def importar_maquinas(request):
     """Importar Máquinas page view"""
     if request.method == 'POST':
-        # Verificar se há arquivo enviado
+        # Verificar primeiro se é confirmação de inativação
+        if 'confirm_inactivate' in request.POST:
+            from app.models import Maquina
+            maquinas_to_inactivate = request.POST.getlist('inactivate_machines')
+            print(f"DEBUG - confirm_inactivate recebido. Máquinas selecionadas: {maquinas_to_inactivate}")
+            
+            if maquinas_to_inactivate:
+                # Converter IDs para inteiros
+                try:
+                    maquinas_ids = [int(id) for id in maquinas_to_inactivate]
+                    print(f"DEBUG - IDs convertidos: {maquinas_ids}")
+                    
+                    # Verificar quantas máquinas existem antes da atualização
+                    maquinas_antes = Maquina.objects.filter(id__in=maquinas_ids, ativo=True).count()
+                    print(f"DEBUG - Máquinas ativas antes da atualização: {maquinas_antes}")
+                    
+                    inactivated_count = Maquina.objects.filter(
+                        id__in=maquinas_ids
+                    ).update(ativo=False)
+                    
+                    print(f"DEBUG - Máquinas atualizadas: {inactivated_count}")
+                    
+                    # Verificar se realmente foram atualizadas
+                    maquinas_depois = Maquina.objects.filter(id__in=maquinas_ids, ativo=False).count()
+                    print(f"DEBUG - Máquinas inativas depois da atualização: {maquinas_depois}")
+                    
+                    if inactivated_count > 0:
+                        messages.success(request, f'{inactivated_count} máquina(s) marcada(s) como inativa(s).')
+                    else:
+                        messages.warning(request, 'Nenhuma máquina foi atualizada. Verifique se as máquinas selecionadas existem.')
+                    
+                    # Limpar sessão
+                    if 'missing_machines' in request.session:
+                        del request.session['missing_machines']
+                    if 'import_success' in request.session:
+                        del request.session['import_success']
+                    if 'created_count' in request.session:
+                        del request.session['created_count']
+                    if 'updated_count' in request.session:
+                        del request.session['updated_count']
+                except (ValueError, TypeError) as e:
+                    print(f"DEBUG - Erro ao processar IDs: {str(e)}")
+                    messages.error(request, f'Erro ao processar IDs das máquinas: {str(e)}')
+            else:
+                messages.warning(request, 'Nenhuma máquina foi selecionada para inativação.')
+            
+            # Redirecionar para evitar reenvio do formulário
+            return redirect('importar_maquinas')
+        
+        # Se não é confirmação de inativação, verificar se há arquivo enviado
         if 'file' not in request.FILES:
             messages.error(request, 'Por favor, selecione um arquivo para importar.')
             context = {
                 'page_title': 'Importar Máquinas',
                 'active_page': 'importar_maquinas'
             }
-            return render(request, 'importar/maquinas.html', context)
+            return render(request, 'importar/importar_maquinas.html', context)
         
         file = request.FILES['file']
         
@@ -1711,7 +1883,7 @@ def importar_maquinas(request):
                 'page_title': 'Importar Máquinas',
                 'active_page': 'importar_maquinas'
             }
-            return render(request, 'importar/maquinas.html', context)
+            return render(request, 'importar/importar_maquinas.html', context)
         
         # Verificar se deve apenas adicionar novos registros (ignorar duplicados)
         only_new_records = request.POST.get('only_new_records', 'off') == 'on'
@@ -1739,7 +1911,7 @@ def importar_maquinas(request):
             
             # Fazer upload dos dados
             # Se only_new_records estiver marcado, update_existing será False (ignora duplicados)
-            created_count, updated_count, errors = upload_maquinas_from_file(
+            created_count, updated_count, errors, missing_machines = upload_maquinas_from_file(
                 file, 
                 update_existing=update_existing,
                 update_fields=update_fields if update_existing else None
@@ -1765,14 +1937,49 @@ def importar_maquinas(request):
             elif not errors:
                 messages.info(request, 'Nenhum registro foi importado.')
             
+            # Se há máquinas não encontradas no arquivo, armazenar na sessão para mostrar na página
+            if missing_machines:
+                # Converter para lista de dicionários simples para garantir serialização correta
+                missing_machines_list = [
+                    {
+                        'id': m.get('id'),
+                        'cd_maquina': m.get('cd_maquina'),
+                        'descr_maquina': m.get('descr_maquina'),
+                        'cd_setormanut': m.get('cd_setormanut'),
+                        'descr_setormanut': m.get('descr_setormanut'),
+                    }
+                    for m in missing_machines
+                ]
+                request.session['missing_machines'] = missing_machines_list
+                request.session['import_success'] = True
+                request.session['created_count'] = created_count
+                request.session['updated_count'] = updated_count
+                print(f"DEBUG - Armazenando {len(missing_machines_list)} máquinas na sessão")
+            
         except Exception as e:
             messages.error(request, f'Erro ao importar arquivo: {str(e)}')
     
+    # Buscar máquinas não encontradas da sessão
+    missing_machines = request.session.get('missing_machines', [])
+    import_success = request.session.get('import_success', False)
+    created_count = request.session.get('created_count', 0)
+    updated_count = request.session.get('updated_count', 0)
+    
+    # Debug: verificar dados da sessão
+    if missing_machines:
+        print(f"DEBUG - Recuperando {len(missing_machines)} máquinas da sessão")
+        if missing_machines:
+            print(f"DEBUG - Primeira máquina da sessão: {missing_machines[0]}")
+    
     context = {
         'page_title': 'Importar Máquinas',
-        'active_page': 'importar_maquinas'
+        'active_page': 'importar_maquinas',
+        'missing_machines': missing_machines,
+        'import_success': import_success,
+        'created_count': created_count,
+        'updated_count': updated_count,
     }
-    return render(request, 'importar/maquinas.html', context)
+    return render(request, 'importar/importar_maquinas.html', context)
 
 
 def importar_manutentores(request):
@@ -2656,16 +2863,55 @@ def importar_locais_e_cas(request):
 def cadastrar_local_e_cas(request):
     """Cadastrar novo Centro de Atividade (CA) com local"""
     from app.forms import CentroAtividadeForm
+    import uuid
     
     if request.method == 'POST':
-        form = CentroAtividadeForm(request.POST)
+        form = CentroAtividadeForm(request.POST, request.FILES)
         
         if form.is_valid():
             try:
-                centro_atividade = form.save()
+                centro_atividade = form.save(commit=False)
+                
+                # Processar upload de imagem se fornecido
+                if 'imagem_upload' in request.FILES:
+                    imagem_file = request.FILES['imagem_upload']
+                    
+                    # Gerar nome único para o arquivo
+                    file_extension = os.path.splitext(imagem_file.name)[1]
+                    unique_filename = f"ca_{centro_atividade.ca}_{uuid.uuid4().hex[:8]}{file_extension}"
+                    
+                    # Caminho completo para salvar
+                    fotos_home_path = os.path.join(settings.STATICFILES_DIRS[0], 'fotos_home')
+                    
+                    # Criar diretório se não existir
+                    os.makedirs(fotos_home_path, exist_ok=True)
+                    
+                    # Caminho completo do arquivo
+                    file_path = os.path.join(fotos_home_path, unique_filename)
+                    
+                    # Salvar arquivo
+                    with open(file_path, 'wb+') as destination:
+                        for chunk in imagem_file.chunks():
+                            destination.write(chunk)
+                    
+                    # Atualizar campo imagem com caminho relativo (sem 'static/')
+                    imagem_path = f"fotos_home/{unique_filename}"
+                    if imagem_path.startswith('static/'):
+                        imagem_path = imagem_path.replace('static/', '', 1)
+                    centro_atividade.imagem = imagem_path
+                    messages.success(request, f'Foto do Centro de Atividade {centro_atividade.ca} cadastrada com sucesso!')
+                else:
+                    # Se não houve upload, normalizar o caminho do campo 'imagem' se fornecido
+                    if centro_atividade.imagem and centro_atividade.imagem.startswith('static/'):
+                        centro_atividade.imagem = centro_atividade.imagem.replace('static/', '', 1)
+                
+                centro_atividade.save()
                 messages.success(request, f'Centro de Atividade {centro_atividade.ca} cadastrado com sucesso!')
                 return redirect('consultar_locais_e_cas')
             except Exception as e:
+                import traceback
+                error_detail = traceback.format_exc()
+                print(f"Erro ao cadastrar Centro de Atividade: {error_detail}")
                 messages.error(request, f'Erro ao cadastrar Centro de Atividade: {str(e)}')
         else:
             handle_form_errors(form, request)
@@ -2673,11 +2919,11 @@ def cadastrar_local_e_cas(request):
         form = CentroAtividadeForm()
     
     context = {
-        'page_title': 'Cadastrar Local e CA',
-        'active_page': 'cadastrar_local_e_cas',
+        'page_title': 'Cadastrar Centro de Atividade',
+        'active_page': 'cadastrar_centro_de_atividade',
         'form': form,
     }
-    return render(request, 'cadastrar/cadastrar_local_e_cas.html', context)
+    return render(request, 'cadastrar/cadastrar_centro_de_atividade.html', context)
 
 
 def consultar_locais_e_cas(request):
@@ -2959,6 +3205,7 @@ def editar_ca_e_locais(request, ca_id):
     """Editar Centro de Atividade (CA) existente com local"""
     from app.forms import CentroAtividadeForm
     from app.models import CentroAtividade
+    import uuid
     
     try:
         centro_atividade = CentroAtividade.objects.get(id=ca_id)
@@ -2967,14 +3214,55 @@ def editar_ca_e_locais(request, ca_id):
         return redirect('consultar_locais_e_cas')
     
     if request.method == 'POST':
-        form = CentroAtividadeForm(request.POST, instance=centro_atividade)
+        form = CentroAtividadeForm(request.POST, request.FILES, instance=centro_atividade)
         
         if form.is_valid():
             try:
-                centro_atividade = form.save()
+                centro_atividade = form.save(commit=False)
+                
+                # Processar upload de imagem se fornecido
+                # Se um arquivo foi enviado, ele tem prioridade sobre o campo de texto 'imagem'
+                if 'imagem_upload' in request.FILES:
+                    imagem_file = request.FILES['imagem_upload']
+                    
+                    # Gerar nome único para o arquivo
+                    file_extension = os.path.splitext(imagem_file.name)[1]
+                    unique_filename = f"ca_{centro_atividade.ca}_{uuid.uuid4().hex[:8]}{file_extension}"
+                    
+                    # Caminho completo para salvar
+                    fotos_home_path = os.path.join(settings.STATICFILES_DIRS[0], 'fotos_home')
+                    
+                    # Criar diretório se não existir
+                    os.makedirs(fotos_home_path, exist_ok=True)
+                    
+                    # Caminho completo do arquivo
+                    file_path = os.path.join(fotos_home_path, unique_filename)
+                    
+                    # Salvar arquivo
+                    with open(file_path, 'wb+') as destination:
+                        for chunk in imagem_file.chunks():
+                            destination.write(chunk)
+                    
+                    # Atualizar campo imagem com caminho relativo (sem 'static/')
+                    # Normalizar: remover 'static/' do início se presente
+                    imagem_path = f"fotos_home/{unique_filename}"
+                    if imagem_path.startswith('static/'):
+                        imagem_path = imagem_path.replace('static/', '', 1)
+                    centro_atividade.imagem = imagem_path
+                    messages.success(request, f'Foto do Centro de Atividade {centro_atividade.ca} atualizada com sucesso!')
+                else:
+                    # Se não houve upload, normalizar o caminho do campo 'imagem' se fornecido
+                    if centro_atividade.imagem and centro_atividade.imagem.startswith('static/'):
+                        centro_atividade.imagem = centro_atividade.imagem.replace('static/', '', 1)
+                
+                # Salvar todos os campos do form
+                centro_atividade.save()
                 messages.success(request, f'Centro de Atividade {centro_atividade.ca} atualizado com sucesso!')
                 return redirect('consultar_locais_e_cas')
             except Exception as e:
+                import traceback
+                error_detail = traceback.format_exc()
+                print(f"Erro ao atualizar Centro de Atividade: {error_detail}")
                 messages.error(request, f'Erro ao atualizar Centro de Atividade: {str(e)}')
         else:
             handle_form_errors(form, request)
@@ -2987,7 +3275,7 @@ def editar_ca_e_locais(request, ca_id):
         'form': form,
         'centro_atividade': centro_atividade,
     }
-    return render(request, 'editar/editar_ca_e_locais.html', context)
+    return render(request, 'editar/editar_centro_de_atividades.html', context)
 
 
 def cadastrar_maquina(request):
@@ -3145,6 +3433,39 @@ def analise_maquinas(request):
     maquinas_com_patrimonio = Maquina.objects.exclude(nro_patrimonio__isnull=True).exclude(nro_patrimonio='').count()
     percentual_patrimonio = (maquinas_com_patrimonio / total_count * 100) if total_count > 0 else 0
     
+    # Estatísticas adicionais para novos cards
+    # Máquinas ativas e inativas
+    maquinas_ativas = Maquina.objects.filter(ativo=True).count()
+    maquinas_inativas = Maquina.objects.filter(ativo=False).count()
+    percentual_ativas = (maquinas_ativas / total_count * 100) if total_count > 0 else 0
+    percentual_inativas = (maquinas_inativas / total_count * 100) if total_count > 0 else 0
+    
+    # Máquinas com código Aurora
+    maquinas_com_codigo_aurora = Maquina.objects.exclude(codigo_aurora__isnull=True).exclude(codigo_aurora='').count()
+    percentual_codigo_aurora = (maquinas_com_codigo_aurora / total_count * 100) if total_count > 0 else 0
+    
+    # Máquinas com código Fabricante
+    maquinas_com_codigo_fabricante = Maquina.objects.exclude(codigo_fabricante__isnull=True).exclude(codigo_fabricante='').count()
+    percentual_codigo_fabricante = (maquinas_com_codigo_fabricante / total_count * 100) if total_count > 0 else 0
+    
+    # Máquinas com documentos PDF
+    maquinas_com_pdf = Maquina.objects.exclude(arquivo_pdf__isnull=True).exclude(arquivo_pdf='').count()
+    percentual_pdf = (maquinas_com_pdf / total_count * 100) if total_count > 0 else 0
+    
+    # Máquinas principais (MÁQUINAS PRINCIPAL)
+    maquinas_principais_count = Maquina.objects.filter(descr_gerenc__iexact='MÁQUINAS PRINCIPAL').count()
+    percentual_principais = (maquinas_principais_count / total_count * 100) if total_count > 0 else 0
+    
+    # Máquinas com centro de atividade associado
+    maquinas_com_centro_atividade = Maquina.objects.exclude(centro_atividade__isnull=True).count()
+    percentual_com_centro = (maquinas_com_centro_atividade / total_count * 100) if total_count > 0 else 0
+    
+    # Total de grupos únicos
+    grupos_unicos_count = Maquina.objects.exclude(cd_grupo__isnull=True).values('cd_grupo').distinct().count()
+    
+    # Total de prioridades únicas
+    prioridades_unicas_count = Maquina.objects.exclude(cd_priomaqutv__isnull=True).values('cd_priomaqutv').distinct().count()
+    
     # Máquinas "MÁQUINAS PRINCIPAL" agrupadas por cd_setormanut
     maquinas_principais = Maquina.objects.filter(
         descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
@@ -3241,6 +3562,23 @@ def analise_maquinas(request):
         'percentual_placa': round(percentual_placa, 1),
         'maquinas_com_patrimonio': maquinas_com_patrimonio,
         'percentual_patrimonio': round(percentual_patrimonio, 1),
+        # Estatísticas adicionais
+        'maquinas_ativas': maquinas_ativas,
+        'maquinas_inativas': maquinas_inativas,
+        'percentual_ativas': round(percentual_ativas, 1),
+        'percentual_inativas': round(percentual_inativas, 1),
+        'maquinas_com_codigo_aurora': maquinas_com_codigo_aurora,
+        'percentual_codigo_aurora': round(percentual_codigo_aurora, 1),
+        'maquinas_com_codigo_fabricante': maquinas_com_codigo_fabricante,
+        'percentual_codigo_fabricante': round(percentual_codigo_fabricante, 1),
+        'maquinas_com_pdf': maquinas_com_pdf,
+        'percentual_pdf': round(percentual_pdf, 1),
+        'maquinas_principais_count': maquinas_principais_count,
+        'percentual_principais': round(percentual_principais, 1),
+        'maquinas_com_centro_atividade': maquinas_com_centro_atividade,
+        'percentual_com_centro': round(percentual_com_centro, 1),
+        'grupos_unicos_count': grupos_unicos_count,
+        'prioridades_unicas_count': prioridades_unicas_count,
         # Dados para gráficos (JSON)
         'setores_labels': json.dumps(setores_labels),
         'setores_data': json.dumps(setores_data),
@@ -3279,21 +3617,29 @@ def analise_maquinas_importadas(request):
     from collections import defaultdict
     import json
     
-    # Estatísticas básicas - apenas máquinas importadas (com created_at)
-    total_importadas = Maquina.objects.exclude(created_at__isnull=True).count()
-    total_geral = Maquina.objects.count()
+    # Estatísticas básicas - apenas máquinas importadas (com created_at) e ativas
+    total_importadas = Maquina.objects.filter(ativo=True).exclude(created_at__isnull=True).count()
+    total_geral = Maquina.objects.filter(ativo=True).count()
     percentual_importadas = (total_importadas / total_geral * 100) if total_geral > 0 else 0
     
-    # Máquinas importadas recentes (últimas 30 dias)
+    # Máquinas importadas recentes (últimas 30 dias) - apenas ativas
     data_30_dias_atras = datetime.now() - timedelta(days=30)
-    importadas_recentes = Maquina.objects.filter(created_at__gte=data_30_dias_atras).exclude(created_at__isnull=True).count()
+    importadas_recentes = Maquina.objects.filter(
+        ativo=True,
+        created_at__gte=data_30_dias_atras
+    ).exclude(created_at__isnull=True).count()
     
-    # Máquinas importadas do mês atual
+    # Máquinas importadas do mês atual - apenas ativas
     mes_atual = datetime.now().replace(day=1)
-    importadas_mes_atual = Maquina.objects.filter(created_at__gte=mes_atual).exclude(created_at__isnull=True).count()
+    importadas_mes_atual = Maquina.objects.filter(
+        ativo=True,
+        created_at__gte=mes_atual
+    ).exclude(created_at__isnull=True).count()
     
-    # Máquinas importadas por setor
-    maquinas_importadas_por_setor = Maquina.objects.exclude(
+    # Máquinas importadas por setor - apenas ativas
+    maquinas_importadas_por_setor = Maquina.objects.filter(
+        ativo=True
+    ).exclude(
         created_at__isnull=True
     ).exclude(
         cd_setormanut__isnull=True
@@ -3306,8 +3652,10 @@ def analise_maquinas_importadas(request):
     setores_labels = [str(item['cd_setormanut']) for item in maquinas_importadas_por_setor]
     setores_data = [item['total'] for item in maquinas_importadas_por_setor]
     
-    # Máquinas importadas por unidade (top 10)
-    maquinas_importadas_por_unidade = Maquina.objects.exclude(
+    # Máquinas importadas por unidade (top 10) - apenas ativas
+    maquinas_importadas_por_unidade = Maquina.objects.filter(
+        ativo=True
+    ).exclude(
         created_at__isnull=True
     ).exclude(
         nome_unid__isnull=True
@@ -3320,9 +3668,11 @@ def analise_maquinas_importadas(request):
     unidades_labels = [item['nome_unid'][:30] for item in maquinas_importadas_por_unidade]
     unidades_data = [item['total'] for item in maquinas_importadas_por_unidade]
     
-    # Máquinas importadas por mês (últimos 12 meses)
+    # Máquinas importadas por mês (últimos 12 meses) - apenas ativas
     maquinas_importadas_por_mes = defaultdict(int)
-    maquinas_importadas = Maquina.objects.exclude(created_at__isnull=True).order_by('created_at')
+    maquinas_importadas = Maquina.objects.filter(
+        ativo=True
+    ).exclude(created_at__isnull=True).order_by('created_at')
     for maquina in maquinas_importadas:
         if maquina.created_at:
             mes_ano = maquina.created_at.strftime('%Y-%m')
@@ -3333,15 +3683,19 @@ def analise_maquinas_importadas(request):
     meses_labels = [datetime.strptime(m, '%Y-%m').strftime('%b/%Y') for m in meses_ordenados]
     meses_data = [maquinas_importadas_por_mes[m] for m in meses_ordenados]
     
-    # Máquinas importadas recentes para exibir na tabela
-    maquinas_importadas_recentes = Maquina.objects.exclude(
+    # Máquinas importadas recentes para exibir na tabela - apenas ativas
+    maquinas_importadas_recentes = Maquina.objects.filter(
+        ativo=True
+    ).exclude(
         created_at__isnull=True
     ).order_by('-created_at')[:50]
     
-    # Agrupar máquinas importadas por descr_gerenc
+    # Agrupar máquinas importadas por descr_gerenc - apenas ativas
     from collections import defaultdict
     maquinas_por_gerencia = defaultdict(list)
-    maquinas_importadas_gerencia = Maquina.objects.exclude(
+    maquinas_importadas_gerencia = Maquina.objects.filter(
+        ativo=True
+    ).exclude(
         created_at__isnull=True
     ).exclude(
         descr_gerenc__isnull=True
@@ -3383,8 +3737,14 @@ def consultar_maquinas(request):
     """Consultar/listar máquinas cadastradas"""
     from app.models import Maquina
     
-    # Buscar todas as máquinas
-    maquinas_list = Maquina.objects.all()
+    # Verificar se deve incluir máquinas inativas
+    include_inativas = request.GET.get('include_inativas', 'off') == 'on'
+    
+    # Buscar máquinas (apenas ativas por padrão)
+    if include_inativas:
+        maquinas_list = Maquina.objects.all()
+    else:
+        maquinas_list = Maquina.objects.filter(ativo=True)
     
     # Filtro de busca geral
     search_query = request.GET.get('search', '').strip()
@@ -3457,29 +3817,25 @@ def consultar_maquinas(request):
     page_number = request.GET.get('page', 1)
     maquinas = paginator.get_page(page_number)
     
-    # Estatísticas
-    total_count = Maquina.objects.count()
-    setores_count = Maquina.objects.exclude(descr_setormanut__isnull=True).exclude(descr_setormanut='').values('descr_setormanut').distinct().count()
-    unidades_count = Maquina.objects.exclude(nome_unid__isnull=True).exclude(nome_unid='').values('nome_unid').distinct().count()
-    
-    # Contar máquinas com descr_gerenc = "MÁQUINAS PRINCIPAL" ou "MÁQUINA PRINCIPAL"
-    maquinas_principais_count = Maquina.objects.filter(
-        descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
-    ).count()
-    
-    # Obter valores distintos de descr_gerenc para o select
-    gerenc_choices = Maquina.objects.exclude(
-        descr_gerenc__isnull=True
-    ).exclude(
-        descr_gerenc=''
-    ).values_list('descr_gerenc', flat=True).distinct().order_by('descr_gerenc')
+    # Estatísticas (usar mesmo filtro de ativo/inativo)
+    if include_inativas:
+        total_count = Maquina.objects.count()
+        setores_count = Maquina.objects.exclude(descr_setormanut__isnull=True).exclude(descr_setormanut='').values('descr_setormanut').distinct().count()
+        unidades_count = Maquina.objects.exclude(nome_unid__isnull=True).exclude(nome_unid='').values('nome_unid').distinct().count()
+        maquinas_principais_count = Maquina.objects.filter(descr_gerenc__iexact='MÁQUINAS PRINCIPAL').count()
+        gerenc_choices = Maquina.objects.exclude(descr_gerenc__isnull=True).exclude(descr_gerenc='').values_list('descr_gerenc', flat=True).distinct().order_by('descr_gerenc')
+    else:
+        total_count = Maquina.objects.filter(ativo=True).count()
+        setores_count = Maquina.objects.filter(ativo=True).exclude(descr_setormanut__isnull=True).exclude(descr_setormanut='').values('descr_setormanut').distinct().count()
+        unidades_count = Maquina.objects.filter(ativo=True).exclude(nome_unid__isnull=True).exclude(nome_unid='').values('nome_unid').distinct().count()
+        maquinas_principais_count = Maquina.objects.filter(ativo=True, descr_gerenc__iexact='MÁQUINAS PRINCIPAL').count()
+        gerenc_choices = Maquina.objects.filter(ativo=True).exclude(descr_gerenc__isnull=True).exclude(descr_gerenc='').values_list('descr_gerenc', flat=True).distinct().order_by('descr_gerenc')
     
     # Obter valores distintos de descr_setormanut para o select
-    setor_choices = Maquina.objects.exclude(
-        descr_setormanut__isnull=True
-    ).exclude(
-        descr_setormanut=''
-    ).values_list('descr_setormanut', flat=True).distinct().order_by('descr_setormanut')
+    if include_inativas:
+        setor_choices = Maquina.objects.exclude(descr_setormanut__isnull=True).exclude(descr_setormanut='').values_list('descr_setormanut', flat=True).distinct().order_by('descr_setormanut')
+    else:
+        setor_choices = Maquina.objects.filter(ativo=True).exclude(descr_setormanut__isnull=True).exclude(descr_setormanut='').values_list('descr_setormanut', flat=True).distinct().order_by('descr_setormanut')
     
     context = {
         'page_title': 'Consultar Máquinas',
@@ -3491,6 +3847,7 @@ def consultar_maquinas(request):
         'maquinas_principais_count': maquinas_principais_count,
         'gerenc_choices': gerenc_choices,
         'setor_choices': setor_choices,
+        'include_inativas': include_inativas,
         # Preservar filtros no contexto
         'filter_codigo': filter_codigo,
         'filter_descricao': filter_descricao,

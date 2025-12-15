@@ -100,12 +100,20 @@ def read_csv_file(file, encoding='utf-8', delimiter=','):
         csv_reader = csv.DictReader(io.StringIO(content), delimiter=delimiter)
         data = []
         for row in csv_reader:
-            # Remover valores vazios e normalizar
+            # Normalizar e preservar todos os valores (incluindo vazios)
             row_dict = {}
             for key, value in row.items():
-                if value:
-                    row_dict[key.strip()] = value.strip()
-            if row_dict:  # Adicionar apenas se nÃ£o estiver vazio
+                # Normalizar nome da coluna
+                normalized_key = key.strip() if key else f'col_{len(row_dict)}'
+                # Preservar valor (mesmo se vazio) mas normalizar espaços
+                # IMPORTANTE: Não converter string vazia para None, manter como string vazia
+                if value is not None:
+                    normalized_value = value.strip() if value.strip() else ''
+                else:
+                    normalized_value = None
+                row_dict[normalized_key] = normalized_value
+            # Adicionar linha se tiver pelo menos uma coluna com valor
+            if any(v for v in row_dict.values() if v):
                 data.append(row_dict)
         
         return data
@@ -409,7 +417,7 @@ def upload_ordens_corretivas_from_file(file, update_existing=False) -> Tuple[int
         return 0, 0, errors
 
 
-def upload_maquinas_from_file(file, update_existing=False, update_fields=None) -> Tuple[int, int, List[str]]:
+def upload_maquinas_from_file(file, update_existing=False, update_fields=None) -> Tuple[int, int, List[str], List]:
     """
     Faz upload de mÃ¡quinas a partir de um arquivo CSV ou Excel
     
@@ -420,13 +428,15 @@ def upload_maquinas_from_file(file, update_existing=False, update_fields=None) -
                       Se update_existing=False, este parÃ¢metro Ã© ignorado.
     
     Returns:
-        Tupla (created_count, updated_count, errors)
+        Tupla (created_count, updated_count, errors, missing_machines)
+        missing_machines: Lista de máquinas que estão no DB mas não no arquivo (apenas ativas)
     """
     from app.models import Maquina
     
     errors = []
     created_count = 0
     updated_count = 0
+    cd_maquinas_in_file = set()  # Para rastrear quais máquinas estão no arquivo
     
     # Determinar tipo de arquivo
     file_name = file.name.lower()
@@ -496,6 +506,9 @@ def upload_maquinas_from_file(file, update_existing=False, update_fields=None) -
                         errors.append(f"Linha {row_num}: CÃ³digo da mÃ¡quina (CD_MAQUINA) Ã© obrigatÃ³rio")
                         continue
                     
+                    # Adicionar cd_maquina ao conjunto de máquinas no arquivo
+                    cd_maquinas_in_file.add(cd_maquina)
+                    
                     # Preparar dados para criaÃ§Ã£o/atualizaÃ§Ã£o
                     maquina_data = {
                         'cd_unid': cd_unid,
@@ -510,6 +523,7 @@ def upload_maquinas_from_file(file, update_existing=False, update_fields=None) -
                         'cd_grupo': cd_grupo,
                         'cd_tpcentativ': cd_tpcentativ,
                         'descr_gerenc': descr_gerenc,
+                        'ativo': True,  # Sempre marcar como ativo quando aparece no arquivo (reativação automática)
                     }
                     
                     # Criar ou atualizar registro
@@ -523,6 +537,9 @@ def upload_maquinas_from_file(file, update_existing=False, update_fields=None) -
                                 for field in update_fields:
                                     if field in maquina_data:
                                         setattr(maquina_obj, field, maquina_data[field])
+                                # Sempre reativar se estava inativa (independente de update_fields)
+                                if not maquina_obj.ativo:
+                                    maquina_obj.ativo = True
                                 maquina_obj.save()
                                 updated_count += 1
                             except Maquina.DoesNotExist:
@@ -535,13 +552,13 @@ def upload_maquinas_from_file(file, update_existing=False, update_fields=None) -
                         else:
                             # Comportamento padrÃ£o: atualizar todos os campos
                             maquina_obj, created = Maquina.objects.update_or_create(
-                            cd_maquina=cd_maquina,
-                            defaults=maquina_data
-                        )
-                        if created:
-                            created_count += 1
-                        else:
-                            updated_count += 1
+                                cd_maquina=cd_maquina,
+                                defaults=maquina_data
+                            )
+                            if created:
+                                created_count += 1
+                            else:
+                                updated_count += 1
                     else:
                         maquina_obj, created = Maquina.objects.get_or_create(
                             cd_maquina=cd_maquina,
@@ -549,6 +566,12 @@ def upload_maquinas_from_file(file, update_existing=False, update_fields=None) -
                         )
                         if created:
                             created_count += 1
+                        else:
+                            # Se já existe, reativar se estava inativa
+                            if not maquina_obj.ativo:
+                                maquina_obj.ativo = True
+                                maquina_obj.save()
+                                updated_count += 1
                     
                 except Exception as e:
                     error_msg = f"Linha {row_num}: Erro ao processar registro - {str(e)}"
@@ -557,18 +580,30 @@ def upload_maquinas_from_file(file, update_existing=False, update_fields=None) -
                     import traceback
                     traceback.print_exc()
         
-        return created_count, updated_count, errors
+        # Identificar máquinas que estão no DB mas não no arquivo (apenas as ativas)
+        missing_machines = []
+        if cd_maquinas_in_file:
+            # Buscar máquinas ativas que não estão no arquivo
+            maquinas_ativas_nao_no_arquivo = Maquina.objects.filter(
+                ativo=True
+            ).exclude(
+                cd_maquina__in=cd_maquinas_in_file
+            ).values('id', 'cd_maquina', 'descr_maquina', 'cd_setormanut', 'descr_setormanut')
+            
+            missing_machines = list(maquinas_ativas_nao_no_arquivo)
+        
+        return created_count, updated_count, errors, missing_machines
     
     except ValidationError as e:
         errors.append(str(e))
-        return 0, 0, errors
+        return 0, 0, errors, []
     except Exception as e:
         error_detail = f"Erro geral ao processar arquivo: {str(e)}"
         errors.append(error_detail)
         print(f"Erro geral: {error_detail}")  # Debug
         import traceback
         traceback.print_exc()
-        return 0, 0, errors
+        return 0, 0, errors, []
 
 
 def upload_requisicoes_almoxarifado_from_file(file, data_requisicao, update_existing=False) -> Tuple[int, int, List[str]]:
@@ -1020,15 +1055,41 @@ def upload_cas_from_file(file, update_existing=False) -> Tuple[int, int, List[st
         if file_name.endswith(('.xlsx', '.xls', '.xlsm')):
             data = read_excel_file(file)
         elif file_name.endswith('.csv'):
-            # Tentar diferentes encodings
-            try:
-                data = read_csv_file(file, encoding='utf-8')
-            except UnicodeDecodeError:
-                try:
-                    file.seek(0)  # Resetar arquivo
-                    data = read_csv_file(file, encoding='latin-1')
-                except Exception as e:
-                    raise ValidationError(f"Erro ao ler arquivo CSV: {str(e)}")
+            # Tentar diferentes delimitadores e encodings
+            # Primeiro tentar com ponto e vÃ­rgula (;) e encoding latin-1 (comum em arquivos brasileiros)
+            data = None
+            encodings_to_try = ['latin-1', 'iso-8859-1', 'utf-8', 'cp1252']
+            delimiters_to_try = [';', ',']
+            
+            last_error = None
+            for delimiter in delimiters_to_try:
+                for encoding in encodings_to_try:
+                    try:
+                        file.seek(0)  # Resetar arquivo
+                        data = read_csv_file(file, encoding=encoding, delimiter=delimiter)
+                        # Se conseguiu ler e tem dados, usar este formato
+                        if data and len(data) > 0:
+                            # Verificar se pelo menos uma coluna importante foi encontrada
+                            first_row = data[0] if data else {}
+                            if 'CA' in first_row or 'ca' in first_row or any('ca' in k.lower() for k in first_row.keys()):
+                                break
+                    except UnicodeDecodeError as e:
+                        last_error = f"Erro de encoding com {encoding}: {str(e)}"
+                        continue
+                    except Exception as e:
+                        last_error = f"Erro ao ler CSV com delimiter '{delimiter}' e encoding '{encoding}': {str(e)}"
+                        continue
+                if data and len(data) > 0:
+                    # Verificar novamente antes de sair do loop externo
+                    first_row = data[0] if data else {}
+                    if 'CA' in first_row or 'ca' in first_row or any('ca' in k.lower() for k in first_row.keys()):
+                        break
+            
+            if not data or len(data) == 0:
+                error_msg = "Erro ao ler arquivo CSV. Verifique o formato e encoding do arquivo."
+                if last_error:
+                    error_msg += f" Último erro: {last_error}"
+                raise ValidationError(error_msg)
         else:
             raise ValidationError("Formato de arquivo nÃ£o suportado. Use .xlsx, .xls, .xlsm ou .csv")
         
@@ -1038,39 +1099,95 @@ def upload_cas_from_file(file, update_existing=False) -> Tuple[int, int, List[st
         # Processar dados em transaÃ§Ã£o
         with transaction.atomic():
             for row_num, row_data in enumerate(data, start=2):  # ComeÃ§ar em 2 (linha 1 Ã© cabeÃ§alho)
+                # Usar savepoint para cada linha, permitindo que erros em uma linha não afetem as outras
+                savepoint_id = transaction.savepoint()
                 try:
                     # Verificar se a linha estÃ¡ vazia ou tem apenas valores vazios
                     if not any(str(v).strip() if v else '' for v in row_data.values()):
+                        transaction.savepoint_commit(savepoint_id)
                         continue
                     
-                    # Normalizar nomes de colunas (lidar com problemas de encoding)
-                    ca_value = _find_column_by_partial_match(row_data, ['ca', 'centro', 'atividade'])
-                    sigla_value = _find_column_by_partial_match(row_data, ['sigla'])
-                    descricao_value = _find_column_by_partial_match(row_data, ['descricao', 'descrio'])
-                    indice_value = _find_column_by_partial_match(row_data, ['indice', 'ndice'])
-                    encarregado_value = _find_column_by_partial_match(row_data, ['encarregado', 'responsavel', 'responsvel'])
-                    local_value = _find_column_by_partial_match(row_data, ['local'])
-                    imagem_value = _find_column_by_partial_match(row_data, ['imagem', 'image'])
+                    # Função auxiliar para encontrar coluna com múltiplas tentativas
+                    def find_column_value(row_data, possible_names, partial_keywords=None):
+                        """Tenta encontrar valor da coluna usando múltiplas estratégias"""
+                        # Primeiro: tentar match exato (case-insensitive, ignorando espaços e encoding)
+                        for key, value in row_data.items():
+                            key_normalized = str(key).strip().upper().replace(' ', '').replace('_', '')
+                            for name in possible_names:
+                                name_normalized = str(name).strip().upper().replace(' ', '').replace('_', '')
+                                if key_normalized == name_normalized:
+                                    return value
+                        
+                        # Segundo: tentar match parcial
+                        if partial_keywords:
+                            result = _find_column_by_partial_match(row_data, partial_keywords)
+                            if result is not None:
+                                return result
+                        
+                        # Terceiro: tentar match direto com variações
+                        for name in possible_names:
+                            if name in row_data:
+                                return row_data[name]
+                        
+                        # Quarto: tentar match case-insensitive direto
+                        for key, value in row_data.items():
+                            if str(key).strip().upper() == str(possible_names[0]).strip().upper():
+                                return value
+                        
+                        return None
                     
-                    # Se nÃ£o encontrou pelo mÃ©todo parcial, tentar nomes diretos
-                    if not ca_value:
-                        ca_value = row_data.get('CA') or row_data.get('ca') or row_data.get('Ca')
-                    if not sigla_value:
-                        sigla_value = row_data.get('SIGLA') or row_data.get('sigla') or row_data.get('Sigla')
-                    if not descricao_value:
-                        descricao_value = row_data.get('DESCRIÃ‡ÃƒO') or row_data.get('DESCRIO') or row_data.get('DescriÃ§Ã£o') or row_data.get('Descrio') or row_data.get('descriÃ§Ã£o') or row_data.get('descrio')
-                    if not indice_value:
-                        indice_value = row_data.get('ÃNDICE') or row_data.get('INDICE') or row_data.get('Ãndice') or row_data.get('Indice') or row_data.get('Ã­ndice') or row_data.get('indice')
-                    if not encarregado_value:
-                        encarregado_value = row_data.get('ENCARREGADO RESPONSÃVEL') or row_data.get('ENCARREGADO RESPONSVEL') or row_data.get('Encarregado ResponsÃ¡vel') or row_data.get('Encarregado Responsavel') or row_data.get('encarregado responsÃ¡vel') or row_data.get('encarregado responsavel')
-                    if not local_value:
-                        local_value = row_data.get('LOCAL') or row_data.get('local') or row_data.get('Local')
-                    if not imagem_value:
-                        imagem_value = row_data.get('IMAGEM') or row_data.get('imagem') or row_data.get('Imagem') or row_data.get('IMAGE') or row_data.get('image')
+                    # Extrair valores das colunas com múltiplas tentativas
+                    ca_value = find_column_value(
+                        row_data, 
+                        ['CA', 'ca', 'Ca', 'CENTRO', 'centro', 'ATIVIDADE', 'atividade'],
+                        ['ca', 'centro', 'atividade']
+                    )
+                    
+                    sigla_value = find_column_value(
+                        row_data,
+                        ['SIGLA', 'sigla', 'Sigla'],
+                        ['sigla']
+                    )
+                    
+                    descricao_value = find_column_value(
+                        row_data,
+                        ['DESCRIÇÃO', 'DESCRI��O', 'DESCRIO', 'Descrição', 'Descri��o', 'Descrio', 
+                         'descrição', 'descri��o', 'descrio', 'DESCRIÃ‡ÃƒO', 'DescriÃ§Ã£o'],
+                        ['descricao', 'descrio']
+                    )
+                    
+                    indice_value = find_column_value(
+                        row_data,
+                        ['INDICE', 'INDICE', 'ÍNDICE', 'ÃNDICE', 'ÃNDICE', 'indice', 'índice', 
+                         'Ã­ndice', 'Indice', 'Índice'],
+                        ['indice', 'ndice']
+                    )
+                    
+                    encarregado_value = find_column_value(
+                        row_data,
+                        ['ENCARREGADO RESPONSÁVEL', 'ENCARREGADO RESPONS�VEL', 'ENCARREGADO RESPONSVEL',
+                         'Encarregado Responsável', 'Encarregado Respons�vel', 'Encarregado Responsavel',
+                         'encarregado responsável', 'encarregado respons�vel', 'encarregado responsavel',
+                         'ENCARREGADO RESPONSÃVEL', 'Encarregado ResponsÃ¡vel'],
+                        ['encarregado', 'responsavel', 'responsvel']
+                    )
+                    
+                    local_value = find_column_value(
+                        row_data,
+                        ['LOCAL', 'local', 'Local'],
+                        ['local']
+                    )
+                    
+                    imagem_value = find_column_value(
+                        row_data,
+                        ['IMAGEM', 'imagem', 'Imagem', 'IMAGE', 'image', 'Image'],
+                        ['imagem', 'image']
+                    )
                     
                     # Validar que temos pelo menos o cÃ³digo CA
                     if not ca_value:
                         errors.append(f"Linha {row_num}: Campo 'CA' Ã© obrigatÃ³rio")
+                        transaction.savepoint_commit(savepoint_id)
                         continue
                     
                     # Converter CA para inteiro
@@ -1078,6 +1195,7 @@ def upload_cas_from_file(file, update_existing=False) -> Tuple[int, int, List[st
                         ca_int = int(float(str(ca_value)))
                     except (ValueError, TypeError):
                         errors.append(f"Linha {row_num}: Valor de CA invÃ¡lido: {ca_value}")
+                        transaction.savepoint_commit(savepoint_id)
                         continue
                     
                     # Converter Ã­ndice para inteiro se existir
@@ -1090,12 +1208,17 @@ def upload_cas_from_file(file, update_existing=False) -> Tuple[int, int, List[st
                     
                     # Preparar dados para criaÃ§Ã£o/atualizaÃ§Ã£o do CA
                     local_str = _safe_str(local_value, max_length=255) if local_value else None
-                    imagem_str = _safe_str(imagem_value) if imagem_value else None
+                    # Preservar imagem mesmo se for string vazia (será None se realmente vazio)
+                    imagem_str = None
+                    if imagem_value is not None:
+                        if str(imagem_value).strip():  # Se tem conteúdo após remover espaços
+                            imagem_str = _safe_str(imagem_value, max_length=500)
+                        # Se for string vazia, manter como None (não salvar strings vazias)
                     
-                    # Preparar observacoes com imagem se houver
-                    observacoes_str = None
-                    if imagem_str:
-                        observacoes_str = f"Imagem: {imagem_str}"
+                    # Normalizar caminho da imagem: remover 'static/' do início se presente
+                    # pois Django's {% static %} tag já adiciona isso
+                    if imagem_str and imagem_str.startswith('static/'):
+                        imagem_str = imagem_str.replace('static/', '', 1)
                     
                     ca_data = {
                         'sigla': _safe_str(sigla_value, max_length=50),
@@ -1103,36 +1226,58 @@ def upload_cas_from_file(file, update_existing=False) -> Tuple[int, int, List[st
                         'indice': indice_int,
                         'encarregado_responsavel': _safe_str(encarregado_value, max_length=255),
                         'local': local_str,
+                        'imagem': imagem_str,
                     }
                     
-                    # Adicionar observacoes se houver imagem
-                    if observacoes_str:
-                        ca_data['observacoes'] = observacoes_str
-                    
                     # Criar ou atualizar CA
+                    # Como CA não é mais único, precisamos verificar se já existe um registro com os mesmos dados
+                    # ou criar um novo registro
                     if update_existing:
-                        ca_obj, ca_created = CentroAtividade.objects.update_or_create(
+                        # Tentar encontrar um registro existente com o mesmo CA e dados similares
+                        existing_ca = CentroAtividade.objects.filter(
                             ca=ca_int,
-                            defaults=ca_data
-                        )
-                        if ca_created:
-                            created_count += 1
-                        else:
+                            sigla=ca_data.get('sigla'),
+                            descricao=ca_data.get('descricao'),
+                            local=ca_data.get('local')
+                        ).first()
+                        
+                        if existing_ca:
+                            # Atualizar registro existente
+                            for key, value in ca_data.items():
+                                setattr(existing_ca, key, value)
+                            existing_ca.save()
                             updated_count += 1
-                    else:
-                        ca_obj, ca_created = CentroAtividade.objects.get_or_create(
-                            ca=ca_int,
-                            defaults=ca_data
-                        )
-                        if ca_created:
+                        else:
+                            # Criar novo registro
+                            CentroAtividade.objects.create(ca=ca_int, **ca_data)
                             created_count += 1
+                    else:
+                        # Verificar se já existe um registro idêntico
+                        existing_ca = CentroAtividade.objects.filter(
+                            ca=ca_int,
+                            sigla=ca_data.get('sigla'),
+                            descricao=ca_data.get('descricao'),
+                            local=ca_data.get('local')
+                        ).first()
+                        
+                        if not existing_ca:
+                            # Criar novo registro apenas se não existir um idêntico
+                            CentroAtividade.objects.create(ca=ca_int, **ca_data)
+                            created_count += 1
+                    
+                    # Confirmar savepoint se tudo correu bem
+                    transaction.savepoint_commit(savepoint_id)
                     
                 except Exception as e:
+                    # Reverter savepoint em caso de erro
+                    transaction.savepoint_rollback(savepoint_id)
                     error_msg = f"Linha {row_num}: Erro ao processar registro - {str(e)}"
                     errors.append(error_msg)
                     print(f"Erro na linha {row_num}: {e}")
                     import traceback
                     traceback.print_exc()
+                    # Continuar processando outras linhas mesmo se esta falhar
+                    continue
         
         return created_count, updated_count, errors
     

@@ -81,6 +81,7 @@ class Maquina(models.Model):
         help_text='Centro de Atividade relacionado ao setor de manutenção',
         related_name='maquinas'
     )
+    ativo = models.BooleanField('Ativo', default=True, db_index=True, help_text='Indica se a máquina está ativa no sistema')
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
     updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
 
@@ -88,6 +89,9 @@ class Maquina(models.Model):
         verbose_name = 'Máquina'
         verbose_name_plural = 'Máquinas'
         ordering = ['cd_maquina']
+        indexes = [
+            models.Index(fields=['ativo', 'cd_maquina']),
+        ]
 
     def __str__(self):
         return f"{self.cd_maquina} - {self.descr_maquina or 'Sem descrição'}"
@@ -240,12 +244,13 @@ class OrdemServicoCorretivaFicha(models.Model):
 
 class CentroAtividade(models.Model):
     """Modelo para armazenar informações de Centros de Atividade (CA)"""
-    ca = models.IntegerField('CA', unique=True, db_index=True)
+    ca = models.IntegerField('CA', db_index=True)
     sigla = models.CharField('Sigla', max_length=50, blank=True, null=True)
     descricao = models.CharField('Descrição', max_length=500, blank=True, null=True)
     indice = models.IntegerField('Índice', blank=True, null=True)
     encarregado_responsavel = models.CharField('Encarregado Responsável', max_length=255, blank=True, null=True)
     local = models.CharField('Local', max_length=255, blank=True, null=True, help_text='Local do Centro de Atividade')
+    imagem = models.CharField('Imagem', max_length=500, blank=True, null=True, help_text='Caminho da imagem (relativo a static/)')
     observacoes = models.TextField('Observações', blank=True, null=True, help_text='Observações sobre o local')
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
     updated_at = models.DateTimeField('Data de Atualização', auto_now=True)

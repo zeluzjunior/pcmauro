@@ -193,6 +193,15 @@
                                             </select>
                                         </div>
                                         <div class="col-12">
+                                            <div class="form-check mb-3">
+                                                <input class="form-check-input" type="checkbox" id="include_inativas" name="include_inativas" {% if include_inativas %}checked{% endif %}>
+                                                <label class="form-check-label" for="include_inativas">
+                                                    <i class="fas fa-eye-slash me-1"></i>Incluir máquinas inativas
+                                                </label>
+                                                <small class="form-text text-muted d-block">Por padrão, apenas máquinas ativas são exibidas. Marque esta opção para incluir também as máquinas marcadas como inativas.</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-12">
                                             <div class="d-flex gap-2">
                                                 <button type="submit" class="btn btn-primary">
                                                     <i class="fas fa-filter me-2"></i>Aplicar Filtros

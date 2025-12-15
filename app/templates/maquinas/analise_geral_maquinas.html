@@ -62,284 +62,126 @@
 <!-- Main Content -->
 <section class="py-5">
     <div class="container">
-        <!-- Centros de Atividade - INDÚSTRIA e FRIGORÍFICO -->
-        <div class="row mb-5">
-            <!-- INDÚSTRIA -->
-            <div class="col-md-6 mb-4">
-                <div class="accordion" id="accordionIndustriaMain">
-                    <div class="accordion-item">
-                        <h2 class="accordion-header" id="headingIndustria">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseIndustria" aria-expanded="true" aria-controls="collapseIndustria">
-                                <strong>
-                                    <i class="fas fa-industry me-2"></i>Centros de Atividade - INDÚSTRIA
-                                    <small class="ms-2">({{ centros_industria|length }} centros)</small>
-                                </strong>
-                            </button>
-                        </h2>
-                        <div id="collapseIndustria" class="accordion-collapse collapse" aria-labelledby="headingIndustria" data-bs-parent="#accordionIndustriaMain">
-                            <div class="accordion-body">
-                                {% if centros_industria %}
-                                    <div class="accordion accordion-flush" id="accordionIndustria">
-                                        {% for centro in centros_industria %}
-                                            <div class="accordion-item">
-                                                <h2 class="accordion-header" id="headingInd{{ centro.id }}">
-                                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseInd{{ centro.id }}" aria-expanded="false" aria-controls="collapseInd{{ centro.id }}">
-                                                        <strong>
-                                                            <i class="fas fa-industry me-2"></i>CA {{ centro.ca }}
-                                                            {% if centro.sigla %}
-                                                                - {{ centro.sigla }}
-                                                            {% endif %}
-                                                        </strong>
-                                                    </button>
-                                                </h2>
-                                                <div id="collapseInd{{ centro.id }}" class="accordion-collapse collapse" aria-labelledby="headingInd{{ centro.id }}" data-bs-parent="#accordionIndustria">
-                                                    <div class="accordion-body">
-                                                        <div class="mb-2">
-                                                            <strong><i class="fas fa-hashtag me-2"></i>CA:</strong>
-                                                            <span class="badge bg-primary">{{ centro.ca }}</span>
-                                                        </div>
-                                                        {% if centro.sigla %}
-                                                            <div class="mb-2">
-                                                                <strong><i class="fas fa-tag me-2"></i>Sigla:</strong>
-                                                                {{ centro.sigla }}
-                                                            </div>
-                                                        {% endif %}
-                                                        {% if centro.descricao %}
-                                                            <div class="mb-2">
-                                                                <strong><i class="fas fa-align-left me-2"></i>Descrição:</strong>
-                                                                <p class="mb-0">{{ centro.descricao }}</p>
-                                                            </div>
-                                                        {% endif %}
-                                                        {% if centro.indice %}
-                                                            <div class="mb-2">
-                                                                <strong><i class="fas fa-sort-numeric-up me-2"></i>Índice:</strong>
-                                                                <span class="badge bg-secondary">{{ centro.indice }}</span>
-                                                            </div>
-                                                        {% endif %}
-                                                        {% if centro.encarregado_responsavel %}
-                                                            <div class="mb-2">
-                                                                <strong><i class="fas fa-user-tie me-2"></i>Encarregado Responsável:</strong>
-                                                                {{ centro.encarregado_responsavel }}
-                                                            </div>
-                                                        {% endif %}
-                                                        {% if centro.local %}
-                                                            <div class="mb-2">
-                                                                <strong><i class="fas fa-map-marker-alt me-2"></i>Local:</strong>
-                                                                <span class="badge bg-primary">{{ centro.local }}</span>
-                                                            </div>
-                                                        {% endif %}
-                                                        <hr>
-                                                        <div class="d-flex justify-content-between align-items-center">
-                                                            <small class="text-muted">
-                                                                <i class="fas fa-calendar me-1"></i>
-                                                                Criado em: {{ centro.created_at|date:"d/m/Y H:i" }}
-                                                            </small>
-                                                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="btn btn-sm btn-outline-primary">
-                                                                <i class="fas fa-eye me-1"></i>Ver Detalhes
-                                                            </a>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-                                {% else %}
-                                    <div class="alert alert-info text-center m-3 mb-0">
-                                        <i class="fas fa-info-circle me-2"></i>Nenhum Centro de Atividade com local "INDÚSTRIA" cadastrado.
-                                    </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- FRIGORÍFICO -->
-            <div class="col-md-6 mb-4">
-                <div class="accordion" id="accordionFrigorificoMain">
-                    <div class="accordion-item">
-                        <h2 class="accordion-header" id="headingFrigorifico">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFrigorifico" aria-expanded="false" aria-controls="collapseFrigorifico">
-                                <strong>
-                                    <i class="fas fa-snowflake me-2"></i>Centros de Atividade - FRIGORÍFICO
-                                    <small class="ms-2">({{ centros_frigorifico|length }} centros)</small>
-                                </strong>
-                            </button>
-                        </h2>
-                        <div id="collapseFrigorifico" class="accordion-collapse collapse" aria-labelledby="headingFrigorifico" data-bs-parent="#accordionFrigorificoMain">
-                            <div class="accordion-body">
-                                {% if centros_frigorifico %}
-                                    <div class="accordion accordion-flush" id="accordionFrigorifico">
-                                        {% for centro in centros_frigorifico %}
-                                            <div class="accordion-item">
-                                                <h2 class="accordion-header" id="headingFrig{{ centro.id }}">
-                                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFrig{{ centro.id }}" aria-expanded="false" aria-controls="collapseFrig{{ centro.id }}">
-                                                        <strong>
-                                                            <i class="fas fa-industry me-2"></i>CA {{ centro.ca }}
-                                                            {% if centro.sigla %}
-                                                                - {{ centro.sigla }}
-                                                            {% endif %}
-                                                        </strong>
-                                                    </button>
-                                                </h2>
-                                                <div id="collapseFrig{{ centro.id }}" class="accordion-collapse collapse" aria-labelledby="headingFrig{{ centro.id }}" data-bs-parent="#accordionFrigorifico">
-                                                    <div class="accordion-body">
-                                                        <div class="mb-2">
-                                                            <strong><i class="fas fa-hashtag me-2"></i>CA:</strong>
-                                                            <span class="badge bg-primary">{{ centro.ca }}</span>
-                                                        </div>
-                                                        {% if centro.sigla %}
-                                                            <div class="mb-2">
-                                                                <strong><i class="fas fa-tag me-2"></i>Sigla:</strong>
-                                                                {{ centro.sigla }}
-                                                            </div>
-                                                        {% endif %}
-                                                        {% if centro.descricao %}
-                                                            <div class="mb-2">
-                                                                <strong><i class="fas fa-align-left me-2"></i>Descrição:</strong>
-                                                                <p class="mb-0">{{ centro.descricao }}</p>
-                                                            </div>
-                                                        {% endif %}
-                                                        {% if centro.indice %}
-                                                            <div class="mb-2">
-                                                                <strong><i class="fas fa-sort-numeric-up me-2"></i>Índice:</strong>
-                                                                <span class="badge bg-secondary">{{ centro.indice }}</span>
-                                                            </div>
-                                                        {% endif %}
-                                                        {% if centro.encarregado_responsavel %}
-                                                            <div class="mb-2">
-                                                                <strong><i class="fas fa-user-tie me-2"></i>Encarregado Responsável:</strong>
-                                                                {{ centro.encarregado_responsavel }}
-                                                            </div>
-                                                        {% endif %}
-                                                        {% if centro.local %}
-                                                            <div class="mb-2">
-                                                                <strong><i class="fas fa-map-marker-alt me-2"></i>Local:</strong>
-                                                                <span class="badge bg-success">{{ centro.local }}</span>
-                                                            </div>
-                                                        {% endif %}
-                                                        <hr>
-                                                        <div class="d-flex justify-content-between align-items-center">
-                                                            <small class="text-muted">
-                                                                <i class="fas fa-calendar me-1"></i>
-                                                                Criado em: {{ centro.created_at|date:"d/m/Y H:i" }}
-                                                            </small>
-                                                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="btn btn-sm btn-outline-primary">
-                                                                <i class="fas fa-eye me-1"></i>Ver Detalhes
-                                                            </a>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-                                {% else %}
-                                    <div class="alert alert-info text-center m-3 mb-0">
-                                        <i class="fas fa-info-circle me-2"></i>Nenhum Centro de Atividade com local "FRIGORÍFICO" cadastrado.
-                                    </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <!-- KPI Cards -->
         <div class="mb-5">
+            <!-- Primeira linha: 5 cards principais (3+2+2+2+3 = 12 colunas) -->
             <div class="row mb-4">
-                <div class="col-md-3 mb-4">
-                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+                <div class="col-md-3 col-sm-6 mb-4">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Total de Máquinas</h6>
-                                    <h2 class="mb-0 fw-bold">{{ total_count }}</h2>
-                                </div>
-                                <i class="fas fa-cogs fa-3x text-primary opacity-25"></i>
+                            <div class="d-flex flex-column align-items-center text-center">
+                                <i class="fas fa-cogs fa-2x text-primary opacity-75 mb-2"></i>
+                                <h6 class="text-muted mb-2 small">Total de Máquinas</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_count }}</h2>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-4">
-                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                <div class="col-md-2 col-sm-6 mb-4">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Últimos 30 Dias</h6>
-                                    <h2 class="mb-0 fw-bold">{{ maquinas_recentes }}</h2>
-                                </div>
-                                <i class="fas fa-calendar-day fa-3x text-success opacity-25"></i>
+                            <div class="d-flex flex-column align-items-center text-center">
+                                <i class="fas fa-check-circle fa-2x text-success opacity-75 mb-2"></i>
+                                <h6 class="text-muted mb-2 small">Máquinas Ativas</h6>
+                                <h3 class="mb-0 fw-bold">{{ maquinas_ativas }}</h3>
+                                <small class="text-muted">{{ percentual_ativas }}%</small>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-4">
-                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+                <div class="col-md-2 col-sm-6 mb-4">
+                    <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Mês Atual</h6>
-                                    <h2 class="mb-0 fw-bold">{{ maquinas_mes_atual }}</h2>
-                                </div>
-                                <i class="fas fa-calendar-alt fa-3x text-warning opacity-25"></i>
+                            <div class="d-flex flex-column align-items-center text-center">
+                                <i class="fas fa-times-circle fa-2x text-danger opacity-75 mb-2"></i>
+                                <h6 class="text-muted mb-2 small">Máquinas Inativas</h6>
+                                <h3 class="mb-0 fw-bold">{{ maquinas_inativas }}</h3>
+                                <small class="text-muted">{{ percentual_inativas }}%</small>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-4">
-                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                <div class="col-md-2 col-sm-6 mb-4">
+                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Com Patrimônio</h6>
-                                    <h2 class="mb-0 fw-bold">{{ maquinas_com_patrimonio }}</h2>
-                                    <small class="text-muted">{{ percentual_patrimonio }}% do total</small>
-                                </div>
-                                <i class="fas fa-barcode fa-3x text-info opacity-25"></i>
+                            <div class="d-flex flex-column align-items-center text-center">
+                                <i class="fas fa-calendar-day fa-2x text-warning opacity-75 mb-2"></i>
+                                <h6 class="text-muted mb-2 small">Últimos 30 Dias</h6>
+                                <h3 class="mb-0 fw-bold">{{ maquinas_recentes }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-4">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex flex-column align-items-center text-center">
+                                <i class="fas fa-calendar-alt fa-2x text-info opacity-75 mb-2"></i>
+                                <h6 class="text-muted mb-2 small">Mês Atual</h6>
+                                <h2 class="mb-0 fw-bold">{{ maquinas_mes_atual }}</h2>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+            
+            <!-- Segunda linha: 5 cards complementares (2+3+2+3+2 = 12 colunas) -->
             <div class="row">
-                <div class="col-md-4 mb-4">
-                    <div class="card stat-card kpi-card kpi-purple shadow-sm border-0">
+                <div class="col-md-2 col-sm-6 mb-4">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Com Foto</h6>
-                                    <h2 class="mb-0 fw-bold">{{ maquinas_com_foto }}</h2>
-                                    <small class="text-muted">{{ percentual_foto }}% do total</small>
-                                </div>
-                                <i class="fas fa-camera fa-3x text-purple opacity-25"></i>
+                            <div class="d-flex flex-column align-items-center text-center">
+                                <i class="fas fa-barcode fa-2x text-primary opacity-75 mb-2"></i>
+                                <h6 class="text-muted mb-2 small">Com Patrimônio</h6>
+                                <h3 class="mb-0 fw-bold">{{ maquinas_com_patrimonio }}</h3>
+                                <small class="text-muted">{{ percentual_patrimonio }}%</small>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4 mb-4">
-                    <div class="card stat-card kpi-card kpi-danger shadow-sm border-0">
+                <div class="col-md-3 col-sm-6 mb-4">
+                    <div class="card stat-card kpi-card kpi-purple shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Com Placa</h6>
-                                    <h2 class="mb-0 fw-bold">{{ maquinas_com_placa }}</h2>
-                                    <small class="text-muted">{{ percentual_placa }}% do total</small>
-                                </div>
-                                <i class="fas fa-id-card fa-3x text-danger opacity-25"></i>
+                            <div class="d-flex flex-column align-items-center text-center">
+                                <i class="fas fa-camera fa-2x text-purple opacity-75 mb-2"></i>
+                                <h6 class="text-muted mb-2 small">Com Foto</h6>
+                                <h2 class="mb-0 fw-bold">{{ maquinas_com_foto }}</h2>
+                                <small class="text-muted">{{ percentual_foto }}% do total</small>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4 mb-4">
-                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                <div class="col-md-2 col-sm-6 mb-4">
+                    <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Setores Únicos</h6>
-                                    <h2 class="mb-0 fw-bold">{{ setores_count }}</h2>
-                                </div>
-                                <i class="fas fa-building fa-3x text-success opacity-25"></i>
+                            <div class="d-flex flex-column align-items-center text-center">
+                                <i class="fas fa-id-card fa-2x text-danger opacity-75 mb-2"></i>
+                                <h6 class="text-muted mb-2 small">Com Placa</h6>
+                                <h3 class="mb-0 fw-bold">{{ maquinas_com_placa }}</h3>
+                                <small class="text-muted">{{ percentual_placa }}%</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-4">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex flex-column align-items-center text-center">
+                                <i class="fas fa-building fa-2x text-success opacity-75 mb-2"></i>
+                                <h6 class="text-muted mb-2 small">Setores Únicos</h6>
+                                <h2 class="mb-0 fw-bold">{{ setores_count }}</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2 col-sm-6 mb-4">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex flex-column align-items-center text-center">
+                                <i class="fas fa-sitemap fa-2x text-info opacity-75 mb-2"></i>
+                                <h6 class="text-muted mb-2 small">Unidades Únicas</h6>
+                                <h3 class="mb-0 fw-bold">{{ unidades_count }}</h3>
                             </div>
                         </div>
                     </div>
