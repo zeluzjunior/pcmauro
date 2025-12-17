@@ -383,6 +383,7 @@
                         </li>
 
                         <li class="border-top my-3"></li>
+
                         <!-- Requisições - Almoxarifado -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#requisicoes-almoxarifado-collapse" aria-expanded="false">
@@ -408,12 +409,51 @@
                             </button>
                             <div class="collapse" id="orcamento-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'dados_orcamento' %}" class="link-dark rounded"><i class="fas fa-chart-bar me-2"></i>Dados de Orçamento</a></li>
-                                    <li><a href="{% url 'consultar_projecao_gastos' %}" class="link-dark rounded"><i class="bi bi-clipboard2-data me-2"></i>Consultar Projeção de Gastos</a></li>
-                                    <li><a href="{% url 'consultar_notas_fiscais' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Notas Fiscais</a></li>
+                                    <!-- Level 2: Análise Geral de Orçamento (primeiro item) -->
+                                    <li><a href="{% url 'analise_geral_orcamento' %}" class="link-dark rounded"><i class="fas fa-chart-bar me-2"></i>Análise Geral de Orçamento</a></li>
                                     <li><a href="{% url 'relacionar_projecao_nota_fiscal' %}" class="link-dark rounded"><i class="fas fa-link me-2"></i>Análise: Projeção x Nota Fiscal</a></li>
-                                    <li><a href="{% url 'consultar_planilha_rc' %}" class="link-dark rounded"><i class="fas fa-table me-2"></i>Consultar Planilha RC</a></li>
-                                    <li><a href="{% url 'analise_planilha_rc' %}" class="link-dark rounded"><i class="bi bi-file-earmark-bar-graph me-2"></i>Análise Planilha RC</a></li>
+                                    <!-- Level 2: Análise: Notas e Projeções de Gastos -->
+                                    <li>
+                                        <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#orcamento-analise-collapse" aria-expanded="false">
+                                            <i class="fas fa-chart-line"></i>
+                                            Projeções de Gastos
+                                        </button>
+                                        <div class="collapse" id="orcamento-analise-collapse">
+                                            <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
+                                                <li><a href="{% url 'analise_projecao_gastos' %}" class="link-dark rounded"><i class="fas fa-chart-pie me-2"></i>Análise de Projeções de Gastos</a></li>
+                                                <li><a href="{% url 'consultar_projecao_gastos' %}" class="link-dark rounded"><i class="bi bi-clipboard2-data me-2"></i>Consultar Projeção de Gastos</a></li>
+                                            </ul>
+                                        </div>
+                                    </li>
+                                 <!-- Level 2: Análise: Notas e Projeções de Gastos -->
+                                 <li>
+                                    <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#orcamento-analise-collapse" aria-expanded="false">
+                                        <i class="fas fa-chart-line"></i>
+                                        Análise: Notas Fiscais
+                                    </button>
+                                    <div class="collapse" id="orcamento-analise-collapse">
+                                        <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
+                                             <li><a href="{% url 'analise_notas_fiscais' %}" class="link-dark rounded"><i class="fas fa-chart-pie me-2"></i>Análise de Notas Fiscais</a></li>
+                                            <li><a href="{% url 'consultar_notas_fiscais' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Notas Fiscais</a></li>
+                                        </ul>
+                                    </div>
+                                </li>
+
+                                    <!-- Level 2: Planilha de Requisições -->
+                                    <li>
+                                        <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#orcamento-planilha-requisicoes-collapse" aria-expanded="false">
+                                            <i class="fas fa-file-alt"></i>
+                                            Planilha de Requisições
+                                        </button>
+                                        <div class="collapse" id="orcamento-planilha-requisicoes-collapse">
+                                            <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
+                                                <li><a href="{% url 'analise_planilha_rc' %}" class="link-dark rounded"><i class="bi bi-file-earmark-bar-graph me-2"></i>Análise Planilha RC</a></li>
+                                                <li><a href="{% url 'consultar_planilha_rc' %}" class="link-dark rounded"><i class="fas fa-table me-2"></i>Consultar Planilha RC</a></li>
+                                            </ul>
+                                        </div>
+                                    </li>
+                                    <!-- Level 2: Outros -->
+                                    <li><a href="{% url 'dados_orcamento' %}" class="link-dark rounded"><i class="fas fa-chart-bar me-2"></i>Configurações de Orçamento</a></li>
                                 </ul>
                             </div>
                         </li>

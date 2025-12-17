@@ -1,0 +1,629 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Análise Geral de Orçamento{% endblock %}
+
+{% block extra_css %}
+<!-- Chart.js CSS -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 30px;
+    }
+    .chart-container-large {
+        position: relative;
+        height: 400px;
+        margin-bottom: 30px;
+    }
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .kpi-card {
+        border-left: 4px solid;
+    }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .kpi-purple { border-left-color: #6f42c1; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise de Orçamento</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Análise Geral de Orçamento</h1>
+                <p class="lead">Dashboard com análises e estatísticas de orçamento, projeções, notas fiscais e requisições</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Filtro de Ano e Mês (Accordion) -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button {% if not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                                <i class="fas fa-filter me-2"></i>
+                                <strong>Filtros</strong>
+                                {% if meses_filtro or ano_filtro %}
+                                    <span class="badge bg-info ms-2">
+                                        {% if meses_filtro %}
+                                            {% if meses_filtro|length == 1 %}
+                                                {% if meses_filtro.0 == 1 %}Janeiro
+                                                {% elif meses_filtro.0 == 2 %}Fevereiro
+                                                {% elif meses_filtro.0 == 3 %}Março
+                                                {% elif meses_filtro.0 == 4 %}Abril
+                                                {% elif meses_filtro.0 == 5 %}Maio
+                                                {% elif meses_filtro.0 == 6 %}Junho
+                                                {% elif meses_filtro.0 == 7 %}Julho
+                                                {% elif meses_filtro.0 == 8 %}Agosto
+                                                {% elif meses_filtro.0 == 9 %}Setembro
+                                                {% elif meses_filtro.0 == 10 %}Outubro
+                                                {% elif meses_filtro.0 == 11 %}Novembro
+                                                {% elif meses_filtro.0 == 12 %}Dezembro
+                                                {% endif %} de {{ ano_filtro }}
+                                            {% else %}
+                                                {{ meses_filtro|length }} meses de {{ ano_filtro }}
+                                            {% endif %}
+                                        {% else %}
+                                            Todos os meses de {{ ano_filtro }}
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'analise_geral_orcamento' %}" class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="ano" class="form-label">Ano</label>
+                                        <select class="form-select" id="ano" name="ano" required>
+                                            {% for ano in anos_disponiveis %}
+                                                <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Meses (Selecione múltiplos meses ou deixe todos desmarcados para todos os meses)</label>
+                                        <div class="row g-2">
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="1" id="mes1" {% if 1 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes1">Janeiro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="2" id="mes2" {% if 2 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes2">Fevereiro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="3" id="mes3" {% if 3 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes3">Março</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="4" id="mes4" {% if 4 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes4">Abril</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="5" id="mes5" {% if 5 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes5">Maio</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="6" id="mes6" {% if 6 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes6">Junho</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="7" id="mes7" {% if 7 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes7">Julho</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="8" id="mes8" {% if 8 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes8">Agosto</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="9" id="mes9" {% if 9 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes9">Setembro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="10" id="mes10" {% if 10 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes10">Outubro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="11" id="mes11" {% if 11 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes11">Novembro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="12" id="mes12" {% if 12 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes12">Dezembro</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosMeses()">Selecionar Todos</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">Desmarcar Todos</button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="fas fa-search me-2"></i>Filtrar
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- KPI Cards -->
+        <div class="row mb-5">
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Orçamento Disponível</h6>
+                                <h2 class="mb-0 fw-bold format-currency">{{ total_orcamento_disponivel|floatformat:2 }}</h2>
+                            </div>
+                            <i class="fas fa-wallet fa-3x text-primary opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-danger shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total de Gastos</h6>
+                                <h2 class="mb-0 fw-bold format-currency">{{ total_gastos|floatformat:2 }}</h2>
+                                <small class="text-muted format-percent">{{ percentual_utilizado|floatformat:1 }}% utilizado</small>
+                            </div>
+                            <i class="fas fa-chart-line fa-3x text-danger opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Saldo Disponível</h6>
+                                <h2 class="mb-0 fw-bold format-currency">{{ saldo_disponivel|floatformat:2 }}</h2>
+                            </div>
+                            <i class="fas fa-piggy-bank fa-3x text-success opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Projeções com NF</h6>
+                                <h2 class="mb-0 fw-bold">{{ projecoes_com_nf }}</h2>
+                                <small class="text-muted format-percent">{{ percentual_projecoes_com_nf|floatformat:1 }}% de {{ total_projecoes }}</small>
+                            </div>
+                            <i class="fas fa-link fa-3x text-info opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI Cards Row 2 -->
+        <div class="row mb-5">
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Projeções de Gastos</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_projecoes }}</h2>
+                                <small class="text-muted format-currency">Total: R$ {{ valor_total_projecoes|floatformat:2 }}</small>
+                            </div>
+                            <i class="fas fa-project-diagram fa-3x text-warning opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-purple shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Notas Fiscais</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_notas }}</h2>
+                                <small class="text-muted format-currency">Total: R$ {{ valor_total_notas|floatformat:2 }}</small>
+                            </div>
+                            <i class="fas fa-file-invoice-dollar fa-3x text-purple opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Requisições Almoxarifado</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_requisicoes }}</h2>
+                                <small class="text-muted format-currency">Total: R$ {{ valor_total_requisicoes|floatformat:2 }}</small>
+                            </div>
+                            <i class="fas fa-boxes fa-3x text-info opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Notas Relacionadas</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_notas_relacionadas }}</h2>
+                                <small class="text-muted format-currency">Total: R$ {{ valor_notas_relacionadas|floatformat:2 }}</small>
+                            </div>
+                            <i class="fas fa-check-circle fa-3x text-success opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 1: Evolução Temporal -->
+        <div class="row mb-5">
+            <div class="col-md-12 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Evolução: Orçamento vs Gastos (Ano {{ ano_filtro }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="evolucaoChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 2 -->
+        <div class="row mb-5">
+            <!-- Distribuição por Setor -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>Distribuição por Setor (Top 10)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="setoresChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Distribuição por Uso Contábil -->
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-warning text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>Distribuição por Uso Contábil (Top 10)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="usoContabilChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 3: Top Fornecedores -->
+        <div class="row mb-5">
+            <div class="col-md-12 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Top 10 Fornecedores por Valor
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="fornecedoresChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+// Função para formatar números no padrão brasileiro (1.234,56)
+function formatarNumeroBR(numero, decimais = 2) {
+    if (numero === null || numero === undefined || isNaN(numero)) {
+        return '0,00';
+    }
+    const num = typeof numero === 'string' ? parseFloat(numero) : numero;
+    return num.toLocaleString('pt-BR', {
+        minimumFractionDigits: decimais,
+        maximumFractionDigits: decimais
+    });
+}
+
+// Função para formatar moeda
+function formatarMoeda(valor) {
+    return 'R$ ' + formatarNumeroBR(valor, 2);
+}
+
+// Formatar números na página após carregamento
+document.addEventListener('DOMContentLoaded', function() {
+    // Formatar valores monetários
+    const currencyElements = document.querySelectorAll('.format-currency');
+    currencyElements.forEach(el => {
+        const text = el.textContent.trim();
+        const num = parseFloat(text.replace(/[^\d,.-]/g, '').replace(',', '.'));
+        if (!isNaN(num)) {
+            el.textContent = formatarMoeda(num);
+        }
+    });
+    
+    // Formatar percentuais
+    const percentElements = document.querySelectorAll('.format-percent');
+    percentElements.forEach(el => {
+        const text = el.textContent.trim();
+        const num = parseFloat(text.replace(/[^\d,.-]/g, '').replace(',', '.'));
+        if (!isNaN(num)) {
+            el.textContent = formatarNumeroBR(num, 1) + '%';
+        }
+    });
+});
+
+// Gráfico de Evolução Temporal
+const evolucaoEl = document.getElementById('evolucaoChart');
+if (evolucaoEl) {
+    const evolucaoCtx = evolucaoEl.getContext('2d');
+    const mesesLabels = {{ meses_labels|safe }};
+    const mesesOrcamento = {{ meses_orcamento|safe }};
+    const mesesGastos = {{ meses_gastos|safe }};
+    const mesesSaldo = {{ meses_saldo|safe }};
+    
+    new Chart(evolucaoCtx, {
+        type: 'line',
+        data: {
+            labels: mesesLabels,
+            datasets: [
+                {
+                    label: 'Orçamento Disponível',
+                    data: mesesOrcamento,
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Gastos',
+                    data: mesesGastos,
+                    borderColor: '#dc3545',
+                    backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Saldo Disponível',
+                    data: mesesSaldo,
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + formatarMoeda(context.parsed.y);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return formatarMoeda(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Gráfico de Pizza: Distribuição por Setor
+const setoresEl = document.getElementById('setoresChart');
+if (setoresEl) {
+    const setoresCtx = setoresEl.getContext('2d');
+    new Chart(setoresCtx, {
+        type: 'pie',
+        data: {
+            labels: {{ setores_labels|safe }},
+            datasets: [{
+                data: {{ setores_data|safe }},
+                backgroundColor: [
+                    '#0d6efd', '#198754', '#ffc107', '#dc3545', '#0dcaf0',
+                    '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.label + ': ' + formatarMoeda(context.parsed);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Gráfico de Pizza: Distribuição por Uso Contábil
+const usoContabilEl = document.getElementById('usoContabilChart');
+if (usoContabilEl) {
+    const usoContabilCtx = usoContabilEl.getContext('2d');
+    new Chart(usoContabilCtx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ uso_contabil_labels|safe }},
+            datasets: [{
+                data: {{ uso_contabil_data|safe }},
+                backgroundColor: [
+                    '#ffc107', '#0d6efd', '#198754', '#dc3545', '#0dcaf0',
+                    '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.label + ': ' + formatarMoeda(context.parsed);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Gráfico de Barras Horizontal: Top Fornecedores
+const fornecedoresEl = document.getElementById('fornecedoresChart');
+if (fornecedoresEl) {
+    const fornecedoresCtx = fornecedoresEl.getContext('2d');
+    new Chart(fornecedoresCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ fornecedores_labels|safe }},
+            datasets: [{
+                label: 'Valor Total',
+                data: {{ fornecedores_data|safe }},
+                backgroundColor: '#dc3545'
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Valor: ' + formatarMoeda(context.parsed.x);
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return formatarMoeda(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Funções para selecionar/desmarcar todos os meses
+function selecionarTodosMeses() {
+    const checkboxes = document.querySelectorAll('input[name="mes"]');
+    checkboxes.forEach(cb => cb.checked = true);
+}
+
+function desmarcarTodosMeses() {
+    const checkboxes = document.querySelectorAll('input[name="mes"]');
+    checkboxes.forEach(cb => cb.checked = false);
+}
+</script>
+{% endblock %}
+

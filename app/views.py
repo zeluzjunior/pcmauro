@@ -11319,15 +11319,366 @@ def dados_orcamento(request):
     return render(request, 'orcamento/dados_orcamento.html', context)
 
 
+def analise_geral_orcamento(request):
+    """Página de análise geral de orçamento com filtros de ano e mês"""
+    from app.models import (
+        DadosOrcamento, ProjecaoGasto, NotaFiscal, 
+        RequisicaoAlmoxarifado, RelacaoProjecaoNotaFiscal
+    )
+    from django.db.models import Sum, Count, Q, Avg
+    from datetime import datetime, timedelta
+    from collections import defaultdict
+    from decimal import Decimal
+    import json
+    
+    # Obter filtros de ano e meses (múltiplos)
+    ano_filtro = request.GET.get('ano', None)
+    meses_filtro = request.GET.getlist('mes')  # getlist para múltiplos valores
+    
+    # Valores padrão: ano atual e todos os meses (None)
+    hoje = datetime.now()
+    if not ano_filtro:
+        ano_filtro = str(hoje.year)
+    
+    # Converter para inteiro
+    try:
+        ano_filtro = int(ano_filtro)
+    except (ValueError, TypeError):
+        ano_filtro = hoje.year
+    
+    # Converter meses para inteiros e validar
+    meses_filtro_int = []
+    if meses_filtro:
+        for mes in meses_filtro:
+            try:
+                mes_int = int(mes)
+                if 1 <= mes_int <= 12:
+                    meses_filtro_int.append(mes_int)
+            except (ValueError, TypeError):
+                continue
+        # Remover duplicatas e ordenar
+        meses_filtro_int = sorted(list(set(meses_filtro_int)))
+    
+    # Se não há meses selecionados, usar todos os meses
+    meses_para_mostrar = meses_filtro_int if meses_filtro_int else list(range(1, 13))
+    
+    # Função auxiliar para parse de datas
+    def parse_date(date_str):
+        """Tenta fazer parse de data em vários formatos"""
+        if not date_str:
+            return None
+        date_str = str(date_str).strip()
+        if not date_str:
+            return None
+        if ' ' in date_str:
+            date_part = date_str.split(' ')[0]
+        else:
+            date_part = date_str
+        date_formats = [
+            '%d/%m/%Y', '%d-%m-%Y', '%d.%m.%Y', '%Y-%m-%d', '%Y/%m/%d',
+            '%d/%m/%y', '%d-%m-%y',
+        ]
+        for fmt in date_formats:
+            try:
+                return datetime.strptime(date_part, fmt)
+            except (ValueError, TypeError):
+                continue
+        if '/' in date_part:
+            parts = date_part.split('/')
+            if len(parts) == 3:
+                try:
+                    day, month, year = parts
+                    if len(year) == 2:
+                        year = '20' + year
+                    return datetime(int(year), int(month), int(day))
+                except (ValueError, TypeError):
+                    pass
+        return None
+    
+    # ========== DADOS DE ORÇAMENTO ==========
+    dados_orcamento_filtrados = DadosOrcamento.objects.filter(
+        ano=ano_filtro,
+        mes__in=meses_para_mostrar
+    )
+    total_orcamento_disponivel = dados_orcamento_filtrados.aggregate(
+        total=Sum('valor_orcamento')
+    )['total'] or Decimal('0')
+    
+    # ========== PROJEÇÕES DE GASTOS ==========
+    projecoes_filtradas = ProjecaoGasto.objects.filter(
+        ano_referencia=ano_filtro
+    )
+    if meses_filtro_int:
+        meses_str = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
+                     'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO']
+        meses_selecionados_str = [meses_str[m-1] for m in meses_filtro_int]
+        projecoes_filtradas = projecoes_filtradas.filter(mes_referencia__in=meses_selecionados_str)
+    
+    total_projecoes = projecoes_filtradas.count()
+    valor_total_projecoes = projecoes_filtradas.aggregate(
+        total=Sum('valor_total')
+    )['total'] or Decimal('0')
+    
+    # Projeções com notas fiscais relacionadas
+    projecoes_com_nf = projecoes_filtradas.filter(
+        relacoes_notas_fiscais__isnull=False
+    ).distinct().count()
+    valor_projecoes_com_nf = RelacaoProjecaoNotaFiscal.objects.filter(
+        projecao__in=projecoes_filtradas
+    ).aggregate(
+        total=Sum('projecao__valor_total')
+    )['total'] or Decimal('0')
+    
+    # ========== NOTAS FISCAIS ==========
+    # Filtrar notas fiscais por data de emissão ou vencimento
+    notas_filtradas = []
+    todas_notas = NotaFiscal.objects.all()
+    for nota in todas_notas:
+        data_emissao = parse_date(nota.data_emissao)
+        data_vencimento = parse_date(nota.data_vencimento)
+        if data_emissao and data_emissao.year == ano_filtro:
+            if not meses_filtro_int or data_emissao.month in meses_filtro_int:
+                notas_filtradas.append(nota)
+        elif data_vencimento and data_vencimento.year == ano_filtro:
+            if not meses_filtro_int or data_vencimento.month in meses_filtro_int:
+                notas_filtradas.append(nota)
+    
+    total_notas = len(notas_filtradas)
+    valor_total_notas = sum(
+        (nota.total_nota or Decimal('0')) for nota in notas_filtradas
+    )
+    
+    # Notas relacionadas a projeções
+    notas_relacionadas = RelacaoProjecaoNotaFiscal.objects.filter(
+        projecao__in=projecoes_filtradas
+    ).values_list('nota_fiscal_id', flat=True).distinct()
+    total_notas_relacionadas = len(notas_relacionadas)
+    valor_notas_relacionadas = sum(
+        (nota.total_nota or Decimal('0')) 
+        for nota in NotaFiscal.objects.filter(id__in=notas_relacionadas)
+    )
+    
+    # ========== REQUISIÇÕES ALMOXARIFADO ==========
+    requisicoes_filtradas = RequisicaoAlmoxarifado.objects.filter(
+        data_requisicao__year=ano_filtro,
+        data_requisicao__month__in=meses_para_mostrar
+    )
+    total_requisicoes = requisicoes_filtradas.count()
+    valor_total_requisicoes = requisicoes_filtradas.aggregate(
+        total=Sum('vlr_movto_estoq')
+    )['total'] or Decimal('0')
+    # Converter para positivo (geralmente são valores negativos)
+    if valor_total_requisicoes < 0:
+        valor_total_requisicoes = abs(valor_total_requisicoes)
+    
+    # ========== KPIs ==========
+    # Total de gastos (projeções + notas + requisições)
+    total_gastos = valor_total_projecoes + valor_total_notas + valor_total_requisicoes
+    
+    # Percentual do orçamento utilizado
+    percentual_utilizado = 0
+    if total_orcamento_disponivel > 0:
+        percentual_utilizado = float((total_gastos / total_orcamento_disponivel) * 100)
+    
+    # Saldo disponível
+    saldo_disponivel = total_orcamento_disponivel - total_gastos
+    
+    # Percentual de projeções com NF relacionada
+    percentual_projecoes_com_nf = 0
+    if total_projecoes > 0:
+        percentual_projecoes_com_nf = (projecoes_com_nf / total_projecoes) * 100
+    
+    # ========== EVOLUÇÃO TEMPORAL ==========
+    meses_nomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+                   'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    meses_labels = []
+    meses_orcamento = []
+    meses_gastos = []
+    meses_saldo = []
+    
+    for mes in range(1, 13):
+        meses_labels.append(meses_nomes[mes-1])
+        # Orçamento do mês
+        orc_mes = DadosOrcamento.objects.filter(
+            ano=ano_filtro, mes=mes
+        ).aggregate(total=Sum('valor_orcamento'))['total'] or Decimal('0')
+        meses_orcamento.append(float(orc_mes))
+        
+        # Gastos do mês
+        gastos_mes = Decimal('0')
+        # Projeções
+        meses_str = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
+                     'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO']
+        proj_mes = ProjecaoGasto.objects.filter(
+            ano_referencia=ano_filtro,
+            mes_referencia=meses_str[mes-1]
+        ).aggregate(total=Sum('valor_total'))['total'] or Decimal('0')
+        gastos_mes += proj_mes
+        
+        # Notas fiscais do mês
+        notas_mes = sum(
+            (nota.total_nota or Decimal('0'))
+            for nota in NotaFiscal.objects.all()
+            if (parse_date(nota.data_emissao) and 
+                parse_date(nota.data_emissao).year == ano_filtro and
+                parse_date(nota.data_emissao).month == mes)
+        )
+        gastos_mes += Decimal(str(notas_mes))
+        
+        # Requisições do mês
+        req_mes = RequisicaoAlmoxarifado.objects.filter(
+            data_requisicao__year=ano_filtro,
+            data_requisicao__month=mes
+        ).aggregate(total=Sum('vlr_movto_estoq'))['total'] or Decimal('0')
+        if req_mes < 0:
+            req_mes = abs(req_mes)
+        gastos_mes += req_mes
+        
+        meses_gastos.append(float(gastos_mes))
+        meses_saldo.append(float(orc_mes - gastos_mes))
+    
+    # ========== DISTRIBUIÇÃO POR SETOR (PROJEÇÕES) ==========
+    projecoes_por_setor = projecoes_filtradas.exclude(
+        setor__isnull=True
+    ).exclude(setor='').values('setor').annotate(
+        total=Count('id'),
+        valor_total=Sum('valor_total')
+    ).order_by('-valor_total')[:10]
+    
+    setores_labels = [item['setor'][:30] for item in projecoes_por_setor]
+    setores_data = [float(item['valor_total'] or 0) for item in projecoes_por_setor]
+    
+    # ========== DISTRIBUIÇÃO POR USO CONTÁBIL ==========
+    uso_contabil_dict = defaultdict(lambda: {'count': 0, 'valor': Decimal('0')})
+    
+    # Projeções
+    for proj in projecoes_filtradas:
+        if proj.uso_contabil:
+            uso_contabil_dict[proj.uso_contabil]['count'] += 1
+            uso_contabil_dict[proj.uso_contabil]['valor'] += (proj.valor_total or Decimal('0'))
+    
+    # Notas fiscais
+    for nota in notas_filtradas:
+        if nota.uso_contabil:
+            uso_contabil_dict[nota.uso_contabil]['count'] += 1
+            uso_contabil_dict[nota.uso_contabil]['valor'] += (nota.total_nota or Decimal('0'))
+    
+    # Requisições
+    for req in requisicoes_filtradas:
+        if req.descr_uso_ctb:
+            uso_contabil_dict[req.descr_uso_ctb]['count'] += 1
+            valor_req = req.vlr_movto_estoq or Decimal('0')
+            if valor_req < 0:
+                valor_req = abs(valor_req)
+            uso_contabil_dict[req.descr_uso_ctb]['valor'] += valor_req
+    
+    uso_contabil_sorted = sorted(
+        uso_contabil_dict.items(),
+        key=lambda x: x[1]['valor'],
+        reverse=True
+    )[:10]
+    
+    uso_contabil_labels = [item[0][:30] for item in uso_contabil_sorted]
+    uso_contabil_data = [float(item[1]['valor']) for item in uso_contabil_sorted]
+    
+    # ========== TOP FORNECEDORES ==========
+    fornecedores_dict = defaultdict(lambda: {'count': 0, 'valor': Decimal('0')})
+    
+    # Projeções
+    for proj in projecoes_filtradas:
+        if proj.fornecedor_nome_fantasia:
+            fornecedores_dict[proj.fornecedor_nome_fantasia]['count'] += 1
+            fornecedores_dict[proj.fornecedor_nome_fantasia]['valor'] += (proj.valor_total or Decimal('0'))
+    
+    # Notas fiscais
+    for nota in notas_filtradas:
+        if nota.nome_fantasia_emitente:
+            fornecedores_dict[nota.nome_fantasia_emitente]['count'] += 1
+            fornecedores_dict[nota.nome_fantasia_emitente]['valor'] += (nota.total_nota or Decimal('0'))
+    
+    fornecedores_sorted = sorted(
+        fornecedores_dict.items(),
+        key=lambda x: x[1]['valor'],
+        reverse=True
+    )[:10]
+    
+    fornecedores_labels = [item[0][:50] for item in fornecedores_sorted]
+    fornecedores_data = [float(item[1]['valor']) for item in fornecedores_sorted]
+    
+    # ========== ANOS DISPONÍVEIS ==========
+    anos_orcamento = sorted(
+        DadosOrcamento.objects.values_list('ano', flat=True).distinct(),
+        reverse=True
+    )
+    anos_projecoes = sorted(
+        ProjecaoGasto.objects.exclude(ano_referencia__isnull=True).values_list('ano_referencia', flat=True).distinct(),
+        reverse=True
+    )
+    anos_requisicoes = sorted(
+        RequisicaoAlmoxarifado.objects.exclude(data_requisicao__isnull=True).values_list('data_requisicao__year', flat=True).distinct(),
+        reverse=True
+    )
+    anos_disponiveis = sorted(
+        set(anos_orcamento + anos_projecoes + anos_requisicoes),
+        reverse=True
+    )
+    if not anos_disponiveis:
+        anos_disponiveis = [hoje.year]
+    
+    context = {
+        'page_title': 'Análise Geral de Orçamento',
+        'active_page': 'analise_geral_orcamento',
+        'ano_filtro': ano_filtro,
+        'meses_filtro': meses_filtro_int,
+        'anos_disponiveis': anos_disponiveis,
+        # KPIs
+        'total_orcamento_disponivel': total_orcamento_disponivel,
+        'total_gastos': total_gastos,
+        'saldo_disponivel': saldo_disponivel,
+        'percentual_utilizado': percentual_utilizado,
+        'total_projecoes': total_projecoes,
+        'valor_total_projecoes': valor_total_projecoes,
+        'projecoes_com_nf': projecoes_com_nf,
+        'percentual_projecoes_com_nf': percentual_projecoes_com_nf,
+        'total_notas': total_notas,
+        'valor_total_notas': valor_total_notas,
+        'total_notas_relacionadas': total_notas_relacionadas,
+        'valor_notas_relacionadas': valor_notas_relacionadas,
+        'total_requisicoes': total_requisicoes,
+        'valor_total_requisicoes': valor_total_requisicoes,
+        # Gráficos
+        'meses_labels': json.dumps(meses_labels, ensure_ascii=False),
+        'meses_orcamento': json.dumps(meses_orcamento, ensure_ascii=False),
+        'meses_gastos': json.dumps(meses_gastos, ensure_ascii=False),
+        'meses_saldo': json.dumps(meses_saldo, ensure_ascii=False),
+        'setores_labels': json.dumps(setores_labels, ensure_ascii=False),
+        'setores_data': json.dumps(setores_data, ensure_ascii=False),
+        'uso_contabil_labels': json.dumps(uso_contabil_labels, ensure_ascii=False),
+        'uso_contabil_data': json.dumps(uso_contabil_data, ensure_ascii=False),
+        'fornecedores_labels': json.dumps(fornecedores_labels, ensure_ascii=False),
+        'fornecedores_data': json.dumps(fornecedores_data, ensure_ascii=False),
+    }
+    
+    return render(request, 'orcamento/analise_geral_orcamento.html', context)
+
+
 def consultar_projecao_gastos(request):
-    """Consultar/listar projeções de gastos com filtros avançados"""
+    """Consultar/listar projeções de gastos com filtros avançados - apenas tabela"""
     from app.models import ProjecaoGasto
     from decimal import Decimal
-    from django.db.models import Sum, Count, Q
+    from django.db.models import Q
+    from django.core.paginator import Paginator
     
-    # Busca geral
-    search_query = request.GET.get('search', '').strip()
-    projecoes_list = ProjecaoGasto.objects.all()
+    try:
+        # Busca geral
+        search_query = request.GET.get('search', '').strip()
+        projecoes_list = ProjecaoGasto.objects.all()
+    except Exception as e:
+        import traceback
+        print(f"Erro ao acessar ProjecaoGasto: {e}")
+        print(traceback.format_exc())
+        projecoes_list = ProjecaoGasto.objects.none()
+        search_query = ''
     
     # Aplicar busca geral
     if search_query:
@@ -11396,23 +11747,27 @@ def consultar_projecao_gastos(request):
             pass
     
     # Ordenar por ano/mês/data (mais recente primeiro)
-    projecoes_list = projecoes_list.order_by('-ano_referencia', '-mes_referencia', '-data_abertura_requisicao', '-created_at')
+    try:
+        projecoes_list = projecoes_list.order_by('-ano_referencia', '-mes_referencia', '-data_abertura_requisicao', '-created_at')
+    except Exception:
+        try:
+            projecoes_list = projecoes_list.order_by('-created_at', '-id')
+        except Exception:
+            pass
     
     # Paginação
-    paginator = Paginator(projecoes_list, 50)  # 50 itens por página
-    page_number = request.GET.get('page', 1)
-    projecoes = paginator.get_page(page_number)
-    
-    # Estatísticas
-    total_count = ProjecaoGasto.objects.count()
-    setores_count = ProjecaoGasto.objects.exclude(setor__isnull=True).exclude(setor='').values('setor').distinct().count()
-    fornecedores_count = ProjecaoGasto.objects.exclude(fornecedor_nome_fantasia__isnull=True).exclude(fornecedor_nome_fantasia='').values('fornecedor_nome_fantasia').distinct().count()
-    
-    # Calcular valor total
-    valor_total_result = ProjecaoGasto.objects.aggregate(
-        total=Sum('valor_total')
-    )
-    valor_total = valor_total_result['total'] or Decimal('0.00')
+    try:
+        paginator = Paginator(projecoes_list, 50)
+        page_number = request.GET.get('page', 1)
+        try:
+            page_number = int(page_number)
+        except (ValueError, TypeError):
+            page_number = 1
+        projecoes = paginator.get_page(page_number)
+    except Exception as e:
+        empty_list = ProjecaoGasto.objects.none()
+        paginator = Paginator(empty_list, 50)
+        projecoes = paginator.page(1)
     
     # Obter valores únicos para os dropdowns de filtros
     setores_unicos = ProjecaoGasto.objects.exclude(
@@ -11435,24 +11790,600 @@ def consultar_projecao_gastos(request):
         'page_title': 'Consultar Projeção de Gastos',
         'active_page': 'consultar_projecao_gastos',
         'projecoes': projecoes,
-        'search_query': search_query,
-        'total_count': total_count,
-        'setores_count': setores_count,
-        'fornecedores_count': fornecedores_count,
-        'valor_total': valor_total,
-        'setores_unicos': setores_unicos,
-        'anos_unicos': anos_unicos,
-        'meses_unicos': meses_unicos,
-        'filtro_setor': filtro_setor,
-        'filtro_fornecedor': filtro_fornecedor,
-        'filtro_ano': filtro_ano,
-        'filtro_mes': filtro_mes,
-        'filtro_numero_requisicao': filtro_numero_requisicao,
-        'filtro_valor_min': filtro_valor_min,
-        'filtro_valor_max': filtro_valor_max,
+        'search_query': search_query or '',
+        'setores_unicos': setores_unicos or [],
+        'anos_unicos': anos_unicos or [],
+        'meses_unicos': meses_unicos or [],
+        'filtro_setor': filtro_setor or '',
+        'filtro_fornecedor': filtro_fornecedor or '',
+        'filtro_ano': filtro_ano or '',
+        'filtro_mes': filtro_mes or '',
+        'filtro_numero_requisicao': filtro_numero_requisicao or '',
+        'filtro_valor_min': filtro_valor_min or '',
+        'filtro_valor_max': filtro_valor_max or '',
     }
     
     return render(request, 'orcamento/consultar_projecao_gastos.html', context)
+
+
+def analise_projecao_gastos(request):
+    """Página de análise detalhada de projeções de gastos com filtros e gráficos"""
+    from app.models import ProjecaoGasto, RelacaoProjecaoNotaFiscal
+    from django.db.models import Sum, Count, Q
+    from datetime import datetime
+    from decimal import Decimal
+    import json
+    
+    # --- Lógica de Filtro ---
+    ano_filtro = request.GET.get('ano', None)
+    meses_filtro = request.GET.getlist('mes')
+
+    hoje = datetime.now()
+    
+    # Anos disponíveis para o filtro (baseado em ano_referencia OU created_at)
+    anos_disponiveis_set = set()
+    # Buscar anos de ano_referencia
+    anos_ref = ProjecaoGasto.objects.exclude(ano_referencia__isnull=True).values_list('ano_referencia', flat=True).distinct()
+    for ano in anos_ref:
+        if ano:
+            anos_disponiveis_set.add(int(ano))
+    # Buscar anos de created_at
+    projecoes_com_data = ProjecaoGasto.objects.exclude(created_at__isnull=True)
+    for proj in projecoes_com_data:
+        if proj.created_at:
+            anos_disponiveis_set.add(proj.created_at.year)
+    
+    anos_disponiveis = sorted(list(anos_disponiveis_set), reverse=True)
+    if not anos_disponiveis:
+        anos_disponiveis = [hoje.year]
+    
+    # Se não há filtro de ano, usar o mais recente disponível
+    if not ano_filtro:
+        ano_filtro = anos_disponiveis[0] if anos_disponiveis else hoje.year
+    else:
+        try:
+            ano_filtro = int(ano_filtro)
+        except (ValueError, TypeError):
+            ano_filtro = anos_disponiveis[0] if anos_disponiveis else hoje.year
+    
+    if ano_filtro not in anos_disponiveis:
+        anos_disponiveis.insert(0, ano_filtro)
+        anos_disponiveis = sorted(list(set(anos_disponiveis)), reverse=True)
+
+    meses_filtro_int = []
+    if meses_filtro:
+        for mes in meses_filtro:
+            try:
+                mes_int = int(mes)
+                if 1 <= mes_int <= 12:
+                    meses_filtro_int.append(mes_int)
+            except (ValueError, TypeError):
+                continue
+        meses_filtro_int = sorted(list(set(meses_filtro_int)))
+
+    # Se nenhum mês for selecionado, considerar todos os meses
+    if not meses_filtro_int:
+        meses_para_mostrar = list(range(1, 13))
+    else:
+        meses_para_mostrar = meses_filtro_int
+
+    meses_choices = [
+        (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
+        (5, 'Maio'), (6, 'Junho'), (7, 'Julho'), (8, 'Agosto'),
+        (9, 'Setembro'), (10, 'Outubro'), (11, 'Novembro'), (12, 'Dezembro'),
+    ]
+
+    # Mapear meses numéricos para strings
+    meses_str_map = {
+        1: 'JANEIRO', 2: 'FEVEREIRO', 3: 'MARÇO', 4: 'ABRIL',
+        5: 'MAIO', 6: 'JUNHO', 7: 'JULHO', 8: 'AGOSTO',
+        9: 'SETEMBRO', 10: 'OUTUBRO', 11: 'NOVEMBRO', 12: 'DEZEMBRO'
+    }
+    meses_selecionados_str = [meses_str_map[m] for m in meses_para_mostrar]
+
+    # --- Queryset Filtrado ---
+    # Começar com todos os dados
+    projecoes_qs = ProjecaoGasto.objects.all()
+    
+    # Aplicar filtro de ano (ano_referencia OU created_at)
+    q_ano = Q(ano_referencia=ano_filtro) | Q(created_at__year=ano_filtro)
+    projecoes_qs_ano = projecoes_qs.filter(q_ano)
+    
+    # Se há resultados com filtro de ano, usar; senão, usar todos
+    if projecoes_qs_ano.count() > 0:
+        projecoes_qs = projecoes_qs_ano
+    
+    # Se há meses selecionados, aplicar filtro de mês
+    if meses_filtro_int:
+        q_mes = Q()
+        for mes_str in meses_selecionados_str:
+            q_mes |= Q(mes_referencia__iexact=mes_str)
+        for mes_num in meses_filtro_int:
+            q_mes |= Q(created_at__month=mes_num)
+        projecoes_qs_mes = projecoes_qs.filter(q_mes)
+        # Se há resultados com filtro de mês, usar; senão, manter o queryset anterior
+        if projecoes_qs_mes.count() > 0:
+            projecoes_qs = projecoes_qs_mes
+
+    # --- KPIs ---
+    total_projecoes = projecoes_qs.count()
+    
+    valor_total_projetado = projecoes_qs.aggregate(Sum('valor_total'))['valor_total__sum'] or Decimal(0)
+    
+    valor_medio = Decimal(0)
+    if total_projecoes > 0:
+        valor_medio = valor_total_projetado / total_projecoes
+
+    # Projeções com Nota Fiscal relacionada
+    projecoes_com_nf_ids = RelacaoProjecaoNotaFiscal.objects.filter(
+        projecao__in=projecoes_qs
+    ).values_list('projecao_id', flat=True).distinct()
+    projecoes_com_nf = len(projecoes_com_nf_ids)
+    percentual_com_nf = (projecoes_com_nf / total_projecoes * 100) if total_projecoes > 0 else 0
+
+    # Projeções com Ordem de Serviço
+    projecoes_com_os = projecoes_qs.exclude(numero_ordem_servico__isnull=True).exclude(numero_ordem_servico='').count()
+    percentual_com_os = (projecoes_com_os / total_projecoes * 100) if total_projecoes > 0 else 0
+
+    # Projeções com serviço concluído
+    projecoes_concluidas = projecoes_qs.exclude(servico_concluido__isnull=True).count()
+    percentual_concluidas = (projecoes_concluidas / total_projecoes * 100) if total_projecoes > 0 else 0
+
+    # Projeções pendentes (sem serviço concluído)
+    projecoes_pendentes = total_projecoes - projecoes_concluidas
+    percentual_pendentes = (projecoes_pendentes / total_projecoes * 100) if total_projecoes > 0 else 0
+
+    # Setores únicos
+    setores_unicos = projecoes_qs.exclude(setor__isnull=True).exclude(setor='').values('setor').distinct().count()
+
+    # --- Dados para Gráficos ---
+    # Gráfico 1: Distribuição por Setor (Top 10) - usando aggregate para eficiência
+    setores_agregados = projecoes_qs.exclude(setor__isnull=True).exclude(setor='').values('setor').annotate(
+        valor_total=Sum('valor_total')
+    ).order_by('-valor_total')[:10]
+    
+    setores_labels = [s['setor'] for s in setores_agregados]
+    setores_data = [float(s['valor_total'] or 0) for s in setores_agregados]
+
+    # Gráfico 2: Top 10 Fornecedores por Valor - usando aggregate para eficiência
+    fornecedores_agregados = projecoes_qs.exclude(fornecedor_nome_fantasia__isnull=True).exclude(fornecedor_nome_fantasia='').values('fornecedor_nome_fantasia').annotate(
+        valor_total=Sum('valor_total')
+    ).order_by('-valor_total')[:10]
+    
+    fornecedores_labels = [f['fornecedor_nome_fantasia'][:30] + '...' if len(f['fornecedor_nome_fantasia']) > 30 else f['fornecedor_nome_fantasia'] for f in fornecedores_agregados]
+    fornecedores_data = [float(f['valor_total'] or 0) for f in fornecedores_agregados]
+
+    # Gráfico 3: Evolução Temporal (Mês a Mês)
+    evolucao_labels = []
+    evolucao_quantidade_data = []
+    evolucao_valor_data = []
+    
+    meses_nomes_curtos = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    
+    for mes_num, mes_nome in meses_choices:
+        if mes_num in meses_para_mostrar:
+            label = f"{meses_nomes_curtos[mes_num-1]}/{str(ano_filtro)[2:]}"
+            evolucao_labels.append(label)
+            
+            # Quantidade de projeções no mês (usar mes_referencia OU created_at)
+            q_mes_temporal = Q(mes_referencia__iexact=meses_str_map[mes_num]) | Q(created_at__month=mes_num)
+            qtd_mes = projecoes_qs.filter(q_mes_temporal).count()
+            evolucao_quantidade_data.append(qtd_mes)
+            
+            # Valor total do mês (usar mes_referencia OU created_at)
+            valor_mes = projecoes_qs.filter(q_mes_temporal).aggregate(Sum('valor_total'))['valor_total__sum'] or Decimal(0)
+            evolucao_valor_data.append(float(valor_mes))
+
+    # Gráfico 4: Status das Projeções
+    status_labels = []
+    status_data = []
+    
+    # Com NF
+    status_labels.append('Com Nota Fiscal')
+    status_data.append(projecoes_com_nf)
+    
+    # Sem NF
+    status_labels.append('Sem Nota Fiscal')
+    status_data.append(total_projecoes - projecoes_com_nf)
+    
+    # Com OS
+    status_labels.append('Com Ordem de Serviço')
+    status_data.append(projecoes_com_os)
+    
+    # Concluídas
+    status_labels.append('Serviços Concluídos')
+    status_data.append(projecoes_concluidas)
+    
+    # Pendentes
+    status_labels.append('Pendentes')
+    status_data.append(projecoes_pendentes)
+
+    # Gráfico 5: Distribuição por Uso Contábil - usando aggregate para eficiência
+    uso_contabil_agregados = projecoes_qs.exclude(uso_contabil__isnull=True).exclude(uso_contabil='').values('uso_contabil').annotate(
+        valor_total=Sum('valor_total')
+    ).order_by('-valor_total')[:15]
+    
+    uso_contabil_labels = [u['uso_contabil'][:40] + '...' if len(u['uso_contabil']) > 40 else u['uso_contabil'] for u in uso_contabil_agregados]
+    uso_contabil_data = [float(u['valor_total'] or 0) for u in uso_contabil_agregados]
+
+    # --- Tabelas Detalhadas ---
+    # Top 10 Setores por Valor
+    top_setores = projecoes_qs.exclude(setor__isnull=True).exclude(setor='').values('setor').annotate(
+        quantidade=Count('id'),
+        valor_total=Sum('valor_total')
+    ).order_by('-valor_total')[:10]
+
+    # Top 10 Fornecedores por Valor
+    top_fornecedores = projecoes_qs.exclude(fornecedor_nome_fantasia__isnull=True).exclude(fornecedor_nome_fantasia='').values('fornecedor_nome_fantasia').annotate(
+        quantidade=Count('id'),
+        valor_total=Sum('valor_total')
+    ).order_by('-valor_total')[:10]
+
+    context = {
+        'page_title': 'Análise de Projeções de Gastos',
+        'active_page': 'analise_projecao_gastos',
+        'anos_disponiveis': anos_disponiveis,
+        'ano_selecionado': ano_filtro,
+        'meses_choices': meses_choices,
+        'meses_selecionados': meses_filtro_int,
+
+        # KPIs
+        'total_projecoes': total_projecoes,
+        'valor_total_projetado': valor_total_projetado,
+        'valor_medio': valor_medio,
+        'projecoes_com_nf': projecoes_com_nf,
+        'percentual_com_nf': percentual_com_nf,
+        'projecoes_com_os': projecoes_com_os,
+        'percentual_com_os': percentual_com_os,
+        'projecoes_concluidas': projecoes_concluidas,
+        'percentual_concluidas': percentual_concluidas,
+        'projecoes_pendentes': projecoes_pendentes,
+        'percentual_pendentes': percentual_pendentes,
+        'setores_unicos': setores_unicos,
+
+        # Gráficos
+        'setores_labels': json.dumps(setores_labels, ensure_ascii=False),
+        'setores_data': json.dumps(setores_data),
+        
+        'fornecedores_labels': json.dumps(fornecedores_labels, ensure_ascii=False),
+        'fornecedores_data': json.dumps(fornecedores_data),
+        
+        'evolucao_labels': json.dumps(evolucao_labels, ensure_ascii=False),
+        'evolucao_quantidade_data': json.dumps(evolucao_quantidade_data),
+        'evolucao_valor_data': json.dumps(evolucao_valor_data),
+        
+        'status_labels': json.dumps(status_labels, ensure_ascii=False),
+        'status_data': json.dumps(status_data),
+        
+        'uso_contabil_labels': json.dumps(uso_contabil_labels, ensure_ascii=False),
+        'uso_contabil_data': json.dumps(uso_contabil_data),
+
+        # Tabelas
+        'top_setores': top_setores,
+        'top_fornecedores': top_fornecedores,
+    }
+
+    return render(request, 'orcamento/analise_projecao_gastos.html', context)
+
+
+def analise_notas_fiscais(request):
+    """Página de análise detalhada de notas fiscais com filtros e gráficos"""
+    from app.models import NotaFiscal, RelacaoProjecaoNotaFiscal
+    from django.db.models import Sum, Count, Q
+    from datetime import datetime
+    from collections import defaultdict
+    from decimal import Decimal
+    import json
+    
+    # --- Lógica de Filtro ---
+    ano_filtro = request.GET.get('ano', None)
+    meses_filtro = request.GET.getlist('mes')
+
+    hoje = datetime.now()
+    if not ano_filtro:
+        ano_filtro = str(hoje.year)
+
+    try:
+        ano_filtro = int(ano_filtro)
+    except (ValueError, TypeError):
+        ano_filtro = hoje.year
+
+    meses_filtro_int = []
+    if meses_filtro:
+        for mes in meses_filtro:
+            try:
+                mes_int = int(mes)
+                if 1 <= mes_int <= 12:
+                    meses_filtro_int.append(mes_int)
+            except (ValueError, TypeError):
+                continue
+        meses_filtro_int = sorted(list(set(meses_filtro_int)))
+
+    if not meses_filtro_int:
+        meses_para_mostrar = list(range(1, 13))
+    else:
+        meses_para_mostrar = meses_filtro_int
+
+    # Função auxiliar para parse de datas
+    def parse_date(date_str):
+        """Tenta fazer parse de data em vários formatos"""
+        if not date_str:
+            return None
+        date_str = str(date_str).strip()
+        if not date_str:
+            return None
+        if ' ' in date_str:
+            date_part = date_str.split(' ')[0]
+        else:
+            date_part = date_str
+        date_formats = [
+            '%d/%m/%Y', '%d-%m-%Y', '%d.%m.%Y', '%Y-%m-%d', '%Y/%m/%d',
+            '%d/%m/%y', '%d-%m-%y',
+        ]
+        for fmt in date_formats:
+            try:
+                return datetime.strptime(date_part, fmt)
+            except (ValueError, TypeError):
+                continue
+        if '/' in date_part:
+            parts = date_part.split('/')
+            if len(parts) == 3:
+                try:
+                    day, month, year = parts
+                    if len(year) == 2:
+                        year = '20' + year
+                    return datetime(int(year), int(month), int(day))
+                except (ValueError, TypeError):
+                    pass
+        return None
+
+    # Anos disponíveis para o filtro (baseado em data_emissao)
+    todas_notas = NotaFiscal.objects.all()
+    anos_set = set()
+    for nota in todas_notas:
+        data_emissao = parse_date(nota.data_emissao)
+        if data_emissao:
+            anos_set.add(data_emissao.year)
+    anos_disponiveis = sorted(list(anos_set), reverse=True)
+    if not anos_disponiveis:
+        anos_disponiveis = [hoje.year]
+    if ano_filtro not in anos_disponiveis:
+        anos_disponiveis.insert(0, ano_filtro)
+        anos_disponiveis = sorted(list(set(anos_disponiveis)), reverse=True)
+
+    meses_choices = [
+        (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
+        (5, 'Maio'), (6, 'Junho'), (7, 'Julho'), (8, 'Agosto'),
+        (9, 'Setembro'), (10, 'Outubro'), (11, 'Novembro'), (12, 'Dezembro'),
+    ]
+
+    # --- Queryset Filtrado (baseado em data_emissao ou data_vencimento) ---
+    notas_filtradas = []
+    todas_notas_list = NotaFiscal.objects.all()
+    for nota in todas_notas_list:
+        data_emissao = parse_date(nota.data_emissao)
+        data_vencimento = parse_date(nota.data_vencimento)
+        
+        # Usar data_emissao como prioridade, senão data_vencimento
+        data_ref = data_emissao or data_vencimento
+        
+        if data_ref and data_ref.year == ano_filtro:
+            if not meses_filtro_int or data_ref.month in meses_filtro_int:
+                notas_filtradas.append(nota)
+
+    # --- KPIs ---
+    total_notas = len(notas_filtradas)
+    
+    valor_total_notas = sum(
+        (nota.total_nota or Decimal(0)) for nota in notas_filtradas
+    )
+    
+    valor_medio = Decimal(0)
+    if total_notas > 0:
+        valor_medio = valor_total_notas / total_notas
+
+    # Notas com projeção relacionada
+    notas_com_projecao_ids = RelacaoProjecaoNotaFiscal.objects.filter(
+        nota_fiscal_id__in=[n.id for n in notas_filtradas]
+    ).values_list('nota_fiscal_id', flat=True).distinct()
+    notas_com_projecao = len(notas_com_projecao_ids)
+    percentual_com_projecao = (notas_com_projecao / total_notas * 100) if total_notas > 0 else 0
+
+    # Emitentes únicos
+    emitentes_unicos = len(set(
+        nota.emitente for nota in notas_filtradas if nota.emitente
+    ))
+
+    # Notas vencidas (data_vencimento < hoje)
+    hoje_date = hoje.date()
+    notas_vencidas = sum(
+        1 for nota in notas_filtradas
+        if parse_date(nota.data_vencimento) and parse_date(nota.data_vencimento).date() < hoje_date
+    )
+    percentual_vencidas = (notas_vencidas / total_notas * 100) if total_notas > 0 else 0
+
+    # Notas pagas (situação contém "paga" ou similar)
+    notas_pagas = sum(
+        1 for nota in notas_filtradas
+        if nota.situacao and ('paga' in nota.situacao.lower() or 'liquidada' in nota.situacao.lower() or 'quitada' in nota.situacao.lower())
+    )
+    percentual_pagas = (notas_pagas / total_notas * 100) if total_notas > 0 else 0
+
+    # Centros de atividade únicos
+    centros_atividade_unicos = len(set(
+        nota.centro_atividade for nota in notas_filtradas if nota.centro_atividade
+    ))
+
+    # --- Dados para Gráficos ---
+    # Gráfico 1: Distribuição por Emitente (Top 10)
+    emitentes_data_dict = defaultdict(Decimal)
+    for nota in notas_filtradas:
+        emitente_key = nota.nome_fantasia_emitente or nota.emitente or 'Não informado'
+        if emitente_key:
+            emitentes_data_dict[emitente_key] += (nota.total_nota or Decimal(0))
+    
+    emitentes_sorted = sorted(emitentes_data_dict.items(), key=lambda x: x[1], reverse=True)[:10]
+    emitentes_labels = [e[0][:30] + '...' if len(e[0]) > 30 else e[0] for e in emitentes_sorted]
+    emitentes_data = [float(e[1]) for e in emitentes_sorted]
+
+    # Gráfico 2: Top 10 Emitentes por Valor (mesmo que acima, mas para bar chart)
+    top_emitentes_labels = emitentes_labels
+    top_emitentes_data = emitentes_data
+
+    # Gráfico 3: Evolução Temporal (Mês a Mês)
+    evolucao_labels = []
+    evolucao_quantidade_data = []
+    evolucao_valor_data = []
+    
+    meses_nomes_curtos = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    
+    for mes_num in meses_para_mostrar:
+        label = f"{meses_nomes_curtos[mes_num-1]}/{str(ano_filtro)[2:]}"
+        evolucao_labels.append(label)
+        
+        # Quantidade de notas no mês
+        qtd_mes = sum(
+            1 for nota in notas_filtradas
+            if (parse_date(nota.data_emissao) and parse_date(nota.data_emissao).month == mes_num) or
+               (not parse_date(nota.data_emissao) and parse_date(nota.data_vencimento) and parse_date(nota.data_vencimento).month == mes_num)
+        )
+        evolucao_quantidade_data.append(qtd_mes)
+        
+        # Valor total do mês
+        valor_mes = sum(
+            (nota.total_nota or Decimal(0)) for nota in notas_filtradas
+            if (parse_date(nota.data_emissao) and parse_date(nota.data_emissao).month == mes_num) or
+               (not parse_date(nota.data_emissao) and parse_date(nota.data_vencimento) and parse_date(nota.data_vencimento).month == mes_num)
+        )
+        evolucao_valor_data.append(float(valor_mes))
+
+    # Gráfico 4: Distribuição por Situação
+    situacao_data_dict = defaultdict(int)
+    for nota in notas_filtradas:
+        situacao_key = nota.situacao or 'Não informado'
+        situacao_data_dict[situacao_key] += 1
+    
+    situacao_sorted = sorted(situacao_data_dict.items(), key=lambda x: x[1], reverse=True)[:6]
+    situacao_labels = [s[0][:40] + '...' if len(s[0]) > 40 else s[0] for s in situacao_sorted]
+    situacao_data = [s[1] for s in situacao_sorted]
+
+    # Gráfico 5: Distribuição por Uso Contábil
+    uso_contabil_data_dict = defaultdict(Decimal)
+    for nota in notas_filtradas:
+        if nota.uso_contabil:
+            uso_contabil_data_dict[nota.uso_contabil] += (nota.total_nota or Decimal(0))
+    
+    uso_contabil_sorted = sorted(uso_contabil_data_dict.items(), key=lambda x: x[1], reverse=True)[:15]
+    uso_contabil_labels = [u[0][:40] + '...' if len(u[0]) > 40 else u[0] for u in uso_contabil_sorted]
+    uso_contabil_data = [float(u[1]) for u in uso_contabil_sorted]
+
+    # Gráfico 6: Distribuição por Centro de Atividade
+    centro_atividade_data_dict = defaultdict(Decimal)
+    for nota in notas_filtradas:
+        centro_key = nota.nome_centro_atividade or nota.centro_atividade or 'Não informado'
+        if centro_key:
+            centro_atividade_data_dict[centro_key] += (nota.total_nota or Decimal(0))
+    
+    centro_atividade_sorted = sorted(centro_atividade_data_dict.items(), key=lambda x: x[1], reverse=True)[:10]
+    centro_atividade_labels = [c[0][:30] + '...' if len(c[0]) > 30 else c[0] for c in centro_atividade_sorted]
+    centro_atividade_data = [float(c[1]) for c in centro_atividade_sorted]
+
+    # --- Tabelas Detalhadas ---
+    # Top 10 Emitentes por Valor
+    top_emitentes = []
+    emitentes_dict = defaultdict(lambda: {'quantidade': 0, 'valor_total': Decimal(0), 'nome': ''})
+    for nota in notas_filtradas:
+        emitente_key = nota.emitente or 'Não informado'
+        nome_key = nota.nome_fantasia_emitente or emitente_key
+        emitentes_dict[emitente_key]['quantidade'] += 1
+        emitentes_dict[emitente_key]['valor_total'] += (nota.total_nota or Decimal(0))
+        emitentes_dict[emitente_key]['nome'] = nome_key
+    
+    top_emitentes = sorted(
+        [
+            {
+                'emitente': k,
+                'nome_fantasia_emitente': v['nome'],
+                'quantidade': v['quantidade'],
+                'valor_total': v['valor_total']
+            }
+            for k, v in emitentes_dict.items()
+        ],
+        key=lambda x: x['valor_total'],
+        reverse=True
+    )[:10]
+
+    # Top 10 Centros de Atividade por Valor
+    top_centros_atividade = []
+    centros_dict = defaultdict(lambda: {'quantidade': 0, 'valor_total': Decimal(0), 'nome': ''})
+    for nota in notas_filtradas:
+        centro_key = nota.centro_atividade or 'Não informado'
+        nome_key = nota.nome_centro_atividade or centro_key
+        centros_dict[centro_key]['quantidade'] += 1
+        centros_dict[centro_key]['valor_total'] += (nota.total_nota or Decimal(0))
+        centros_dict[centro_key]['nome'] = nome_key
+    
+    top_centros_atividade = sorted(
+        [
+            {
+                'centro_atividade': k,
+                'nome_centro_atividade': v['nome'],
+                'quantidade': v['quantidade'],
+                'valor_total': v['valor_total']
+            }
+            for k, v in centros_dict.items()
+        ],
+        key=lambda x: x['valor_total'],
+        reverse=True
+    )[:10]
+
+    context = {
+        'page_title': 'Análise de Notas Fiscais',
+        'active_page': 'analise_notas_fiscais',
+        'anos_disponiveis': anos_disponiveis,
+        'ano_selecionado': ano_filtro,
+        'meses_choices': meses_choices,
+        'meses_selecionados': meses_filtro_int,
+
+        # KPIs
+        'total_notas': total_notas,
+        'valor_total_notas': valor_total_notas,
+        'valor_medio': valor_medio,
+        'notas_com_projecao': notas_com_projecao,
+        'percentual_com_projecao': percentual_com_projecao,
+        'emitentes_unicos': emitentes_unicos,
+        'notas_vencidas': notas_vencidas,
+        'percentual_vencidas': percentual_vencidas,
+        'notas_pagas': notas_pagas,
+        'percentual_pagas': percentual_pagas,
+        'centros_atividade_unicos': centros_atividade_unicos,
+
+        # Gráficos
+        'emitentes_labels': json.dumps(emitentes_labels, ensure_ascii=False),
+        'emitentes_data': json.dumps(emitentes_data),
+        
+        'top_emitentes_labels': json.dumps(top_emitentes_labels, ensure_ascii=False),
+        'top_emitentes_data': json.dumps(top_emitentes_data),
+        
+        'evolucao_labels': json.dumps(evolucao_labels, ensure_ascii=False),
+        'evolucao_quantidade_data': json.dumps(evolucao_quantidade_data),
+        'evolucao_valor_data': json.dumps(evolucao_valor_data),
+        
+        'situacao_labels': json.dumps(situacao_labels, ensure_ascii=False),
+        'situacao_data': json.dumps(situacao_data),
+        
+        'uso_contabil_labels': json.dumps(uso_contabil_labels, ensure_ascii=False),
+        'uso_contabil_data': json.dumps(uso_contabil_data),
+
+        'centro_atividade_labels': json.dumps(centro_atividade_labels, ensure_ascii=False),
+        'centro_atividade_data': json.dumps(centro_atividade_data),
+
+        # Tabelas
+        'top_emitentes': top_emitentes,
+        'top_centros_atividade': top_centros_atividade,
+    }
+
+    return render(request, 'orcamento/analise_notas_fiscais.html', context)
 
 
 def relacionar_projecao_nota_fiscal(request):

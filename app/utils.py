@@ -3461,7 +3461,8 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                     numero_pedido_compra = _safe_str(find_column_value(row_data, ['NÚMERO DO \nPEDIDO DE COMPRA', 'NÚMERO DO PEDIDO DE COMPRA', 'N�MERO DO \nPEDIDO DE COMPRA']), max_length=100)
                     servico_concluido = _safe_date(find_column_value(row_data, ['SERVIÇO CONCLUÍDO', 'SERVI�O CONCLU�DO']))
                     nf_servico_recebida = _safe_date(find_column_value(row_data, ['NF DE SERVIÇO\n RECEBIDA', 'NF DE SERVIÇO RECEBIDA', 'NF DE SERVI�O\n RECEBIDA']))
-                    nf_enviada_lancamento = _safe_date(find_column_value(row_data, ['NF ENVIADA\n PARA LANÇAMENTO ', 'NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA\n PARA LAN�AMENTO ']))
+                    nf_enviada_lancamento = _safe_date(find_column_value(row_data, ['NF ENVIADA\n PARA LANÇAMENTO ', 'NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA\n PARA LANAMENTO ']))
+                    observacoes = _safe_str(find_column_value(row_data, ['OBSERVAÇÕES', 'OBSERVAES', 'OBSERVACOES', 'OBSERVAÇÕES ']), max_length=None)
                     
                     # Extrair mês e ano da previsão
                     mes_referencia, ano_referencia = extract_mes_ano(previsao_execucao)
@@ -3486,6 +3487,7 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                         'servico_concluido': servico_concluido,
                         'nf_servico_recebida': nf_servico_recebida,
                         'nf_enviada_lancamento': nf_enviada_lancamento,
+                        'observacoes': observacoes,  # Campo OBSERVAÇÕES do Excel
                         # Campos legados para compatibilidade
                         'centro_atividade': setor,  # Mapear SETOR para centro_atividade
                         'fornecedor': fornecedor_nome,  # Mapear para campo legado

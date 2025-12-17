@@ -1,0 +1,727 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Análise de Projeções de Gastos{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .kpi-card {
+        border-left: 4px solid;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .kpi-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .kpi-purple { border-left-color: #6f42c1; }
+
+    .chart-container-large {
+        position: relative;
+        height: 400px;
+        margin-bottom: 30px;
+    }
+
+    .accordion-button:not(.collapsed) {
+        color: #fff;
+        background-color: #0d6efd;
+    }
+    .accordion-button {
+        font-weight: bold;
+    }
+    .filter-section {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(0, 123, 255, 0.5), rgba(0, 123, 255, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Orçamento</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise de Projeções</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Análise de Projeções de Gastos</h1>
+                <p class="lead">Dashboard com análises detalhadas das projeções de gastos e requisições</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Filter Section (Accordion) -->
+        <div class="accordion mb-4 filter-section" id="filterAccordion">
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingFilter">
+                    <button class="accordion-button {% if not meses_selecionados %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if meses_selecionados %}true{% else %}false{% endif %}" aria-controls="collapseFilter">
+                        <i class="fas fa-filter me-2"></i>Filtros de Análise
+                    </button>
+                </h2>
+                <div id="collapseFilter" class="accordion-collapse collapse {% if meses_selecionados %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
+                    <div class="accordion-body">
+                        <form method="GET" class="row g-3 align-items-end">
+                            <div class="col-md-3">
+                                <label for="ano_filtro" class="form-label">Ano:</label>
+                                <select class="form-select" id="ano_filtro" name="ano">
+                                    {% for ano in anos_disponiveis %}
+                                        <option value="{{ ano }}" {% if ano == ano_selecionado %}selected{% endif %}>{{ ano }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="mes_filtro" class="form-label">Mês(es):</label>
+                                <div class="row">
+                                    <div class="col-12 mb-2">
+                                        <button type="button" class="btn btn-sm btn-outline-primary me-2" onclick="toggleAllMonths(true)">Selecionar Todos</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleAllMonths(false)">Desmarcar Todos</button>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    {% for mes_num, mes_nome in meses_choices %}
+                                        <div class="col-md-3 col-sm-4 col-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input mes-checkbox" type="checkbox" id="mes_{{ mes_num }}" name="mes" value="{{ mes_num }}"
+                                                    {% if mes_num in meses_selecionados %}checked{% endif %}>
+                                                <label class="form-check-label" for="mes_{{ mes_num }}">{{ mes_nome }}</label>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="col-md-3 d-flex justify-content-end">
+                                <button type="submit" class="btn btn-primary me-2"><i class="fas fa-filter me-1"></i>Aplicar Filtros</button>
+                                <a href="{% url 'analise_projecao_gastos' %}" class="btn btn-outline-secondary"><i class="fas fa-sync-alt me-1"></i>Limpar</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Debug Info -->
+        <div class="alert alert-info mb-4">
+            <strong>Total de Projeções encontradas:</strong> {{ total_projecoes|default:0 }}
+            {% if total_projecoes == 0 %}
+                <br><small>Nenhuma projeção encontrada com os filtros aplicados. Tente selecionar outro ano ou remover os filtros de mês.</small>
+            {% endif %}
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="row mb-5">
+            <div class="col-md-3 mb-4">
+                <div class="card kpi-card kpi-primary shadow-sm border-0 h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-clipboard-list fa-3x text-primary opacity-50 mb-3"></i>
+                        <h6 class="text-muted mb-2">Total de Projeções</h6>
+                        <h2 class="mb-0 fw-bold text-primary format-number">{{ total_projecoes|default:0 }}</h2>
+                        <small class="text-muted">Projeções cadastradas</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card kpi-card kpi-success shadow-sm border-0 h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-money-bill-wave fa-3x text-success opacity-50 mb-3"></i>
+                        <h6 class="text-muted mb-2">Valor Total Projetado</h6>
+                        <h2 class="mb-0 fw-bold text-success format-money" data-value="{{ valor_total_projetado|default:0 }}">R$ {{ valor_total_projetado|floatformat:2 }}</h2>
+                        <small class="text-muted">Soma de todas as projeções</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card kpi-card kpi-info shadow-sm border-0 h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-calculator fa-3x text-info opacity-50 mb-3"></i>
+                        <h6 class="text-muted mb-2">Valor Médio</h6>
+                        <h2 class="mb-0 fw-bold text-info format-money" data-value="{{ valor_medio|default:0 }}">R$ {{ valor_medio|floatformat:2 }}</h2>
+                        <small class="text-muted">Por projeção</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card kpi-card kpi-warning shadow-sm border-0 h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-file-invoice-dollar fa-3x text-warning opacity-50 mb-3"></i>
+                        <h6 class="text-muted mb-2">Com Nota Fiscal</h6>
+                        <h2 class="mb-0 fw-bold text-warning format-number">{{ projecoes_com_nf|default:0 }}</h2>
+                        <small class="text-muted">{{ percentual_com_nf|floatformat:1 }}% do total</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-5">
+            <div class="col-md-3 mb-4">
+                <div class="card kpi-card kpi-purple shadow-sm border-0 h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-wrench fa-3x text-purple opacity-50 mb-3"></i>
+                        <h6 class="text-muted mb-2">Com Ordem de Serviço</h6>
+                        <h2 class="mb-0 fw-bold text-purple format-number">{{ projecoes_com_os|default:0 }}</h2>
+                        <small class="text-muted">{{ percentual_com_os|floatformat:1 }}% do total</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card kpi-card kpi-success shadow-sm border-0 h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-check-circle fa-3x text-success opacity-50 mb-3"></i>
+                        <h6 class="text-muted mb-2">Serviços Concluídos</h6>
+                        <h2 class="mb-0 fw-bold text-success format-number">{{ projecoes_concluidas|default:0 }}</h2>
+                        <small class="text-muted">{{ percentual_concluidas|floatformat:1 }}% do total</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card kpi-card kpi-danger shadow-sm border-0 h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-clock fa-3x text-danger opacity-50 mb-3"></i>
+                        <h6 class="text-muted mb-2">Pendentes</h6>
+                        <h2 class="mb-0 fw-bold text-danger format-number">{{ projecoes_pendentes|default:0 }}</h2>
+                        <small class="text-muted">{{ percentual_pendentes|floatformat:1 }}% do total</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card kpi-card kpi-info shadow-sm border-0 h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-building fa-3x text-info opacity-50 mb-3"></i>
+                        <h6 class="text-muted mb-2">Setores Únicos</h6>
+                        <h2 class="mb-0 fw-bold text-info format-number">{{ setores_unicos|default:0 }}</h2>
+                        <small class="text-muted">Setores diferentes</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        {% if total_projecoes > 0 %}
+        <div class="row mb-5">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Distribuição por Setor (Top 10)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="setoresChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Top 10 Fornecedores por Valor</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="fornecedoresChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-5">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-warning text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Evolução Temporal (Mês a Mês)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="evolucaoTemporalChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-doughnut me-2"></i>Status das Projeções</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-5">
+            <div class="col-md-12 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-purple text-white" style="background-color: #6f42c1 !important;">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Distribuição por Uso Contábil</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="usoContabilChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Tables -->
+        <div class="row mb-5">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-table me-2"></i>Top 10 Setores por Valor</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Setor</th>
+                                        <th class="text-end">Quantidade</th>
+                                        <th class="text-end">Valor Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for setor in top_setores %}
+                                    <tr>
+                                        <td><strong>{{ setor.setor|default:"Não informado" }}</strong></td>
+                                        <td class="text-end format-number">{{ setor.quantidade }}</td>
+                                        <td class="text-end format-money" data-value="{{ setor.valor_total|default:0 }}">R$ {{ setor.valor_total|floatformat:2 }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted">Nenhum dado disponível</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-table me-2"></i>Top 10 Fornecedores por Valor</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Fornecedor</th>
+                                        <th class="text-end">Quantidade</th>
+                                        <th class="text-end">Valor Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for fornecedor in top_fornecedores %}
+                                    <tr>
+                                        <td><strong>{{ fornecedor.fornecedor_nome_fantasia|default:"Não informado"|truncatewords:5 }}</strong></td>
+                                        <td class="text-end format-number">{{ fornecedor.quantidade }}</td>
+                                        <td class="text-end format-money" data-value="{{ fornecedor.valor_total|default:0 }}">R$ {{ fornecedor.valor_total|floatformat:2 }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted">Nenhum dado disponível</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Função para formatar números para o padrão brasileiro
+    function formatarNumeroBR(numero) {
+        if (typeof numero !== 'number') {
+            numero = parseFloat(String(numero).replace(/\./g, '').replace(',', '.'));
+            if (isNaN(numero)) return 'N/A';
+        }
+        return numero.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+
+    // Função para formatar valores monetários para o padrão brasileiro
+    function formatarMoedaBR(valor) {
+        if (typeof valor !== 'number') {
+            valor = parseFloat(String(valor).replace(/\./g, '').replace(',', '.'));
+            if (isNaN(valor)) return 'R$ 0,00';
+        }
+        return 'R$ ' + valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // Função para selecionar/desmarcar todos os meses
+    function toggleAllMonths(select) {
+        const checkboxes = document.querySelectorAll('.mes-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = select;
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Aplicar formatação brasileira aos números
+        document.querySelectorAll('.format-number').forEach(function(element) {
+            const texto = element.textContent.trim();
+            const numero = parseFloat(texto.replace(/\./g, '').replace(',', '.'));
+            if (!isNaN(numero)) {
+                element.textContent = formatarNumeroBR(numero);
+            }
+        });
+
+        // Aplicar formatação brasileira aos valores monetários
+        document.querySelectorAll('.format-money').forEach(function(element) {
+            const valor = parseFloat(element.getAttribute('data-value') || element.textContent.replace('R$', '').replace(/\./g, '').replace(',', '.').trim());
+            if (!isNaN(valor)) {
+                element.textContent = formatarMoedaBR(valor);
+            }
+        });
+
+        // Verificar se há dados antes de criar gráficos
+        const totalProjecoes = {{ total_projecoes|default:0 }};
+        if (totalProjecoes === 0) {
+            return; // Não criar gráficos se não há dados
+        }
+
+        // Gráfico de Distribuição por Setor
+        const setoresCtx = document.getElementById('setoresChart');
+        if (setoresCtx) {
+            const setoresLabelsData = {{ setores_labels|safe }};
+            const setoresDataValues = {{ setores_data|safe }};
+            
+            if (setoresLabelsData && setoresLabelsData.length > 0 && setoresDataValues && setoresDataValues.length > 0 && setoresDataValues.some(val => val !== 0)) {
+                new Chart(setoresCtx.getContext('2d'), {
+                    type: 'pie',
+                    data: {
+                        labels: setoresLabelsData,
+                        datasets: [{
+                            label: 'Valor Total',
+                            data: setoresDataValues,
+                            backgroundColor: [
+                                '#0d6efd', '#198754', '#ffc107', '#dc3545', '#0dcaf0',
+                                '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d'
+                            ],
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: { padding: 15, font: { size: 12 } },
+                                generateLabels: function(chart) {
+                                    const data = chart.data;
+                                    if (data.labels.length && data.datasets.length) {
+                                        return data.labels.map(function(label, i) {
+                                            const value = data.datasets[0].data[i];
+                                            const total = data.datasets[0].data.reduce(function(a, b) { return a + b; }, 0);
+                                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                                            return {
+                                                text: label + ': R$ ' + formatarMoedaBR(value).replace('R$ ', '') + ' (' + percentage + '%)',
+                                                fillStyle: data.datasets[0].backgroundColor[i],
+                                                hidden: false,
+                                                index: i
+                                            };
+                                        });
+                                    }
+                                    return [];
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.parsed || 0;
+                                        const total = context.dataset.data.reduce(function(a, b) { return a + b; }, 0);
+                                        const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                                        return label + ': R$ ' + formatarMoedaBR(value).replace('R$ ', '') + ' (' + percentage + '%)';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                setoresCtx.parentElement.innerHTML = '<p class="text-center text-muted py-5">Nenhum dado disponível para este gráfico</p>';
+            }
+        }
+
+        // Gráfico Top 10 Fornecedores
+        const fornecedoresCtx = document.getElementById('fornecedoresChart');
+        if (fornecedoresCtx) {
+            const fornecedoresLabelsData = {{ fornecedores_labels|safe }};
+            const fornecedoresDataValues = {{ fornecedores_data|safe }};
+            
+            if (fornecedoresLabelsData && fornecedoresLabelsData.length > 0 && fornecedoresDataValues && fornecedoresDataValues.length > 0 && fornecedoresDataValues.some(val => val !== 0)) {
+                new Chart(fornecedoresCtx.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: fornecedoresLabelsData,
+                        datasets: [{
+                            label: 'Valor Total',
+                            data: fornecedoresDataValues,
+                            backgroundColor: 'rgba(25, 135, 84, 0.7)',
+                            borderColor: '#198754',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return 'R$ ' + formatarMoedaBR(context.parsed.y).replace('R$ ', '');
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return 'R$ ' + formatarMoedaBR(value).replace('R$ ', '');
+                                    }
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                fornecedoresCtx.parentElement.innerHTML = '<p class="text-center text-muted py-5">Nenhum dado disponível para este gráfico</p>';
+            }
+        }
+
+        // Gráfico de Evolução Temporal
+        const evolucaoCtx = document.getElementById('evolucaoTemporalChart');
+        if (evolucaoCtx) {
+            const evolucaoLabelsData = {{ evolucao_labels|safe }};
+            const evolucaoQuantidadeData = {{ evolucao_quantidade_data|safe }};
+            const evolucaoValorData = {{ evolucao_valor_data|safe }};
+            
+            if (evolucaoLabelsData && evolucaoLabelsData.length > 0) {
+                new Chart(evolucaoCtx.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: evolucaoLabelsData,
+                        datasets: [
+                            {
+                                label: 'Quantidade de Projeções',
+                                data: evolucaoQuantidadeData,
+                                borderColor: '#ffc107',
+                                backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                                fill: true,
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Valor Total',
+                                data: evolucaoValorData,
+                                borderColor: '#198754',
+                                backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                                fill: true,
+                                tension: 0.4,
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        plugins: {
+                            legend: { position: 'top' },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.dataset.label.includes('Valor')) {
+                                            label += 'R$ ' + formatarMoedaBR(context.parsed.y).replace('R$ ', '');
+                                        } else {
+                                            label += formatarNumeroBR(context.parsed.y);
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return formatarNumeroBR(value);
+                                    }
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return 'R$ ' + formatarMoedaBR(value).replace('R$ ', '');
+                                    }
+                                },
+                                grid: {
+                                    drawOnChartArea: false,
+                                },
+                            }
+                        }
+                    }
+                });
+            } else {
+                evolucaoCtx.parentElement.innerHTML = '<p class="text-center text-muted py-5">Nenhum dado disponível para este gráfico</p>';
+            }
+        }
+
+        // Gráfico de Status
+        const statusCtx = document.getElementById('statusChart');
+        if (statusCtx) {
+            const statusLabelsData = {{ status_labels|safe }};
+            const statusDataValues = {{ status_data|safe }};
+            
+            if (statusLabelsData && statusLabelsData.length > 0 && statusDataValues && statusDataValues.length > 0 && statusDataValues.some(val => val !== 0)) {
+                new Chart(statusCtx.getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: statusLabelsData,
+                        datasets: [{
+                            label: 'Quantidade',
+                            data: statusDataValues,
+                            backgroundColor: [
+                                '#198754', '#dc3545', '#ffc107', '#0dcaf0', '#6f42c1'
+                            ],
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: { padding: 15, font: { size: 12 } }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.parsed || 0;
+                                        const total = context.dataset.data.reduce(function(a, b) { return a + b; }, 0);
+                                        const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                                        return label + ': ' + formatarNumeroBR(value) + ' (' + percentage + '%)';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                statusCtx.parentElement.innerHTML = '<p class="text-center text-muted py-5">Nenhum dado disponível para este gráfico</p>';
+            }
+        }
+
+        // Gráfico de Uso Contábil
+        const usoContabilCtx = document.getElementById('usoContabilChart');
+        if (usoContabilCtx) {
+            const usoContabilLabelsData = {{ uso_contabil_labels|safe }};
+            const usoContabilDataValues = {{ uso_contabil_data|safe }};
+            
+            if (usoContabilLabelsData && usoContabilLabelsData.length > 0 && usoContabilDataValues && usoContabilDataValues.length > 0 && usoContabilDataValues.some(val => val !== 0)) {
+                new Chart(usoContabilCtx.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: usoContabilLabelsData,
+                        datasets: [{
+                            label: 'Valor Total',
+                            data: usoContabilDataValues,
+                            backgroundColor: 'rgba(111, 66, 193, 0.7)',
+                            borderColor: '#6f42c1',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return 'R$ ' + formatarMoedaBR(context.parsed.y).replace('R$ ', '');
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return 'R$ ' + formatarMoedaBR(value).replace('R$ ', '');
+                                    }
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                usoContabilCtx.parentElement.innerHTML = '<p class="text-center text-muted py-5">Nenhum dado disponível para este gráfico</p>';
+            }
+        }
+    });
+</script>
+{% endblock %}

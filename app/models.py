@@ -81,7 +81,6 @@ class Maquina(models.Model):
         help_text='Centro de Atividade relacionado ao setor de manutenção',
         related_name='maquinas'
     )
-    ativo = models.BooleanField('Ativo', default=True, db_index=True, help_text='Indica se a máquina está ativa no sistema')
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
     updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
 
@@ -89,9 +88,6 @@ class Maquina(models.Model):
         verbose_name = 'Máquina'
         verbose_name_plural = 'Máquinas'
         ordering = ['cd_maquina']
-        indexes = [
-            models.Index(fields=['ativo', 'cd_maquina']),
-        ]
 
     def __str__(self):
         return f"{self.cd_maquina} - {self.descr_maquina or 'Sem descrição'}"
@@ -244,13 +240,12 @@ class OrdemServicoCorretivaFicha(models.Model):
 
 class CentroAtividade(models.Model):
     """Modelo para armazenar informações de Centros de Atividade (CA)"""
-    ca = models.IntegerField('CA', db_index=True)
+    ca = models.IntegerField('CA', unique=True, db_index=True)
     sigla = models.CharField('Sigla', max_length=50, blank=True, null=True)
     descricao = models.CharField('Descrição', max_length=500, blank=True, null=True)
     indice = models.IntegerField('Índice', blank=True, null=True)
     encarregado_responsavel = models.CharField('Encarregado Responsável', max_length=255, blank=True, null=True)
     local = models.CharField('Local', max_length=255, blank=True, null=True, help_text='Local do Centro de Atividade')
-    imagem = models.CharField('Imagem', max_length=500, blank=True, null=True, help_text='Caminho da imagem (relativo a static/)')
     observacoes = models.TextField('Observações', blank=True, null=True, help_text='Observações sobre o local')
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
     updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
@@ -1089,6 +1084,7 @@ class ProjecaoGasto(models.Model):
     servico_concluido = models.DateField('Serviço Concluído', blank=True, null=True)  # SERVIÇO CONCLUÍDO
     nf_servico_recebida = models.DateField('NF de Serviço Recebida', blank=True, null=True)  # NF DE SERVIÇO RECEBIDA
     nf_enviada_lancamento = models.DateField('NF Enviada para Lançamento', blank=True, null=True)  # NF ENVIADA PARA LANÇAMENTO
+    observacoes = models.TextField('Observações', blank=True, null=True)  # OBSERVAÇÕES do Excel
     
     # Campos legados (mantidos para compatibilidade, mas não mais usados)
     tipo = models.CharField('Tipo', max_length=100, blank=True, null=True, db_index=True)  # Mantido para compatibilidade
@@ -1103,7 +1099,6 @@ class ProjecaoGasto(models.Model):
     fornecedor = models.CharField('Fornecedor', max_length=255, blank=True, null=True)  # Mantido para compatibilidade (mapeado de fornecedor_nome_fantasia)
     numero_requisicao = models.CharField('Número Requisição', max_length=100, blank=True, null=True, db_index=True)  # Mantido para compatibilidade (mapeado de numero_requisicao_compra)
     status = models.CharField('Status', max_length=100, blank=True, null=True)  # Mantido para compatibilidade
-    observacoes = models.TextField('Observações', blank=True, null=True)  # Mantido para compatibilidade
     
     # Campos flexíveis para armazenar dados adicionais do Excel
     dados_adicionais = models.JSONField('Dados Adicionais', blank=True, null=True, default=dict)
@@ -1232,56 +1227,3 @@ class DadosOrcamento(models.Model):
     
     def __str__(self):
         return f"{self.ano}/{self.mes:02d} - {self.conta_orcamentaria}"
-
-class ControleRCeNF(models.Model):
-    """Modelo para armazenar dados do controle de RC e NF"""
-    # Dados básicos
-    solicitante = models.CharField('Solicitante', max_length=255, blank=True, null=True)
-    empresa = models.CharField('Empresa', max_length=255, blank=True, null=True)
-    nf_saida = models.CharField('NF Saída', max_length=100, blank=True, null=True, db_index=True)
-    descricao_servico = models.TextField('Descrição do Serviço', blank=True, null=True)
-    ca_rateio = models.CharField('C.A/Rateio', max_length=100, blank=True, null=True)
-    uso = models.CharField('Uso', max_length=50, blank=True, null=True)
-    quem_abriu_rc = models.CharField('Quem Abriu a RC', max_length=255, blank=True, null=True)
-    orcamento = models.CharField('Orçamento', max_length=500, blank=True, null=True)
-    os = models.CharField('O.S', max_length=100, blank=True, null=True)
-    classificacao = models.CharField('Classificação', max_length=50, blank=True, null=True)
-    justificativa_classificacao = models.TextField('Justificativa Classificação', blank=True, null=True)
-    spaf0009_acesso_portaria = models.CharField('SPAF0009 - Acesso portaria p/ classif. 5 e 8', max_length=255, blank=True, null=True)
-    rc = models.CharField('RC', max_length=100, blank=True, null=True, db_index=True)
-    data_rc = models.DateTimeField('Data RC', blank=True, null=True)
-    
-    # Dados do pedido
-    pedido = models.CharField('Pedido', max_length=100, blank=True, null=True, db_index=True)
-    valor_total_pedido = models.DecimalField('Valor Total do Pedido', max_digits=15, decimal_places=2, blank=True, null=True)
-    previsao_para_uso = models.DateTimeField('Previsão para Uso', blank=True, null=True)
-    
-    # Dados da NF
-    nf_servico = models.CharField('NF Serviço', max_length=100, blank=True, null=True)
-    nf_retorno_e_data_lancamento = models.CharField('NF Retorno e Data Lançamento', max_length=255, blank=True, null=True)
-    cnpj_aurora = models.CharField('CNPJ Aurora', max_length=50, blank=True, null=True)
-    simples_nacional = models.CharField('Simples Nacional', max_length=50, blank=True, null=True)
-    valor_nf = models.DecimalField('Valor NF', max_digits=15, decimal_places=2, blank=True, null=True)
-    emissao = models.DateTimeField('Emissão', blank=True, null=True)
-    inclusao_198 = models.DateTimeField('Inclusão 198', blank=True, null=True)
-    status = models.CharField('Status', max_length=255, blank=True, null=True)
-    obs = models.TextField('Observações', blank=True, null=True)
-    saldo_residual_pedido = models.DecimalField('Saldo Residual Pedido', max_digits=15, decimal_places=2, blank=True, null=True)
-    
-    # Timestamps
-    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
-    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
-    
-    class Meta:
-        verbose_name = 'Controle RC e NF'
-        verbose_name_plural = 'Controles RC e NF'
-        ordering = ['-data_rc', '-created_at']
-        indexes = [
-            models.Index(fields=['nf_saida']),
-            models.Index(fields=['rc']),
-            models.Index(fields=['pedido']),
-            models.Index(fields=['data_rc']),
-        ]
-    
-    def __str__(self):
-        return f"RC: {self.rc or 'N/A'} - NF: {self.nf_saida or 'N/A'} - {self.empresa or 'N/A'}"

@@ -2,7 +2,7 @@
 {% load static %}
 {% load form_extras %}
 
-{% block title %}Consultar Projeção de Gastos{% endblock %}
+{% block title %}Consultar e Analisar Projeção de Gastos{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -76,7 +76,7 @@
                     </ol>
                 </nav>
                 <h1 class="display-4 fw-bold mt-3">
-                    <i class="bi bi-clipboard2-data me-2"></i>Consultar Projeção de Gastos
+                    <i class="bi bi-clipboard2-data me-2"></i>Consultar Projeções de Gastos
                 </h1>
                 <p class="lead">Visualize e consulte todas as projeções de gastos cadastradas</p>
             </div>
@@ -99,42 +99,6 @@
             </div>
         </div>
 
-        <!-- Statistics -->
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Total de Projeções</h5>
-                        <p class="card-text display-6">{{ total_count }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-success text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Setores Únicos</h5>
-                        <p class="card-text display-6">{{ setores_count }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-info text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Fornecedores</h5>
-                        <p class="card-text display-6">{{ fornecedores_count }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-warning text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Valor Total</h5>
-                        <p class="card-text display-6">R$ {{ valor_total|floatformat:2 }}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Table -->
         <div class="row">
             <div class="col-12">
@@ -142,7 +106,7 @@
                     <div class="card-header bg-secondary text-white">
                         <h5 class="mb-0">
                             <i class="bi bi-clipboard2-data me-2"></i>Projeções de Gastos
-                            <small class="ms-2">({{ projecoes.paginator.count }} registro{{ projecoes.paginator.count|pluralize }})</small>
+                            <small class="ms-2">(<span class="format-number">{{ projecoes.paginator.count }}</span> registro{{ projecoes.paginator.count|pluralize }})</small>
                         </h5>
                     </div>
                     <div class="card-body p-0">
@@ -218,7 +182,7 @@
                                                 {% endif %}
                                             </td>
                                             <td class="col-valor">
-                                                <strong>R$ {{ projecao.valor_total|floatformat:2|default:"0,00" }}</strong>
+                                                <strong class="format-money" data-value="{{ projecao.valor_total|default:0 }}">R$ {{ projecao.valor_total|floatformat:2|default:"0,00" }}</strong>
                                             </td>
                                             <td class="col-data">
                                                 {% if projecao.data_abertura_requisicao %}
@@ -272,7 +236,7 @@
                                 
                                 <li class="page-item active">
                                     <span class="page-link">
-                                        Página {{ projecoes.number }} de {{ projecoes.paginator.num_pages }}
+                                        Página <span class="format-number">{{ projecoes.number }}</span> de <span class="format-number">{{ projecoes.paginator.num_pages }}</span>
                                     </span>
                                 </li>
                                 
@@ -295,4 +259,44 @@
 </section>
 {% endblock %}
 
+{% block extra_js %}
+<script>
+    // Função para formatar números para o padrão brasileiro
+    function formatarNumeroBR(numero) {
+        if (typeof numero !== 'number') {
+            numero = parseFloat(String(numero).replace(/\./g, '').replace(',', '.'));
+            if (isNaN(numero)) return 'N/A';
+        }
+        return numero.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
 
+    // Função para formatar valores monetários para o padrão brasileiro
+    function formatarMoedaBR(valor) {
+        if (typeof valor !== 'number') {
+            valor = parseFloat(String(valor).replace(/\./g, '').replace(',', '.'));
+            if (isNaN(valor)) return 'R$ 0,00';
+        }
+        return 'R$ ' + valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // Aplicar formatação quando a página carregar
+    document.addEventListener('DOMContentLoaded', function() {
+        // Formatar números simples
+        document.querySelectorAll('.format-number').forEach(function(element) {
+            const texto = element.textContent.trim();
+            const numero = parseFloat(texto.replace(/\./g, '').replace(',', '.'));
+            if (!isNaN(numero)) {
+                element.textContent = formatarNumeroBR(numero);
+            }
+        });
+
+        // Formatar valores monetários
+        document.querySelectorAll('.format-money').forEach(function(element) {
+            const valor = parseFloat(element.getAttribute('data-value') || element.textContent.replace('R$', '').replace(/\./g, '').replace(',', '.').trim());
+            if (!isNaN(valor)) {
+                element.textContent = formatarMoedaBR(valor);
+            }
+        });
+    });
+</script>
+{% endblock %}
