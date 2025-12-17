@@ -873,7 +873,7 @@ def analise_requisicoes(request):
         'ano_selecionado': ano_selecionado,
         'mes_selecionado_filtro': mes_selecionado,
     }
-    return render(request, 'orcamento/analise_requisicoes.html', context)
+    return render(request, 'almoxarifado/analise_requisicoes.html', context)
 
 
 def api_meses_por_ano(request):
@@ -2550,6 +2550,146 @@ def importar_requisicoes_almoxarifado(request):
         'active_page': 'importar_requisicoes_almoxarifado'
     }
     return render(request, 'importar/importar_requisicoes_almoxaridado.html', context)
+
+
+def importar_projecao_gastos(request):
+    """Importar Projeção de Gastos page view"""
+    from django.contrib import messages
+    from app.utils import upload_projecao_gastos_from_file
+    
+    if request.method == 'POST':
+        # Verificar se há arquivo enviado
+        if 'file' not in request.FILES:
+            messages.error(request, 'Por favor, selecione um arquivo para importar.')
+            context = {
+                'page_title': 'Importar Projeção de Gastos',
+                'active_page': 'importar_projecao_gastos'
+            }
+            return render(request, 'importar/importar_projecao_gastos.html', context)
+        
+        file = request.FILES['file']
+        
+        # Validar extensão do arquivo
+        allowed_extensions = ['.xlsx', '.xls', '.xlsm']
+        file_extension = '.' + file.name.split('.')[-1].lower()
+        
+        if file_extension not in allowed_extensions:
+            messages.error(
+                request, 
+                f'Formato de arquivo não suportado. Use: {", ".join(allowed_extensions)}'
+            )
+            context = {
+                'page_title': 'Importar Projeção de Gastos',
+                'active_page': 'importar_projecao_gastos'
+            }
+            return render(request, 'importar/importar_projecao_gastos.html', context)
+        
+        # Verificar opção de atualização
+        update_existing = request.POST.get('update_existing', 'off') == 'on'
+        
+        try:
+            # Fazer upload dos dados
+            created_count, updated_count, errors = upload_projecao_gastos_from_file(
+                file, 
+                update_existing=update_existing
+            )
+            
+            # Preparar mensagens
+            if errors:
+                for error in errors[:10]:  # Mostrar apenas os primeiros 10 erros
+                    messages.warning(request, error)
+                if len(errors) > 10:
+                    messages.warning(request, f'... e mais {len(errors) - 10} erros.')
+            
+            if created_count > 0:
+                messages.success(request, f'{created_count} projeção(ões) de gasto(s) criada(s) com sucesso!')
+            if updated_count > 0:
+                messages.info(request, f'{updated_count} projeção(ões) de gasto(s) atualizada(s)!')
+            if created_count == 0 and updated_count == 0 and not errors:
+                messages.info(request, 'Nenhum registro novo foi importado. Todas as projeções já existem no banco de dados.')
+            
+        except Exception as e:
+            error_msg = f'Erro ao importar arquivo: {str(e)}'
+            messages.error(request, error_msg)
+            # Log detalhado do erro para debug
+            import traceback
+            print(f"Erro ao importar projeção de gastos: {error_msg}")
+            traceback.print_exc()
+    
+    context = {
+        'page_title': 'Importar Projeção de Gastos',
+        'active_page': 'importar_projecao_gastos'
+    }
+    return render(request, 'importar/importar_projecao_gastos.html', context)
+
+
+def importar_controle_nf_e_rc(request):
+    """Importar Controle RC e NF page view"""
+    from django.contrib import messages
+    from app.utils import upload_controle_rc_e_nf_from_file
+    
+    if request.method == 'POST':
+        # Verificar se há arquivo enviado
+        if 'file' not in request.FILES:
+            messages.error(request, 'Por favor, selecione um arquivo para importar.')
+            context = {
+                'page_title': 'Importar Controle RC e NF',
+                'active_page': 'importar_controle_nf_e_rc'
+            }
+            return render(request, 'importar/importar_controle_nf_e_rc.html', context)
+        
+        file = request.FILES['file']
+        
+        # Validar extensão do arquivo
+        allowed_extensions = ['.xlsx', '.xls', '.xlsm']
+        file_extension = '.' + file.name.split('.')[-1].lower()
+        
+        if file_extension not in allowed_extensions:
+            messages.error(
+                request, 
+                f'Formato de arquivo não suportado. Use: {", ".join(allowed_extensions)}'
+            )
+            context = {
+                'page_title': 'Importar Controle RC e NF',
+                'active_page': 'importar_controle_nf_e_rc'
+            }
+            return render(request, 'importar/importar_controle_nf_e_rc.html', context)
+        
+        # Verificar opção de atualização
+        update_existing = request.POST.get('update_existing', 'off') == 'on'
+        
+        try:
+            # Fazer upload dos dados
+            created_count, updated_count, errors = upload_controle_rc_e_nf_from_file(
+                file, 
+                update_existing=update_existing
+            )
+            
+            # Preparar mensagens
+            if errors:
+                for error in errors[:10]:  # Mostrar apenas os primeiros 10 erros
+                    messages.warning(request, error)
+                if len(errors) > 10:
+                    messages.warning(request, f'... e mais {len(errors) - 10} erros.')
+            
+            if created_count > 0:
+                messages.success(request, f'{created_count} registro(s) criado(s) com sucesso!')
+            
+            if updated_count > 0:
+                messages.success(request, f'{updated_count} registro(s) atualizado(s) com sucesso!')
+            
+            if created_count == 0 and updated_count == 0 and not errors:
+                messages.info(request, 'Nenhum registro foi importado. Verifique se o arquivo contém dados válidos.')
+                
+        except Exception as e:
+            messages.error(request, f'Erro ao importar arquivo: {str(e)}')
+    
+    context = {
+        'page_title': 'Importar Controle RC e NF',
+        'active_page': 'importar_controle_nf_e_rc'
+    }
+    
+    return render(request, 'importar/importar_controle_nf_e_rc.html', context)
 
 
 def importar_estoque(request):
@@ -11066,3 +11206,1137 @@ def atualizar_foto_detalhada(request, item_id):
         messages.error(request, f'Erro ao atualizar foto: {str(e)}')
     
     return redirect('visualizar_item_estoque', item_id=item_id)
+
+
+def dados_orcamento(request):
+    """Página para gerenciar dados de orçamento por ano, mês e conta orçamentária"""
+    from app.models import DadosOrcamento, ProjecaoGasto, NotaFiscal
+    from django.db.models import Count, Sum
+    from collections import defaultdict
+    from decimal import Decimal
+    
+    # Processar POST para criar novo registro
+    if request.method == 'POST':
+        try:
+            ano = int(request.POST.get('ano'))
+            mes = int(request.POST.get('mes'))
+            conta_orcamentaria = request.POST.get('conta_orcamentaria', '').strip()
+            valor_orcamento_str = request.POST.get('valor_orcamento', '0').replace(',', '.')
+            valor_final_desejado_str = request.POST.get('valor_final_desejado', '0').replace(',', '.')
+            
+            if not conta_orcamentaria:
+                messages.error(request, 'Conta orçamentária é obrigatória.')
+            else:
+                try:
+                    valor_orcamento = Decimal(valor_orcamento_str)
+                    valor_final_desejado = Decimal(valor_final_desejado_str)
+                    
+                    # Criar ou atualizar registro
+                    dados_orcamento, created = DadosOrcamento.objects.update_or_create(
+                        ano=ano,
+                        mes=mes,
+                        conta_orcamentaria=conta_orcamentaria,
+                        defaults={
+                            'valor_orcamento': valor_orcamento,
+                            'valor_final_desejado': valor_final_desejado,
+                        }
+                    )
+                    
+                    if created:
+                        messages.success(request, f'Registro criado com sucesso para {conta_orcamentaria}!')
+                    else:
+                        messages.info(request, f'Registro atualizado com sucesso para {conta_orcamentaria}!')
+                except ValueError:
+                    messages.error(request, 'Valores inválidos. Use números válidos.')
+        except (ValueError, TypeError) as e:
+            messages.error(request, f'Erro ao processar dados: {str(e)}')
+        
+        return redirect('dados_orcamento')
+    
+    # Buscar todos os dados de orçamento
+    todos_dados = DadosOrcamento.objects.all().order_by('ano', 'mes', 'conta_orcamentaria')
+    
+    # Organizar por ano e mês
+    anos_dados = []
+    anos_unicos = sorted(set(todos_dados.values_list('ano', flat=True)), reverse=True)
+    
+    meses_nomes = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+    
+    for ano in anos_unicos:
+        dados_ano = todos_dados.filter(ano=ano)
+        meses_unicos = sorted(set(dados_ano.values_list('mes', flat=True)))
+        
+        meses_data = []
+        for mes in meses_unicos:
+            dados_mes = dados_ano.filter(mes=mes)
+            meses_data.append({
+                'mes': mes,
+                'mes_nome': meses_nomes.get(mes, f'Mês {mes}'),
+                'dados': list(dados_mes)
+            })
+        
+        anos_dados.append({
+            'ano': ano,
+            'meses': meses_data
+        })
+    
+    # Se não houver dados, criar estrutura para o ano atual
+    if not anos_dados:
+        from datetime import datetime
+        ano_atual = datetime.now().year
+        meses_data = []
+        for mes in range(1, 13):
+            meses_data.append({
+                'mes': mes,
+                'mes_nome': meses_nomes.get(mes, f'Mês {mes}'),
+                'dados': []
+            })
+        anos_dados.append({
+            'ano': ano_atual,
+            'meses': meses_data
+        })
+    
+    # Calcular estatísticas
+    total_projecoes = ProjecaoGasto.objects.count()
+    total_notas_fiscais = NotaFiscal.objects.count()
+    total_requisicoes = DadosOrcamento.objects.count()
+    total_relacoes_confirmadas = 0  # Placeholder - ajustar conforme necessário
+    
+    context = {
+        'page_title': 'Dados de Orçamento',
+        'active_page': 'dados_orcamento',
+        'anos_dados': anos_dados,
+        'total_projecoes': total_projecoes,
+        'total_notas_fiscais': total_notas_fiscais,
+        'total_requisicoes': total_requisicoes,
+        'total_relacoes_confirmadas': total_relacoes_confirmadas,
+    }
+    
+    return render(request, 'orcamento/dados_orcamento.html', context)
+
+
+def consultar_projecao_gastos(request):
+    """Consultar/listar projeções de gastos com filtros avançados"""
+    from app.models import ProjecaoGasto
+    from decimal import Decimal
+    from django.db.models import Sum, Count, Q
+    
+    # Busca geral
+    search_query = request.GET.get('search', '').strip()
+    projecoes_list = ProjecaoGasto.objects.all()
+    
+    # Aplicar busca geral
+    if search_query:
+        try:
+            search_num = Decimal(search_query.replace(',', '.'))
+            projecoes_list = projecoes_list.filter(
+                Q(setor__icontains=search_query) |
+                Q(descricao__icontains=search_query) |
+                Q(fornecedor_nome_fantasia__icontains=search_query) |
+                Q(numero_requisicao_compra__icontains=search_query) |
+                Q(numero_ordem_servico__icontains=search_query) |
+                Q(valor_total=search_num)
+            )
+        except (ValueError, TypeError):
+            projecoes_list = projecoes_list.filter(
+                Q(setor__icontains=search_query) |
+                Q(descricao__icontains=search_query) |
+                Q(fornecedor_nome_fantasia__icontains=search_query) |
+                Q(numero_requisicao_compra__icontains=search_query) |
+                Q(numero_ordem_servico__icontains=search_query) |
+                Q(solicitante__icontains=search_query)
+            )
+    
+    # Filtros específicos
+    filtro_setor = request.GET.get('filtro_setor', '').strip()
+    if filtro_setor:
+        projecoes_list = projecoes_list.filter(setor__icontains=filtro_setor)
+    
+    filtro_fornecedor = request.GET.get('filtro_fornecedor', '').strip()
+    if filtro_fornecedor:
+        projecoes_list = projecoes_list.filter(
+            Q(fornecedor_nome_fantasia__icontains=filtro_fornecedor) |
+            Q(fornecedor_cnpj__icontains=filtro_fornecedor)
+        )
+    
+    filtro_ano = request.GET.get('filtro_ano', '').strip()
+    if filtro_ano:
+        try:
+            ano = int(filtro_ano)
+            projecoes_list = projecoes_list.filter(ano_referencia=ano)
+        except (ValueError, TypeError):
+            pass
+    
+    filtro_mes = request.GET.get('filtro_mes', '').strip()
+    if filtro_mes:
+        projecoes_list = projecoes_list.filter(mes_referencia__icontains=filtro_mes)
+    
+    filtro_numero_requisicao = request.GET.get('filtro_numero_requisicao', '').strip()
+    if filtro_numero_requisicao:
+        projecoes_list = projecoes_list.filter(numero_requisicao_compra__icontains=filtro_numero_requisicao)
+    
+    filtro_valor_min = request.GET.get('filtro_valor_min', '').strip()
+    if filtro_valor_min:
+        try:
+            valor_min = Decimal(filtro_valor_min.replace(',', '.'))
+            projecoes_list = projecoes_list.filter(valor_total__gte=valor_min)
+        except (ValueError, TypeError):
+            pass
+    
+    filtro_valor_max = request.GET.get('filtro_valor_max', '').strip()
+    if filtro_valor_max:
+        try:
+            valor_max = Decimal(filtro_valor_max.replace(',', '.'))
+            projecoes_list = projecoes_list.filter(valor_total__lte=valor_max)
+        except (ValueError, TypeError):
+            pass
+    
+    # Ordenar por ano/mês/data (mais recente primeiro)
+    projecoes_list = projecoes_list.order_by('-ano_referencia', '-mes_referencia', '-data_abertura_requisicao', '-created_at')
+    
+    # Paginação
+    paginator = Paginator(projecoes_list, 50)  # 50 itens por página
+    page_number = request.GET.get('page', 1)
+    projecoes = paginator.get_page(page_number)
+    
+    # Estatísticas
+    total_count = ProjecaoGasto.objects.count()
+    setores_count = ProjecaoGasto.objects.exclude(setor__isnull=True).exclude(setor='').values('setor').distinct().count()
+    fornecedores_count = ProjecaoGasto.objects.exclude(fornecedor_nome_fantasia__isnull=True).exclude(fornecedor_nome_fantasia='').values('fornecedor_nome_fantasia').distinct().count()
+    
+    # Calcular valor total
+    valor_total_result = ProjecaoGasto.objects.aggregate(
+        total=Sum('valor_total')
+    )
+    valor_total = valor_total_result['total'] or Decimal('0.00')
+    
+    # Obter valores únicos para os dropdowns de filtros
+    setores_unicos = ProjecaoGasto.objects.exclude(
+        setor__isnull=True
+    ).exclude(
+        setor=''
+    ).values_list('setor', flat=True).distinct().order_by('setor')
+    
+    anos_unicos = ProjecaoGasto.objects.exclude(
+        ano_referencia__isnull=True
+    ).values_list('ano_referencia', flat=True).distinct().order_by('-ano_referencia')
+    
+    meses_unicos = ProjecaoGasto.objects.exclude(
+        mes_referencia__isnull=True
+    ).exclude(
+        mes_referencia=''
+    ).values_list('mes_referencia', flat=True).distinct().order_by('mes_referencia')
+    
+    context = {
+        'page_title': 'Consultar Projeção de Gastos',
+        'active_page': 'consultar_projecao_gastos',
+        'projecoes': projecoes,
+        'search_query': search_query,
+        'total_count': total_count,
+        'setores_count': setores_count,
+        'fornecedores_count': fornecedores_count,
+        'valor_total': valor_total,
+        'setores_unicos': setores_unicos,
+        'anos_unicos': anos_unicos,
+        'meses_unicos': meses_unicos,
+        'filtro_setor': filtro_setor,
+        'filtro_fornecedor': filtro_fornecedor,
+        'filtro_ano': filtro_ano,
+        'filtro_mes': filtro_mes,
+        'filtro_numero_requisicao': filtro_numero_requisicao,
+        'filtro_valor_min': filtro_valor_min,
+        'filtro_valor_max': filtro_valor_max,
+    }
+    
+    return render(request, 'orcamento/consultar_projecao_gastos.html', context)
+
+
+def relacionar_projecao_nota_fiscal(request):
+    """Relacionar Projeções de Gastos com Notas Fiscais - encontrar matches e confirmar relações"""
+    from app.models import ProjecaoGasto, NotaFiscal, RelacaoProjecaoNotaFiscal
+    from django.db.models import Q
+    from decimal import Decimal
+    from django.contrib import messages
+    
+    # Processar ações POST
+    if request.method == 'POST':
+        acao = request.POST.get('acao')
+        projecao_id = request.POST.get('projecao_id')
+        nota_id = request.POST.get('nota_id')
+        
+        if acao == 'confirmar':
+            try:
+                projecao = ProjecaoGasto.objects.get(id=projecao_id)
+                nota = NotaFiscal.objects.get(id=nota_id)
+                score_match = request.POST.get('score_match', '0')
+                observacoes = request.POST.get('observacoes', '').strip()
+                
+                relacao, created = RelacaoProjecaoNotaFiscal.objects.update_or_create(
+                    projecao=projecao,
+                    nota_fiscal=nota,
+                    defaults={
+                        'status': 'confirmado',
+                        'score_match': Decimal(score_match) if score_match else None,
+                        'confirmado_por': request.user.username if request.user.is_authenticated else 'Anônimo',
+                        'observacoes': observacoes if observacoes else None,
+                    }
+                )
+                
+                if created:
+                    messages.success(request, f'Relação confirmada com sucesso entre Projeção e Nota Fiscal {nota.nota}!')
+                else:
+                    messages.success(request, f'Relação atualizada com sucesso!')
+                    
+            except ProjecaoGasto.DoesNotExist:
+                messages.error(request, 'Projeção de gasto não encontrada.')
+            except NotaFiscal.DoesNotExist:
+                messages.error(request, 'Nota fiscal não encontrada.')
+            except Exception as e:
+                messages.error(request, f'Erro ao confirmar relação: {str(e)}')
+        
+        elif acao == 'rejeitar':
+            try:
+                projecao = ProjecaoGasto.objects.get(id=projecao_id)
+                nota = NotaFiscal.objects.get(id=nota_id)
+                observacoes = request.POST.get('observacoes', '').strip()
+                
+                relacao, created = RelacaoProjecaoNotaFiscal.objects.update_or_create(
+                    projecao=projecao,
+                    nota_fiscal=nota,
+                    defaults={
+                        'status': 'rejeitado',
+                        'confirmado_por': request.user.username if request.user.is_authenticated else 'Anônimo',
+                        'observacoes': observacoes if observacoes else None,
+                    }
+                )
+                
+                messages.success(request, f'Relação rejeitada com sucesso.')
+                    
+            except ProjecaoGasto.DoesNotExist:
+                messages.error(request, 'Projeção de gasto não encontrada.')
+            except NotaFiscal.DoesNotExist:
+                messages.error(request, 'Nota fiscal não encontrada.')
+            except Exception as e:
+                messages.error(request, f'Erro ao rejeitar relação: {str(e)}')
+        
+        elif acao == 'remover':
+            try:
+                projecao = ProjecaoGasto.objects.get(id=projecao_id)
+                nota = NotaFiscal.objects.get(id=nota_id)
+                
+                RelacaoProjecaoNotaFiscal.objects.filter(
+                    projecao=projecao,
+                    nota_fiscal=nota
+                ).delete()
+                
+                messages.success(request, f'Relação removida com sucesso.')
+                    
+            except Exception as e:
+                messages.error(request, f'Erro ao remover relação: {str(e)}')
+        
+        return redirect('relacionar_projecao_nota_fiscal')
+    
+    # Função para calcular score de match
+    def calcular_match_score(projecao, nota):
+        """Calcula score de correspondência entre projeção e nota fiscal (0-100)"""
+        score = 0
+        total_peso = 0
+        detalhes = []
+        
+        # Valor (peso 30)
+        if projecao.valor_total and nota.total_nota:
+            total_peso += 30
+            diff_percent = abs(float(projecao.valor_total - nota.total_nota)) / float(projecao.valor_total) * 100
+            if diff_percent <= 5:  # Diferença de até 5%
+                score += 30
+                detalhes.append(f"Valor: Match perfeito (diff: {diff_percent:.1f}%)")
+            elif diff_percent <= 10:
+                score += 20
+                detalhes.append(f"Valor: Match bom (diff: {diff_percent:.1f}%)")
+            elif diff_percent <= 20:
+                score += 10
+                detalhes.append(f"Valor: Match parcial (diff: {diff_percent:.1f}%)")
+            else:
+                detalhes.append(f"Valor: Diferença significativa (diff: {diff_percent:.1f}%)")
+        
+        # Fornecedor/Emitente (peso 25)
+        fornecedor_proj = (projecao.fornecedor_nome_fantasia or '').strip().upper()
+        emitente_nota = (nota.nome_fantasia_emitente or nota.emitente or '').strip().upper()
+        if fornecedor_proj and emitente_nota:
+            total_peso += 25
+            if fornecedor_proj == emitente_nota:
+                score += 25
+                detalhes.append("Fornecedor/Emitente: Match perfeito")
+            elif fornecedor_proj in emitente_nota or emitente_nota in fornecedor_proj:
+                score += 15
+                detalhes.append("Fornecedor/Emitente: Match parcial")
+            else:
+                detalhes.append("Fornecedor/Emitente: Não corresponde")
+        
+        # CNPJ (peso 20)
+        cnpj_proj = (projecao.fornecedor_cnpj or '').strip().replace('.', '').replace('/', '').replace('-', '')
+        cnpj_nota = (nota.emitente or '').strip().replace('.', '').replace('/', '').replace('-', '')
+        if cnpj_proj and cnpj_nota:
+            total_peso += 20
+            if cnpj_proj == cnpj_nota:
+                score += 20
+                detalhes.append("CNPJ: Match perfeito")
+            else:
+                detalhes.append("CNPJ: Não corresponde")
+        
+        # Data (peso 15)
+        if projecao.data_abertura_requisicao and nota.data_emissao:
+            total_peso += 15
+            # Tentar parsear data_emissao que é string
+            try:
+                from datetime import datetime
+                # Tentar diferentes formatos de data
+                data_nota_str = nota.data_emissao.strip()
+                data_nota = None
+                for fmt in ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y']:
+                    try:
+                        data_nota = datetime.strptime(data_nota_str, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+                
+                if data_nota:
+                    diff_dias = abs((projecao.data_abertura_requisicao - data_nota).days)
+                    if diff_dias <= 7:
+                        score += 15
+                        detalhes.append(f"Data: Match próximo ({diff_dias} dias)")
+                    elif diff_dias <= 30:
+                        score += 10
+                        detalhes.append(f"Data: Match razoável ({diff_dias} dias)")
+                    elif diff_dias <= 90:
+                        score += 5
+                        detalhes.append(f"Data: Match distante ({diff_dias} dias)")
+                    else:
+                        detalhes.append(f"Data: Diferença grande ({diff_dias} dias)")
+                else:
+                    detalhes.append("Data: Formato não reconhecido")
+            except Exception:
+                detalhes.append("Data: Erro ao comparar")
+        
+        # Número NF (peso 10)
+        nf_proj = (projecao.numero_nf or '').strip()
+        nf_nota = (nota.nota or '').strip()
+        if nf_proj and nf_nota:
+            total_peso += 10
+            if nf_proj == nf_nota:
+                score += 10
+                detalhes.append("Número NF: Match perfeito")
+            else:
+                detalhes.append("Número NF: Não corresponde")
+        
+        if total_peso == 0:
+            return 0, []
+        
+        percentual = (score / total_peso * 100)
+        return round(percentual, 2), detalhes
+    
+    # Obter filtros
+    filtro_centro_atividade = request.GET.get('filtro_centro_atividade', '').strip()
+    filtro_ano = request.GET.get('filtro_ano', '').strip()
+    filtro_tipo = request.GET.get('filtro_tipo', '').strip()
+    filtro_valor_min = request.GET.get('filtro_valor_min', '').strip()
+    filtro_valor_max = request.GET.get('filtro_valor_max', '').strip()
+    mostrar_apenas_proximos = request.GET.get('mostrar_apenas_proximos', '') == 'on'
+    mostrar_apenas_nao_confirmados = request.GET.get('mostrar_apenas_nao_confirmados', '') == 'on'
+    
+    # Buscar projeções com filtros
+    projecoes = ProjecaoGasto.objects.all()
+    if filtro_centro_atividade:
+        projecoes = projecoes.filter(
+            Q(setor__icontains=filtro_centro_atividade) |
+            Q(centro_atividade__icontains=filtro_centro_atividade)
+        )
+    if filtro_ano:
+        try:
+            ano = int(filtro_ano)
+            projecoes = projecoes.filter(ano_referencia=ano)
+        except ValueError:
+            pass
+    if filtro_tipo:
+        projecoes = projecoes.filter(tipo__icontains=filtro_tipo)
+    if filtro_valor_min:
+        try:
+            projecoes = projecoes.filter(valor_total__gte=Decimal(filtro_valor_min))
+        except (ValueError, TypeError):
+            pass
+    if filtro_valor_max:
+        try:
+            projecoes = projecoes.filter(valor_total__lte=Decimal(filtro_valor_max))
+        except (ValueError, TypeError):
+            pass
+    
+    # Buscar notas fiscais separadas por uso_contabil
+    notas_242 = NotaFiscal.objects.filter(uso_contabil='242')
+    notas_5 = NotaFiscal.objects.filter(uso_contabil='5')
+    notas_170 = NotaFiscal.objects.filter(uso_contabil='170')
+    
+    # Buscar relações confirmadas
+    relacoes_confirmadas = RelacaoProjecaoNotaFiscal.objects.filter(
+        status='confirmado'
+    ).select_related('projecao', 'nota_fiscal')
+    
+    # Criar dicionário de relações confirmadas para lookup rápido
+    relacoes_dict = {}
+    for relacao in relacoes_confirmadas:
+        relacoes_dict[(relacao.projecao.id, relacao.nota_fiscal.id)] = relacao
+    
+    # Função auxiliar para calcular matches
+    def calcular_matches_para_notas(notas_list):
+        matches_list = []
+        for projecao in projecoes:
+            for nota in notas_list:
+                # Verificar se já está confirmado
+                relacao_confirmada = relacoes_dict.get((projecao.id, nota.id))
+                
+                # Se filtro "apenas não confirmados" está ativo, pular confirmados
+                if mostrar_apenas_nao_confirmados and relacao_confirmada:
+                    continue
+                
+                # Calcular score
+                score, detalhes = calcular_match_score(projecao, nota)
+                
+                # Se filtro "apenas próximos" está ativo, pular scores baixos
+                if mostrar_apenas_proximos and score < 50:
+                    continue
+                
+                matches_list.append({
+                    'projecao': projecao,
+                    'nota': nota,
+                    'match_info': {
+                        'percentual': score,
+                        'detalhes': detalhes,
+                    },
+                    'relacao_confirmada': relacao_confirmada,
+                })
+        
+        # Ordenar por score (maior primeiro)
+        matches_list.sort(key=lambda x: x['match_info']['percentual'], reverse=True)
+        return matches_list
+    
+    # Calcular matches para cada uso_contabil
+    matches_242 = calcular_matches_para_notas(notas_242)
+    matches_5 = calcular_matches_para_notas(notas_5)
+    matches_170 = calcular_matches_para_notas(notas_170)
+    
+    # Estatísticas
+    total_projecoes = ProjecaoGasto.objects.count()
+    total_notas_242 = notas_242.count()
+    total_notas_5 = notas_5.count()
+    total_notas_170 = notas_170.count()
+    total_notas = total_notas_242 + total_notas_5 + total_notas_170
+    total_relacoes_confirmadas = RelacaoProjecaoNotaFiscal.objects.filter(status='confirmado').count()
+    
+    context = {
+        'page_title': 'Relacionar Projeção vs Nota Fiscal',
+        'active_page': 'relacionar_projecao_nota_fiscal',
+        'matches_242': matches_242,
+        'matches_5': matches_5,
+        'matches_170': matches_170,
+        'total_projecoes': total_projecoes,
+        'total_notas': total_notas,
+        'total_notas_242': total_notas_242,
+        'total_notas_5': total_notas_5,
+        'total_notas_170': total_notas_170,
+        'total_relacoes_confirmadas': total_relacoes_confirmadas,
+        'filtro_centro_atividade': filtro_centro_atividade,
+        'filtro_ano': filtro_ano,
+        'filtro_tipo': filtro_tipo,
+        'filtro_valor_min': filtro_valor_min,
+        'filtro_valor_max': filtro_valor_max,
+        'mostrar_apenas_proximos': mostrar_apenas_proximos,
+        'mostrar_apenas_nao_confirmados': mostrar_apenas_nao_confirmados,
+    }
+    
+    return render(request, 'orcamento/relacionar_projecao_nota_fiscal.html', context)
+
+
+def visualizar_relacao_projecao_nota(request):
+    """Visualizar detalhes da relação entre uma Projeção de Gasto e uma Nota Fiscal"""
+    from app.models import ProjecaoGasto, NotaFiscal, RelacaoProjecaoNotaFiscal
+    from django.contrib import messages
+    from datetime import datetime
+    from decimal import Decimal
+    
+    # Obter IDs dos parâmetros
+    projecao_id = request.GET.get('projecao_id')
+    nota_id = request.GET.get('nota_id')
+    
+    if not projecao_id or not nota_id:
+        messages.error(request, 'Parâmetros projecao_id e nota_id são obrigatórios.')
+        return redirect('relacionar_projecao_nota_fiscal')
+    
+    try:
+        projecao = ProjecaoGasto.objects.get(id=projecao_id)
+        nota = NotaFiscal.objects.get(id=nota_id)
+    except ProjecaoGasto.DoesNotExist:
+        messages.error(request, 'Projeção de gasto não encontrada.')
+        return redirect('relacionar_projecao_nota_fiscal')
+    except NotaFiscal.DoesNotExist:
+        messages.error(request, 'Nota fiscal não encontrada.')
+        return redirect('relacionar_projecao_nota_fiscal')
+    
+    # Buscar relação se existir
+    relacao = None
+    try:
+        relacao = RelacaoProjecaoNotaFiscal.objects.get(projecao=projecao, nota_fiscal=nota)
+    except RelacaoProjecaoNotaFiscal.DoesNotExist:
+        pass
+    
+    # Calcular match score e criar estrutura detalhada
+    score = 0
+    total_peso = 0
+    comparacoes = {}
+    
+    # Centro de Atividade
+    centro_proj = (projecao.centro_atividade or '').strip()
+    centro_nota = (nota.centro_atividade or '').strip()
+    if centro_proj and centro_nota:
+        if centro_proj == centro_nota:
+            comparacoes['centro_atividade'] = {
+                'projecao': centro_proj,
+                'nota': centro_nota,
+                'status': 'exato'
+            }
+        elif centro_proj in centro_nota or centro_nota in centro_proj:
+            comparacoes['centro_atividade'] = {
+                'projecao': centro_proj,
+                'nota': centro_nota,
+                'status': 'parcial'
+            }
+        else:
+            comparacoes['centro_atividade'] = {
+                'projecao': centro_proj,
+                'nota': centro_nota,
+                'status': 'diferente'
+            }
+    elif centro_proj or centro_nota:
+        comparacoes['centro_atividade'] = {
+            'projecao': centro_proj or '-',
+            'nota': centro_nota or '-',
+            'status': 'diferente'
+        }
+    
+    # Valor
+    valor_proj = projecao.valor_total
+    valor_nota = nota.total_nota
+    if valor_proj and valor_nota:
+        total_peso += 30
+        diff = abs(float(valor_proj - valor_nota))
+        diff_percent = (diff / float(valor_proj)) * 100
+        
+        tipo_valor = 'Total'
+        if projecao.valor_planejado:
+            tipo_valor = 'Planejado'
+        elif projecao.valor_realizado:
+            tipo_valor = 'Realizado'
+        elif projecao.valor_projetado:
+            tipo_valor = 'Projetado'
+        
+        if diff_percent <= 5:
+            score += 30
+            status_valor = 'match'
+        elif diff_percent <= 10:
+            score += 20
+            status_valor = 'parcial'
+        elif diff_percent <= 20:
+            score += 10
+            status_valor = 'parcial'
+        else:
+            status_valor = 'diferente'
+        
+        comparacoes['valor'] = {
+            'tipo': tipo_valor,
+            'projecao': float(valor_proj),
+            'nota': float(valor_nota),
+            'diferenca': diff,
+            'diferenca_percent': diff_percent,
+            'status': status_valor
+        }
+    elif valor_proj or valor_nota:
+        comparacoes['valor'] = {
+            'tipo': 'Total',
+            'projecao': float(valor_proj) if valor_proj else None,
+            'nota': float(valor_nota) if valor_nota else None,
+            'status': 'diferente'
+        }
+    
+    # Data
+    data_proj = projecao.data_abertura_requisicao or projecao.data_requisicao
+    data_nota = None
+    if nota.data_emissao:
+        data_nota_str = nota.data_emissao.strip()
+        for fmt in ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y']:
+            try:
+                data_nota = datetime.strptime(data_nota_str, fmt).date()
+                break
+            except ValueError:
+                continue
+    
+    if data_proj and data_nota:
+        total_peso += 15
+        diff_dias = abs((data_proj - data_nota).days)
+        if diff_dias <= 7:
+            score += 15
+            status_data = 'exato'
+        elif diff_dias <= 30:
+            score += 10
+            status_data = 'proximo'
+        elif diff_dias <= 90:
+            score += 5
+            status_data = 'parcial'
+        else:
+            status_data = 'diferente'
+        
+        comparacoes['data'] = {
+            'projecao': data_proj,
+            'nota': data_nota,
+            'diff_dias': diff_dias,
+            'status': status_data
+        }
+    elif data_proj or data_nota:
+        comparacoes['data'] = {
+            'projecao': data_proj,
+            'nota': data_nota,
+            'status': 'diferente'
+        }
+    
+    # Fornecedor/Emitente
+    fornecedor_proj = (projecao.fornecedor_nome_fantasia or projecao.fornecedor or '').strip()
+    emitente_nota = (nota.nome_fantasia_emitente or nota.emitente or '').strip()
+    if fornecedor_proj and emitente_nota:
+        total_peso += 25
+        fornecedor_proj_upper = fornecedor_proj.upper()
+        emitente_nota_upper = emitente_nota.upper()
+        if fornecedor_proj_upper == emitente_nota_upper:
+            score += 25
+            status_fornecedor = 'exato'
+        elif fornecedor_proj_upper in emitente_nota_upper or emitente_nota_upper in fornecedor_proj_upper:
+            score += 15
+            status_fornecedor = 'parcial'
+        else:
+            status_fornecedor = 'diferente'
+        
+        comparacoes['fornecedor'] = {
+            'projecao': fornecedor_proj,
+            'nota': emitente_nota,
+            'status': status_fornecedor
+        }
+    elif fornecedor_proj or emitente_nota:
+        comparacoes['fornecedor'] = {
+            'projecao': fornecedor_proj or '-',
+            'nota': emitente_nota or '-',
+            'status': 'diferente'
+        }
+    
+    # Número (Requisição vs Nota Fiscal)
+    numero_proj = (projecao.numero_requisicao or projecao.numero_nf or '').strip()
+    numero_nota = (nota.nota or '').strip()
+    if numero_proj and numero_nota:
+        total_peso += 10
+        if numero_proj == numero_nota:
+            score += 10
+            status_numero = 'exato'
+        else:
+            status_numero = 'diferente'
+        
+        comparacoes['numero'] = {
+            'projecao': numero_proj,
+            'nota': numero_nota,
+            'status': status_numero
+        }
+    elif numero_proj or numero_nota:
+        comparacoes['numero'] = {
+            'projecao': numero_proj or '-',
+            'nota': numero_nota or '-',
+            'status': 'diferente'
+        }
+    
+    # Calcular percentual
+    if total_peso == 0:
+        percentual = 0
+    else:
+        percentual = (score / total_peso * 100)
+    
+    match_info = {
+        'percentual': round(percentual, 2),
+        'score': score,
+        'max_score': total_peso,
+        'comparacoes': comparacoes
+    }
+    
+    context = {
+        'page_title': 'Visualizar Relação Projeção vs Nota Fiscal',
+        'active_page': 'relacionar_projecao_nota_fiscal',
+        'projecao': projecao,
+        'nota': nota,
+        'match_info': match_info,
+        'relacao': relacao,
+    }
+    
+    return render(request, 'visualizar/visualizar_relacao_projecao_nota.html', context)
+
+
+def consultar_planilha_rc(request):
+    """Consultar/listar dados do Controle RC e NF com filtros"""
+    from app.models import ControleRCeNF
+    from django.db.models import Q, Sum, Count
+    from decimal import Decimal
+    from django.core.paginator import Paginator
+    
+    # Busca geral
+    search_query = request.GET.get('search', '').strip()
+    controles_list = ControleRCeNF.objects.all()
+    
+    # Aplicar busca geral
+    if search_query:
+        try:
+            search_num = Decimal(search_query.replace(',', '.'))
+            controles_list = controles_list.filter(
+                Q(solicitante__icontains=search_query) |
+                Q(empresa__icontains=search_query) |
+                Q(nf_saida__icontains=search_query) |
+                Q(descricao_servico__icontains=search_query) |
+                Q(rc__icontains=search_query) |
+                Q(pedido__icontains=search_query) |
+                Q(os__icontains=search_query) |
+                Q(valor_total_pedido=search_num) |
+                Q(valor_nf=search_num)
+            )
+        except (ValueError, TypeError):
+            controles_list = controles_list.filter(
+                Q(solicitante__icontains=search_query) |
+                Q(empresa__icontains=search_query) |
+                Q(nf_saida__icontains=search_query) |
+                Q(descricao_servico__icontains=search_query) |
+                Q(rc__icontains=search_query) |
+                Q(pedido__icontains=search_query) |
+                Q(os__icontains=search_query) |
+                Q(status__icontains=search_query)
+            )
+    
+    # Filtros específicos
+    filtro_empresa = request.GET.get('filtro_empresa', '').strip()
+    if filtro_empresa:
+        controles_list = controles_list.filter(empresa__icontains=filtro_empresa)
+    
+    filtro_solicitante = request.GET.get('filtro_solicitante', '').strip()
+    if filtro_solicitante:
+        controles_list = controles_list.filter(solicitante__icontains=filtro_solicitante)
+    
+    filtro_rc = request.GET.get('filtro_rc', '').strip()
+    if filtro_rc:
+        controles_list = controles_list.filter(rc__icontains=filtro_rc)
+    
+    filtro_status = request.GET.get('filtro_status', '').strip()
+    if filtro_status:
+        controles_list = controles_list.filter(status__icontains=filtro_status)
+    
+    filtro_uso = request.GET.get('filtro_uso', '').strip()
+    if filtro_uso:
+        controles_list = controles_list.filter(uso__icontains=filtro_uso)
+    
+    filtro_valor_min = request.GET.get('filtro_valor_min', '').strip()
+    if filtro_valor_min:
+        try:
+            controles_list = controles_list.filter(
+                Q(valor_total_pedido__gte=Decimal(filtro_valor_min.replace(',', '.'))) |
+                Q(valor_nf__gte=Decimal(filtro_valor_min.replace(',', '.')))
+            )
+        except (ValueError, TypeError):
+            pass
+    
+    filtro_valor_max = request.GET.get('filtro_valor_max', '').strip()
+    if filtro_valor_max:
+        try:
+            controles_list = controles_list.filter(
+                Q(valor_total_pedido__lte=Decimal(filtro_valor_max.replace(',', '.'))) |
+                Q(valor_nf__lte=Decimal(filtro_valor_max.replace(',', '.')))
+            )
+        except (ValueError, TypeError):
+            pass
+    
+    # Ordenação
+    order_by = request.GET.get('order_by', '-data_rc')
+    if order_by:
+        controles_list = controles_list.order_by(order_by)
+    
+    # Paginação
+    paginator = Paginator(controles_list, 50)  # 50 itens por página
+    page_number = request.GET.get('page', 1)
+    controles = paginator.get_page(page_number)
+    
+    # Estatísticas
+    total_count = ControleRCeNF.objects.count()
+    empresas_count = ControleRCeNF.objects.exclude(empresa__isnull=True).exclude(empresa='').values('empresa').distinct().count()
+    
+    # Calcular valor total
+    valor_total_result = ControleRCeNF.objects.aggregate(
+        total_pedido=Sum('valor_total_pedido'),
+        total_nf=Sum('valor_nf')
+    )
+    valor_total_pedido = valor_total_result['total_pedido'] or Decimal('0.00')
+    valor_total_nf = valor_total_result['total_nf'] or Decimal('0.00')
+    
+    # Obter valores únicos para os dropdowns de filtros
+    empresas_unicas = ControleRCeNF.objects.exclude(
+        empresa__isnull=True
+    ).exclude(
+        empresa=''
+    ).values_list('empresa', flat=True).distinct().order_by('empresa')
+    
+    solicitantes_unicos = ControleRCeNF.objects.exclude(
+        solicitante__isnull=True
+    ).exclude(
+        solicitante=''
+    ).values_list('solicitante', flat=True).distinct().order_by('solicitante')
+    
+    status_unicos = ControleRCeNF.objects.exclude(
+        status__isnull=True
+    ).exclude(
+        status=''
+    ).values_list('status', flat=True).distinct().order_by('status')
+    
+    usos_unicos = ControleRCeNF.objects.exclude(
+        uso__isnull=True
+    ).exclude(
+        uso=''
+    ).values_list('uso', flat=True).distinct().order_by('uso')
+    
+    context = {
+        'page_title': 'Consultar Planilha RC',
+        'active_page': 'consultar_planilha_rc',
+        'controles': controles,
+        'search_query': search_query,
+        'total_count': total_count,
+        'empresas_count': empresas_count,
+        'valor_total_pedido': valor_total_pedido,
+        'valor_total_nf': valor_total_nf,
+        'empresas_unicas': empresas_unicas,
+        'solicitantes_unicos': solicitantes_unicos,
+        'status_unicos': status_unicos,
+        'usos_unicos': usos_unicos,
+        'filtro_empresa': filtro_empresa,
+        'filtro_solicitante': filtro_solicitante,
+        'filtro_rc': filtro_rc,
+        'filtro_status': filtro_status,
+        'filtro_uso': filtro_uso,
+        'filtro_valor_min': filtro_valor_min,
+        'filtro_valor_max': filtro_valor_max,
+    }
+    
+    return render(request, 'orcamento/consultar_planilha_rc.html', context)
+
+
+def visualizar_planilha_rc(request, controle_id):
+    """Visualizar detalhes completos de um registro do Controle RC e NF"""
+    from app.models import ControleRCeNF
+    from django.contrib import messages
+    
+    try:
+        controle = ControleRCeNF.objects.get(id=controle_id)
+    except ControleRCeNF.DoesNotExist:
+        messages.error(request, 'Registro não encontrado.')
+        return redirect('consultar_planilha_rc')
+    
+    context = {
+        'page_title': f'Visualizar Planilha RC - {controle.rc or controle.nf_saida or controle.id}',
+        'active_page': 'consultar_planilha_rc',
+        'controle': controle,
+    }
+    return render(request, 'visualizar/visualizar_planilha_rc.html', context)
+
+
+def analise_planilha_rc(request):
+    """Análise da Planilha RC e NF com foco em status"""
+    from app.models import ControleRCeNF
+    from django.db.models import Count, Sum, Q, Avg
+    from decimal import Decimal
+    from collections import defaultdict
+    import json
+    from datetime import datetime, timedelta
+    
+    # Estatísticas básicas
+    total_registros = ControleRCeNF.objects.count()
+    
+    # Análise por STATUS (mais importante)
+    status_distribution = ControleRCeNF.objects.exclude(
+        status__isnull=True
+    ).exclude(
+        status=''
+    ).values('status').annotate(
+        total=Count('id'),
+        valor_total_pedido=Sum('valor_total_pedido'),
+        valor_total_nf=Sum('valor_nf')
+    ).order_by('-total')
+    
+    status_labels = [item['status'][:50] for item in status_distribution]
+    status_data = [item['total'] for item in status_distribution]
+    status_valores_pedido = [float(item['valor_total_pedido'] or 0) for item in status_distribution]
+    status_valores_nf = [float(item['valor_total_nf'] or 0) for item in status_distribution]
+    
+    # Calcular percentuais para status
+    status_percentages = []
+    if total_registros > 0:
+        status_percentages = [(item['total'] / total_registros * 100) for item in status_distribution]
+    else:
+        status_percentages = [0] * len(status_distribution)
+    
+    # Registros sem status
+    registros_sem_status = ControleRCeNF.objects.filter(
+        Q(status__isnull=True) | Q(status='')
+    ).count()
+    
+    # Análise por Empresa
+    empresa_distribution = ControleRCeNF.objects.exclude(
+        empresa__isnull=True
+    ).exclude(
+        empresa=''
+    ).values('empresa').annotate(
+        total=Count('id')
+    ).order_by('-total')[:10]
+    
+    empresa_labels = [item['empresa'][:30] for item in empresa_distribution]
+    empresa_data = [item['total'] for item in empresa_distribution]
+    
+    # Análise por Solicitante
+    solicitante_distribution = ControleRCeNF.objects.exclude(
+        solicitante__isnull=True
+    ).exclude(
+        solicitante=''
+    ).values('solicitante').annotate(
+        total=Count('id')
+    ).order_by('-total')[:10]
+    
+    solicitante_labels = [item['solicitante'][:30] for item in solicitante_distribution]
+    solicitante_data = [item['total'] for item in solicitante_distribution]
+    
+    # Análise por Uso
+    uso_distribution = ControleRCeNF.objects.exclude(
+        uso__isnull=True
+    ).exclude(
+        uso=''
+    ).values('uso').annotate(
+        total=Count('id')
+    ).order_by('-total')
+    
+    uso_labels = [item['uso'] for item in uso_distribution]
+    uso_data = [item['total'] for item in uso_distribution]
+    
+    # Análise temporal por Data RC (últimos 12 meses)
+    data_12_meses_atras = datetime.now() - timedelta(days=365)
+    registros_por_mes = defaultdict(int)
+    registros_com_data = ControleRCeNF.objects.filter(
+        data_rc__gte=data_12_meses_atras
+    ).exclude(data_rc__isnull=True)
+    
+    for registro in registros_com_data:
+        if registro.data_rc:
+            mes_ano = registro.data_rc.strftime('%Y-%m')
+            registros_por_mes[mes_ano] += 1
+    
+    meses_ordenados = sorted(registros_por_mes.keys())[-12:]
+    meses_labels = [datetime.strptime(m, '%Y-%m').strftime('%b/%Y') for m in meses_ordenados]
+    meses_data = [registros_por_mes[m] for m in meses_ordenados]
+    
+    # Valores totais
+    valor_total_pedido_geral = ControleRCeNF.objects.aggregate(
+        total=Sum('valor_total_pedido')
+    )['total'] or Decimal('0.00')
+    
+    valor_total_nf_geral = ControleRCeNF.objects.aggregate(
+        total=Sum('valor_nf')
+    )['total'] or Decimal('0.00')
+    
+    # Valores médios
+    valor_medio_pedido = ControleRCeNF.objects.exclude(
+        valor_total_pedido__isnull=True
+    ).aggregate(
+        media=Avg('valor_total_pedido')
+    )['media'] or Decimal('0.00')
+    
+    valor_medio_nf = ControleRCeNF.objects.exclude(
+        valor_nf__isnull=True
+    ).aggregate(
+        media=Avg('valor_nf')
+    )['media'] or Decimal('0.00')
+    
+    # Top 10 status por valor total
+    top_status_por_valor = ControleRCeNF.objects.exclude(
+        status__isnull=True
+    ).exclude(
+        status=''
+    ).values('status').annotate(
+        total_registros=Count('id'),
+        valor_total_pedido=Sum('valor_total_pedido'),
+        valor_total_nf=Sum('valor_nf')
+    ).order_by('-valor_total_nf')[:10]
+    
+    top_status_valor_labels = [item['status'][:40] for item in top_status_por_valor]
+    top_status_valor_pedido = [float(item['valor_total_pedido'] or 0) for item in top_status_por_valor]
+    top_status_valor_nf = [float(item['valor_total_nf'] or 0) for item in top_status_por_valor]
+    
+    # Estatísticas adicionais
+    registros_com_rc = ControleRCeNF.objects.exclude(
+        Q(rc__isnull=True) | Q(rc='')
+    ).count()
+    
+    registros_com_pedido = ControleRCeNF.objects.exclude(
+        Q(pedido__isnull=True) | Q(pedido='')
+    ).count()
+    
+    registros_com_nf_saida = ControleRCeNF.objects.exclude(
+        Q(nf_saida__isnull=True) | Q(nf_saida='')
+    ).count()
+    
+    registros_com_nf_servico = ControleRCeNF.objects.exclude(
+        Q(nf_servico__isnull=True) | Q(nf_servico='')
+    ).count()
+    
+    context = {
+        'page_title': 'Análise Planilha RC',
+        'active_page': 'analise_planilha_rc',
+        'total_registros': total_registros,
+        'registros_sem_status': registros_sem_status,
+        'registros_com_rc': registros_com_rc,
+        'registros_com_pedido': registros_com_pedido,
+        'registros_com_nf_saida': registros_com_nf_saida,
+        'registros_com_nf_servico': registros_com_nf_servico,
+        'valor_total_pedido_geral': valor_total_pedido_geral,
+        'valor_total_nf_geral': valor_total_nf_geral,
+        'valor_medio_pedido': valor_medio_pedido,
+        'valor_medio_nf': valor_medio_nf,
+        # Status (principal)
+        'status_distribution': status_distribution,
+        'status_labels': json.dumps(status_labels, ensure_ascii=False),
+        'status_data': json.dumps(status_data),
+        'status_percentages': json.dumps([round(p, 1) for p in status_percentages]),
+        'status_valores_pedido': json.dumps(status_valores_pedido),
+        'status_valores_nf': json.dumps(status_valores_nf),
+        # Empresa
+        'empresa_labels': json.dumps(empresa_labels, ensure_ascii=False),
+        'empresa_data': json.dumps(empresa_data),
+        # Solicitante
+        'solicitante_labels': json.dumps(solicitante_labels, ensure_ascii=False),
+        'solicitante_data': json.dumps(solicitante_data),
+        # Uso
+        'uso_labels': json.dumps(uso_labels, ensure_ascii=False),
+        'uso_data': json.dumps(uso_data),
+        # Temporal
+        'meses_labels': json.dumps(meses_labels, ensure_ascii=False),
+        'meses_data': json.dumps(meses_data),
+        # Top status por valor
+        'top_status_valor_labels': json.dumps(top_status_valor_labels, ensure_ascii=False),
+        'top_status_valor_pedido': json.dumps(top_status_valor_pedido),
+        'top_status_valor_nf': json.dumps(top_status_valor_nf),
+    }
+    
+    return render(request, 'orcamento/analise_planilha_rc.html', context)

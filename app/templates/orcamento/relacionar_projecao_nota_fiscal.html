@@ -111,7 +111,7 @@
 
         <!-- Statistics -->
         <div class="row mb-4">
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card bg-primary text-white stat-card">
                     <div class="card-body">
                         <h5 class="card-title">Total Projeções:</h5>
@@ -119,7 +119,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card bg-info text-white stat-card">
                     <div class="card-body">
                         <h5 class="card-title">Total Notas:</h5>
@@ -127,7 +127,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card bg-success text-white stat-card">
                     <div class="card-body">
                         <h5 class="card-title">Confirmadas:</h5>
@@ -135,11 +135,30 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card bg-warning text-white stat-card">
+            <div class="col-md-2">
+                <div class="card bg-primary text-white stat-card">
                     <div class="card-body">
-                        <h5 class="card-title">Possíveis Matches:</h5>
-                        <p class="card-text display-6">{{ matches|length }}</p>
+                        <h5 class="card-title">UC 242 Matches:</h5>
+                        <p class="card-text display-6">{{ matches_242|length }}</p>
+                        <small>Notas: {{ total_notas_242 }}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card bg-info text-white stat-card">
+                    <div class="card-body">
+                        <h5 class="card-title">UC 5 Matches:</h5>
+                        <p class="card-text display-6">{{ matches_5|length }}</p>
+                        <small>Notas: {{ total_notas_5 }}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card bg-warning text-dark stat-card">
+                    <div class="card-body">
+                        <h5 class="card-title">UC 170 Matches:</h5>
+                        <p class="card-text display-6">{{ matches_170|length }}</p>
+                        <small>Notas: {{ total_notas_170 }}</small>
                     </div>
                 </div>
             </div>
@@ -212,17 +231,17 @@
             </div>
         </div>
 
-        <!-- Possíveis Correspondências -->
+        <!-- Seção: Uso Contábil 242 -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="card shadow-sm">
-                    <div class="card-header bg-success text-white">
+                    <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-link me-2"></i>Possíveis Correspondências ({{ matches|length }})
+                            <i class="fas fa-link me-2"></i>Uso Contábil 242 - Possíveis Correspondências ({{ matches_242|length }})
                         </h5>
                     </div>
                     <div class="card-body">
-                        {% if matches %}
+                        {% if matches_242 %}
                         <div class="table-responsive">
                             <table class="table table-hover comparison-table">
                                 <thead>
@@ -240,195 +259,103 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for match in matches %}
-                                    <tr {% if match.relacao_confirmada %}class="table-success"{% endif %}>
-                                        <td>
-                                            {% if match.match_info.percentual >= 70 %}
-                                                <span class="match-score match-high">{{ match.match_info.percentual|floatformat:0 }}%</span>
-                                            {% elif match.match_info.percentual >= 50 %}
-                                                <span class="match-score match-medium">{{ match.match_info.percentual|floatformat:0 }}%</span>
-                                            {% else %}
-                                                <span class="match-score match-low">{{ match.match_info.percentual|floatformat:0 }}%</span>
-                                            {% endif %}
-                                            {% if match.relacao_confirmada %}
-                                                <br><span class="confirmed-badge">✓ Confirmado</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <strong>{{ match.projecao.tipo|default:"-" }}</strong><br>
-                                            <small class="text-muted">{{ match.projecao.descricao|truncatewords:5|default:"-" }}</small><br>
-                                            {% if match.projecao.numero_requisicao %}
-                                                <small><strong>Req:</strong> {{ match.projecao.numero_requisicao }}</small>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <strong>Nota: {{ match.nota.nota|default:"-" }}</strong><br>
-                                            <small class="text-muted">Série: {{ match.nota.serie|default:"-" }}</small><br>
-                                            <small class="text-muted">Modelo: {{ match.nota.modelo|default:"-" }}</small>
-                                        </td>
-                                        <td>
-                                            {% if match.projecao.centro_atividade %}
-                                                {{ match.projecao.centro_atividade }}
-                                                {% if match.projecao.nome_centro_atividade %}
-                                                    <br><small class="text-muted">{{ match.projecao.nome_centro_atividade|truncatewords:2 }}</small>
-                                                {% endif %}
-                                            {% else %}
-                                                <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <strong>Proj:</strong>
-                                            {% if match.projecao.valor_planejado %}
-                                                R$ {{ match.projecao.valor_planejado|floatformat:2 }}<br>
-                                            {% endif %}
-                                            {% if match.projecao.valor_realizado %}
-                                                <small>Real: R$ {{ match.projecao.valor_realizado|floatformat:2 }}</small><br>
-                                            {% endif %}
-                                            <strong>Nota:</strong>
-                                            {% if match.nota.total_nota %}
-                                                R$ {{ match.nota.total_nota|floatformat:2 }}
-                                            {% else %}
-                                                <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if match.projecao.data_requisicao %}
-                                                <strong>Proj:</strong> {{ match.projecao.data_requisicao|date:"d/m/Y" }}<br>
-                                            {% endif %}
-                                            {% if match.nota.data_emissao %}
-                                                <strong>Nota:</strong> {{ match.nota.data_emissao|truncatewords:1 }}
-                                            {% else %}
-                                                <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if match.projecao.fornecedor %}
-                                                <strong>Fornec:</strong> {{ match.projecao.fornecedor|truncatewords:2 }}<br>
-                                            {% endif %}
-                                            {% if match.nota.nome_fantasia_emitente %}
-                                                <strong>Emit:</strong> {{ match.nota.nome_fantasia_emitente|truncatewords:2 }}
-                                            {% else %}
-                                                <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if match.nota.uso_contabil %}
-                                                <span class="badge bg-secondary">{{ match.nota.uso_contabil }}</span>
-                                            {% else %}
-                                                <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <div class="match-details">
-                                                {% for detalhe in match.match_info.detalhes %}
-                                                    <div>{{ detalhe }}</div>
-                                                {% endfor %}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="action-buttons">
-                                                <a href="{% url 'visualizar_relacao_projecao_nota' %}?projecao_id={{ match.projecao.id }}&nota_id={{ match.nota.id }}" class="btn btn-sm btn-info mb-1" title="Visualizar detalhes da relação" style="display: block; width: 100%;">
-                                                    <i class="fas fa-eye"></i> Ver Detalhes
-                                                </a>
-                                                {% if match.relacao_confirmada %}
-                                                    <form method="post" action="{% url 'relacionar_projecao_nota_fiscal' %}" style="display: inline;" onsubmit="return confirm('Deseja realmente remover esta relação confirmada?');">
-                                                        {% csrf_token %}
-                                                        <input type="hidden" name="acao" value="remover">
-                                                        <input type="hidden" name="projecao_id" value="{{ match.projecao.id }}">
-                                                        <input type="hidden" name="nota_id" value="{{ match.nota.id }}">
-                                                        <button type="submit" class="btn btn-sm btn-danger" title="Remover relação" style="width: 100%;">
-                                                            <i class="fas fa-trash"></i> Remover
-                                                        </button>
-                                                    </form>
-                                                {% else %}
-                                                    <button type="button" class="btn btn-sm btn-success mb-1" data-bs-toggle="modal" data-bs-target="#confirmModal{{ match.projecao.id }}_{{ match.nota.id }}" title="Confirmar relação" style="width: 100%;">
-                                                        <i class="fas fa-check"></i> Confirmar
-                                                    </button>
-                                                    <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ match.projecao.id }}_{{ match.nota.id }}" title="Rejeitar relação" style="width: 100%;">
-                                                        <i class="fas fa-times"></i> Rejeitar
-                                                    </button>
-                                                    
-                                                    <!-- Modal Confirmar -->
-                                                    <div class="modal fade" id="confirmModal{{ match.projecao.id }}_{{ match.nota.id }}" tabindex="-1" aria-labelledby="confirmModalLabel{{ match.projecao.id }}_{{ match.nota.id }}" aria-hidden="true">
-                                                        <div class="modal-dialog">
-                                                            <div class="modal-content">
-                                                                <div class="modal-header">
-                                                                    <h5 class="modal-title" id="confirmModalLabel{{ match.projecao.id }}_{{ match.nota.id }}">Confirmar Relação</h5>
-                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                                </div>
-                                                                <form method="post" action="{% url 'relacionar_projecao_nota_fiscal' %}" id="confirmForm{{ match.projecao.id }}_{{ match.nota.id }}">
-                                                                    {% csrf_token %}
-                                                                    <input type="hidden" name="acao" value="confirmar">
-                                                                    <input type="hidden" name="projecao_id" value="{{ match.projecao.id }}">
-                                                                    <input type="hidden" name="nota_id" value="{{ match.nota.id }}">
-                                                                    <input type="hidden" name="score_match" value="{{ match.match_info.percentual|floatformat:2 }}">
-                                                                    <div class="modal-body">
-                                                                        <p>Deseja confirmar a relação entre:</p>
-                                                                        <ul>
-                                                                            <li><strong>Projeção:</strong> {{ match.projecao.tipo|default:"-" }} - {{ match.projecao.descricao|truncatewords:10|default:"-" }}</li>
-                                                                            <li><strong>Nota Fiscal:</strong> {{ match.nota.nota|default:"-" }} - {{ match.nota.nome_fantasia_emitente|truncatewords:5|default:"-" }}</li>
-                                                                        </ul>
-                                                                        <div class="mb-3">
-                                                                            <label for="observacoes_confirm_{{ match.projecao.id }}_{{ match.nota.id }}" class="form-label">Observações (opcional):</label>
-                                                                            <textarea class="form-control" id="observacoes_confirm_{{ match.projecao.id }}_{{ match.nota.id }}" name="observacoes" rows="3"></textarea>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div class="modal-footer">
-                                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                                                        <button type="submit" class="btn btn-success">
-                                                                            <i class="fas fa-check me-2"></i>Confirmar
-                                                                        </button>
-                                                                    </div>
-                                                                </form>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <!-- Modal Rejeitar -->
-                                                    <div class="modal fade" id="rejectModal{{ match.projecao.id }}_{{ match.nota.id }}" tabindex="-1" aria-labelledby="rejectModalLabel{{ match.projecao.id }}_{{ match.nota.id }}" aria-hidden="true">
-                                                        <div class="modal-dialog">
-                                                            <div class="modal-content">
-                                                                <div class="modal-header">
-                                                                    <h5 class="modal-title" id="rejectModalLabel{{ match.projecao.id }}_{{ match.nota.id }}">Rejeitar Relação</h5>
-                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                                </div>
-                                                                <form method="post" action="{% url 'relacionar_projecao_nota_fiscal' %}" id="rejectForm{{ match.projecao.id }}_{{ match.nota.id }}">
-                                                                    {% csrf_token %}
-                                                                    <input type="hidden" name="acao" value="rejeitar">
-                                                                    <input type="hidden" name="projecao_id" value="{{ match.projecao.id }}">
-                                                                    <input type="hidden" name="nota_id" value="{{ match.nota.id }}">
-                                                                    <div class="modal-body">
-                                                                        <p>Deseja rejeitar a relação entre:</p>
-                                                                        <ul>
-                                                                            <li><strong>Projeção:</strong> {{ match.projecao.tipo|default:"-" }} - {{ match.projecao.descricao|truncatewords:10|default:"-" }}</li>
-                                                                            <li><strong>Nota Fiscal:</strong> {{ match.nota.nota|default:"-" }} - {{ match.nota.nome_fantasia_emitente|truncatewords:5|default:"-" }}</li>
-                                                                        </ul>
-                                                                        <div class="mb-3">
-                                                                            <label for="observacoes_reject_{{ match.projecao.id }}_{{ match.nota.id }}" class="form-label">Motivo da rejeição (opcional):</label>
-                                                                            <textarea class="form-control" id="observacoes_reject_{{ match.projecao.id }}_{{ match.nota.id }}" name="observacoes" rows="3"></textarea>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div class="modal-footer">
-                                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                                                        <button type="submit" class="btn btn-danger">
-                                                                            <i class="fas fa-times me-2"></i>Rejeitar
-                                                                        </button>
-                                                                    </div>
-                                                                </form>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                    </tr>
+                                    {% for match in matches_242 %}
+                                    {% include 'orcamento/_match_row.html' with match=match %}
                                     {% endfor %}
                                 </tbody>
                             </table>
                         </div>
                         {% else %}
                         <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>Nenhuma correspondência encontrada com os filtros aplicados.
+                            <i class="fas fa-info-circle me-2"></i>Nenhuma correspondência encontrada para Uso Contábil 242 com os filtros aplicados.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção: Uso Contábil 5 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-link me-2"></i>Uso Contábil 5 - Possíveis Correspondências ({{ matches_5|length }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if matches_5 %}
+                        <div class="table-responsive">
+                            <table class="table table-hover comparison-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 6%;">Score</th>
+                                        <th style="width: 12%;">Projeção</th>
+                                        <th style="width: 12%;">Nota Fiscal</th>
+                                        <th style="width: 8%;">Centro Atividade</th>
+                                        <th style="width: 8%;">Valor</th>
+                                        <th style="width: 8%;">Data</th>
+                                        <th style="width: 10%;">Fornecedor/Emitente</th>
+                                        <th style="width: 9%;">Uso Contábil</th>
+                                        <th style="width: 15%;">Detalhes do Match</th>
+                                        <th style="width: 12%;">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for match in matches_5 %}
+                                    {% include 'orcamento/_match_row.html' with match=match %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>Nenhuma correspondência encontrada para Uso Contábil 5 com os filtros aplicados.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção: Uso Contábil 170 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-link me-2"></i>Uso Contábil 170 - Possíveis Correspondências ({{ matches_170|length }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if matches_170 %}
+                        <div class="table-responsive">
+                            <table class="table table-hover comparison-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 6%;">Score</th>
+                                        <th style="width: 12%;">Projeção</th>
+                                        <th style="width: 12%;">Nota Fiscal</th>
+                                        <th style="width: 8%;">Centro Atividade</th>
+                                        <th style="width: 8%;">Valor</th>
+                                        <th style="width: 8%;">Data</th>
+                                        <th style="width: 10%;">Fornecedor/Emitente</th>
+                                        <th style="width: 9%;">Uso Contábil</th>
+                                        <th style="width: 15%;">Detalhes do Match</th>
+                                        <th style="width: 12%;">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for match in matches_170 %}
+                                    {% include 'orcamento/_match_row.html' with match=match %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>Nenhuma correspondência encontrada para Uso Contábil 170 com os filtros aplicados.
                         </div>
                         {% endif %}
                     </div>

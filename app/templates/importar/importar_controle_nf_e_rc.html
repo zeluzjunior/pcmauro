@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Importar Controle RC e NF{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Importar Dados</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Importar Controle RC e NF</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Importar Controle RC e NF</h1>
+                <p class="lead">Importe dados do controle de Requisições de Compra e Notas Fiscais através de arquivo Excel</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Upload Section -->
+        <div class="row mb-5">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-upload me-2"></i>Selecionar Arquivo
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'importar_controle_nf_e_rc' %}" enctype="multipart/form-data" id="importarForm">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="fileInput" class="form-label">Arquivo para Importação</label>
+                                <input type="file" class="form-control" id="fileInput" name="file" accept=".xlsx,.xls,.xlsm" required>
+                                <div class="form-text">Formatos aceitos: Excel (.xlsx, .xls, .xlsm)</div>
+                                <div class="form-text">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    O arquivo deve conter uma planilha chamada "CONTROLE RC E NF" com os cabeçalhos na linha 3.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="updateExisting" name="update_existing">
+                                    <label class="form-check-label" for="updateExisting">
+                                        <strong>Atualizar registros existentes</strong>
+                                    </label>
+                                    <div class="form-text">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Quando marcado, registros existentes (identificados pelo número RC ou NF Saída) serão atualizados com os dados do arquivo. Quando desmarcado, apenas novos registros serão criados.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-upload me-2"></i>Importar Arquivo
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions Section -->
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Instruções
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>Formato do Arquivo:</h6>
+                        <ul>
+                            <li>O arquivo deve ser um arquivo Excel (.xlsx, .xls ou .xlsm)</li>
+                            <li>Deve conter uma planilha chamada <strong>"CONTROLE RC E NF"</strong></li>
+                            <li>A linha 1 deve estar vazia</li>
+                            <li>A linha 2 contém o título</li>
+                            <li>A linha 3 deve conter os cabeçalhos das colunas</li>
+                            <li>Os dados começam na linha 4</li>
+                        </ul>
+                        
+                        <h6 class="mt-4">Colunas Esperadas:</h6>
+                        <ul>
+                            <li><strong>SOLICITANTE</strong> - Nome do solicitante</li>
+                            <li><strong>EMPRESA</strong> - Nome da empresa</li>
+                            <li><strong>NF SAÍDA</strong> - Número da nota fiscal de saída</li>
+                            <li><strong>DESCRIÇÃO DO SERVIÇO</strong> - Descrição do serviço</li>
+                            <li><strong>C.A/RATEIO</strong> - Centro de Atividade/Rateio</li>
+                            <li><strong>USO</strong> - Uso contábil</li>
+                            <li><strong>QUEM ABRIU A RC</strong> - Pessoa que abriu a requisição</li>
+                            <li><strong>ORÇAMENTO</strong> - Informações do orçamento</li>
+                            <li><strong>O.S</strong> - Número da ordem de serviço</li>
+                            <li><strong>CLASSIF.</strong> - Classificação</li>
+                            <li><strong>JUSTIFICATIVA CLASSIFICAÇÃO</strong> - Justificativa</li>
+                            <li><strong>SPAF0009 - Acesso portaria p/ classif. 5 e 8</strong> - Informação SPAF0009</li>
+                            <li><strong>RC</strong> - Número da requisição de compra (identificador único)</li>
+                            <li><strong>DATA RC</strong> - Data da requisição de compra</li>
+                            <li><strong>PEDIDO</strong> - Número do pedido</li>
+                            <li><strong>VALOR TOTAL DO PEDIDO</strong> - Valor total</li>
+                            <li><strong>PREVISÃO PARA USO</strong> - Data de previsão</li>
+                            <li><strong>NF SERVIÇO</strong> - Número da NF de serviço</li>
+                            <li><strong>NF RETORNO E DATA LANÇAMENTO</strong> - NF retorno e data</li>
+                            <li><strong>CNPJ AURORA</strong> - CNPJ Aurora</li>
+                            <li><strong>SIMPLES NACIONAL</strong> - Simples Nacional</li>
+                            <li><strong>VALOR NF</strong> - Valor da nota fiscal</li>
+                            <li><strong>EMISSÃO</strong> - Data de emissão</li>
+                            <li><strong>INCLUSÃO 198</strong> - Data de inclusão 198</li>
+                            <li><strong>STATUS</strong> - Status do registro</li>
+                            <li><strong>OBS</strong> - Observações</li>
+                            <li><strong>SALDO RESIDUAL PEDIDO</strong> - Saldo residual</li>
+                        </ul>
+                        
+                        <div class="alert alert-warning mt-4">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Importante:</strong> O campo <strong>RC</strong> (ou <strong>NF SAÍDA</strong> se não houver RC) é usado como identificador único. Se um registro com o mesmo número já existir no banco de dados e a opção "Atualizar registros existentes" estiver marcada, os dados serão atualizados. Caso contrário, a linha será ignorada.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+

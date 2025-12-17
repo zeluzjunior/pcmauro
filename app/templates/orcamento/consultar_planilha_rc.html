@@ -1,0 +1,352 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Consultar Planilha RC{% endblock %}
+
+{% block extra_css %}
+<style>
+    .table-container {
+        max-height: 70vh;
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+    .table {
+        width: 100%;
+        table-layout: auto;
+    }
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+        white-space: nowrap;
+        vertical-align: middle;
+        text-align: center;
+        padding: 12px 8px;
+    }
+    .table tbody td {
+        vertical-align: middle;
+        padding: 10px 8px;
+    }
+    .filter-input {
+        width: 100%;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        margin-top: 4px;
+    }
+    .filter-input:focus {
+        outline: none;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    .filter-header {
+        padding: 8px !important;
+        background-color: #e9ecef;
+    }
+    .filter-row th {
+        background-color: #e9ecef;
+        padding: 4px 8px !important;
+        position: sticky;
+        top: 48px;
+        z-index: 8;
+    }
+    .col-empresa { min-width: 120px; }
+    .col-solicitante { min-width: 150px; }
+    .col-nf { min-width: 100px; }
+    .col-descricao { min-width: 250px; }
+    .col-rc { min-width: 120px; }
+    .col-pedido { min-width: 120px; }
+    .col-valor { min-width: 120px; text-align: right; }
+    .col-data { min-width: 120px; }
+    .col-status { min-width: 150px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Orçamento e GMD</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar Planilha RC</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="bi bi-clipboard2-data me-2"></i>Consultar Planilha RC
+                </h1>
+                <p class="lead">Visualize e consulte todos os dados do Controle de RC e NF</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <!-- Search Bar -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <form method="get" action="{% url 'consultar_planilha_rc' %}" class="d-flex">
+                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por empresa, solicitante, RC, NF, pedido, OS..." value="{{ search_query|default:'' }}">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total de Registros</h5>
+                        <p class="card-text display-6">{{ total_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Empresas Únicas</h5>
+                        <p class="card-text display-6">{{ empresas_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Valor Total Pedidos</h5>
+                        <p class="card-text display-6">{{ valor_total_pedido|currency_br }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Valor Total NF</h5>
+                        <p class="card-text display-6">{{ valor_total_nf|currency_br }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-clipboard2-data me-2"></i>Controle RC e NF
+                            <small class="ms-2">({{ controles.paginator.count }} registro{{ controles.paginator.count|pluralize }})</small>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <form method="get" action="{% url 'consultar_planilha_rc' %}" id="filterForm">
+                            <!-- Preservar busca geral -->
+                            <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                            
+                            <div class="table-container">
+                                <table class="table table-hover table-striped mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-empresa">Empresa</th>
+                                            <th class="col-solicitante">Solicitante</th>
+                                            <th class="col-nf">NF Saída</th>
+                                            <th class="col-descricao">Descrição Serviço</th>
+                                            <th class="col-rc">RC</th>
+                                            <th class="col-data">Data RC</th>
+                                            <th class="col-pedido">Pedido</th>
+                                            <th class="col-valor">Valor Pedido</th>
+                                            <th class="col-nf">NF Serviço</th>
+                                            <th class="col-valor">Valor NF</th>
+                                            <th class="col-data">Emissão</th>
+                                            <th class="col-status">Status</th>
+                                            <th class="col-nf">Uso</th>
+                                            <th style="min-width: 100px;">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <thead class="filter-row">
+                                        <tr>
+                                            <th class="filter-header">
+                                                <select name="filtro_empresa" class="filter-input" onchange="document.getElementById('filterForm').submit();">
+                                                    <option value="">Todas</option>
+                                                    {% for empresa in empresas_unicas %}
+                                                        <option value="{{ empresa }}" {% if filtro_empresa == empresa %}selected{% endif %}>{{ empresa }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </th>
+                                            <th class="filter-header">
+                                                <select name="filtro_solicitante" class="filter-input" onchange="document.getElementById('filterForm').submit();">
+                                                    <option value="">Todos</option>
+                                                    {% for solicitante in solicitantes_unicos %}
+                                                        <option value="{{ solicitante }}" {% if filtro_solicitante == solicitante %}selected{% endif %}>{{ solicitante }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </th>
+                                            <th class="filter-header"></th>
+                                            <th class="filter-header"></th>
+                                            <th class="filter-header">
+                                                <input type="text" name="filtro_rc" class="filter-input" placeholder="Filtrar RC..." value="{{ filtro_rc|default:'' }}" onchange="document.getElementById('filterForm').submit();">
+                                            </th>
+                                            <th class="filter-header"></th>
+                                            <th class="filter-header"></th>
+                                            <th class="filter-header">
+                                                <div class="d-flex gap-1">
+                                                    <input type="text" name="filtro_valor_min" class="filter-input" placeholder="Min" value="{{ filtro_valor_min|default:'' }}" style="width: 48%;" onchange="document.getElementById('filterForm').submit();">
+                                                    <input type="text" name="filtro_valor_max" class="filter-input" placeholder="Max" value="{{ filtro_valor_max|default:'' }}" style="width: 48%;" onchange="document.getElementById('filterForm').submit();">
+                                                </div>
+                                            </th>
+                                            <th class="filter-header"></th>
+                                            <th class="filter-header"></th>
+                                            <th class="filter-header"></th>
+                                            <th class="filter-header">
+                                                <select name="filtro_status" class="filter-input" onchange="document.getElementById('filterForm').submit();">
+                                                    <option value="">Todos</option>
+                                                    {% for status in status_unicos %}
+                                                        <option value="{{ status }}" {% if filtro_status == status %}selected{% endif %}>{{ status|truncatewords:3 }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </th>
+                                            <th class="filter-header">
+                                                <select name="filtro_uso" class="filter-input" onchange="document.getElementById('filterForm').submit();">
+                                                    <option value="">Todos</option>
+                                                    {% for uso in usos_unicos %}
+                                                        <option value="{{ uso }}" {% if filtro_uso == uso %}selected{% endif %}>{{ uso }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </th>
+                                            <th class="filter-header"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for controle in controles %}
+                                        <tr>
+                                            <td class="col-empresa">
+                                                <strong>{{ controle.empresa|default:"-" }}</strong>
+                                            </td>
+                                            <td class="col-solicitante">
+                                                {{ controle.solicitante|default:"-" }}
+                                            </td>
+                                            <td class="col-nf">
+                                                {{ controle.nf_saida|default:"-" }}
+                                            </td>
+                                            <td class="col-descricao">
+                                                {{ controle.descricao_servico|default:"-"|truncatewords:10 }}
+                                            </td>
+                                            <td class="col-rc">
+                                                <strong>{{ controle.rc|default:"-" }}</strong>
+                                            </td>
+                                            <td class="col-data">
+                                                {% if controle.data_rc %}
+                                                    {{ controle.data_rc|date:"d/m/Y" }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td class="col-pedido">
+                                                {{ controle.pedido|default:"-" }}
+                                            </td>
+                                            <td class="col-valor">
+                                                {% if controle.valor_total_pedido %}
+                                                    <strong>{{ controle.valor_total_pedido|currency_br }}</strong>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td class="col-nf">
+                                                {{ controle.nf_servico|default:"-" }}
+                                            </td>
+                                            <td class="col-valor">
+                                                {% if controle.valor_nf %}
+                                                    <strong>{{ controle.valor_nf|currency_br }}</strong>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td class="col-data">
+                                                {% if controle.emissao %}
+                                                    {{ controle.emissao|date:"d/m/Y" }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td class="col-status">
+                                                {% if controle.status %}
+                                                    <span class="badge bg-secondary">{{ controle.status|truncatewords:3 }}</span>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td class="col-nf">
+                                                {% if controle.uso %}
+                                                    <span class="badge bg-info">{{ controle.uso }}</span>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{% url 'visualizar_planilha_rc' controle.id %}" class="btn btn-sm btn-primary" title="Visualizar detalhes completos">
+                                                    <i class="fas fa-eye"></i> Ver
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="14" class="text-center text-muted py-4">
+                                                <i class="fas fa-inbox fa-2x mb-2"></i>
+                                                <p>Nenhum registro encontrado.</p>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="card-footer">
+                        <!-- Pagination -->
+                        {% if controles.has_other_pages %}
+                        <nav aria-label="Paginação">
+                            <ul class="pagination justify-content-center mb-0">
+                                {% if controles.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_rc %}&filtro_rc={{ filtro_rc }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">&laquo; Primeira</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ controles.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_rc %}&filtro_rc={{ filtro_rc }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Anterior</a>
+                                    </li>
+                                {% endif %}
+                                
+                                <li class="page-item active">
+                                    <span class="page-link">
+                                        Página {{ controles.number }} de {{ controles.paginator.num_pages }}
+                                    </span>
+                                </li>
+                                
+                                {% if controles.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ controles.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_rc %}&filtro_rc={{ filtro_rc }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Próxima</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ controles.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_rc %}&filtro_rc={{ filtro_rc }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Última &raquo;</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+

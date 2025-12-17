@@ -552,13 +552,13 @@ def upload_maquinas_from_file(file, update_existing=False, update_fields=None) -
                         else:
                             # Comportamento padrÃ£o: atualizar todos os campos
                             maquina_obj, created = Maquina.objects.update_or_create(
-                                cd_maquina=cd_maquina,
-                                defaults=maquina_data
-                            )
-                            if created:
-                                created_count += 1
-                            else:
-                                updated_count += 1
+                            cd_maquina=cd_maquina,
+                            defaults=maquina_data
+                        )
+                        if created:
+                            created_count += 1
+                        else:
+                            updated_count += 1
                     else:
                         maquina_obj, created = Maquina.objects.get_or_create(
                             cd_maquina=cd_maquina,
@@ -1079,6 +1079,8 @@ def upload_cas_from_file(file, update_existing=False) -> Tuple[int, int, List[st
                     except Exception as e:
                         last_error = f"Erro ao ler CSV com delimiter '{delimiter}' e encoding '{encoding}': {str(e)}"
                         continue
+                if data and len(data) > 0:
+                    break
                 if data and len(data) > 0:
                     # Verificar novamente antes de sair do loop externo
                     first_row = data[0] if data else {}
@@ -1802,6 +1804,71 @@ def _safe_decimal(value, default=None):
         
         return Decimal(value_str)
     except (InvalidOperation, ValueError, TypeError):
+        return default
+
+
+def _safe_date(value, default=None):
+    """Converte valor para date de forma segura
+    
+    Suporta:
+    - Objetos datetime/date do Python
+    - Strings em vários formatos brasileiros e internacionais
+    - Objetos datetime do Excel (openpyxl)
+    """
+    from datetime import datetime, date
+    
+    if value is None or value == '':
+        return default
+    
+    # Se já for um objeto date, retornar diretamente
+    if isinstance(value, date):
+        return value
+    
+    # Se for datetime, extrair apenas a data
+    if isinstance(value, datetime):
+        return value.date()
+    
+    # Tentar converter string para date
+    value_str = str(value).strip()
+    if not value_str:
+        return default
+    
+    # Remover hora se existir
+    if ' ' in value_str:
+        date_part = value_str.split(' ')[0]
+    else:
+        date_part = value_str
+    
+    # Tentar diferentes formatos de data
+    date_formats = [
+        '%d/%m/%Y',      # 26/09/2025
+        '%d-%m-%Y',      # 26-09-2025
+        '%d.%m.%Y',      # 26.09.2025
+        '%Y-%m-%d',      # 2025-09-26
+        '%Y/%m/%d',      # 2025/09/26
+        '%d/%m/%y',      # 26/09/25
+        '%d-%m-%y',      # 26-09-25
+    ]
+    
+    for fmt in date_formats:
+        try:
+            return datetime.strptime(date_part, fmt).date()
+        except (ValueError, TypeError):
+            continue
+    
+    # Se nenhum formato funcionou, tentar parse manual para formato brasileiro comum
+    if '/' in date_part:
+        parts = date_part.split('/')
+        if len(parts) == 3:
+            try:
+                day, month, year = parts
+                # Se ano tem 2 dígitos, assumir 2000+
+                if len(year) == 2:
+                    year = '20' + year
+                return date(int(year), int(month), int(day))
+            except (ValueError, TypeError):
+                pass
+    
         return default
 
 
@@ -3300,3 +3367,347 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
         traceback.print_exc()
         return 0, 0, errors
 
+
+def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:
+    """
+    Faz upload de projeções de gastos a partir de um arquivo Excel
+    
+    Args:
+        file: Arquivo Django UploadedFile
+        update_existing: Se True, atualiza registros existentes. Se False, ignora duplicados.
+    
+    Returns:
+        Tupla (created_count, updated_count, errors)
+    """
+    from app.models import ProjecaoGasto
+    from datetime import datetime
+    import re
+    
+    errors = []
+    created_count = 0
+    updated_count = 0
+    
+    # Determinar tipo de arquivo
+    file_name = file.name.lower()
+    
+    try:
+        # Ler arquivo baseado na extensão
+        if file_name.endswith(('.xlsx', '.xls', '.xlsm')):
+            data = read_excel_file(file, sheet_name='GASTOS')  # Planilha específica
+        else:
+            raise ValidationError("Formato de arquivo não suportado. Use .xlsx, .xls ou .xlsm")
+        
+        if not data:
+            raise ValidationError("Arquivo vazio ou sem dados válidos")
+        
+        # Função auxiliar para encontrar valor de coluna (case-insensitive e normaliza quebras de linha)
+        def find_column_value(row_data, possible_names):
+            """Encontra valor de coluna considerando variações de nome"""
+            for name in possible_names:
+                # Tentar nome exato
+                if name in row_data:
+                    return row_data[name]
+                # Tentar normalizado (sem quebras de linha, espaços normalizados)
+                normalized_name = re.sub(r'\s+', ' ', name.replace('\n', ' ').strip())
+                for key in row_data.keys():
+                    normalized_key = re.sub(r'\s+', ' ', key.replace('\n', ' ').strip())
+                    if normalized_key.upper() == normalized_name.upper():
+                        return row_data[key]
+            return None
+        
+        # Função para extrair mês e ano de previsão
+        def extract_mes_ano(previsao_str):
+            """Extrai mês e ano de uma string como 'OUTUBRO / 2025'"""
+            if not previsao_str:
+                return None, None
+            previsao_str = str(previsao_str).strip().upper()
+            # Mapear meses em português
+            meses = {
+                'JANEIRO': '01', 'FEVEREIRO': '02', 'MARÇO': '03', 'MARCO': '03',
+                'ABRIL': '04', 'MAIO': '05', 'JUNHO': '06',
+                'JULHO': '07', 'AGOSTO': '08', 'SETEMBRO': '09',
+                'OUTUBRO': '10', 'NOVEMBRO': '11', 'DEZEMBRO': '12'
+            }
+            # Procurar padrão "MÊS / ANO" ou "MÊS/ANO"
+            match = re.search(r'([A-ZÇ]+)\s*/\s*(\d{4})', previsao_str)
+            if match:
+                mes_nome = match.group(1)
+                ano = int(match.group(2))
+                mes = meses.get(mes_nome)
+                return mes, ano
+            return None, None
+        
+        # Processar dados em transação
+        with transaction.atomic():
+            for row_num, row_data in enumerate(data, start=2):  # Começar em 2 (linha 1 é cabeçalho)
+                try:
+                    # Verificar se a linha está vazia ou tem apenas valores vazios
+                    if not any(str(v).strip() if v else '' for v in row_data.values()):
+                        continue
+                    
+                    # Mapear colunas do Excel para campos do modelo
+                    setor = _safe_str(find_column_value(row_data, ['SETOR ', 'SETOR', 'setor']), max_length=100)
+                    solicitante = _safe_str(find_column_value(row_data, ['SOLICITANTE', 'solicitante']), max_length=100)
+                    fornecedor_nome = _safe_str(find_column_value(row_data, ['FORNECEDOR\nNOME FANTASIA', 'FORNECEDOR NOME FANTASIA', 'FORNECEDOR']), max_length=255)
+                    fornecedor_cnpj = _safe_str(find_column_value(row_data, ['FORNECEDOR\nCNPJ', 'FORNECEDOR CNPJ']), max_length=20)
+                    descricao = _safe_str(find_column_value(row_data, ['DESCRIÇÃO DO SERVIÇO', 'DESCRI��O DO SERVI�O', 'DESCRICAO DO SERVICO']), max_length=500)
+                    valor_total = _safe_decimal(find_column_value(row_data, ['VALOR TOTAL', 'valor_total']))
+                    previsao_execucao = _safe_str(find_column_value(row_data, ['PREVISÃO \nP/ EXECUÇÃO', 'PREVISÃO P/ EXECUÇÃO', 'PREVIS�O \nP/ EXECU��O']), max_length=50)
+                    uso_contabil = _safe_str(find_column_value(row_data, ['USO \nCONTÁBIL', 'USO CONTÁBIL', 'USO \nCONT�BIL']), max_length=100)
+                    numero_nf = _safe_str(find_column_value(row_data, ['NÚMERO DA \nNOTA FISCAL', 'NÚMERO DA NOTA FISCAL', 'N�MERO DA \nNOTA FISCAL']), max_length=100)
+                    numero_ordem_servico = _safe_str(find_column_value(row_data, ['ORDEM \nDE SERVIÇO', 'ORDEM DE SERVIÇO', 'ORDEM \nDE SERVI�O']), max_length=100)
+                    data_abertura = _safe_date(find_column_value(row_data, ['DATA DE ABERTURA \nDA REQUISIÇÃO', 'DATA DE ABERTURA DA REQUISIÇÃO', 'DATA DE ABERTURA \nDA REQUISI��O']))
+                    numero_requisicao_compra = _safe_str(find_column_value(row_data, ['NÚMERO DA REQUISIÇÃO \nDE COMPRA', 'NÚMERO DA REQUISIÇÃO DE COMPRA', 'N�EMRO DA REQUISI��O \nDE COMPRA']), max_length=100)
+                    numero_pedido_compra = _safe_str(find_column_value(row_data, ['NÚMERO DO \nPEDIDO DE COMPRA', 'NÚMERO DO PEDIDO DE COMPRA', 'N�MERO DO \nPEDIDO DE COMPRA']), max_length=100)
+                    servico_concluido = _safe_date(find_column_value(row_data, ['SERVIÇO CONCLUÍDO', 'SERVI�O CONCLU�DO']))
+                    nf_servico_recebida = _safe_date(find_column_value(row_data, ['NF DE SERVIÇO\n RECEBIDA', 'NF DE SERVIÇO RECEBIDA', 'NF DE SERVI�O\n RECEBIDA']))
+                    nf_enviada_lancamento = _safe_date(find_column_value(row_data, ['NF ENVIADA\n PARA LANÇAMENTO ', 'NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA\n PARA LAN�AMENTO ']))
+                    
+                    # Extrair mês e ano da previsão
+                    mes_referencia, ano_referencia = extract_mes_ano(previsao_execucao)
+                    
+                    # Preparar dados para criação/atualização
+                    projecao_data = {
+                        'setor': setor,
+                        'solicitante': solicitante,
+                        'descricao': descricao,
+                        'valor_total': valor_total,
+                        'data_abertura_requisicao': data_abertura,
+                        'previsao_execucao': previsao_execucao,
+                        'mes_referencia': mes_referencia,
+                        'ano_referencia': ano_referencia,
+                        'fornecedor_nome_fantasia': fornecedor_nome,
+                        'fornecedor_cnpj': fornecedor_cnpj,
+                        'uso_contabil': uso_contabil,
+                        'numero_nf': numero_nf,
+                        'numero_ordem_servico': numero_ordem_servico,
+                        'numero_requisicao_compra': numero_requisicao_compra,
+                        'numero_pedido_compra': numero_pedido_compra,
+                        'servico_concluido': servico_concluido,
+                        'nf_servico_recebida': nf_servico_recebida,
+                        'nf_enviada_lancamento': nf_enviada_lancamento,
+                        # Campos legados para compatibilidade
+                        'centro_atividade': setor,  # Mapear SETOR para centro_atividade
+                        'fornecedor': fornecedor_nome,  # Mapear para campo legado
+                        'data_requisicao': data_abertura,  # Mapear para campo legado
+                        'numero_requisicao': numero_requisicao_compra,  # Mapear para campo legado
+                    }
+                    
+                    # Usar numero_requisicao_compra como chave única (se disponível)
+                    if numero_requisicao_compra:
+                        if update_existing:
+                            projecao_obj, created = ProjecaoGasto.objects.update_or_create(
+                                numero_requisicao_compra=numero_requisicao_compra,
+                                defaults=projecao_data
+                            )
+                            if created:
+                                created_count += 1
+                            else:
+                                updated_count += 1
+                        else:
+                            projecao_obj, created = ProjecaoGasto.objects.get_or_create(
+                                numero_requisicao_compra=numero_requisicao_compra,
+                                defaults=projecao_data
+                            )
+                            if created:
+                                created_count += 1
+                    else:
+                        # Se não tem numero_requisicao_compra, criar sempre como novo
+                        projecao_obj = ProjecaoGasto.objects.create(**projecao_data)
+                        created_count += 1
+                        
+                except Exception as e:
+                    error_msg = f"Linha {row_num}: {str(e)}"
+                    errors.append(error_msg)
+                    print(f"Erro ao processar linha {row_num}: {error_msg}")
+                    continue
+        
+        return created_count, updated_count, errors
+    
+    except ValidationError as e:
+        errors.append(str(e))
+        return 0, 0, errors
+    except Exception as e:
+        error_detail = f"Erro geral ao processar arquivo: {str(e)}"
+        errors.append(error_detail)
+        print(f"Erro geral: {error_detail}")
+        import traceback
+        traceback.print_exc()
+        return 0, 0, errors
+
+
+def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:
+    """
+    Faz upload de controle RC e NF a partir de um arquivo Excel
+    
+    Args:
+        file: Arquivo Django UploadedFile
+        update_existing: Se True, atualiza registros existentes. Se False, ignora duplicados.
+    
+    Returns:
+        Tupla (created_count, updated_count, errors)
+    """
+    from app.models import ControleRCeNF
+    from datetime import datetime, date
+    from decimal import Decimal, InvalidOperation
+    
+    errors = []
+    created_count = 0
+    updated_count = 0
+    
+    try:
+        # Ler arquivo Excel
+        if hasattr(file, 'read'):
+            file.seek(0)
+            wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
+        else:
+            wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
+        
+        # Selecionar a planilha "CONTROLE RC E NF"
+        try:
+            ws = wb['CONTROLE RC E NF']
+        except KeyError:
+            raise ValidationError("Planilha 'CONTROLE RC E NF' não encontrada no arquivo")
+        
+        # Ler cabeçalhos da linha 3 (linha 1 está vazia, linha 2 tem título)
+        headers = []
+        for cell in ws[3]:
+            header_value = cell.value if cell.value else None
+            if isinstance(header_value, str):
+                header_value = header_value.strip().replace('\xa0', ' ').replace('\u00a0', ' ')
+                import re
+                header_value = re.sub(r'\s+', ' ', header_value).strip()
+            headers.append(header_value)
+        
+        # Função auxiliar para converter valores
+        def _safe_str(value, max_length=None):
+            if value is None:
+                return None
+            if isinstance(value, (int, float)):
+                value = str(int(value)) if isinstance(value, float) and value.is_integer() else str(value)
+            value = str(value).strip()
+            if max_length and len(value) > max_length:
+                value = value[:max_length]
+            return value if value else None
+        
+        def _safe_decimal(value):
+            if value is None or value == '':
+                return None
+            if isinstance(value, (int, float)):
+                return Decimal(str(value))
+            if isinstance(value, str):
+                # Remover formatação brasileira (pontos e vírgulas)
+                value = value.replace('.', '').replace(',', '.')
+                try:
+                    return Decimal(value)
+                except (InvalidOperation, ValueError):
+                    return None
+            return None
+        
+        def _safe_datetime(value):
+            if value is None or value == '':
+                return None
+            if isinstance(value, datetime):
+                return value
+            if isinstance(value, date) and not isinstance(value, datetime):
+                return datetime.combine(value, datetime.min.time())
+            if isinstance(value, str):
+                # Tentar diferentes formatos
+                for fmt in ['%Y-%m-%d %H:%M:%S', '%Y-%m-%d', '%d/%m/%Y %H:%M:%S', '%d/%m/%Y']:
+                    try:
+                        return datetime.strptime(value.strip(), fmt)
+                    except ValueError:
+                        continue
+            return None
+        
+        # Processar dados em transação
+        with transaction.atomic():
+            # Ler dados a partir da linha 4
+            for row_num, row in enumerate(ws.iter_rows(min_row=4, values_only=False), start=4):
+                try:
+                    # Verificar se a linha está vazia
+                    if not any(cell.value for cell in row if cell.value):
+                        continue
+                    
+                    # Criar dicionário com os dados da linha
+                    row_data = {}
+                    for idx, cell in enumerate(row):
+                        if idx < len(headers) and headers[idx]:
+                            row_data[headers[idx]] = cell.value
+                    
+                    # Verificar se tem dados mínimos (RC ou NF Saída)
+                    rc = _safe_str(row_data.get('RC'))
+                    nf_saida = _safe_str(row_data.get('NF SAÍDA'))
+                    
+                    # Se não tem RC nem NF Saída, pular
+                    if not rc and not nf_saida:
+                        continue
+                    
+                    # Buscar registro existente (usar RC como identificador único, ou NF Saída se não tiver RC)
+                    if rc:
+                        existing = ControleRCeNF.objects.filter(rc=rc).first()
+                    else:
+                        existing = ControleRCeNF.objects.filter(nf_saida=nf_saida).first()
+                    
+                    if existing and not update_existing:
+                        continue
+                    
+                    # Preparar dados
+                    data_dict = {
+                        'solicitante': _safe_str(row_data.get('SOLICITANTE')),
+                        'empresa': _safe_str(row_data.get('EMPRESA')),
+                        'nf_saida': nf_saida,
+                        'descricao_servico': _safe_str(row_data.get('DESCRIÇÃO DO SERVIÇO'), max_length=1000),
+                        'ca_rateio': _safe_str(row_data.get('C.A/RATEIO')),
+                        'uso': _safe_str(row_data.get('USO')),
+                        'quem_abriu_rc': _safe_str(row_data.get('QUEM ABRIU \nA RC') or row_data.get('QUEM ABRIU A RC')),
+                        'orcamento': _safe_str(row_data.get('ORÇAMENTO'), max_length=500),
+                        'os': _safe_str(row_data.get('O.S')),
+                        'classificacao': _safe_str(row_data.get('CLASSIF.')),
+                        'justificativa_classificacao': _safe_str(row_data.get('JUSTIFICATIVA CLASSIFICAÇÃO'), max_length=1000),
+                        'spaf0009_acesso_portaria': _safe_str(row_data.get('SPAF0009 - Acesso portária p/ classif. 5 e 8'), max_length=255),
+                        'rc': rc,
+                        'data_rc': _safe_datetime(row_data.get('DATA RC')),
+                        'pedido': _safe_str(row_data.get('PEDIDO')),
+                        'valor_total_pedido': _safe_decimal(row_data.get('VALOR TOTAL DO PEDIDO')),
+                        'previsao_para_uso': _safe_datetime(row_data.get('PREVISÃO PARA USO')),
+                        'nf_servico': _safe_str(row_data.get('NF SERVIÇO')),
+                        'nf_retorno_e_data_lancamento': _safe_str(row_data.get('NF RETORNO E DATA LANÇAMENTO'), max_length=255),
+                        'cnpj_aurora': _safe_str(row_data.get('CNPJ AURORA')),
+                        'simples_nacional': _safe_str(row_data.get('SIMPLES NACIONAL')),
+                        'valor_nf': _safe_decimal(row_data.get('VALOR NF')),
+                        'emissao': _safe_datetime(row_data.get('EMISSÃO')),
+                        'inclusao_198': _safe_datetime(row_data.get('INCLUSÃO 198')),
+                        'status': _safe_str(row_data.get('STATUS'), max_length=255),
+                        'obs': _safe_str(row_data.get('OBS'), max_length=1000),
+                        'saldo_residual_pedido': _safe_decimal(row_data.get('SALDO RESIDUAL PEDIDO ')),
+                    }
+                    
+                    if existing:
+                        # Atualizar registro existente
+                        for key, value in data_dict.items():
+                            setattr(existing, key, value)
+                        existing.save()
+                        updated_count += 1
+                    else:
+                        # Criar novo registro
+                        ControleRCeNF.objects.create(**data_dict)
+                        created_count += 1
+                        
+                except Exception as e:
+                    error_msg = f"Linha {row_num}: {str(e)}"
+                    errors.append(error_msg)
+                    print(f"Erro na linha {row_num}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    continue
+        
+        return created_count, updated_count, errors
+        
+    except Exception as e:
+        error_detail = f"Erro ao processar arquivo: {str(e)}"
+        errors.append(error_detail)
+        print(f"Erro geral: {error_detail}")
+        import traceback
+        traceback.print_exc()
+        return 0, 0, errors

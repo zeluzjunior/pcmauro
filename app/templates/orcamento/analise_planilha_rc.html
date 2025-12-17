@@ -1,0 +1,699 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Análise Planilha RC{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .chart-container {
+        position: relative;
+        height: 400px;
+        margin-bottom: 30px;
+    }
+    .chart-container-small {
+        position: relative;
+        height: 300px;
+        margin-bottom: 30px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Orçamento e GMD</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise Planilha RC</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="bi bi-file-earmark-bar-graph me-2"></i>Análise Planilha RC
+                </h1>
+                <p class="lead">Análise completa dos dados do Controle de RC e NF com foco em Status</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white stat-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Total de Registros</h5>
+                        <p class="card-text display-6">{{ total_registros }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white stat-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Valor Total Pedidos</h5>
+                        <p class="card-text display-6">{{ valor_total_pedido_geral|currency_br }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white stat-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Valor Total NF</h5>
+                        <p class="card-text display-6">{{ valor_total_nf_geral|currency_br }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white stat-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Registros sem Status</h5>
+                        <p class="card-text display-6">{{ registros_sem_status }}</p>
+                        <small>{% if total_registros > 0 %}{% widthratio registros_sem_status total_registros 100 %}%{% else %}0%{% endif %}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Additional Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-2">
+                <div class="card bg-light stat-card">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted">Com RC</h6>
+                        <h4 class="text-primary">{{ registros_com_rc }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card bg-light stat-card">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted">Com Pedido</h6>
+                        <h4 class="text-info">{{ registros_com_pedido }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card bg-light stat-card">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted">Com NF Saída</h6>
+                        <h4 class="text-success">{{ registros_com_nf_saida }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card bg-light stat-card">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted">Com NF Serviço</h6>
+                        <h4 class="text-warning">{{ registros_com_nf_servico }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card bg-light stat-card">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted">Valor Médio Pedido</h6>
+                        <h5 class="text-primary">{{ valor_medio_pedido|currency_br }}</h5>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card bg-light stat-card">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted">Valor Médio NF</h6>
+                        <h5 class="text-success">{{ valor_medio_nf|currency_br }}</h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Análise por Status (Principal) -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>Distribuição por Status
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Top 10 Status por Quantidade
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="statusBarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Valores por Status -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-dollar-sign me-2"></i>Valores por Status (Top 10)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-small">
+                            <canvas id="statusValorChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Análise por Empresa e Solicitante -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-building me-2"></i>Top 10 Empresas
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="empresaChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-user me-2"></i>Top 10 Solicitantes
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="solicitanteChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Análise por Uso e Temporal -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-tags me-2"></i>Distribuição por Uso
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="usoChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-calendar-alt me-2"></i>Evolução Temporal (Últimos 12 Meses)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="temporalChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela Detalhada de Status -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>Detalhamento por Status
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th class="text-center">Quantidade</th>
+                                        <th class="text-center">% do Total</th>
+                                        <th class="text-end">Valor Total Pedido</th>
+                                        <th class="text-end">Valor Total NF</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in status_distribution %}
+                                    <tr>
+                                        <td><strong>{{ item.status|truncatewords:10 }}</strong></td>
+                                        <td class="text-center">{{ item.total }}</td>
+                                        <td class="text-center">
+                                            {% if total_registros > 0 %}
+                                                {% widthratio item.total total_registros 100 %}%
+                                            {% else %}
+                                                0%
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">
+                                            {% if item.valor_total_pedido %}
+                                                {{ item.valor_total_pedido|currency_br }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">
+                                            {% if item.valor_total_nf %}
+                                                {{ item.valor_total_nf|currency_br }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted">Nenhum registro encontrado.</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if registros_sem_status > 0 %}
+                                    <tr class="table-warning">
+                                        <td><strong>Sem Status</strong></td>
+                                        <td class="text-center">{{ registros_sem_status }}</td>
+                                        <td class="text-center">
+                                            {% if total_registros > 0 %}
+                                                {% widthratio registros_sem_status total_registros 100 %}%
+                                            {% else %}
+                                                0%
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">-</td>
+                                        <td class="text-end">-</td>
+                                    </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Função para formatar números no padrão brasileiro
+    function formatarNumeroBR(numero, decimais = 0) {
+        if (numero === null || numero === undefined || isNaN(numero)) {
+            return '0';
+        }
+        const num = typeof numero === 'string' ? parseFloat(numero) : numero;
+        return num.toLocaleString('pt-BR', {
+            minimumFractionDigits: decimais,
+            maximumFractionDigits: decimais
+        });
+    }
+
+    // Função para formatar moeda brasileira
+    function formatarMoedaBR(valor) {
+        return 'R$ ' + formatarNumeroBR(valor, 2);
+    }
+
+    // Cores para gráficos
+    const colors = [
+        '#0d6efd', '#198754', '#ffc107', '#dc3545', '#0dcaf0',
+        '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d',
+        '#17a2b8', '#28a745', '#ff6b6b', '#4ecdc4', '#95e1d3'
+    ];
+
+    // Gráfico de Pizza: Distribuição por Status
+    const statusCtx = document.getElementById('statusChart');
+    if (statusCtx) {
+        const statusLabels = {{ status_labels|safe }};
+        const statusData = {{ status_data|safe }};
+        const statusPercentages = {{ status_percentages|safe }};
+        
+        new Chart(statusCtx.getContext('2d'), {
+            type: 'pie',
+            data: {
+                labels: statusLabels,
+                datasets: [{
+                    data: statusData,
+                    backgroundColor: colors.slice(0, statusLabels.length),
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                const percentage = statusPercentages[context.dataIndex] || 0;
+                                label += formatarNumeroBR(context.parsed) + ' (' + formatarNumeroBR(percentage, 1) + '%)';
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Barras: Top 10 Status
+    const statusBarCtx = document.getElementById('statusBarChart');
+    if (statusBarCtx) {
+        const statusLabels = {{ status_labels|safe }};
+        const statusData = {{ status_data|safe }};
+        
+        new Chart(statusBarCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: statusLabels.slice(0, 10),
+                datasets: [{
+                    label: 'Quantidade',
+                    data: statusData.slice(0, 10),
+                    backgroundColor: '#198754',
+                    borderColor: '#146c43',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Quantidade: ' + formatarNumeroBR(context.parsed.y);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return formatarNumeroBR(value);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Barras: Valores por Status
+    const statusValorCtx = document.getElementById('statusValorChart');
+    if (statusValorCtx) {
+        const topStatusLabels = {{ top_status_valor_labels|safe }};
+        const topStatusValorPedido = {{ top_status_valor_pedido|safe }};
+        const topStatusValorNF = {{ top_status_valor_nf|safe }};
+        
+        new Chart(statusValorCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: topStatusLabels,
+                datasets: [
+                    {
+                        label: 'Valor Total Pedido',
+                        data: topStatusValorPedido,
+                        backgroundColor: '#0dcaf0',
+                        borderColor: '#0aa2c0',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Valor Total NF',
+                        data: topStatusValorNF,
+                        backgroundColor: '#ffc107',
+                        borderColor: '#ffb300',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + formatarMoedaBR(context.parsed.y);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return formatarMoedaBR(value);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Barras: Top 10 Empresas
+    const empresaCtx = document.getElementById('empresaChart');
+    if (empresaCtx) {
+        const empresaLabels = {{ empresa_labels|safe }};
+        const empresaData = {{ empresa_data|safe }};
+        
+        new Chart(empresaCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: empresaLabels,
+                datasets: [{
+                    label: 'Registros',
+                    data: empresaData,
+                    backgroundColor: '#ffc107',
+                    borderColor: '#ffb300',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Registros: ' + formatarNumeroBR(context.parsed.x);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return formatarNumeroBR(value);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Barras: Top 10 Solicitantes
+    const solicitanteCtx = document.getElementById('solicitanteChart');
+    if (solicitanteCtx) {
+        const solicitanteLabels = {{ solicitante_labels|safe }};
+        const solicitanteData = {{ solicitante_data|safe }};
+        
+        new Chart(solicitanteCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: solicitanteLabels,
+                datasets: [{
+                    label: 'Registros',
+                    data: solicitanteData,
+                    backgroundColor: '#6c757d',
+                    borderColor: '#5a6268',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Registros: ' + formatarNumeroBR(context.parsed.x);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return formatarNumeroBR(value);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Pizza: Distribuição por Uso
+    const usoCtx = document.getElementById('usoChart');
+    if (usoCtx) {
+        const usoLabels = {{ uso_labels|safe }};
+        const usoData = {{ uso_data|safe }};
+        
+        new Chart(usoCtx.getContext('2d'), {
+            type: 'pie',
+            data: {
+                labels: usoLabels,
+                datasets: [{
+                    data: usoData,
+                    backgroundColor: colors.slice(0, usoLabels.length),
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += formatarNumeroBR(context.parsed);
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Linha: Evolução Temporal
+    const temporalCtx = document.getElementById('temporalChart');
+    if (temporalCtx) {
+        const mesesLabels = {{ meses_labels|safe }};
+        const mesesData = {{ meses_data|safe }};
+        
+        new Chart(temporalCtx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: mesesLabels,
+                datasets: [{
+                    label: 'Registros por Mês',
+                    data: mesesData,
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Registros: ' + formatarNumeroBR(context.parsed.y);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return formatarNumeroBR(value);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+

@@ -408,7 +408,12 @@
                             </button>
                             <div class="collapse" id="orcamento-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'dados_orcamento' %}" class="link-dark rounded"><i class="fas fa-chart-bar me-2"></i>Dados de Orçamento</a></li>
+                                    <li><a href="{% url 'consultar_projecao_gastos' %}" class="link-dark rounded"><i class="bi bi-clipboard2-data me-2"></i>Consultar Projeção de Gastos</a></li>
                                     <li><a href="{% url 'consultar_notas_fiscais' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Notas Fiscais</a></li>
+                                    <li><a href="{% url 'relacionar_projecao_nota_fiscal' %}" class="link-dark rounded"><i class="fas fa-link me-2"></i>Análise: Projeção x Nota Fiscal</a></li>
+                                    <li><a href="{% url 'consultar_planilha_rc' %}" class="link-dark rounded"><i class="fas fa-table me-2"></i>Consultar Planilha RC</a></li>
+                                    <li><a href="{% url 'analise_planilha_rc' %}" class="link-dark rounded"><i class="bi bi-file-earmark-bar-graph me-2"></i>Análise Planilha RC</a></li>
                                 </ul>
                             </div>
                         </li>
@@ -511,10 +516,12 @@
                                     <li><a href="{% url 'importar_plano_preventiva' %}" class="link-dark rounded">Plano Preventiva</a></li>
                                     <li><a href="{% url 'importar_roteiro_preventiva' %}" class="link-dark rounded">Roteiro Preventiva</a></li>
                                     <li><a href="{% url 'importar_locais_e_cas' %}" class="link-dark rounded">Centro de Atividade</a></li>
+                                    <li><a href="{% url 'importar_projecao_gastos' %}" class="link-dark rounded">Projeção de Gastos</a></li>
                                     <li><a href="{% url 'importar_estoque' %}" class="link-dark rounded">Estoque</a></li>
                                     <li><a href="{% url 'importar_52_semanas' %}" class="link-dark rounded">52 Semanas</a></li>
                                     <li><a href="{% url 'importar_requisicoes_almoxarifado' %}" class="link-dark rounded">Requisições Almoxarifado</a></li>
                                     <li><a href="{% url 'importar_notas_fiscais' %}" class="link-dark rounded">Notas Fiscais</a></li>
+                                    <li><a href="{% url 'importar_controle_nf_e_rc' %}" class="link-dark rounded">Controle RC e NF</a></li>
                                 </ul>
                             </div>
                         </li>

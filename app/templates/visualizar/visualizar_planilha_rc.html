@@ -1,0 +1,332 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Visualizar Planilha RC - {{ controle.rc|default:controle.nf_saida|default:controle.id }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_planilha_rc' %}" class="text-white">Consultar Planilha RC</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">RC {{ controle.rc|default:controle.nf_saida|default:controle.id }}</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-file-alt me-2"></i>Visualizar Planilha RC
+                </h1>
+                <p class="lead">Detalhes completos do registro RC: {{ controle.rc|default:"N/A" }} - NF: {{ controle.nf_saida|default:"N/A" }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <div class="row">
+            <div class="col-12">
+                <!-- Informações Básicas -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Informações Básicas
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Solicitante</label>
+                                <p class="form-control-plaintext">{{ controle.solicitante|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Empresa</label>
+                                <p class="form-control-plaintext fs-5"><strong>{{ controle.empresa|default:"-" }}</strong></p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">NF Saída</label>
+                                <p class="form-control-plaintext fs-5"><strong>{{ controle.nf_saida|default:"-" }}</strong></p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">RC</label>
+                                <p class="form-control-plaintext fs-5"><strong>{{ controle.rc|default:"-" }}</strong></p>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label fw-bold">Descrição do Serviço</label>
+                                <p class="form-control-plaintext">{{ controle.descricao_servico|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dados da Requisição de Compra -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-shopping-cart me-2"></i>Dados da Requisição de Compra (RC)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">RC</label>
+                                <p class="form-control-plaintext fs-5"><strong>{{ controle.rc|default:"-" }}</strong></p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Data RC</label>
+                                <p class="form-control-plaintext">
+                                    {% if controle.data_rc %}
+                                        {{ controle.data_rc|date:"d/m/Y H:i" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Quem Abriu a RC</label>
+                                <p class="form-control-plaintext">{{ controle.quem_abriu_rc|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">C.A/Rateio</label>
+                                <p class="form-control-plaintext">{{ controle.ca_rateio|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Uso</label>
+                                <p class="form-control-plaintext">
+                                    {% if controle.uso %}
+                                        <span class="badge bg-info fs-6">{{ controle.uso }}</span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Classificação</label>
+                                <p class="form-control-plaintext">{{ controle.classificacao|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Justificativa Classificação</label>
+                                <p class="form-control-plaintext">{{ controle.justificativa_classificacao|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">SPAF0009 - Acesso portaria p/ classif. 5 e 8</label>
+                                <p class="form-control-plaintext">{{ controle.spaf0009_acesso_portaria|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dados do Pedido -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-invoice-dollar me-2"></i>Dados do Pedido
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Pedido</label>
+                                <p class="form-control-plaintext fs-5"><strong>{{ controle.pedido|default:"-" }}</strong></p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Valor Total do Pedido</label>
+                                <p class="form-control-plaintext fs-5 text-success fw-bold">
+                                    {% if controle.valor_total_pedido %}
+                                        R$ {{ controle.valor_total_pedido|floatformat:2 }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Previsão para Uso</label>
+                                <p class="form-control-plaintext">
+                                    {% if controle.previsao_para_uso %}
+                                        {{ controle.previsao_para_uso|date:"d/m/Y H:i" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Saldo Residual Pedido</label>
+                                <p class="form-control-plaintext">
+                                    {% if controle.saldo_residual_pedido %}
+                                        R$ {{ controle.saldo_residual_pedido|floatformat:2 }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dados da Nota Fiscal -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-invoice me-2"></i>Dados da Nota Fiscal
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">NF Saída</label>
+                                <p class="form-control-plaintext fs-5"><strong>{{ controle.nf_saida|default:"-" }}</strong></p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">NF Serviço</label>
+                                <p class="form-control-plaintext">{{ controle.nf_servico|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Valor NF</label>
+                                <p class="form-control-plaintext fs-5 text-success fw-bold">
+                                    {% if controle.valor_nf %}
+                                        R$ {{ controle.valor_nf|floatformat:2 }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Status</label>
+                                <p class="form-control-plaintext">
+                                    {% if controle.status %}
+                                        <span class="badge bg-secondary fs-6">{{ controle.status }}</span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">NF Retorno e Data Lançamento</label>
+                                <p class="form-control-plaintext">{{ controle.nf_retorno_e_data_lancamento|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">CNPJ Aurora</label>
+                                <p class="form-control-plaintext">
+                                    {% if controle.cnpj_aurora %}
+                                        <span class="badge bg-success">{{ controle.cnpj_aurora }}</span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Simples Nacional</label>
+                                <p class="form-control-plaintext">{{ controle.simples_nacional|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Emissão</label>
+                                <p class="form-control-plaintext">
+                                    {% if controle.emissao %}
+                                        {{ controle.emissao|date:"d/m/Y H:i" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Inclusão 198</label>
+                                <p class="form-control-plaintext">
+                                    {% if controle.inclusao_198 %}
+                                        {{ controle.inclusao_198|date:"d/m/Y H:i" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dados Adicionais -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clipboard-list me-2"></i>Dados Adicionais
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Orçamento</label>
+                                <p class="form-control-plaintext">{{ controle.orcamento|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">O.S</label>
+                                <p class="form-control-plaintext">{{ controle.os|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Uso</label>
+                                <p class="form-control-plaintext">
+                                    {% if controle.uso %}
+                                        <span class="badge bg-info">{{ controle.uso }}</span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                            </div>
+                            {% if controle.obs %}
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label fw-bold">Observações</label>
+                                <p class="form-control-plaintext">{{ controle.obs }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações do Sistema -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-database me-2"></i>Informações do Sistema
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Data de Criação</label>
+                                <p class="form-control-plaintext">
+                                    {% if controle.created_at %}
+                                        {{ controle.created_at|date:"d/m/Y H:i:s" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Data de Atualização</label>
+                                <p class="form-control-plaintext">
+                                    {% if controle.updated_at %}
+                                        {{ controle.updated_at|date:"d/m/Y H:i:s" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="row">
+                    <div class="col-12 text-center">
+                        <a href="{% url 'consultar_planilha_rc' %}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-arrow-left me-2"></i>Voltar para Consultar Planilha RC
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+

@@ -1232,3 +1232,56 @@ class DadosOrcamento(models.Model):
     
     def __str__(self):
         return f"{self.ano}/{self.mes:02d} - {self.conta_orcamentaria}"
+
+class ControleRCeNF(models.Model):
+    """Modelo para armazenar dados do controle de RC e NF"""
+    # Dados básicos
+    solicitante = models.CharField('Solicitante', max_length=255, blank=True, null=True)
+    empresa = models.CharField('Empresa', max_length=255, blank=True, null=True)
+    nf_saida = models.CharField('NF Saída', max_length=100, blank=True, null=True, db_index=True)
+    descricao_servico = models.TextField('Descrição do Serviço', blank=True, null=True)
+    ca_rateio = models.CharField('C.A/Rateio', max_length=100, blank=True, null=True)
+    uso = models.CharField('Uso', max_length=50, blank=True, null=True)
+    quem_abriu_rc = models.CharField('Quem Abriu a RC', max_length=255, blank=True, null=True)
+    orcamento = models.CharField('Orçamento', max_length=500, blank=True, null=True)
+    os = models.CharField('O.S', max_length=100, blank=True, null=True)
+    classificacao = models.CharField('Classificação', max_length=50, blank=True, null=True)
+    justificativa_classificacao = models.TextField('Justificativa Classificação', blank=True, null=True)
+    spaf0009_acesso_portaria = models.CharField('SPAF0009 - Acesso portaria p/ classif. 5 e 8', max_length=255, blank=True, null=True)
+    rc = models.CharField('RC', max_length=100, blank=True, null=True, db_index=True)
+    data_rc = models.DateTimeField('Data RC', blank=True, null=True)
+    
+    # Dados do pedido
+    pedido = models.CharField('Pedido', max_length=100, blank=True, null=True, db_index=True)
+    valor_total_pedido = models.DecimalField('Valor Total do Pedido', max_digits=15, decimal_places=2, blank=True, null=True)
+    previsao_para_uso = models.DateTimeField('Previsão para Uso', blank=True, null=True)
+    
+    # Dados da NF
+    nf_servico = models.CharField('NF Serviço', max_length=100, blank=True, null=True)
+    nf_retorno_e_data_lancamento = models.CharField('NF Retorno e Data Lançamento', max_length=255, blank=True, null=True)
+    cnpj_aurora = models.CharField('CNPJ Aurora', max_length=50, blank=True, null=True)
+    simples_nacional = models.CharField('Simples Nacional', max_length=50, blank=True, null=True)
+    valor_nf = models.DecimalField('Valor NF', max_digits=15, decimal_places=2, blank=True, null=True)
+    emissao = models.DateTimeField('Emissão', blank=True, null=True)
+    inclusao_198 = models.DateTimeField('Inclusão 198', blank=True, null=True)
+    status = models.CharField('Status', max_length=255, blank=True, null=True)
+    obs = models.TextField('Observações', blank=True, null=True)
+    saldo_residual_pedido = models.DecimalField('Saldo Residual Pedido', max_digits=15, decimal_places=2, blank=True, null=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Controle RC e NF'
+        verbose_name_plural = 'Controles RC e NF'
+        ordering = ['-data_rc', '-created_at']
+        indexes = [
+            models.Index(fields=['nf_saida']),
+            models.Index(fields=['rc']),
+            models.Index(fields=['pedido']),
+            models.Index(fields=['data_rc']),
+        ]
+    
+    def __str__(self):
+        return f"RC: {self.rc or 'N/A'} - NF: {self.nf_saida or 'N/A'} - {self.empresa or 'N/A'}"
