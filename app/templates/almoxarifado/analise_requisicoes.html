@@ -81,114 +81,142 @@
 <!-- Main Content -->
 <section class="py-5">
     <div class="container">
-        <!-- Filtros -->
+        <!-- Filtro de Ano e Mês (Accordion) -->
         <div class="row mb-4">
             <div class="col-12">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i class="fas fa-filter me-2"></i>Filtros de Análise
-                        </h5>
-                        {% if data_inicio or data_fim or ano_selecionado %}
-                        <span class="badge bg-light text-primary">
-                            <i class="fas fa-check-circle me-1"></i>Filtros Ativos ({{ total_requisicoes }} registros)
-                        </span>
-                        {% endif %}
-                    </div>
-                    <div class="card-body">
-                        <form method="get" action="{% url 'analise_requisicoes' %}" id="filtrosForm">
-                            <div class="row g-3">
-                                <!-- Filtro 1: Intervalo de Datas -->
-                                <div class="col-md-6">
-                                    <label class="form-label fw-bold">Intervalo de Datas</label>
-                                    <div class="row g-2">
-                                        <div class="col-6">
-                                            <label class="form-label small">Data Inicial</label>
-                                            <input type="date" 
-                                                   class="form-control" 
-                                                   name="data_inicio" 
-                                                   id="dataInicio"
-                                                   value="{{ data_inicio }}">
-                                        </div>
-                                        <div class="col-6">
-                                            <label class="form-label small">Data Final</label>
-                                            <input type="date" 
-                                                   class="form-control" 
-                                                   name="data_fim" 
-                                                   id="dataFim"
-                                                   value="{{ data_fim }}">
-                                        </div>
-                                    </div>
-                                    <small class="text-muted">
-                                        <i class="fas fa-info-circle me-1"></i>
-                                        Selecione um intervalo de datas para filtrar as análises
-                                    </small>
-                                </div>
-                                
-                                <!-- Filtro 2: Ano e Mês -->
-                                <div class="col-md-6">
-                                    <label class="form-label fw-bold">Ano e Mês</label>
-                                    <div class="row g-2">
-                                        <div class="col-6">
-                                            <label class="form-label small">Ano</label>
-                                            <select class="form-select" 
-                                                    name="ano" 
-                                                    id="anoSelecionado">
-                                                <option value="">Todos os anos</option>
-                                                {% for ano in anos_disponiveis %}
-                                                <option value="{{ ano }}" {% if ano_selecionado == ano|stringformat:"s" %}selected{% endif %}>
-                                                    {{ ano }}
-                                                </option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        <div class="col-6">
-                                            <label class="form-label small">Mês</label>
-                                            <select class="form-select" 
-                                                    name="mes" 
-                                                    id="mesSelecionadoFiltro"
-                                                    {% if not ano_selecionado %}disabled{% endif %}>
-                                                <option value="">Todos os meses</option>
-                                                {% if ano_selecionado %}
-                                                    {% for mes_num in meses_ano_selecionado %}
-                                                    <option value="{{ mes_num }}" {% if mes_selecionado_filtro == mes_num|stringformat:"s" %}selected{% endif %}>
-                                                        {{ meses_nomes|get_item:mes_num }}
-                                                    </option>
-                                                    {% endfor %}
-                                                {% endif %}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <small class="text-muted">
-                                        <i class="fas fa-info-circle me-1"></i>
-                                        Selecione um ano e opcionalmente um mês específico
-                                    </small>
-                                </div>
-                            </div>
-                            
-                            <div class="row mt-3">
-                                <div class="col-12">
-                                    <button type="submit" class="btn btn-primary me-2" id="aplicarFiltrosBtn">
-                                        <i class="fas fa-search me-2"></i>Aplicar Filtros
-                                    </button>
-                                    <a href="{% url 'analise_requisicoes' %}" class="btn btn-outline-secondary">
-                                        <i class="fas fa-times me-2"></i>Limpar Filtros
-                                    </a>
-                                    {% if data_inicio or data_fim or ano_selecionado %}
-                                    <div class="mt-2">
-                                        <small class="text-muted">
-                                            <i class="fas fa-info-circle me-1"></i>
-                                            {% if data_inicio or data_fim %}
-                                                Filtro de intervalo de datas ativo
-                                            {% elif ano_selecionado %}
-                                                Filtro de ano{% if mes_selecionado_filtro %} e mês{% endif %} ativo
+                <div class="accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button {% if not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                                <i class="fas fa-filter me-2"></i>
+                                <strong>Filtros</strong>
+                                {% if meses_filtro or ano_filtro %}
+                                    <span class="badge bg-info ms-2">
+                                        {% if meses_filtro %}
+                                            {% if meses_filtro|length == 1 %}
+                                                {% if meses_filtro.0 == 1 %}Janeiro
+                                                {% elif meses_filtro.0 == 2 %}Fevereiro
+                                                {% elif meses_filtro.0 == 3 %}Março
+                                                {% elif meses_filtro.0 == 4 %}Abril
+                                                {% elif meses_filtro.0 == 5 %}Maio
+                                                {% elif meses_filtro.0 == 6 %}Junho
+                                                {% elif meses_filtro.0 == 7 %}Julho
+                                                {% elif meses_filtro.0 == 8 %}Agosto
+                                                {% elif meses_filtro.0 == 9 %}Setembro
+                                                {% elif meses_filtro.0 == 10 %}Outubro
+                                                {% elif meses_filtro.0 == 11 %}Novembro
+                                                {% elif meses_filtro.0 == 12 %}Dezembro
+                                                {% endif %} de {{ ano_filtro }}
+                                            {% else %}
+                                                {{ meses_filtro|length }} meses de {{ ano_filtro }}
                                             {% endif %}
-                                        </small>
+                                        {% else %}
+                                            Todos os meses de {{ ano_filtro }}
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'analise_requisicoes' %}" class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="ano" class="form-label">Ano</label>
+                                        <select class="form-select" id="ano" name="ano" required>
+                                            {% for ano in anos_disponiveis %}
+                                                <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                            {% endfor %}
+                                        </select>
                                     </div>
-                                    {% endif %}
-                                </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Meses (Selecione múltiplos meses ou deixe todos desmarcados para todos os meses)</label>
+                                        <div class="row g-2">
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="1" id="mes1" {% if 1 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes1">Janeiro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="2" id="mes2" {% if 2 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes2">Fevereiro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="3" id="mes3" {% if 3 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes3">Março</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="4" id="mes4" {% if 4 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes4">Abril</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="5" id="mes5" {% if 5 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes5">Maio</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="6" id="mes6" {% if 6 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes6">Junho</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="7" id="mes7" {% if 7 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes7">Julho</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="8" id="mes8" {% if 8 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes8">Agosto</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="9" id="mes9" {% if 9 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes9">Setembro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="10" id="mes10" {% if 10 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes10">Outubro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="11" id="mes11" {% if 11 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes11">Novembro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="12" id="mes12" {% if 12 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes12">Dezembro</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosMeses()">Selecionar Todos</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">Desmarcar Todos</button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="fas fa-search me-2"></i>Filtrar
+                                        </button>
+                                    </div>
+                                </form>
                             </div>
-                        </form>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -573,6 +601,18 @@
 <!-- Chart.js - Load synchronously -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
+// Funções para selecionar/deselecionar todos os meses
+function selecionarTodosMeses() {
+    const checkboxes = document.querySelectorAll('input[name="mes"]');
+    checkboxes.forEach(cb => cb.checked = true);
+}
+
+function desmarcarTodosMeses() {
+    const checkboxes = document.querySelectorAll('input[name="mes"]');
+    checkboxes.forEach(cb => cb.checked = false);
+}
+</script>
+<script>
 // Verificar imediatamente se Chart.js carregou
 console.log('Verificando Chart.js...');
 console.log('Chart disponível?', typeof Chart !== 'undefined');
@@ -636,139 +676,10 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Chart.js carregado com sucesso! Versão:', Chart.version || 'desconhecida');
         
         // Initialize Bootstrap tooltips
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-    
-    // Handle year/month filter dependency
-    const anoSelecionado = document.getElementById('anoSelecionado');
-    const mesSelecionadoFiltro = document.getElementById('mesSelecionadoFiltro');
-    const dataInicio = document.getElementById('dataInicio');
-    const dataFim = document.getElementById('dataFim');
-    const aplicarFiltrosBtn = document.getElementById('aplicarFiltrosBtn');
-    
-    // Disable year/month filters when date range is used
-    function updateFilterStates() {
-        const temDataRange = (dataInicio && dataInicio.value) || (dataFim && dataFim.value);
-        
-        if (temDataRange) {
-            if (anoSelecionado) {
-                anoSelecionado.disabled = true;
-                anoSelecionado.value = '';
-            }
-            if (mesSelecionadoFiltro) {
-                mesSelecionadoFiltro.disabled = true;
-                mesSelecionadoFiltro.innerHTML = '<option value="">Todos os meses</option>';
-            }
-        } else {
-            if (anoSelecionado) {
-                anoSelecionado.disabled = false;
-            }
-            if (mesSelecionadoFiltro && anoSelecionado && anoSelecionado.value) {
-                mesSelecionadoFiltro.disabled = false;
-            }
-        }
-    }
-    
-    // Listen for date range changes
-    if (dataInicio) {
-        dataInicio.addEventListener('change', updateFilterStates);
-    }
-    if (dataFim) {
-        dataFim.addEventListener('change', updateFilterStates);
-    }
-    
-    // Initial state
-    updateFilterStates();
-    
-    if (anoSelecionado && mesSelecionadoFiltro) {
-        anoSelecionado.addEventListener('change', function() {
-            const ano = this.value;
-            
-            if (ano && !anoSelecionado.disabled) {
-                // Fetch months for selected year
-                const apiUrl = '{% url "api_meses_por_ano" %}';
-                fetch(`${apiUrl}?ano=${ano}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.error) {
-                            console.error('Erro ao carregar meses:', data.error);
-                            return;
-                        }
-                        
-                        // Clear and populate month dropdown
-                        mesSelecionadoFiltro.innerHTML = '<option value="">Todos os meses</option>';
-                        mesSelecionadoFiltro.disabled = false;
-                        
-                        data.meses.forEach(function(mes) {
-                            const option = document.createElement('option');
-                            option.value = mes.value;
-                            option.textContent = mes.label;
-                            mesSelecionadoFiltro.appendChild(option);
-                        });
-                    })
-                    .catch(error => {
-                        console.error('Erro ao carregar meses:', error);
-                    });
-            } else {
-                // No year selected, disable month dropdown
-                mesSelecionadoFiltro.innerHTML = '<option value="">Todos os meses</option>';
-                if (!ano) {
-                    mesSelecionadoFiltro.disabled = true;
-                }
-            }
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
         });
-    }
-    
-    // Form submission handler - ensure form submits correctly
-    // Need to prevent main.js from interfering
-    setTimeout(function() {
-        const filtrosForm = document.getElementById('filtrosForm');
-        const aplicarFiltrosBtn = document.getElementById('aplicarFiltrosBtn');
-        
-        if (filtrosForm && aplicarFiltrosBtn) {
-            // Clone button to remove main.js listeners
-            const newBtn = aplicarFiltrosBtn.cloneNode(true);
-            aplicarFiltrosBtn.parentNode.replaceChild(newBtn, aplicarFiltrosBtn);
-            const cleanBtn = document.getElementById('aplicarFiltrosBtn');
-            
-            // Clone form to remove main.js listeners
-            const newForm = filtrosForm.cloneNode(true);
-            filtrosForm.parentNode.replaceChild(newForm, filtrosForm);
-            const cleanForm = document.getElementById('filtrosForm');
-            
-            // Re-attach the cloned button to the cloned form
-            const btnContainer = cleanForm.querySelector('.row.mt-3 .col-12');
-            if (btnContainer && cleanBtn) {
-                const existingBtn = btnContainer.querySelector('#aplicarFiltrosBtn');
-                if (!existingBtn) {
-                    btnContainer.insertBefore(cleanBtn, btnContainer.firstChild);
-                }
-            }
-            
-            // Add submit handler that doesn't prevent default
-            if (cleanForm) {
-                cleanForm.addEventListener('submit', function(e) {
-                    console.log('Filter form submitting...');
-                    // Show loading state but don't prevent submission
-                    if (cleanBtn) {
-                        cleanBtn.disabled = true;
-                        cleanBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Aplicando...';
-                    }
-                    // Let form submit normally - don't call e.preventDefault()
-                }, true); // Use capture phase
-            }
-            
-            // Also handle button click
-            if (cleanBtn) {
-                cleanBtn.addEventListener('click', function(e) {
-                    console.log('Filter button clicked');
-                    // Don't prevent default - let form submit
-                }, true);
-            }
-        }
-    }, 200); // Wait for main.js to finish
     
     // Gráfico de Linha: Evolução Temporal
     const temporalCtx = document.getElementById('temporalChart');

@@ -497,56 +497,49 @@ def analise_requisicoes(request):
         meses = RequisicaoAlmoxarifado.objects.filter(data_requisicao__year=ano).values_list('data_requisicao__month', flat=True).distinct().order_by('data_requisicao__month')
         meses_disponiveis[ano] = list(meses)
     
-    # Processar filtros
-    data_inicio_str = request.GET.get('data_inicio', '').strip()
-    data_fim_str = request.GET.get('data_fim', '').strip()
-    ano_selecionado = request.GET.get('ano', '').strip()
-    mes_selecionado = request.GET.get('mes', '').strip()
+    # Obter filtros de ano e meses (múltiplos) - similar ao analise_corretiva_outros
+    ano_filtro = request.GET.get('ano', None)
+    meses_filtro = request.GET.getlist('mes')  # getlist para múltiplos valores
     
-    # Debug: verificar se os filtros estão sendo recebidos
-    # print(f"DEBUG - Filtros recebidos: data_inicio={data_inicio_str}, data_fim={data_fim_str}, ano={ano_selecionado}, mes={mes_selecionado}")
+    # Valores padrão: ano atual e todos os meses
+    hoje = datetime.now()
+    if not ano_filtro:
+        ano_filtro = str(hoje.year)
+    
+    # Converter para inteiro
+    try:
+        ano_filtro = int(ano_filtro)
+    except (ValueError, TypeError):
+        ano_filtro = hoje.year
+    
+    # Converter meses para inteiros e validar
+    meses_filtro_int = []
+    if meses_filtro:
+        for mes in meses_filtro:
+            try:
+                mes_int = int(mes)
+                if 1 <= mes_int <= 12:
+                    meses_filtro_int.append(mes_int)
+            except (ValueError, TypeError):
+                continue
+        # Remover duplicatas e ordenar
+        meses_filtro_int = sorted(list(set(meses_filtro_int)))
     
     # Construir queryset base com filtros
     queryset_base = RequisicaoAlmoxarifado.objects.all()
     
-    # Prioridade: Se há filtro de intervalo de datas, usar apenas ele
-    # Caso contrário, usar filtro de ano/mês
-    tem_filtro_data_range = bool(data_inicio_str or data_fim_str)
-    tem_filtro_ano_mes = bool(ano_selecionado)
-    
-    if tem_filtro_data_range:
-        # Aplicar filtro de intervalo de datas
-        if data_inicio_str:
-            try:
-                data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
-                queryset_base = queryset_base.filter(data_requisicao__gte=data_inicio)
-            except ValueError as e:
-                # print(f"DEBUG - Erro ao parse data_inicio: {e}")
-                pass
+    # Aplicar filtro de ano
+    if ano_filtro:
+        queryset_base = queryset_base.filter(data_requisicao__year=ano_filtro)
         
-        if data_fim_str:
-            try:
-                data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
-                queryset_base = queryset_base.filter(data_requisicao__lte=data_fim)
-            except ValueError as e:
-                # print(f"DEBUG - Erro ao parse data_fim: {e}")
-                pass
-    elif tem_filtro_ano_mes:
-        # Aplicar filtro de ano/mês
-        try:
-            ano = int(ano_selecionado)
-            queryset_base = queryset_base.filter(data_requisicao__year=ano)
-            
-            if mes_selecionado:
-                try:
-                    mes = int(mes_selecionado)
-                    queryset_base = queryset_base.filter(data_requisicao__month=mes)
-                except ValueError as e:
-                    # print(f"DEBUG - Erro ao parse mes: {e}")
-                    pass
-        except ValueError as e:
-            # print(f"DEBUG - Erro ao parse ano: {e}")
-            pass
+        # Aplicar filtro de meses (múltiplos)
+        if meses_filtro_int:
+            # Filtrar por múltiplos meses usando Q objects
+            from django.db.models import Q
+            mes_conditions = Q()
+            for mes in meses_filtro_int:
+                mes_conditions |= Q(data_requisicao__month=mes)
+            queryset_base = queryset_base.filter(mes_conditions)
     
     # Debug: verificar quantos registros após filtro
     # total_antes = RequisicaoAlmoxarifado.objects.count()
@@ -557,8 +550,8 @@ def analise_requisicoes(request):
     hoje = datetime.now().date()
     total_requisicoes = queryset_base.count()
     
-    # Últimos 30 dias (apenas se não houver filtros de data)
-    if not tem_filtro_data_range and not tem_filtro_ano_mes:
+    # Últimos 30 dias (apenas se não houver filtros)
+    if not ano_filtro:
         data_30_dias_atras = hoje - timedelta(days=30)
         requisicoes_recentes = queryset_base.filter(
             data_requisicao__gte=data_30_dias_atras
@@ -567,8 +560,8 @@ def analise_requisicoes(request):
         # Se há filtros, mostrar total filtrado
         requisicoes_recentes = total_requisicoes
     
-    # Mês atual (apenas se não houver filtros de data)
-    if not tem_filtro_data_range and not tem_filtro_ano_mes:
+    # Mês atual (apenas se não houver filtros)
+    if not ano_filtro:
         primeiro_dia_mes = hoje.replace(day=1)
         requisicoes_mes_atual = queryset_base.filter(
             data_requisicao__gte=primeiro_dia_mes
@@ -604,34 +597,24 @@ def analise_requisicoes(request):
     meses_valor = []
     
     # Determinar período para evolução temporal
-    if data_inicio_str and data_fim_str:
+    if ano_filtro:
         try:
-            periodo_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
-            periodo_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
-        except ValueError:
-            periodo_inicio = (hoje - timedelta(days=365)).replace(day=1)
-            periodo_fim = hoje
-    elif ano_selecionado:
-        try:
-            ano = int(ano_selecionado)
-            periodo_inicio = datetime(ano, 1, 1).date()
-            if mes_selecionado:
-                try:
-                    mes = int(mes_selecionado)
-                    periodo_inicio = datetime(ano, mes, 1).date()
-                    ultimo_dia = monthrange(ano, mes)[1]
-                    periodo_fim = datetime(ano, mes, ultimo_dia).date()
-                    if periodo_fim > hoje:
-                        periodo_fim = hoje
-                except ValueError:
-                    periodo_fim = datetime(ano, 12, 31).date()
-                    if periodo_fim > hoje:
-                        periodo_fim = hoje
-            else:
-                periodo_fim = datetime(ano, 12, 31).date()
+            periodo_inicio = datetime(ano_filtro, 1, 1).date()
+            if meses_filtro_int:
+                # Se há meses selecionados, usar apenas o primeiro e último mês selecionado
+                primeiro_mes = min(meses_filtro_int)
+                ultimo_mes = max(meses_filtro_int)
+                periodo_inicio = datetime(ano_filtro, primeiro_mes, 1).date()
+                ultimo_dia = monthrange(ano_filtro, ultimo_mes)[1]
+                periodo_fim = datetime(ano_filtro, ultimo_mes, ultimo_dia).date()
                 if periodo_fim > hoje:
                     periodo_fim = hoje
-        except ValueError:
+            else:
+                # Todos os meses do ano
+                periodo_fim = datetime(ano_filtro, 12, 31).date()
+                if periodo_fim > hoje:
+                    periodo_fim = hoje
+        except (ValueError, TypeError):
             periodo_inicio = (hoje - timedelta(days=365)).replace(day=1)
             periodo_fim = hoje
     else:
@@ -767,15 +750,15 @@ def analise_requisicoes(request):
         usuarios_data_valor.append(float(dados['valor']))
     
     # Dados diários para o mês selecionado (para o gráfico de evolução diária)
-    if ano_selecionado and mes_selecionado:
+    if ano_filtro and meses_filtro_int:
         try:
-            ano = int(ano_selecionado)
-            mes = int(mes_selecionado)
-            primeiro_dia_mes_atual = datetime(ano, mes, 1).date()
-            ultimo_dia_mes_atual = datetime(ano, mes, monthrange(ano, mes)[1]).date()
+            # Usar o primeiro mês selecionado para o gráfico diário
+            mes = meses_filtro_int[0]
+            primeiro_dia_mes_atual = datetime(ano_filtro, mes, 1).date()
+            ultimo_dia_mes_atual = datetime(ano_filtro, mes, monthrange(ano_filtro, mes)[1]).date()
             if ultimo_dia_mes_atual > hoje:
                 ultimo_dia_mes_atual = hoje
-        except ValueError:
+        except (ValueError, TypeError):
             primeiro_dia_mes_atual = hoje.replace(day=1)
             if hoje.month == 12:
                 ultimo_dia_mes_atual = hoje.replace(year=hoje.year + 1, month=1, day=1) - timedelta(days=1)
@@ -811,8 +794,8 @@ def analise_requisicoes(request):
         dias_valor.append(float(valor_dia))
     
     # Determinar mês selecionado para o gráfico diário
-    if ano_selecionado and mes_selecionado:
-        mes_selecionado_grafico = f"{ano_selecionado}-{mes_selecionado.zfill(2)}"
+    if ano_filtro and meses_filtro_int:
+        mes_selecionado_grafico = f"{ano_filtro}-{str(meses_filtro_int[0]).zfill(2)}"
     else:
         mes_selecionado_grafico = hoje.strftime('%Y-%m')
     
@@ -823,14 +806,10 @@ def analise_requisicoes(request):
         9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
     }
     
-    # Meses do ano selecionado (se houver)
-    meses_ano_selecionado = []
-    if ano_selecionado:
-        try:
-            ano_int = int(ano_selecionado)
-            meses_ano_selecionado = meses_disponiveis.get(ano_int, [])
-        except ValueError:
-            pass
+    # Obter lista de anos disponíveis
+    anos_disponiveis_list = list(anos_disponiveis)
+    if not anos_disponiveis_list:
+        anos_disponiveis_list = [hoje.year]
     
     context = {
         'page_title': 'Análise de Requisições',
@@ -864,14 +843,10 @@ def analise_requisicoes(request):
         'usuarios_data_valor': json.dumps(usuarios_data_valor),
         'requisicoes_recentes_list': requisicoes_recentes_list,
         # Filtros
-        'anos_disponiveis': list(anos_disponiveis),
-        'meses_disponiveis': meses_disponiveis,
+        'anos_disponiveis': anos_disponiveis_list,
         'meses_nomes': meses_nomes,
-        'meses_ano_selecionado': meses_ano_selecionado,
-        'data_inicio': data_inicio_str,
-        'data_fim': data_fim_str,
-        'ano_selecionado': ano_selecionado,
-        'mes_selecionado_filtro': mes_selecionado,
+        'ano_filtro': ano_filtro,
+        'meses_filtro': meses_filtro_int,
     }
     return render(request, 'almoxarifado/analise_requisicoes.html', context)
 
@@ -10430,7 +10405,8 @@ def gerenciar_projeto(request):
         ItemEstoque, ManutencaoCsv, ManutencaoTerceiro, MaquinaPeca,
         MaquinaPrimariaSecundaria, PlanoPreventiva, PlanoPreventivaDocumento,
         MeuPlanoPreventiva, MeuPlanoPreventivaDocumento, AgendamentoCronograma,
-        RoteiroPreventiva, RequisicaoAlmoxarifado
+        RoteiroPreventiva, RequisicaoAlmoxarifado, NotaFiscal, Visitas,
+        ProjecaoGasto, RelacaoProjecaoNotaFiscal, DadosOrcamento, ControleRCeNF
     )
     
     # Definir todos os modelos com suas informações
@@ -10595,6 +10571,54 @@ def gerenciar_projeto(request):
             'cor': 'warning',
             'descricao': 'Requisições de itens retirados do almoxarifado'
         },
+        {
+            'nome': 'Notas Fiscais',
+            'modelo': NotaFiscal,
+            'key': 'nota_fiscal',
+            'icone': 'fas fa-file-invoice-dollar',
+            'cor': 'primary',
+            'descricao': 'Notas fiscais cadastradas no sistema'
+        },
+        {
+            'nome': 'Visitas',
+            'modelo': Visitas,
+            'key': 'visitas',
+            'icone': 'fas fa-calendar-check',
+            'cor': 'info',
+            'descricao': 'Registros de visitas cadastradas'
+        },
+        {
+            'nome': 'Projeções de Gastos',
+            'modelo': ProjecaoGasto,
+            'key': 'projecao_gasto',
+            'icone': 'fas fa-chart-line',
+            'cor': 'success',
+            'descricao': 'Projeções de gastos e requisições de serviço'
+        },
+        {
+            'nome': 'Relações Projeção-Nota Fiscal',
+            'modelo': RelacaoProjecaoNotaFiscal,
+            'key': 'relacao_projecao_nota_fiscal',
+            'icone': 'fas fa-link',
+            'cor': 'info',
+            'descricao': 'Relações confirmadas entre projeções e notas fiscais'
+        },
+        {
+            'nome': 'Dados de Orçamento',
+            'modelo': DadosOrcamento,
+            'key': 'dados_orcamento',
+            'icone': 'fas fa-money-bill-wave',
+            'cor': 'success',
+            'descricao': 'Dados de orçamento por ano, mês e conta orçamentária'
+        },
+        {
+            'nome': 'Controle RC e NF',
+            'modelo': ControleRCeNF,
+            'key': 'controle_rc_nf',
+            'icone': 'fas fa-clipboard-list',
+            'cor': 'warning',
+            'descricao': 'Controle de RC (Requisição de Compra) e NF (Nota Fiscal)'
+        },
     ]
     
     # Contar registros em cada tabela
@@ -10641,7 +10665,8 @@ def limpar_tabela(request):
         ItemEstoque, ManutencaoCsv, ManutencaoTerceiro, MaquinaPeca,
         MaquinaPrimariaSecundaria, PlanoPreventiva, PlanoPreventivaDocumento,
         MeuPlanoPreventiva, MeuPlanoPreventivaDocumento, AgendamentoCronograma,
-        RoteiroPreventiva, RequisicaoAlmoxarifado
+        RoteiroPreventiva, RequisicaoAlmoxarifado, NotaFiscal, Visitas,
+        ProjecaoGasto, RelacaoProjecaoNotaFiscal, DadosOrcamento, ControleRCeNF
     )
     
     # Mapeamento de tabelas para modelos
@@ -10666,6 +10691,12 @@ def limpar_tabela(request):
         'meu_plano_preventiva_documento': {'modelo': MeuPlanoPreventivaDocumento, 'nome': 'Documentos Meus Planos Preventiva'},
         'agendamento_cronograma': {'modelo': AgendamentoCronograma, 'nome': 'Agendamentos Cronograma'},
         'requisicao_almoxarifado': {'modelo': RequisicaoAlmoxarifado, 'nome': 'Requisições Almoxarifado'},
+        'nota_fiscal': {'modelo': NotaFiscal, 'nome': 'Notas Fiscais'},
+        'visitas': {'modelo': Visitas, 'nome': 'Visitas'},
+        'projecao_gasto': {'modelo': ProjecaoGasto, 'nome': 'Projeções de Gastos'},
+        'relacao_projecao_nota_fiscal': {'modelo': RelacaoProjecaoNotaFiscal, 'nome': 'Relações Projeção-Nota Fiscal'},
+        'dados_orcamento': {'modelo': DadosOrcamento, 'nome': 'Dados de Orçamento'},
+        'controle_rc_nf': {'modelo': ControleRCeNF, 'nome': 'Controle RC e NF'},
     }
     
     tabela = request.POST.get('tabela', '')
@@ -12078,6 +12109,8 @@ def analise_notas_fiscais(request):
     # --- Lógica de Filtro ---
     ano_filtro = request.GET.get('ano', None)
     meses_filtro = request.GET.getlist('mes')
+    uso_contabil_filtro = request.GET.get('uso_contabil', '').strip()
+    situacao_filtro = request.GET.get('situacao', '').strip()
 
     hoje = datetime.now()
     if not ano_filtro:
@@ -12138,9 +12171,9 @@ def analise_notas_fiscais(request):
         return None
 
     # Anos disponíveis para o filtro (baseado em data_emissao)
-    todas_notas = NotaFiscal.objects.all()
+    todas_notas_list = NotaFiscal.objects.all()
     anos_set = set()
-    for nota in todas_notas:
+    for nota in todas_notas_list:
         data_emissao = parse_date(nota.data_emissao)
         if data_emissao:
             anos_set.add(data_emissao.year)
@@ -12156,10 +12189,20 @@ def analise_notas_fiscais(request):
         (5, 'Maio'), (6, 'Junho'), (7, 'Julho'), (8, 'Agosto'),
         (9, 'Setembro'), (10, 'Outubro'), (11, 'Novembro'), (12, 'Dezembro'),
     ]
+    
+    # Obter valores únicos para uso_contabil e situacao
+    uso_contabil_unicos = sorted(list(set(
+        nota.uso_contabil.strip() for nota in todas_notas_list
+        if nota.uso_contabil and nota.uso_contabil.strip()
+    )))
+    
+    situacao_unicas = sorted(list(set(
+        nota.situacao.strip() for nota in todas_notas_list
+        if nota.situacao and nota.situacao.strip()
+    )))
 
     # --- Queryset Filtrado (baseado em data_emissao ou data_vencimento) ---
     notas_filtradas = []
-    todas_notas_list = NotaFiscal.objects.all()
     for nota in todas_notas_list:
         data_emissao = parse_date(nota.data_emissao)
         data_vencimento = parse_date(nota.data_vencimento)
@@ -12167,8 +12210,19 @@ def analise_notas_fiscais(request):
         # Usar data_emissao como prioridade, senão data_vencimento
         data_ref = data_emissao or data_vencimento
         
+        # Filtro de ano e mês
         if data_ref and data_ref.year == ano_filtro:
             if not meses_filtro_int or data_ref.month in meses_filtro_int:
+                # Filtro de uso_contabil (exato, case-insensitive)
+                if uso_contabil_filtro:
+                    if not nota.uso_contabil or nota.uso_contabil.strip().lower() != uso_contabil_filtro.lower():
+                        continue
+                
+                # Filtro de situacao (exato, case-insensitive)
+                if situacao_filtro:
+                    if not nota.situacao or nota.situacao.strip().lower() != situacao_filtro.lower():
+                        continue
+                
                 notas_filtradas.append(nota)
 
     # --- KPIs ---
@@ -12344,6 +12398,10 @@ def analise_notas_fiscais(request):
         'ano_selecionado': ano_filtro,
         'meses_choices': meses_choices,
         'meses_selecionados': meses_filtro_int,
+        'uso_contabil_unicos': uso_contabil_unicos,
+        'situacao_unicas': situacao_unicas,
+        'uso_contabil_filtro': uso_contabil_filtro,
+        'situacao_filtro': situacao_filtro,
 
         # KPIs
         'total_notas': total_notas,

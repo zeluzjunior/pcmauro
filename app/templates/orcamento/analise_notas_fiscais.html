@@ -54,7 +54,7 @@
 
 {% block content %}
 <!-- Page Header -->
-<section class="py-5 text-white" style="background-image: linear-gradient(rgba(0, 123, 255, 0.5), rgba(0, 123, 255, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
     <div class="container">
         <div class="row">
             <div class="col-12">
@@ -79,14 +79,14 @@
         <div class="accordion mb-4 filter-section" id="filterAccordion">
             <div class="accordion-item">
                 <h2 class="accordion-header" id="headingFilter">
-                    <button class="accordion-button {% if not ano_selecionado and not meses_selecionados %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if ano_selecionado or meses_selecionados %}true{% else %}false{% endif %}" aria-controls="collapseFilter">
+                    <button class="accordion-button {% if not ano_selecionado and not meses_selecionados and not uso_contabil_filtro and not situacao_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if ano_selecionado or meses_selecionados or uso_contabil_filtro or situacao_filtro %}true{% else %}false{% endif %}" aria-controls="collapseFilter">
                         <i class="fas fa-filter me-2"></i>Filtros de Análise
                     </button>
                 </h2>
-                <div id="collapseFilter" class="accordion-collapse collapse {% if ano_selecionado or meses_selecionados %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
+                <div id="collapseFilter" class="accordion-collapse collapse {% if ano_selecionado or meses_selecionados or uso_contabil_filtro or situacao_filtro %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
                     <div class="accordion-body">
                         <form method="GET" class="row g-3 align-items-end">
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <label for="ano_filtro" class="form-label">Ano:</label>
                                 <select class="form-select" id="ano_filtro" name="ano">
                                     {% for ano in anos_disponiveis %}
@@ -94,7 +94,7 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <label for="mes_filtro" class="form-label">Mês(es):</label>
                                 <div class="row">
                                     <div class="col-12">
@@ -120,7 +120,25 @@
                                     {% endfor %}
                                 </div>
                             </div>
-                            <div class="col-md-3 d-flex justify-content-end">
+                            <div class="col-md-2">
+                                <label for="uso_contabil_filtro" class="form-label">Uso Contábil:</label>
+                                <select class="form-select" id="uso_contabil_filtro" name="uso_contabil">
+                                    <option value="">Todos</option>
+                                    {% for uso in uso_contabil_unicos %}
+                                        <option value="{{ uso }}" {% if uso == uso_contabil_filtro %}selected{% endif %}>{{ uso }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="situacao_filtro" class="form-label">Situação:</label>
+                                <select class="form-select" id="situacao_filtro" name="situacao">
+                                    <option value="">Todas</option>
+                                    {% for situacao in situacao_unicas %}
+                                        <option value="{{ situacao }}" {% if situacao == situacao_filtro %}selected{% endif %}>{{ situacao }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2 d-flex justify-content-end">
                                 <button type="submit" class="btn btn-primary me-2"><i class="fas fa-filter me-1"></i>Aplicar Filtros</button>
                                 <a href="{% url 'analise_notas_fiscais' %}" class="btn btn-outline-secondary"><i class="fas fa-sync-alt me-1"></i>Limpar</a>
                             </div>

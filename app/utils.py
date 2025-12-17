@@ -1807,6 +1807,53 @@ def _safe_decimal(value, default=None):
         return default
 
 
+def _safe_uso_contabil(value, default=''):
+    """Extrai apenas a parte inteira do uso contábil
+    
+    Converte valores como "242,00", "242.00", "242" para "242"
+    Remove qualquer parte decimal e retorna apenas o número inteiro como string
+    """
+    if value is None or value == '':
+        return default
+    
+    # Converter para string e remover espaços
+    str_value = str(value).strip()
+    if not str_value:
+        return default
+    
+    import re
+    
+    # Remover tudo exceto dígitos, vírgula e ponto
+    cleaned = re.sub(r'[^\d,.]', '', str_value)
+    
+    if not cleaned:
+        return default
+    
+    # Extrair número inteiro
+    # Se tiver vírgula, assumir formato brasileiro (242,00)
+    if ',' in cleaned:
+        # Formato brasileiro: 242,00 ou 1.242,00
+        parts = cleaned.split(',')
+        integer_part = parts[0].replace('.', '')  # Remover separador de milhares se houver
+    # Se tiver ponto, verificar se é decimal ou separador de milhares
+    elif '.' in cleaned:
+        parts = cleaned.split('.')
+        # Se a parte após o ponto tem 1-2 dígitos, é provavelmente decimal (242.00)
+        # Caso contrário, é separador de milhares (1.242)
+        if len(parts) == 2 and len(parts[1]) <= 2:
+            integer_part = parts[0]  # Formato US: 242.00
+        else:
+            integer_part = cleaned.replace('.', '')  # Separador de milhares: 1.242
+    else:
+        # Apenas números inteiros
+        integer_part = cleaned
+    
+    # Garantir que temos apenas dígitos
+    integer_part = re.sub(r'\D', '', integer_part)
+    
+    return integer_part if integer_part else default
+
+
 def _safe_date(value, default=None):
     """Converte valor para date de forma segura
     
@@ -3293,6 +3340,10 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
                     # LanÃ§amento
                     lancamento_tesf0028 = _safe_str(row_data.get('LANCAMENTO TESF0028') or row_data.get('lancamento tesf0028') or row_data.get('Lancamento TESF0028'), max_length=255)
                     
+                    # Uso Contábil - extrair apenas parte inteira (242,00 -> 242)
+                    uso_contabil_raw = row_data.get('Uso contábil') or row_data.get('uso contábil') or row_data.get('USO CONTÁBIL') or row_data.get('Uso contabil') or row_data.get('USO CONTABIL')
+                    uso_contabil = _safe_uso_contabil(uso_contabil_raw, default='')
+                    
                     # Preparar dados para criaÃ§Ã£o/atualizaÃ§Ã£o
                     nota_data = {
                         'emitente': emitente,
@@ -3301,6 +3352,7 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
                         'serie': serie,
                         'modelo': modelo,
                         'total_nota': total_nota,
+                        'uso_contabil': uso_contabil,
                         'data_emissao': data_emissao,
                         'data_vencimento': data_vencimento,
                         'data_inclusao': data_inclusao,
