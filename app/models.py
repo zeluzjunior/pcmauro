@@ -246,6 +246,7 @@ class CentroAtividade(models.Model):
     indice = models.IntegerField('Índice', blank=True, null=True)
     encarregado_responsavel = models.CharField('Encarregado Responsável', max_length=255, blank=True, null=True)
     local = models.CharField('Local', max_length=255, blank=True, null=True, help_text='Local do Centro de Atividade')
+    imagem = models.CharField('Caminho da Imagem', max_length=500, blank=True, null=True, help_text='Caminho da imagem (ex: fotos_home/imagem.jpg)')
     observacoes = models.TextField('Observações', blank=True, null=True, help_text='Observações sobre o local')
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
     updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
@@ -1079,8 +1080,8 @@ class ProjecaoGasto(models.Model):
     uso_contabil = models.CharField('Uso Contábil', max_length=100, blank=True, null=True)  # USO CONTÁBIL
     numero_nf = models.CharField('Número da NF', max_length=100, blank=True, null=True)  # NÚMERO DA NF
     numero_ordem_servico = models.CharField('Número Ordem de Serviço', max_length=100, blank=True, null=True, db_index=True)  # ORDEM DE SERVIÇO
-    numero_requisicao_compra = models.CharField('Número da Requisição de Compra', max_length=100, blank=True, null=True, db_index=True)  # NÚMERO DA REQUISIÇÃO DE COMPRA
-    numero_pedido_compra = models.CharField('Número do Pedido de Compra', max_length=100, blank=True, null=True)  # NÚMERO DO PEDIDO DE COMPRA
+    numero_requisicao_compra = models.CharField('Número da Requisição de Compra', max_length=100, blank=True, null=True, db_index=True, unique=True)  # NÚMERO DA REQUISIÇÃO DE COMPRA
+    numero_pedido_compra = models.CharField('Número do Pedido de Compra', max_length=100, blank=True, null=True, unique=True)  # NÚMERO DO PEDIDO DE COMPRA
     servico_concluido = models.DateField('Serviço Concluído', blank=True, null=True)  # SERVIÇO CONCLUÍDO
     nf_servico_recebida = models.DateField('NF de Serviço Recebida', blank=True, null=True)  # NF DE SERVIÇO RECEBIDA
     nf_enviada_lancamento = models.DateField('NF Enviada para Lançamento', blank=True, null=True)  # NF ENVIADA PARA LANÇAMENTO
@@ -1227,7 +1228,6 @@ class DadosOrcamento(models.Model):
     
     def __str__(self):
         return f"{self.ano}/{self.mes:02d} - {self.conta_orcamentaria}"
-
 
 class ControleRCeNF(models.Model):
     """Modelo para armazenar dados do controle de RC e NF"""

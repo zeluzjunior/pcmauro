@@ -103,11 +103,17 @@
         <div class="row">
             <div class="col-12">
                 <div class="card shadow-sm">
-                    <div class="card-header bg-secondary text-white">
+                    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">
                             <i class="bi bi-clipboard2-data me-2"></i>Projeções de Gastos
                             <small class="ms-2">(<span class="format-number">{{ projecoes.paginator.count }}</span> registro{{ projecoes.paginator.count|pluralize }})</small>
                         </h5>
+                        <div id="bulkActions" style="display: none;">
+                            <span class="me-2" id="selectedCount">0 selecionado(s)</span>
+                            <button type="button" class="btn btn-sm btn-danger" id="bulkDeleteBtn">
+                                <i class="fas fa-trash-alt me-1"></i>Excluir Selecionados
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body p-0">
                         <form method="get" action="{% url 'consultar_projecao_gastos' %}" id="filterForm">
@@ -118,6 +124,9 @@
                                 <table class="table table-hover table-striped mb-0">
                                     <thead>
                                         <tr>
+                                            <th style="width: 40px; text-align: center;">
+                                                <input type="checkbox" id="selectAll" title="Selecionar todos">
+                                            </th>
                                             <th class="col-setor">Setor</th>
                                             <th class="col-descricao">Descrição</th>
                                             <th class="col-fornecedor">Fornecedor</th>
@@ -126,10 +135,12 @@
                                             <th class="col-numero">Mês/Ano Ref.</th>
                                             <th class="col-numero">Nº Requisição</th>
                                             <th class="col-numero">Nº Ordem Serviço</th>
+                                            <th style="min-width: 80px; text-align: center;">Ações</th>
                                         </tr>
                                     </thead>
                                     <thead class="filter-row">
                                         <tr>
+                                            <th class="filter-header"></th>
                                             <th class="filter-header">
                                                 <input type="text" name="filtro_setor" class="filter-input" placeholder="Filtrar setor..." value="{{ filtro_setor|default:'' }}" onchange="document.getElementById('filterForm').submit();">
                                             </th>
@@ -164,11 +175,15 @@
                                                 <input type="text" name="filtro_numero_requisicao" class="filter-input" placeholder="Filtrar nº requisição..." value="{{ filtro_numero_requisicao|default:'' }}" onchange="document.getElementById('filterForm').submit();">
                                             </th>
                                             <th class="filter-header"></th>
+                                            <th class="filter-header"></th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for projecao in projecoes %}
                                         <tr>
+                                            <td style="text-align: center;">
+                                                <input type="checkbox" class="row-checkbox" value="{{ projecao.id }}" data-descricao="{{ projecao.descricao|default:'registro'|truncatewords:5 }}">
+                                            </td>
                                             <td class="col-setor">
                                                 <strong>{{ projecao.setor|default:"-" }}</strong>
                                             </td>
@@ -206,10 +221,19 @@
                                             <td class="col-numero">
                                                 {{ projecao.numero_ordem_servico|default:"-" }}
                                             </td>
+                                            <td style="text-align: center;">
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-danger delete-btn" 
+                                                        data-id="{{ projecao.id }}"
+                                                        data-descricao="{{ projecao.descricao|default:'registro'|truncatewords:5 }}"
+                                                        title="Excluir registro">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </td>
                                         </tr>
                                         {% empty %}
                                         <tr>
-                                            <td colspan="8" class="text-center text-muted py-4">
+                                            <td colspan="10" class="text-center text-muted py-4">
                                                 <i class="fas fa-inbox fa-2x mb-2"></i>
                                                 <p>Nenhuma projeção de gasto encontrada.</p>
                                             </td>
@@ -297,6 +321,154 @@
                 element.textContent = formatarMoedaBR(valor);
             }
         });
+
+        // Adicionar event listeners para botões de deletar
+        document.querySelectorAll('.delete-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const id = this.getAttribute('data-id');
+                const descricao = this.getAttribute('data-descricao');
+                
+                if (confirm('Tem certeza que deseja excluir o registro "' + descricao + '"?\n\nEsta ação não pode ser desfeita.')) {
+                    // Criar formulário para enviar requisição POST
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = '{% url "deletar_projecao_gasto" 0 %}'.replace('0', id);
+                    
+                    // Preservar parâmetros da URL atual para redirecionamento
+                    const currentUrl = new URL(window.location.href);
+                    const nextInput = document.createElement('input');
+                    nextInput.type = 'hidden';
+                    nextInput.name = 'next';
+                    nextInput.value = currentUrl.pathname + currentUrl.search;
+                    form.appendChild(nextInput);
+                    
+                    // Adicionar CSRF token
+                    const csrfToken = getCookie('csrftoken');
+                    if (csrfToken) {
+                        const csrfInput = document.createElement('input');
+                        csrfInput.type = 'hidden';
+                        csrfInput.name = 'csrfmiddlewaretoken';
+                        csrfInput.value = csrfToken;
+                        form.appendChild(csrfInput);
+                    }
+                    
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            });
+        });
+
+        // Função auxiliar para obter cookie
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Funcionalidade de seleção em massa
+        const selectAllCheckbox = document.getElementById('selectAll');
+        const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+        const bulkActions = document.getElementById('bulkActions');
+        const selectedCount = document.getElementById('selectedCount');
+        const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+
+        // Função para atualizar contador e visibilidade do botão de ações em massa
+        function updateBulkActions() {
+            const checked = document.querySelectorAll('.row-checkbox:checked');
+            const count = checked.length;
+            
+            if (count > 0) {
+                bulkActions.style.display = 'block';
+                selectedCount.textContent = count + ' selecionado(s)';
+            } else {
+                bulkActions.style.display = 'none';
+            }
+            
+            // Atualizar estado do "Selecionar todos"
+            if (rowCheckboxes.length > 0) {
+                selectAllCheckbox.checked = checked.length === rowCheckboxes.length;
+                selectAllCheckbox.indeterminate = checked.length > 0 && checked.length < rowCheckboxes.length;
+            }
+        }
+
+        // Selecionar/Deselecionar todos
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                rowCheckboxes.forEach(function(checkbox) {
+                    checkbox.checked = this.checked;
+                }, this);
+                updateBulkActions();
+            });
+        }
+
+        // Atualizar quando checkbox individual é clicado
+        rowCheckboxes.forEach(function(checkbox) {
+            checkbox.addEventListener('change', updateBulkActions);
+        });
+
+        // Botão de exclusão em massa
+        if (bulkDeleteBtn) {
+            bulkDeleteBtn.addEventListener('click', function() {
+                const checked = document.querySelectorAll('.row-checkbox:checked');
+                const ids = Array.from(checked).map(function(cb) { return cb.value; });
+                const count = ids.length;
+                
+                if (count === 0) {
+                    alert('Por favor, selecione pelo menos um registro para excluir.');
+                    return;
+                }
+                
+                const confirmMessage = 'Tem certeza que deseja excluir ' + count + ' registro(s)?\n\nEsta ação não pode ser desfeita.';
+                if (confirm(confirmMessage)) {
+                    // Criar formulário para enviar requisição POST
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = '{% url "deletar_projecao_gasto_em_massa" %}';
+                    
+                    // Adicionar IDs selecionados
+                    ids.forEach(function(id) {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'ids';
+                        input.value = id;
+                        form.appendChild(input);
+                    });
+                    
+                    // Preservar parâmetros da URL atual para redirecionamento
+                    const currentUrl = new URL(window.location.href);
+                    const nextInput = document.createElement('input');
+                    nextInput.type = 'hidden';
+                    nextInput.name = 'next';
+                    nextInput.value = currentUrl.pathname + currentUrl.search;
+                    form.appendChild(nextInput);
+                    
+                    // Adicionar CSRF token
+                    const csrfToken = getCookie('csrftoken');
+                    if (csrfToken) {
+                        const csrfInput = document.createElement('input');
+                        csrfInput.type = 'hidden';
+                        csrfInput.name = 'csrfmiddlewaretoken';
+                        csrfInput.value = csrfToken;
+                        form.appendChild(csrfInput);
+                    }
+                    
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            });
+        }
+
+        // Inicializar estado
+        updateBulkActions();
     });
 </script>
 {% endblock %}

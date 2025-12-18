@@ -48,6 +48,33 @@
     .row .col-md-2 .card.h-100 {
         min-height: 200px;
     }
+    /* Adjust font sizes for KPI cards */
+    .kpi-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .kpi-money {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    @media (max-width: 768px) {
+        .kpi-number {
+            font-size: 2rem;
+        }
+        .kpi-money {
+            font-size: 1.75rem;
+        }
+    }
+    @media (max-width: 576px) {
+        .kpi-number {
+            font-size: 1.75rem;
+        }
+        .kpi-money {
+            font-size: 1.5rem;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -59,7 +86,7 @@
     <div class="container">
         <div class="row">
             <div class="col-12">
-                <h1 class="display-5 fw-bold mt-3">Planejamento e Controle de Manutenções - FAC [atulizado D]</h1>
+                <h1 class="display-5 fw-bold mt-3">Planejamento e Controle de Manutenções - FAC [atulizado E]</h1>
             </div>
         </div>
     </div>
@@ -120,7 +147,7 @@
                 <div class="card border-0 bg-primary text-white w-100 h-100">
                     <div class="card-body d-flex flex-column justify-content-center">
                         <i class="bi bi-clipboard2-data fa-2x mb-2"></i>
-                        <h3 class="display-4 fw-bold">{{ manutencoes_corretivas|default:0 }}</h3>
+                        <h3 class="kpi-number format-number" data-value="{{ manutencoes_corretivas|default:0 }}">{{ manutencoes_corretivas|default:0 }}</h3>
                         <p class="mb-0">Manutenções Corretivas</p>
                         {% if semana_atual %}
                         <small class="opacity-75">Esta Semana</small>
@@ -133,7 +160,7 @@
                 <div class="card border-0 bg-success text-white w-100 h-100">
                     <div class="card-body d-flex flex-column justify-content-center">
                         <i class="fas fa-chart-line fa-2x mb-2"></i>
-                        <h3 class="display-4 fw-bold">{{ manutencoes_preventivas|default:0 }}</h3>
+                        <h3 class="kpi-number format-number" data-value="{{ manutencoes_preventivas|default:0 }}">{{ manutencoes_preventivas|default:0 }}</h3>
                         <p class="mb-0">Manutenções Preventivas</p>
                         {% if semana_atual %}
                         <small class="opacity-75">Esta Semana</small>
@@ -146,7 +173,7 @@
                 <div class="card border-0 bg-warning text-white w-100 h-100">
                     <div class="card-body d-flex flex-column justify-content-center">
                         <i class="fas fa-clock fa-2x mb-2"></i>
-                        <h3 class="display-4 fw-bold">R$ {{ valor_total_semana|floatformat:0|default:0 }}</h3>
+                        <h3 class="kpi-money format-money" data-value="{{ valor_total_semana|default:0 }}">R$ {{ valor_total_semana|floatformat:2|default:0 }}</h3>
                         <p class="mb-0">Valor Requisições</p>
                         {% if semana_atual %}
                         <small class="opacity-75">Esta Semana</small>
@@ -159,7 +186,7 @@
                 <div class="card border-0 bg-info text-white w-100 h-100">
                     <div class="card-body d-flex flex-column justify-content-center">
                         <i class="fas fa-globe fa-2x mb-2"></i>
-                        <h3 class="display-4 fw-bold">{{ total_requisicoes_semana|default:0 }}</h3>
+                        <h3 class="kpi-number format-number" data-value="{{ total_requisicoes_semana|default:0 }}">{{ total_requisicoes_semana|default:0 }}</h3>
                         <p class="mb-0">Requisições Almoxarifado</p>
                         {% if semana_atual %}
                         <small class="opacity-75">Esta Semana</small>
@@ -172,7 +199,7 @@
                 <div class="card border-0 bg-danger text-white w-100 h-100">
                     <div class="card-body d-flex flex-column justify-content-center">
                         <i class="bi bi-tools fa-2x mb-2"></i>
-                        <h3 class="display-4 fw-bold">{{ total_maquinas|default:0 }}</h3>
+                        <h3 class="kpi-number format-number" data-value="{{ total_maquinas|default:0 }}">{{ total_maquinas|default:0 }}</h3>
                         <p class="mb-0">Máquinas</p>
                         <small class="opacity-75">Total</small>
                     </div>
@@ -183,7 +210,7 @@
                 <div class="card border-0 bg-secondary text-white w-100 h-100">
                     <div class="card-body d-flex flex-column justify-content-center">
                         <i class="bi bi-people fa-2x mb-2"></i>
-                        <h3 class="display-4 fw-bold">{{ total_manutentores|default:0 }}</h3>
+                        <h3 class="kpi-number format-number" data-value="{{ total_manutentores|default:0 }}">{{ total_manutentores|default:0 }}</h3>
                         <p class="mb-0">Manutentores</p>
                         <small class="opacity-75">Total</small>
                     </div>
@@ -276,7 +303,41 @@
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
+    // Função para formatar números para o padrão brasileiro
+    function formatarNumeroBR(numero) {
+        if (typeof numero !== 'number') {
+            numero = parseFloat(String(numero).replace(/\./g, '').replace(',', '.'));
+            if (isNaN(numero)) return '0';
+        }
+        return numero.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+
+    // Função para formatar valores monetários para o padrão brasileiro
+    function formatarMoedaBR(valor) {
+        if (typeof valor !== 'number') {
+            valor = parseFloat(String(valor).replace(/\./g, '').replace(',', '.'));
+            if (isNaN(valor)) return 'R$ 0,00';
+        }
+        return 'R$ ' + valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
+        // Aplicar formatação brasileira aos números
+        document.querySelectorAll('.format-number').forEach(function(element) {
+            const valor = parseFloat(element.getAttribute('data-value') || element.textContent.replace(/\./g, '').replace(',', '.').trim());
+            if (!isNaN(valor)) {
+                element.textContent = formatarNumeroBR(valor);
+            }
+        });
+
+        // Aplicar formatação brasileira aos valores monetários
+        document.querySelectorAll('.format-money').forEach(function(element) {
+            const valor = parseFloat(element.getAttribute('data-value') || element.textContent.replace('R$', '').replace(/\./g, '').replace(',', '.').trim());
+            if (!isNaN(valor)) {
+                element.textContent = formatarMoedaBR(valor);
+            }
+        });
+
         var calendarEl = document.getElementById('calendar');
         
         var calendar = new FullCalendar.Calendar(calendarEl, {
@@ -388,6 +449,22 @@
                                     legend: {
                                         display: true,
                                         position: 'top'
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                let label = context.dataset.label || '';
+                                                if (label) {
+                                                    label += ': ';
+                                                }
+                                                if (context.dataset.label && context.dataset.label.includes('Valor')) {
+                                                    label += formatarMoedaBR(context.parsed.y);
+                                                } else {
+                                                    label += formatarNumeroBR(context.parsed.y);
+                                                }
+                                                return label;
+                                            }
+                                        }
                                     }
                                 },
                                 scales: {
@@ -399,6 +476,11 @@
                                         title: {
                                             display: true,
                                             text: 'Quantidade'
+                                        },
+                                        ticks: {
+                                            callback: function(value) {
+                                                return formatarNumeroBR(value);
+                                            }
                                         }
                                     },
                                     y1: {
@@ -409,6 +491,11 @@
                                         title: {
                                             display: true,
                                             text: 'Valor (R$)'
+                                        },
+                                        ticks: {
+                                            callback: function(value) {
+                                                return 'R$ ' + formatarMoedaBR(value).replace('R$ ', '');
+                                            }
                                         },
                                         grid: {
                                             drawOnChartArea: false
@@ -523,7 +610,7 @@
                             tooltip: {
                                 callbacks: {
                                     label: function(context) {
-                                        return 'Ordens Fechadas: ' + context.parsed.y;
+                                        return 'Ordens Fechadas: ' + formatarNumeroBR(context.parsed.y);
                                     }
                                 }
                             }
@@ -533,7 +620,10 @@
                                 beginAtZero: true,
                                 ticks: {
                                     stepSize: 1,
-                                    precision: 0
+                                    precision: 0,
+                                    callback: function(value) {
+                                        return formatarNumeroBR(value);
+                                    }
                                 },
                                 title: {
                                     display: true,

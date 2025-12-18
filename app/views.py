@@ -2563,8 +2563,58 @@ def importar_projecao_gastos(request):
         update_existing = request.POST.get('update_existing', 'off') == 'on'
         
         try:
-            # Fazer upload dos dados
-            created_count, updated_count, errors = upload_projecao_gastos_from_file(
+            # Primeiro, verificar duplicatas sem importar
+            _, _, _, potential_duplicates = upload_projecao_gastos_from_file(
+                file, 
+                update_existing=False,
+                check_duplicates_only=True
+            )
+            
+            # Se há duplicatas, redirecionar para página de revisão
+            if potential_duplicates:
+                # Salvar dados do arquivo na sessão para processar depois
+                file.seek(0)
+                import base64
+                from decimal import Decimal
+                from datetime import date, datetime
+                
+                file_content = file.read()
+                file_data = {
+                    'name': file.name,
+                    'content': base64.b64encode(file_content).decode('utf-8'),
+                    'update_existing': update_existing,
+                }
+                request.session['projecao_gastos_file_data'] = file_data
+                
+                # Converter dados para formato JSON-serializable
+                duplicates_serializable = []
+                for dup in potential_duplicates:
+                    # Converter new_data para formato serializável
+                    new_data_serializable = {}
+                    for key, value in dup['new_data'].items():
+                        if isinstance(value, Decimal):
+                            new_data_serializable[key] = str(value)
+                        elif isinstance(value, (date, datetime)):
+                            new_data_serializable[key] = value.isoformat() if value else None
+                        elif value is None:
+                            new_data_serializable[key] = None
+                        else:
+                            new_data_serializable[key] = value
+                    
+                    duplicates_serializable.append({
+                        'row_num': dup['row_num'],
+                        'key': dup['key'],
+                        'match_type': dup['match_type'],
+                        'match_value': dup['match_value'],
+                        'new_data': new_data_serializable,
+                        'existing_id': dup['existing_id'],
+                    })
+                
+                request.session['projecao_gastos_duplicates'] = duplicates_serializable
+                return redirect('revisar_duplicatas_projecao_gastos')
+            
+            # Se não há duplicatas, fazer upload normalmente
+            created_count, updated_count, errors, _ = upload_projecao_gastos_from_file(
                 file, 
                 update_existing=update_existing
             )
@@ -2596,6 +2646,132 @@ def importar_projecao_gastos(request):
         'active_page': 'importar_projecao_gastos'
     }
     return render(request, 'importar/importar_projecao_gastos.html', context)
+
+
+def revisar_duplicatas_projecao_gastos(request):
+    """Página para revisar duplicatas encontradas durante importação"""
+    from app.models import ProjecaoGasto
+    from decimal import Decimal
+    from datetime import datetime, date
+    
+    # Recuperar dados da sessão
+    duplicates_data = request.session.get('projecao_gastos_duplicates', [])
+    file_data = request.session.get('projecao_gastos_file_data', None)
+    
+    if not duplicates_data or not file_data:
+        messages.error(request, 'Sessão expirada. Por favor, faça o upload novamente.')
+        return redirect('importar_projecao_gastos')
+    
+    # Carregar registros existentes e converter dados serializados de volta
+    duplicates = []
+    for dup_data in duplicates_data:
+        try:
+            existing = ProjecaoGasto.objects.get(id=dup_data['existing_id'])
+            
+            # Converter new_data de volta para tipos apropriados (se necessário para exibição)
+            new_data = dup_data['new_data'].copy()
+            # Converter strings de Decimal de volta para Decimal se necessário
+            if 'valor_total' in new_data and new_data['valor_total']:
+                try:
+                    new_data['valor_total'] = Decimal(str(new_data['valor_total']))
+                except (ValueError, TypeError):
+                    pass
+            
+            # Converter strings de data de volta para date se necessário
+            if 'data_abertura_requisicao' in new_data and new_data['data_abertura_requisicao']:
+                if isinstance(new_data['data_abertura_requisicao'], str):
+                    try:
+                        new_data['data_abertura_requisicao'] = datetime.fromisoformat(new_data['data_abertura_requisicao']).date()
+                    except (ValueError, AttributeError):
+                        pass
+            
+            duplicates.append({
+                'row_num': dup_data['row_num'],
+                'key': dup_data['key'],
+                'match_type': dup_data['match_type'],
+                'match_value': dup_data['match_value'],
+                'new_data': new_data,
+                'existing': existing,
+            })
+        except ProjecaoGasto.DoesNotExist:
+            continue
+    
+    context = {
+        'page_title': 'Revisar Duplicatas - Projeção de Gastos',
+        'active_page': 'importar_projecao_gastos',
+        'duplicates': duplicates,
+        'update_existing': file_data.get('update_existing', False),
+    }
+    return render(request, 'importar/revisar_duplicatas_projecao_gastos.html', context)
+
+
+def processar_duplicatas_projecao_gastos(request):
+    """Processa a confirmação do usuário sobre duplicatas e completa a importação"""
+    from app.utils import upload_projecao_gastos_from_file
+    import base64
+    from io import BytesIO
+    from django.core.files.uploadedfile import InMemoryUploadedFile
+    
+    if request.method != 'POST':
+        messages.error(request, 'Método inválido.')
+        return redirect('importar_projecao_gastos')
+    
+    # Recuperar dados da sessão
+    duplicates_data = request.session.get('projecao_gastos_duplicates', [])
+    file_data = request.session.get('projecao_gastos_file_data', None)
+    
+    if not file_data:
+        messages.error(request, 'Sessão expirada. Por favor, faça o upload novamente.')
+        return redirect('importar_projecao_gastos')
+    
+    # Obter IDs de duplicatas que o usuário confirmou para pular
+    skip_duplicate_keys = request.POST.getlist('skip_duplicates')
+    update_existing = file_data.get('update_existing', False)
+    
+    # Recriar arquivo a partir dos dados da sessão
+    file_content = base64.b64decode(file_data['content'])
+    file_obj = BytesIO(file_content)
+    uploaded_file = InMemoryUploadedFile(
+        file_obj, None, file_data['name'], 
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        len(file_content), None
+    )
+    
+    try:
+        # Fazer upload com os IDs para pular
+        created_count, updated_count, errors, _ = upload_projecao_gastos_from_file(
+            uploaded_file,
+            update_existing=update_existing,
+            skip_duplicate_ids=skip_duplicate_keys
+        )
+        
+        # Limpar sessão
+        if 'projecao_gastos_duplicates' in request.session:
+            del request.session['projecao_gastos_duplicates']
+        if 'projecao_gastos_file_data' in request.session:
+            del request.session['projecao_gastos_file_data']
+        
+        # Preparar mensagens
+        if errors:
+            for error in errors[:10]:
+                messages.warning(request, error)
+            if len(errors) > 10:
+                messages.warning(request, f'... e mais {len(errors) - 10} erros.')
+        
+        if created_count > 0:
+            messages.success(request, f'{created_count} projeção(ões) de gasto(s) criada(s) com sucesso!')
+        if updated_count > 0:
+            messages.info(request, f'{updated_count} projeção(ões) de gasto(s) atualizada(s)!')
+        if len(skip_duplicate_keys) > 0:
+            messages.info(request, f'{len(skip_duplicate_keys)} registro(s) duplicado(s) foram ignorados conforme sua seleção.')
+        
+    except Exception as e:
+        error_msg = f'Erro ao processar importação: {str(e)}'
+        messages.error(request, error_msg)
+        import traceback
+        traceback.print_exc()
+    
+    return redirect('importar_projecao_gastos')
 
 
 def importar_controle_nf_e_rc(request):
@@ -11837,11 +12013,92 @@ def consultar_projecao_gastos(request):
     return render(request, 'orcamento/consultar_projecao_gastos.html', context)
 
 
+def deletar_projecao_gasto(request, projecao_id):
+    """Deletar uma projeção de gasto"""
+    from app.models import ProjecaoGasto
+    from django.contrib import messages
+    from django.shortcuts import redirect
+    from django.urls import reverse
+    
+    if request.method == 'POST':
+        try:
+            projecao = ProjecaoGasto.objects.get(id=projecao_id)
+            descricao = projecao.descricao or f"Projeção #{projecao.id}"
+            projecao.delete()
+            messages.success(request, f'Projeção de gasto "{descricao[:50]}" excluída com sucesso!')
+        except ProjecaoGasto.DoesNotExist:
+            messages.error(request, 'Projeção de gasto não encontrada.')
+        except Exception as e:
+            messages.error(request, f'Erro ao excluir projeção de gasto: {str(e)}')
+    
+    # Redirecionar de volta para a página de consulta, preservando filtros da URL anterior
+    next_url = request.GET.get('next', None)
+    if next_url:
+        return redirect(next_url)
+    
+    # Se não houver next, construir URL com filtros preservados
+    redirect_url = reverse('consultar_projecao_gastos')
+    params = request.GET.copy()
+    if 'next' in params:
+        del params['next']
+    if params:
+        redirect_url += '?' + params.urlencode()
+    
+    return redirect(redirect_url)
+
+
+def deletar_projecao_gasto_em_massa(request):
+    """Deletar múltiplas projeções de gasto de uma vez"""
+    from app.models import ProjecaoGasto
+    from django.contrib import messages
+    from django.shortcuts import redirect
+    from django.urls import reverse
+    
+    if request.method == 'POST':
+        ids = request.POST.getlist('ids')
+        
+        if not ids:
+            messages.error(request, 'Nenhum registro selecionado para exclusão.')
+        else:
+            try:
+                # Converter IDs para inteiros e filtrar registros existentes
+                ids_int = []
+                for id_str in ids:
+                    try:
+                        ids_int.append(int(id_str))
+                    except (ValueError, TypeError):
+                        continue
+                
+                if not ids_int:
+                    messages.error(request, 'IDs inválidos fornecidos.')
+                else:
+                    # Buscar e deletar registros
+                    projecoes = ProjecaoGasto.objects.filter(id__in=ids_int)
+                    count = projecoes.count()
+                    
+                    if count == 0:
+                        messages.warning(request, 'Nenhum registro encontrado para exclusão.')
+                    else:
+                        # Deletar em lote
+                        projecoes.delete()
+                        messages.success(request, f'{count} projeção(ões) de gasto(s) excluída(s) com sucesso!')
+            except Exception as e:
+                messages.error(request, f'Erro ao excluir projeções de gasto: {str(e)}')
+    
+    # Redirecionar de volta para a página de consulta, preservando filtros da URL anterior
+    next_url = request.GET.get('next') or request.POST.get('next')
+    if next_url:
+        return redirect(next_url)
+    
+    # Se não houver next, redirecionar para a página de consulta
+    return redirect('consultar_projecao_gastos')
+
+
 def analise_projecao_gastos(request):
     """Página de análise detalhada de projeções de gastos com filtros e gráficos"""
     from app.models import ProjecaoGasto, RelacaoProjecaoNotaFiscal
     from django.db.models import Sum, Count, Q
-    from datetime import datetime
+    from datetime import datetime, timedelta
     from decimal import Decimal
     import json
     
@@ -11864,18 +12121,21 @@ def analise_projecao_gastos(request):
         if proj.created_at:
             anos_disponiveis_set.add(proj.created_at.year)
     
+    # Sempre incluir o ano atual na lista de anos disponíveis
+    anos_disponiveis_set.add(hoje.year)
+    
     anos_disponiveis = sorted(list(anos_disponiveis_set), reverse=True)
     if not anos_disponiveis:
         anos_disponiveis = [hoje.year]
     
-    # Se não há filtro de ano, usar o mais recente disponível
+    # Se não há filtro de ano, usar o ano atual (para incluir dados novos)
     if not ano_filtro:
-        ano_filtro = anos_disponiveis[0] if anos_disponiveis else hoje.year
+        ano_filtro = hoje.year
     else:
         try:
             ano_filtro = int(ano_filtro)
         except (ValueError, TypeError):
-            ano_filtro = anos_disponiveis[0] if anos_disponiveis else hoje.year
+            ano_filtro = hoje.year
     
     if ano_filtro not in anos_disponiveis:
         anos_disponiveis.insert(0, ano_filtro)
@@ -11917,24 +12177,30 @@ def analise_projecao_gastos(request):
     projecoes_qs = ProjecaoGasto.objects.all()
     
     # Aplicar filtro de ano (ano_referencia OU created_at)
-    q_ano = Q(ano_referencia=ano_filtro) | Q(created_at__year=ano_filtro)
-    projecoes_qs_ano = projecoes_qs.filter(q_ano)
+    # Incluir também registros sem ano_referencia mas com created_at no ano filtrado
+    # E também incluir registros recentes (últimos 90 dias) mesmo que ano_referencia seja diferente
+    # Isso garante que dados novos importados sejam sempre visíveis
+    data_limite_recente = hoje - timedelta(days=90)
     
-    # Se há resultados com filtro de ano, usar; senão, usar todos
-    if projecoes_qs_ano.count() > 0:
-        projecoes_qs = projecoes_qs_ano
+    q_ano = (
+        Q(ano_referencia=ano_filtro) |  # Ano de referência coincide
+        Q(created_at__year=ano_filtro) |  # Criado no ano filtrado
+        (Q(ano_referencia__isnull=True) & Q(created_at__year=ano_filtro)) |  # Sem ano_referencia mas criado no ano
+        (Q(created_at__gte=data_limite_recente))  # Dados recentes (últimos 90 dias) sempre incluídos
+    )
+    projecoes_qs = projecoes_qs.filter(q_ano)
     
     # Se há meses selecionados, aplicar filtro de mês
+    # Mas sempre incluir dados recentes (últimos 90 dias) mesmo que não correspondam ao mês
     if meses_filtro_int:
         q_mes = Q()
         for mes_str in meses_selecionados_str:
             q_mes |= Q(mes_referencia__iexact=mes_str)
         for mes_num in meses_filtro_int:
             q_mes |= Q(created_at__month=mes_num)
-        projecoes_qs_mes = projecoes_qs.filter(q_mes)
-        # Se há resultados com filtro de mês, usar; senão, manter o queryset anterior
-        if projecoes_qs_mes.count() > 0:
-            projecoes_qs = projecoes_qs_mes
+        # Incluir dados recentes mesmo que não correspondam ao mês filtrado
+        q_mes |= Q(created_at__gte=data_limite_recente)
+        projecoes_qs = projecoes_qs.filter(q_mes)
 
     # --- KPIs ---
     total_projecoes = projecoes_qs.count()
@@ -12268,6 +12534,47 @@ def analise_notas_fiscais(request):
         nota.centro_atividade for nota in notas_filtradas if nota.centro_atividade
     ))
 
+    # Contadores por Situação
+    notas_autorizadas = sum(
+        1 for nota in notas_filtradas
+        if nota.situacao and ('AUTORIZADA' in nota.situacao.upper() and 'AGUARDANDO' not in nota.situacao.upper())
+    )
+    valor_autorizadas = sum(
+        (nota.total_nota or Decimal(0)) for nota in notas_filtradas
+        if nota.situacao and ('AUTORIZADA' in nota.situacao.upper() and 'AGUARDANDO' not in nota.situacao.upper())
+    )
+    percentual_autorizadas = (notas_autorizadas / total_notas * 100) if total_notas > 0 else 0
+
+    notas_lancadas = sum(
+        1 for nota in notas_filtradas
+        if nota.situacao and ('LANÇADA' in nota.situacao.upper() or 'LANCADA' in nota.situacao.upper())
+    )
+    valor_lancadas = sum(
+        (nota.total_nota or Decimal(0)) for nota in notas_filtradas
+        if nota.situacao and ('LANÇADA' in nota.situacao.upper() or 'LANCADA' in nota.situacao.upper())
+    )
+    percentual_lancadas = (notas_lancadas / total_notas * 100) if total_notas > 0 else 0
+
+    notas_aguardando = sum(
+        1 for nota in notas_filtradas
+        if nota.situacao and ('AGUARDANDO AUTORIZAÇÃO' in nota.situacao.upper() or 'AGUARDANDO AUTORIZACAO' in nota.situacao.upper())
+    )
+    valor_aguardando = sum(
+        (nota.total_nota or Decimal(0)) for nota in notas_filtradas
+        if nota.situacao and ('AGUARDANDO AUTORIZAÇÃO' in nota.situacao.upper() or 'AGUARDANDO AUTORIZACAO' in nota.situacao.upper())
+    )
+    percentual_aguardando = (notas_aguardando / total_notas * 100) if total_notas > 0 else 0
+
+    notas_pendentes = sum(
+        1 for nota in notas_filtradas
+        if nota.situacao and 'PENDENTE' in nota.situacao.upper()
+    )
+    valor_pendentes = sum(
+        (nota.total_nota or Decimal(0)) for nota in notas_filtradas
+        if nota.situacao and 'PENDENTE' in nota.situacao.upper()
+    )
+    percentual_pendentes = (notas_pendentes / total_notas * 100) if total_notas > 0 else 0
+
     # --- Dados para Gráficos ---
     # Gráfico 1: Distribuição por Emitente (Top 10)
     emitentes_data_dict = defaultdict(Decimal)
@@ -12415,6 +12722,20 @@ def analise_notas_fiscais(request):
         'notas_pagas': notas_pagas,
         'percentual_pagas': percentual_pagas,
         'centros_atividade_unicos': centros_atividade_unicos,
+        
+        # Situações
+        'notas_autorizadas': notas_autorizadas,
+        'valor_autorizadas': valor_autorizadas,
+        'percentual_autorizadas': percentual_autorizadas,
+        'notas_lancadas': notas_lancadas,
+        'valor_lancadas': valor_lancadas,
+        'percentual_lancadas': percentual_lancadas,
+        'notas_aguardando': notas_aguardando,
+        'valor_aguardando': valor_aguardando,
+        'percentual_aguardando': percentual_aguardando,
+        'notas_pendentes': notas_pendentes,
+        'valor_pendentes': valor_pendentes,
+        'percentual_pendentes': percentual_pendentes,
 
         # Gráficos
         'emitentes_labels': json.dumps(emitentes_labels, ensure_ascii=False),
