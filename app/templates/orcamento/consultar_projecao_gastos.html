@@ -2,7 +2,7 @@
 {% load static %}
 {% load form_extras %}
 
-{% block title %}Consultar e Analisar Projeção de Gastos{% endblock %}
+{% block title %}Consultar Projeção de Gastos{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -87,10 +87,164 @@
 <!-- Main Content -->
 <section class="py-5">
     <div class="container-fluid px-5">
+        <!-- Filtro de Ano e Mês (Accordion) -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button {% if not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                                <i class="fas fa-filter me-2"></i>
+                                <strong>Filtros</strong>
+                                {% if meses_filtro or ano_filtro %}
+                                    <span class="badge bg-info ms-2">
+                                        {% if meses_filtro %}
+                                            {% if meses_filtro|length == 1 %}
+                                                {% if meses_filtro.0 == 1 %}Janeiro
+                                                {% elif meses_filtro.0 == 2 %}Fevereiro
+                                                {% elif meses_filtro.0 == 3 %}Março
+                                                {% elif meses_filtro.0 == 4 %}Abril
+                                                {% elif meses_filtro.0 == 5 %}Maio
+                                                {% elif meses_filtro.0 == 6 %}Junho
+                                                {% elif meses_filtro.0 == 7 %}Julho
+                                                {% elif meses_filtro.0 == 8 %}Agosto
+                                                {% elif meses_filtro.0 == 9 %}Setembro
+                                                {% elif meses_filtro.0 == 10 %}Outubro
+                                                {% elif meses_filtro.0 == 11 %}Novembro
+                                                {% elif meses_filtro.0 == 12 %}Dezembro
+                                                {% endif %} de {{ ano_filtro }}
+                                            {% else %}
+                                                {{ meses_filtro|length }} meses de {{ ano_filtro }}
+                                            {% endif %}
+                                        {% else %}
+                                            Todos os meses de {{ ano_filtro }}
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'consultar_projecao_gastos' %}" class="row g-3">
+                                    <!-- Preservar busca geral e outros filtros -->
+                                    {% if search_query %}<input type="hidden" name="search" value="{{ search_query }}">{% endif %}
+                                    {% if filtro_setor %}<input type="hidden" name="filtro_setor" value="{{ filtro_setor }}">{% endif %}
+                                    {% if filtro_fornecedor %}<input type="hidden" name="filtro_fornecedor" value="{{ filtro_fornecedor }}">{% endif %}
+                                    {% if filtro_numero_requisicao %}<input type="hidden" name="filtro_numero_requisicao" value="{{ filtro_numero_requisicao }}">{% endif %}
+                                    {% if filtro_valor_min %}<input type="hidden" name="filtro_valor_min" value="{{ filtro_valor_min }}">{% endif %}
+                                    {% if filtro_valor_max %}<input type="hidden" name="filtro_valor_max" value="{{ filtro_valor_max }}">{% endif %}
+                                    
+                                    <div class="col-md-4">
+                                        <label for="ano" class="form-label">Ano</label>
+                                        <select class="form-select" id="ano" name="ano" required>
+                                            {% for ano in anos_disponiveis %}
+                                                <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Meses (Selecione múltiplos meses ou deixe todos desmarcados para todos os meses)</label>
+                                        <div class="row g-2">
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="1" id="mes1" {% if 1 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes1">Janeiro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="2" id="mes2" {% if 2 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes2">Fevereiro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="3" id="mes3" {% if 3 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes3">Março</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="4" id="mes4" {% if 4 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes4">Abril</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="5" id="mes5" {% if 5 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes5">Maio</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="6" id="mes6" {% if 6 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes6">Junho</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="7" id="mes7" {% if 7 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes7">Julho</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="8" id="mes8" {% if 8 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes8">Agosto</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="9" id="mes9" {% if 9 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes9">Setembro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="10" id="mes10" {% if 10 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes10">Outubro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="11" id="mes11" {% if 11 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes11">Novembro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="12" id="mes12" {% if 12 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes12">Dezembro</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosMeses()">Selecionar Todos</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">Desmarcar Todos</button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="fas fa-search me-2"></i>Filtrar
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Search Bar -->
         <div class="row mb-4">
             <div class="col-12">
                 <form method="get" action="{% url 'consultar_projecao_gastos' %}" class="d-flex">
+                    <!-- Preservar filtros de ano/mês -->
+                    <input type="hidden" name="ano" value="{{ ano_filtro }}">
+                    {% for mes in meses_filtro %}
+                        <input type="hidden" name="mes" value="{{ mes }}">
+                    {% endfor %}
                     <input type="text" name="search" class="form-control me-2" placeholder="Buscar por setor, descrição, fornecedor, número de requisição..." value="{{ search_query|default:'' }}">
                     <button type="submit" class="btn btn-outline-primary">
                         <i class="fas fa-search"></i> Buscar
@@ -103,30 +257,25 @@
         <div class="row">
             <div class="col-12">
                 <div class="card shadow-sm">
-                    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                    <div class="card-header bg-secondary text-white">
                         <h5 class="mb-0">
                             <i class="bi bi-clipboard2-data me-2"></i>Projeções de Gastos
                             <small class="ms-2">(<span class="format-number">{{ projecoes.paginator.count }}</span> registro{{ projecoes.paginator.count|pluralize }})</small>
                         </h5>
-                        <div id="bulkActions" style="display: none;">
-                            <span class="me-2" id="selectedCount">0 selecionado(s)</span>
-                            <button type="button" class="btn btn-sm btn-danger" id="bulkDeleteBtn">
-                                <i class="fas fa-trash-alt me-1"></i>Excluir Selecionados
-                            </button>
-                        </div>
                     </div>
                     <div class="card-body p-0">
                         <form method="get" action="{% url 'consultar_projecao_gastos' %}" id="filterForm">
-                            <!-- Preservar busca geral -->
+                            <!-- Preservar busca geral e filtros de ano/mês -->
                             <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                            <input type="hidden" name="ano" value="{{ ano_filtro }}">
+                            {% for mes in meses_filtro %}
+                                <input type="hidden" name="mes" value="{{ mes }}">
+                            {% endfor %}
                             
                             <div class="table-container">
                                 <table class="table table-hover table-striped mb-0">
                                     <thead>
                                         <tr>
-                                            <th style="width: 40px; text-align: center;">
-                                                <input type="checkbox" id="selectAll" title="Selecionar todos">
-                                            </th>
                                             <th class="col-setor">Setor</th>
                                             <th class="col-descricao">Descrição</th>
                                             <th class="col-fornecedor">Fornecedor</th>
@@ -135,12 +284,10 @@
                                             <th class="col-numero">Mês/Ano Ref.</th>
                                             <th class="col-numero">Nº Requisição</th>
                                             <th class="col-numero">Nº Ordem Serviço</th>
-                                            <th style="min-width: 80px; text-align: center;">Ações</th>
                                         </tr>
                                     </thead>
                                     <thead class="filter-row">
                                         <tr>
-                                            <th class="filter-header"></th>
                                             <th class="filter-header">
                                                 <input type="text" name="filtro_setor" class="filter-input" placeholder="Filtrar setor..." value="{{ filtro_setor|default:'' }}" onchange="document.getElementById('filterForm').submit();">
                                             </th>
@@ -155,35 +302,16 @@
                                                 </div>
                                             </th>
                                             <th class="filter-header"></th>
-                                            <th class="filter-header">
-                                                <div class="d-flex gap-1">
-                                                    <select name="filtro_mes" class="filter-input" style="width: 48%;" onchange="document.getElementById('filterForm').submit();">
-                                                        <option value="">Mês</option>
-                                                        {% for mes in meses_unicos %}
-                                                            <option value="{{ mes }}" {% if filtro_mes == mes %}selected{% endif %}>{{ mes }}</option>
-                                                        {% endfor %}
-                                                    </select>
-                                                    <select name="filtro_ano" class="filter-input" style="width: 48%;" onchange="document.getElementById('filterForm').submit();">
-                                                        <option value="">Ano</option>
-                                                        {% for ano in anos_unicos %}
-                                                            <option value="{{ ano }}" {% if filtro_ano == ano|stringformat:"s" %}selected{% endif %}>{{ ano }}</option>
-                                                        {% endfor %}
-                                                    </select>
-                                                </div>
-                                            </th>
+                                            <th class="filter-header"></th>
                                             <th class="filter-header">
                                                 <input type="text" name="filtro_numero_requisicao" class="filter-input" placeholder="Filtrar nº requisição..." value="{{ filtro_numero_requisicao|default:'' }}" onchange="document.getElementById('filterForm').submit();">
                                             </th>
-                                            <th class="filter-header"></th>
                                             <th class="filter-header"></th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for projecao in projecoes %}
                                         <tr>
-                                            <td style="text-align: center;">
-                                                <input type="checkbox" class="row-checkbox" value="{{ projecao.id }}" data-descricao="{{ projecao.descricao|default:'registro'|truncatewords:5 }}">
-                                            </td>
                                             <td class="col-setor">
                                                 <strong>{{ projecao.setor|default:"-" }}</strong>
                                             </td>
@@ -221,19 +349,10 @@
                                             <td class="col-numero">
                                                 {{ projecao.numero_ordem_servico|default:"-" }}
                                             </td>
-                                            <td style="text-align: center;">
-                                                <button type="button" 
-                                                        class="btn btn-sm btn-danger delete-btn" 
-                                                        data-id="{{ projecao.id }}"
-                                                        data-descricao="{{ projecao.descricao|default:'registro'|truncatewords:5 }}"
-                                                        title="Excluir registro">
-                                                    <i class="fas fa-trash-alt"></i>
-                                                </button>
-                                            </td>
                                         </tr>
                                         {% empty %}
                                         <tr>
-                                            <td colspan="10" class="text-center text-muted py-4">
+                                            <td colspan="8" class="text-center text-muted py-4">
                                                 <i class="fas fa-inbox fa-2x mb-2"></i>
                                                 <p>Nenhuma projeção de gasto encontrada.</p>
                                             </td>
@@ -251,10 +370,10 @@
                             <ul class="pagination justify-content-center mb-0">
                                 {% if projecoes.has_previous %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_ano %}&filtro_ano={{ filtro_ano }}{% endif %}{% if filtro_mes %}&filtro_mes={{ filtro_mes }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">&laquo; Primeira</a>
+                                        <a class="page-link" href="?page=1&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">&laquo; Primeira</a>
                                     </li>
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ projecoes.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_ano %}&filtro_ano={{ filtro_ano }}{% endif %}{% if filtro_mes %}&filtro_mes={{ filtro_mes }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Anterior</a>
+                                        <a class="page-link" href="?page={{ projecoes.previous_page_number }}&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Anterior</a>
                                     </li>
                                 {% endif %}
                                 
@@ -266,10 +385,10 @@
                                 
                                 {% if projecoes.has_next %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ projecoes.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_ano %}&filtro_ano={{ filtro_ano }}{% endif %}{% if filtro_mes %}&filtro_mes={{ filtro_mes }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Próxima</a>
+                                        <a class="page-link" href="?page={{ projecoes.next_page_number }}&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Próxima</a>
                                     </li>
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ projecoes.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_ano %}&filtro_ano={{ filtro_ano }}{% endif %}{% if filtro_mes %}&filtro_mes={{ filtro_mes }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Última &raquo;</a>
+                                        <a class="page-link" href="?page={{ projecoes.paginator.num_pages }}&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Última &raquo;</a>
                                     </li>
                                 {% endif %}
                             </ul>
@@ -303,6 +422,19 @@
         return 'R$ ' + valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    // Funções para selecionar/deselecionar todos os meses
+    function selecionarTodosMeses() {
+        for (let i = 1; i <= 12; i++) {
+            document.getElementById('mes' + i).checked = true;
+        }
+    }
+
+    function desmarcarTodosMeses() {
+        for (let i = 1; i <= 12; i++) {
+            document.getElementById('mes' + i).checked = false;
+        }
+    }
+
     // Aplicar formatação quando a página carregar
     document.addEventListener('DOMContentLoaded', function() {
         // Formatar números simples
@@ -321,154 +453,6 @@
                 element.textContent = formatarMoedaBR(valor);
             }
         });
-
-        // Adicionar event listeners para botões de deletar
-        document.querySelectorAll('.delete-btn').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                const id = this.getAttribute('data-id');
-                const descricao = this.getAttribute('data-descricao');
-                
-                if (confirm('Tem certeza que deseja excluir o registro "' + descricao + '"?\n\nEsta ação não pode ser desfeita.')) {
-                    // Criar formulário para enviar requisição POST
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = '{% url "deletar_projecao_gasto" 0 %}'.replace('0', id);
-                    
-                    // Preservar parâmetros da URL atual para redirecionamento
-                    const currentUrl = new URL(window.location.href);
-                    const nextInput = document.createElement('input');
-                    nextInput.type = 'hidden';
-                    nextInput.name = 'next';
-                    nextInput.value = currentUrl.pathname + currentUrl.search;
-                    form.appendChild(nextInput);
-                    
-                    // Adicionar CSRF token
-                    const csrfToken = getCookie('csrftoken');
-                    if (csrfToken) {
-                        const csrfInput = document.createElement('input');
-                        csrfInput.type = 'hidden';
-                        csrfInput.name = 'csrfmiddlewaretoken';
-                        csrfInput.value = csrfToken;
-                        form.appendChild(csrfInput);
-                    }
-                    
-                    document.body.appendChild(form);
-                    form.submit();
-                }
-            });
-        });
-
-        // Função auxiliar para obter cookie
-        function getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            return cookieValue;
-        }
-
-        // Funcionalidade de seleção em massa
-        const selectAllCheckbox = document.getElementById('selectAll');
-        const rowCheckboxes = document.querySelectorAll('.row-checkbox');
-        const bulkActions = document.getElementById('bulkActions');
-        const selectedCount = document.getElementById('selectedCount');
-        const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
-
-        // Função para atualizar contador e visibilidade do botão de ações em massa
-        function updateBulkActions() {
-            const checked = document.querySelectorAll('.row-checkbox:checked');
-            const count = checked.length;
-            
-            if (count > 0) {
-                bulkActions.style.display = 'block';
-                selectedCount.textContent = count + ' selecionado(s)';
-            } else {
-                bulkActions.style.display = 'none';
-            }
-            
-            // Atualizar estado do "Selecionar todos"
-            if (rowCheckboxes.length > 0) {
-                selectAllCheckbox.checked = checked.length === rowCheckboxes.length;
-                selectAllCheckbox.indeterminate = checked.length > 0 && checked.length < rowCheckboxes.length;
-            }
-        }
-
-        // Selecionar/Deselecionar todos
-        if (selectAllCheckbox) {
-            selectAllCheckbox.addEventListener('change', function() {
-                rowCheckboxes.forEach(function(checkbox) {
-                    checkbox.checked = this.checked;
-                }, this);
-                updateBulkActions();
-            });
-        }
-
-        // Atualizar quando checkbox individual é clicado
-        rowCheckboxes.forEach(function(checkbox) {
-            checkbox.addEventListener('change', updateBulkActions);
-        });
-
-        // Botão de exclusão em massa
-        if (bulkDeleteBtn) {
-            bulkDeleteBtn.addEventListener('click', function() {
-                const checked = document.querySelectorAll('.row-checkbox:checked');
-                const ids = Array.from(checked).map(function(cb) { return cb.value; });
-                const count = ids.length;
-                
-                if (count === 0) {
-                    alert('Por favor, selecione pelo menos um registro para excluir.');
-                    return;
-                }
-                
-                const confirmMessage = 'Tem certeza que deseja excluir ' + count + ' registro(s)?\n\nEsta ação não pode ser desfeita.';
-                if (confirm(confirmMessage)) {
-                    // Criar formulário para enviar requisição POST
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = '{% url "deletar_projecao_gasto_em_massa" %}';
-                    
-                    // Adicionar IDs selecionados
-                    ids.forEach(function(id) {
-                        const input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = 'ids';
-                        input.value = id;
-                        form.appendChild(input);
-                    });
-                    
-                    // Preservar parâmetros da URL atual para redirecionamento
-                    const currentUrl = new URL(window.location.href);
-                    const nextInput = document.createElement('input');
-                    nextInput.type = 'hidden';
-                    nextInput.name = 'next';
-                    nextInput.value = currentUrl.pathname + currentUrl.search;
-                    form.appendChild(nextInput);
-                    
-                    // Adicionar CSRF token
-                    const csrfToken = getCookie('csrftoken');
-                    if (csrfToken) {
-                        const csrfInput = document.createElement('input');
-                        csrfInput.type = 'hidden';
-                        csrfInput.name = 'csrfmiddlewaretoken';
-                        csrfInput.value = csrfToken;
-                        form.appendChild(csrfInput);
-                    }
-                    
-                    document.body.appendChild(form);
-                    form.submit();
-                }
-            });
-        }
-
-        // Inicializar estado
-        updateBulkActions();
     });
 </script>
 {% endblock %}

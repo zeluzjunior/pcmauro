@@ -52,12 +52,14 @@
         top: 48px;
         z-index: 8;
     }
-    .col-nota { min-width: 100px; }
-    .col-emitente { min-width: 200px; }
-    .col-data { min-width: 120px; }
-    .col-valor { min-width: 120px; text-align: right; }
-    .col-unidade { min-width: 150px; }
-    .col-situacao { min-width: 150px; }
+    .col-nota { min-width: 100px; text-align: center; }
+    .col-emitente { min-width: 200px; text-align: left; }
+    .col-data { min-width: 120px; text-align: center; }
+    .col-valor { min-width: 120px; text-align: center; }
+    .col-uso-contabil { min-width: 120px; text-align: center; }
+    .col-situacao { min-width: 150px; text-align: center; }
+    .col-data-autorizacao { min-width: 120px; text-align: center; }
+    .col-acoes { min-width: 80px; text-align: center; }
 </style>
 {% endblock %}
 
@@ -84,11 +86,192 @@
 <!-- Main Content -->
 <section class="py-5">
     <div class="container-fluid px-5">
+        <!-- Filtros (Accordion) -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button {% if not meses_filtro and not filtro_situacao and not filtro_uso_contabil %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro or filtro_situacao or filtro_uso_contabil %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                                <i class="fas fa-filter me-2"></i>
+                                <strong>Filtros</strong>
+                                {% if meses_filtro or ano_filtro or filtro_situacao or filtro_uso_contabil %}
+                                    <span class="badge bg-info ms-2">
+                                        {% if meses_filtro %}
+                                            {% if meses_filtro|length == 1 %}
+                                                {% if meses_filtro.0 == 1 %}Janeiro
+                                                {% elif meses_filtro.0 == 2 %}Fevereiro
+                                                {% elif meses_filtro.0 == 3 %}Março
+                                                {% elif meses_filtro.0 == 4 %}Abril
+                                                {% elif meses_filtro.0 == 5 %}Maio
+                                                {% elif meses_filtro.0 == 6 %}Junho
+                                                {% elif meses_filtro.0 == 7 %}Julho
+                                                {% elif meses_filtro.0 == 8 %}Agosto
+                                                {% elif meses_filtro.0 == 9 %}Setembro
+                                                {% elif meses_filtro.0 == 10 %}Outubro
+                                                {% elif meses_filtro.0 == 11 %}Novembro
+                                                {% elif meses_filtro.0 == 12 %}Dezembro
+                                                {% endif %} de {{ ano_filtro }}
+                                            {% else %}
+                                                {{ meses_filtro|length }} meses de {{ ano_filtro }}
+                                            {% endif %}
+                                        {% elif ano_filtro %}
+                                            Todos os meses de {{ ano_filtro }}
+                                        {% endif %}
+                                        {% if filtro_situacao or filtro_uso_contabil %}
+                                            {% if meses_filtro or ano_filtro %} | {% endif %}
+                                            {% if filtro_situacao and filtro_uso_contabil %}
+                                                {{ filtro_situacao }} | {{ filtro_uso_contabil }}
+                                            {% elif filtro_situacao %}
+                                                {{ filtro_situacao }}
+                                            {% elif filtro_uso_contabil %}
+                                                Uso: {{ filtro_uso_contabil }}
+                                            {% endif %}
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro or filtro_situacao or filtro_uso_contabil %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'consultar_notas_fiscais' %}" class="row g-3">
+                                    <!-- Preservar busca geral -->
+                                    <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                                    
+                                    <!-- Filtros de Data -->
+                                    <div class="col-md-3">
+                                        <label for="ano" class="form-label">Ano</label>
+                                        <select class="form-select" id="ano" name="ano" required>
+                                            {% for ano in anos_disponiveis %}
+                                                <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-9">
+                                        <label class="form-label">Meses (Selecione múltiplos meses ou deixe todos desmarcados para todos os meses)</label>
+                                        <div class="row g-2">
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="1" id="mes1" {% if 1 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes1">Janeiro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="2" id="mes2" {% if 2 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes2">Fevereiro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="3" id="mes3" {% if 3 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes3">Março</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="4" id="mes4" {% if 4 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes4">Abril</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="5" id="mes5" {% if 5 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes5">Maio</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="6" id="mes6" {% if 6 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes6">Junho</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="7" id="mes7" {% if 7 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes7">Julho</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="8" id="mes8" {% if 8 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes8">Agosto</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="9" id="mes9" {% if 9 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes9">Setembro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="10" id="mes10" {% if 10 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes10">Outubro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="11" id="mes11" {% if 11 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes11">Novembro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="12" id="mes12" {% if 12 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes12">Dezembro</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosMeses()">Selecionar Todos</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">Desmarcar Todos</button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Filtros de Situação e Uso Contábil -->
+                                    <div class="col-md-4">
+                                        <label for="filtro_situacao" class="form-label">Situação</label>
+                                        <select class="form-select" id="filtro_situacao" name="filtro_situacao">
+                                            <option value="">Todas as Situações</option>
+                                            {% for situacao in situacoes_unicas %}
+                                                <option value="{{ situacao }}" {% if filtro_situacao == situacao %}selected{% endif %}>{{ situacao }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="filtro_uso_contabil" class="form-label">Uso Contábil</label>
+                                        <select class="form-select" id="filtro_uso_contabil" name="filtro_uso_contabil">
+                                            <option value="">Todos os Usos Contábeis</option>
+                                            {% for uso in uso_contabil_unicos %}
+                                                <option value="{{ uso }}" {% if filtro_uso_contabil == uso %}selected{% endif %}>{{ uso }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="fas fa-search me-2"></i>Filtrar
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Search Bar -->
         <div class="row mb-4">
             <div class="col-12">
                 <form method="get" action="{% url 'consultar_notas_fiscais' %}" class="d-flex">
-                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por nota, emitente, unidade, situação..." value="{{ search_query|default:'' }}">
+                    <input type="hidden" name="ano" value="{{ ano_filtro }}">
+                    {% for mes in meses_filtro %}
+                        <input type="hidden" name="mes" value="{{ mes }}">
+                    {% endfor %}
+                    <input type="hidden" name="filtro_situacao" value="{{ filtro_situacao|default:'' }}">
+                    <input type="hidden" name="filtro_uso_contabil" value="{{ filtro_uso_contabil|default:'' }}">
+                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por nota, emitente, situação..." value="{{ search_query|default:'' }}">
                     <button type="submit" class="btn btn-outline-primary">
                         <i class="fas fa-search"></i> Buscar
                     </button>
@@ -102,7 +285,7 @@
                 <div class="card bg-primary text-white">
                     <div class="card-body">
                         <h5 class="card-title">Total de Notas</h5>
-                        <p class="card-text display-6">{{ total_count }}</p>
+                        <p class="card-text display-6 format-number">{{ total_count }}</p>
                     </div>
                 </div>
             </div>
@@ -110,7 +293,7 @@
                 <div class="card bg-success text-white">
                     <div class="card-body">
                         <h5 class="card-title">Emitentes Únicos</h5>
-                        <p class="card-text display-6">{{ emitentes_count }}</p>
+                        <p class="card-text display-6 format-number">{{ emitentes_count }}</p>
                     </div>
                 </div>
             </div>
@@ -118,7 +301,7 @@
                 <div class="card bg-info text-white">
                     <div class="card-body">
                         <h5 class="card-title">Unidades</h5>
-                        <p class="card-text display-6">{{ unidades_count }}</p>
+                        <p class="card-text display-6 format-number">{{ unidades_count }}</p>
                     </div>
                 </div>
             </div>
@@ -126,7 +309,7 @@
                 <div class="card bg-warning text-white">
                     <div class="card-body">
                         <h5 class="card-title">Valor Total</h5>
-                        <p class="card-text display-6">R$ {{ valor_total|floatformat:2 }}</p>
+                        <p class="card-text display-6 format-money" data-value="{{ valor_total|default:0 }}">R$ {{ valor_total|floatformat:2 }}</p>
                     </div>
                 </div>
             </div>
@@ -139,13 +322,18 @@
                     <div class="card-header bg-secondary text-white">
                         <h5 class="mb-0">
                             <i class="fas fa-file-invoice me-2"></i>Notas Fiscais
-                            <small class="ms-2">({{ notas.paginator.count }} registro{{ notas.paginator.count|pluralize }})</small>
+                            <small class="ms-2">(<span class="format-number">{{ notas.paginator.count }}</span> registro{{ notas.paginator.count|pluralize }})</small>
                         </h5>
                     </div>
                     <div class="card-body p-0">
                         <form method="get" action="{% url 'consultar_notas_fiscais' %}" id="filterForm">
-                            <!-- Preservar busca geral -->
+                            <!-- Preservar busca geral e filtros -->
                             <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                            <input type="hidden" name="ano" value="{{ ano_filtro }}">
+                            {% for mes in meses_filtro %}
+                                <input type="hidden" name="mes" value="{{ mes }}">
+                            {% endfor %}
+                            <!-- Note: filtro_situacao and filtro_uso_contabil are in the filter row as selects, so they will be submitted automatically -->
                             
                             <div class="table-container">
                                 <table class="table table-hover table-striped mb-0">
@@ -154,62 +342,76 @@
                                             <th class="col-nota">Nota</th>
                                             <th class="col-emitente">Emitente</th>
                                             <th class="col-data">Data Emissão</th>
+                                            <th class="col-data-autorizacao">Data Autorização</th>
                                             <th class="col-valor">Total</th>
-                                            <th class="col-unidade">Unidade</th>
+                                            <th class="col-uso-contabil">Uso Contábil</th>
                                             <th class="col-situacao">Situação</th>
-                                            <th>Ações</th>
+                                            <th class="col-acoes">Ações</th>
                                         </tr>
                                         <tr class="filter-row">
                                             <th>
-                                                <input type="text" name="filtro_nota" class="filter-input" value="{{ filtro_nota|default:'' }}" placeholder="Nota">
+                                                <input type="text" name="filtro_nota" class="filter-input" value="{{ filtro_nota|default:'' }}" placeholder="Filtrar Nota" onchange="document.getElementById('filterForm').submit();">
                                             </th>
                                             <th>
-                                                <input type="text" name="filtro_emitente" class="filter-input" value="{{ filtro_emitente|default:'' }}" placeholder="Emitente">
+                                                <input type="text" name="filtro_emitente" class="filter-input" value="{{ filtro_emitente|default:'' }}" placeholder="Filtrar Emitente" onchange="document.getElementById('filterForm').submit();">
                                             </th>
                                             <th>
-                                                <input type="text" name="filtro_data_emissao_inicio" class="filter-input" value="{{ filtro_data_emissao_inicio|default:'' }}" placeholder="Data Início">
-                                            </th>
-                                            <th>
-                                                <input type="text" name="filtro_total_min" class="filter-input" value="{{ filtro_total_min|default:'' }}" placeholder="Min">
-                                            </th>
-                                            <th>
-                                                <select name="filtro_unidade" class="filter-input">
-                                                    <option value="">Todas</option>
-                                                    {% for unidade in unidades_unicas %}
-                                                    <option value="{{ unidade }}" {% if filtro_unidade == unidade %}selected{% endif %}>{{ unidade }}</option>
+                                                <select name="filtro_data_emissao" class="filter-input" onchange="document.getElementById('filterForm').submit();">
+                                                    <option value="">Todas as Datas</option>
+                                                    {% for data in datas_emissao_unicas %}
+                                                        <option value="{{ data }}" {% if filtro_data_emissao == data %}selected{% endif %}>{{ data }}</option>
                                                     {% endfor %}
                                                 </select>
                                             </th>
                                             <th>
-                                                <select name="filtro_situacao" class="filter-input">
-                                                    <option value="">Todas</option>
-                                                    {% for situacao in situacoes_unicas %}
-                                                    <option value="{{ situacao }}" {% if filtro_situacao == situacao %}selected{% endif %}>{{ situacao }}</option>
+                                                <select name="filtro_data_autorizacao" class="filter-input" onchange="document.getElementById('filterForm').submit();">
+                                                    <option value="">Todas as Datas</option>
+                                                    {% for data in datas_autorizacao_unicas %}
+                                                        <option value="{{ data }}" {% if filtro_data_autorizacao == data %}selected{% endif %}>{{ data }}</option>
                                                     {% endfor %}
                                                 </select>
                                             </th>
                                             <th>
-                                                <button type="submit" class="btn btn-sm btn-primary w-100">
-                                                    <i class="fas fa-filter"></i> Filtrar
-                                                </button>
+                                                <div class="d-flex gap-1">
+                                                    <input type="text" name="filtro_total_min" class="filter-input" value="{{ filtro_total_min|default:'' }}" placeholder="Min" style="width: 48%;" onchange="document.getElementById('filterForm').submit();">
+                                                    <input type="text" name="filtro_total_max" class="filter-input" value="{{ filtro_total_max|default:'' }}" placeholder="Max" style="width: 48%;" onchange="document.getElementById('filterForm').submit();">
+                                                </div>
                                             </th>
+                                            <th>
+                                                <select name="filtro_uso_contabil" class="filter-input" onchange="document.getElementById('filterForm').submit();">
+                                                    <option value="">Todos</option>
+                                                    {% for uso in uso_contabil_unicos_filtrados %}
+                                                        <option value="{{ uso }}" {% if filtro_uso_contabil == uso %}selected{% endif %}>{{ uso }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </th>
+                                            <th>
+                                                <select name="filtro_situacao" class="filter-input" onchange="document.getElementById('filterForm').submit();">
+                                                    <option value="">Todas</option>
+                                                    {% for situacao in situacoes_unicas_filtradas %}
+                                                        <option value="{{ situacao }}" {% if filtro_situacao == situacao %}selected{% endif %}>{{ situacao }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </th>
+                                            <th></th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for nota in notas %}
                                         <tr>
-                                            <td><span class="badge bg-primary">{{ nota.nota|default:"-" }}</span></td>
-                                            <td>{{ nota.nome_fantasia_emitente|default:nota.emitente|default:"-"|truncatechars:40 }}</td>
-                                            <td>{{ nota.data_emissao|default:"-" }}</td>
-                                            <td class="text-end">
+                                            <td class="col-nota"><span class="badge bg-primary format-number">{{ nota.nota|default:"-" }}</span></td>
+                                            <td class="col-emitente">{{ nota.nome_fantasia_emitente|default:nota.emitente|default:"-"|truncatechars:40 }}</td>
+                                            <td class="col-data">{{ nota.data_emissao|default:"-" }}</td>
+                                            <td class="col-data-autorizacao">{{ nota.data_autorizacao|default:"-" }}</td>
+                                            <td class="col-valor">
                                                 {% if nota.total_nota %}
-                                                    R$ {{ nota.total_nota|floatformat:2 }}
+                                                    <span class="format-money" data-value="{{ nota.total_nota|default:0 }}">R$ {{ nota.total_nota|floatformat:2 }}</span>
                                                 {% else %}
                                                     -
                                                 {% endif %}
                                             </td>
-                                            <td>{{ nota.nome_unidade|default:nota.unidade|default:"-"|truncatechars:30 }}</td>
-                                            <td>
+                                            <td class="col-uso-contabil">{{ nota.uso_contabil|default:"-" }}</td>
+                                            <td class="col-situacao">
                                                 {% if nota.situacao %}
                                                     <span class="badge {% if 'AUTORIZADA' in nota.situacao %}bg-success{% elif 'PENDENTE' in nota.situacao %}bg-warning{% elif 'CANCELADA' in nota.situacao %}bg-danger{% else %}bg-secondary{% endif %}">
                                                         {{ nota.situacao|truncatechars:30 }}
@@ -218,7 +420,7 @@
                                                     -
                                                 {% endif %}
                                             </td>
-                                            <td>
+                                            <td class="col-acoes">
                                                 <a href="{% url 'visualizar_nota_fiscal' nota.id %}" class="btn btn-sm btn-outline-primary" title="Visualizar">
                                                     <i class="fas fa-eye"></i>
                                                 </a>
@@ -226,7 +428,7 @@
                                         </tr>
                                         {% empty %}
                                         <tr>
-                                            <td colspan="7" class="text-center text-muted py-5">
+                                            <td colspan="8" class="text-center text-muted py-5">
                                                 <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
                                                 Nenhuma nota fiscal encontrada.
                                             </td>
@@ -249,25 +451,25 @@
                     <ul class="pagination justify-content-center">
                         {% if notas.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filtro_nota %}filtro_nota={{ filtro_nota }}&{% endif %}{% if filtro_emitente %}filtro_emitente={{ filtro_emitente }}&{% endif %}{% if filtro_unidade %}filtro_unidade={{ filtro_unidade }}&{% endif %}{% if filtro_situacao %}filtro_situacao={{ filtro_situacao }}&{% endif %}page=1">Primeira</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if filtro_nota %}&filtro_nota={{ filtro_nota }}{% endif %}{% if filtro_emitente %}&filtro_emitente={{ filtro_emitente }}{% endif %}{% if filtro_data_emissao %}&filtro_data_emissao={{ filtro_data_emissao }}{% endif %}{% if filtro_data_autorizacao %}&filtro_data_autorizacao={{ filtro_data_autorizacao }}{% endif %}{% if filtro_situacao %}&filtro_situacao={{ filtro_situacao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_total_min %}&filtro_total_min={{ filtro_total_min }}{% endif %}{% if filtro_total_max %}&filtro_total_max={{ filtro_total_max }}{% endif %}&page=1">Primeira</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filtro_nota %}filtro_nota={{ filtro_nota }}&{% endif %}{% if filtro_emitente %}filtro_emitente={{ filtro_emitente }}&{% endif %}{% if filtro_unidade %}filtro_unidade={{ filtro_unidade }}&{% endif %}{% if filtro_situacao %}filtro_situacao={{ filtro_situacao }}&{% endif %}page={{ notas.previous_page_number }}">Anterior</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if filtro_nota %}&filtro_nota={{ filtro_nota }}{% endif %}{% if filtro_emitente %}&filtro_emitente={{ filtro_emitente }}{% endif %}{% if filtro_data_emissao %}&filtro_data_emissao={{ filtro_data_emissao }}{% endif %}{% if filtro_data_autorizacao %}&filtro_data_autorizacao={{ filtro_data_autorizacao }}{% endif %}{% if filtro_situacao %}&filtro_situacao={{ filtro_situacao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_total_min %}&filtro_total_min={{ filtro_total_min }}{% endif %}{% if filtro_total_max %}&filtro_total_max={{ filtro_total_max }}{% endif %}&page={{ notas.previous_page_number }}">Anterior</a>
                             </li>
                         {% endif %}
                         
                         <li class="page-item active">
                             <span class="page-link">
-                                Página {{ notas.number }} de {{ notas.paginator.num_pages }}
+                                Página <span class="format-number">{{ notas.number }}</span> de <span class="format-number">{{ notas.paginator.num_pages }}</span>
                             </span>
                         </li>
                         
                         {% if notas.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filtro_nota %}filtro_nota={{ filtro_nota }}&{% endif %}{% if filtro_emitente %}filtro_emitente={{ filtro_emitente }}&{% endif %}{% if filtro_unidade %}filtro_unidade={{ filtro_unidade }}&{% endif %}{% if filtro_situacao %}filtro_situacao={{ filtro_situacao }}&{% endif %}page={{ notas.next_page_number }}">Próxima</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if filtro_nota %}&filtro_nota={{ filtro_nota }}{% endif %}{% if filtro_emitente %}&filtro_emitente={{ filtro_emitente }}{% endif %}{% if filtro_data_emissao %}&filtro_data_emissao={{ filtro_data_emissao }}{% endif %}{% if filtro_data_autorizacao %}&filtro_data_autorizacao={{ filtro_data_autorizacao }}{% endif %}{% if filtro_situacao %}&filtro_situacao={{ filtro_situacao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_total_min %}&filtro_total_min={{ filtro_total_min }}{% endif %}{% if filtro_total_max %}&filtro_total_max={{ filtro_total_max }}{% endif %}&page={{ notas.next_page_number }}">Próxima</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filtro_nota %}filtro_nota={{ filtro_nota }}&{% endif %}{% if filtro_emitente %}filtro_emitente={{ filtro_emitente }}&{% endif %}{% if filtro_unidade %}filtro_unidade={{ filtro_unidade }}&{% endif %}{% if filtro_situacao %}filtro_situacao={{ filtro_situacao }}&{% endif %}page={{ notas.paginator.num_pages }}">Última</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if filtro_nota %}&filtro_nota={{ filtro_nota }}{% endif %}{% if filtro_emitente %}&filtro_emitente={{ filtro_emitente }}{% endif %}{% if filtro_data_emissao %}&filtro_data_emissao={{ filtro_data_emissao }}{% endif %}{% if filtro_data_autorizacao %}&filtro_data_autorizacao={{ filtro_data_autorizacao }}{% endif %}{% if filtro_situacao %}&filtro_situacao={{ filtro_situacao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_total_min %}&filtro_total_min={{ filtro_total_min }}{% endif %}{% if filtro_total_max %}&filtro_total_max={{ filtro_total_max }}{% endif %}&page={{ notas.paginator.num_pages }}">Última</a>
                             </li>
                         {% endif %}
                     </ul>
@@ -281,8 +483,45 @@
 
 {% block extra_js %}
 <script>
-// Auto-submit form when filter inputs change
+// Função para formatar números no padrão brasileiro (1.234,56)
+function formatarNumeroBR(numero, decimais = 2) {
+    if (numero === null || numero === undefined || isNaN(numero)) {
+        return '0,00';
+    }
+    const num = typeof numero === 'string' ? parseFloat(numero) : numero;
+    return num.toLocaleString('pt-BR', {
+        minimumFractionDigits: decimais,
+        maximumFractionDigits: decimais
+    });
+}
+
+// Função para formatar moeda
+function formatarMoeda(valor) {
+    return 'R$ ' + formatarNumeroBR(valor, 2);
+}
+
+// Formatar números na página após carregamento
 document.addEventListener('DOMContentLoaded', function() {
+    // Formatar valores monetários
+    const currencyElements = document.querySelectorAll('.format-money');
+    currencyElements.forEach(el => {
+        const valor = parseFloat(el.getAttribute('data-value') || el.textContent.replace('R$', '').replace(/\./g, '').replace(',', '.').trim());
+        if (!isNaN(valor)) {
+            el.textContent = formatarMoeda(valor);
+        }
+    });
+    
+    // Formatar números simples
+    const numberElements = document.querySelectorAll('.format-number');
+    numberElements.forEach(el => {
+        const texto = el.textContent.trim();
+        const numero = parseFloat(texto.replace(/\./g, '').replace(',', '.'));
+        if (!isNaN(numero)) {
+            el.textContent = formatarNumeroBR(numero, 0);
+        }
+    });
+    
+    // Auto-submit form when filter inputs change
     const filterInputs = document.querySelectorAll('.filter-input');
     const filterForm = document.getElementById('filterForm');
     
@@ -304,5 +543,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+// Funções para selecionar/desmarcar todos os meses
+function selecionarTodosMeses() {
+    const checkboxes = document.querySelectorAll('input[name="mes"]');
+    checkboxes.forEach(cb => cb.checked = true);
+}
+
+function desmarcarTodosMeses() {
+    const checkboxes = document.querySelectorAll('input[name="mes"]');
+    checkboxes.forEach(cb => cb.checked = false);
+}
 </script>
 {% endblock %}

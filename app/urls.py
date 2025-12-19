@@ -27,8 +27,6 @@ urlpatterns = [
     path('importar/locais-e-cas/', views.importar_locais_e_cas, name="importar_locais_e_cas"),
     path('importar/estoque/', views.importar_estoque, name="importar_estoque"),
     path('importar/projecao-gastos/', views.importar_projecao_gastos, name="importar_projecao_gastos"),
-    path('importar/projecao-gastos/revisar-duplicatas/', views.revisar_duplicatas_projecao_gastos, name="revisar_duplicatas_projecao_gastos"),
-    path('importar/projecao-gastos/processar-duplicatas/', views.processar_duplicatas_projecao_gastos, name="processar_duplicatas_projecao_gastos"),
     
     # Estoque
     path('estoque/consultar/', views.consultar_estoque, name="consultar_estoque"),
@@ -45,8 +43,6 @@ urlpatterns = [
     path('orcamento/dados-orcamento/', views.dados_orcamento, name="dados_orcamento"),
     path('orcamento/analise-geral/', views.analise_geral_orcamento, name="analise_geral_orcamento"),
     path('orcamento/consultar-projecao-gastos/', views.consultar_projecao_gastos, name="consultar_projecao_gastos"),
-    path('orcamento/deletar-projecao-gasto/<int:projecao_id>/', views.deletar_projecao_gasto, name="deletar_projecao_gasto"),
-    path('orcamento/deletar-projecao-gasto-em-massa/', views.deletar_projecao_gasto_em_massa, name="deletar_projecao_gasto_em_massa"),
     path('orcamento/analise-projecao-gastos/', views.analise_projecao_gastos, name="analise_projecao_gastos"),
     path('orcamento/analise-notas-fiscais/', views.analise_notas_fiscais, name="analise_notas_fiscais"),
     path('orcamento/relacionar-projecao-nota-fiscal/', views.relacionar_projecao_nota_fiscal, name="relacionar_projecao_nota_fiscal"),

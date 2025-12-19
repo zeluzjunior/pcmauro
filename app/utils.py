@@ -3420,19 +3420,16 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
         return 0, 0, errors
 
 
-def upload_projecao_gastos_from_file(file, update_existing=False, check_duplicates_only=False, skip_duplicate_ids=None) -> Tuple[int, int, List[str], List[Dict]]:
+def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:
     """
     Faz upload de projeções de gastos a partir de um arquivo Excel
     
     Args:
         file: Arquivo Django UploadedFile
         update_existing: Se True, atualiza registros existentes. Se False, ignora duplicados.
-        check_duplicates_only: Se True, apenas verifica duplicatas sem importar
-        skip_duplicate_ids: Lista de IDs de duplicatas que o usuário confirmou para pular
     
     Returns:
-        Tupla (created_count, updated_count, errors, potential_duplicates)
-        potential_duplicates: Lista de dicionários com informações sobre duplicatas encontradas
+        Tupla (created_count, updated_count, errors)
     """
     from app.models import ProjecaoGasto
     from datetime import datetime
@@ -3441,7 +3438,6 @@ def upload_projecao_gastos_from_file(file, update_existing=False, check_duplicat
     errors = []
     created_count = 0
     updated_count = 0
-    potential_duplicates = []  # Lista de duplicatas encontradas
     
     # Determinar tipo de arquivo
     file_name = file.name.lower()
@@ -3581,124 +3577,118 @@ def upload_projecao_gastos_from_file(file, update_existing=False, check_duplicat
                     projecao_obj = None
                     created = False
                     
-                    # Normalizar numero_requisicao_compra e numero_pedido_compra (tratar strings vazias como None)
-                    if numero_requisicao_compra:
-                        if isinstance(numero_requisicao_compra, str):
-                            numero_requisicao_compra = numero_requisicao_compra.strip()
-                        else:
-                            numero_requisicao_compra = str(numero_requisicao_compra).strip()
-                        numero_requisicao_compra = numero_requisicao_compra if numero_requisicao_compra else None
-                    else:
-                        numero_requisicao_compra = None
-                    
-                    if numero_pedido_compra:
-                        if isinstance(numero_pedido_compra, str):
-                            numero_pedido_compra = numero_pedido_compra.strip()
-                        else:
-                            numero_pedido_compra = str(numero_pedido_compra).strip()
-                        numero_pedido_compra = numero_pedido_compra if numero_pedido_compra else None
-                    else:
-                        numero_pedido_compra = None
-                    
                     # Tentativa 1: Usar numero_requisicao_compra como chave única
                     if numero_requisicao_compra:
-                        # Usar filter().first() para evitar erro quando há múltiplos registros
-                        existing = ProjecaoGasto.objects.filter(numero_requisicao_compra=numero_requisicao_compra).first()
-                        
-                        if existing:
-                            # Criar hash único para identificar esta duplicata
-                            duplicate_key = f"req_{numero_requisicao_compra}_{row_num}"
-                            
-                            # Se check_duplicates_only, apenas coletar a duplicata
-                            if check_duplicates_only:
-                                potential_duplicates.append({
-                                    'row_num': row_num,
-                                    'key': duplicate_key,
-                                    'match_type': 'numero_requisicao_compra',
-                                    'match_value': numero_requisicao_compra,
-                                    'new_data': projecao_data,
-                                    'existing_id': existing.id,
-                                    'existing': existing,
-                                })
-                                continue  # Pular para próxima linha
-                            
-                            # Se está na lista de IDs para pular, pular
-                            if skip_duplicate_ids and duplicate_key in skip_duplicate_ids:
-                                projecao_obj = existing
-                                created = False
-                                continue
-                            
-                            if update_existing:
-                                # Atualizar registro existente
-                                for key, value in projecao_data.items():
-                                    setattr(existing, key, value)
-                                existing.save()
-                                projecao_obj = existing
-                                created = False
-                                updated_count += 1
-                            else:
-                                # Coletar duplicata para revisão
-                                potential_duplicates.append({
-                                    'row_num': row_num,
-                                    'key': duplicate_key,
-                                    'match_type': 'numero_requisicao_compra',
-                                    'match_value': numero_requisicao_compra,
-                                    'new_data': projecao_data,
-                                    'existing_id': existing.id,
-                                    'existing': existing,
-                                })
-                                # Não criar nem atualizar - aguardar confirmação do usuário
-                                continue
-                        else:
-                            # Criar novo registro
-                            # Verificar se já existe (pode haver duplicatas no banco)
-                            try:
-                                projecao_obj = ProjecaoGasto.objects.create(**projecao_data)
-                                created = True
+                        if update_existing:
+                            projecao_obj, created = ProjecaoGasto.objects.update_or_create(
+                                numero_requisicao_compra=numero_requisicao_compra,
+                                defaults=projecao_data
+                            )
+                            if created:
                                 created_count += 1
-                            except Exception as create_error:
-                                # Se falhar por constraint unique ou se já existe duplicata
-                                error_str = str(create_error).lower()
-                                if 'unique' in error_str or 'duplicate' in error_str or 'get() returned more than one' in error_str:
-                                    # Tentar encontrar registro existente novamente (pode ter sido criado entre a verificação e agora)
-                                    existing_retry = ProjecaoGasto.objects.filter(numero_requisicao_compra=numero_requisicao_compra).order_by('-created_at').first()
-                                    if existing_retry:
-                                        projecao_obj = existing_retry
-                                        created = False
-                                    else:
-                                        # Se não encontrou, re-lançar o erro original
-                                        raise create_error
-                                else:
-                                    raise create_error
+                            else:
+                                updated_count += 1
+                        else:
+                            projecao_obj, created = ProjecaoGasto.objects.get_or_create(
+                                numero_requisicao_compra=numero_requisicao_compra,
+                                defaults=projecao_data
+                            )
+                            if created:
+                                created_count += 1
                     
                     # Tentativa 2: Se não encontrou e tem numero_pedido_compra, usar esse
                     elif numero_pedido_compra:
-                        # Usar filter().first() para evitar erro quando há múltiplos registros
-                        existing = ProjecaoGasto.objects.filter(numero_pedido_compra=numero_pedido_compra).first()
+                        if update_existing:
+                            projecao_obj, created = ProjecaoGasto.objects.update_or_create(
+                                numero_pedido_compra=numero_pedido_compra,
+                                defaults=projecao_data
+                            )
+                            if created:
+                                created_count += 1
+                            else:
+                                updated_count += 1
+                        else:
+                            projecao_obj, created = ProjecaoGasto.objects.get_or_create(
+                                numero_pedido_compra=numero_pedido_compra,
+                                defaults=projecao_data
+                            )
+                            if created:
+                                created_count += 1
+                    
+                    # Tentativa 3: Se não tem números únicos, usar fingerprint baseado em múltiplos campos
+                    else:
+                        fingerprint = criar_fingerprint(
+                            setor, descricao, fornecedor_nome, fornecedor_cnpj, valor_total,
+                            mes_referencia, ano_referencia, data_abertura, uso_contabil
+                        )
+                        
+                        # Buscar registros existentes que correspondem ao fingerprint
+                        # Verificar se existe registro com mesma combinação de campos chave
+                        from django.db.models import Q
+                        from functools import reduce
+                        from operator import and_
+                        
+                        # Construir lista de condições Q
+                        q_conditions = []
+                        
+                        # Adicionar condições para cada campo (só se o campo tiver valor)
+                        if setor:
+                            q_conditions.append(Q(setor=setor))
+                        else:
+                            q_conditions.append(Q(setor__isnull=True) | Q(setor=''))
+                        
+                        if descricao:
+                            q_conditions.append(Q(descricao=descricao))
+                        else:
+                            q_conditions.append(Q(descricao__isnull=True) | Q(descricao=''))
+                        
+                        if fornecedor_nome:
+                            q_conditions.append(Q(fornecedor_nome_fantasia=fornecedor_nome))
+                        else:
+                            q_conditions.append(Q(fornecedor_nome_fantasia__isnull=True) | Q(fornecedor_nome_fantasia=''))
+                        
+                        if fornecedor_cnpj:
+                            q_conditions.append(Q(fornecedor_cnpj=fornecedor_cnpj))
+                        else:
+                            q_conditions.append(Q(fornecedor_cnpj__isnull=True) | Q(fornecedor_cnpj=''))
+                        
+                        if valor_total:
+                            q_conditions.append(Q(valor_total=valor_total))
+                        else:
+                            q_conditions.append(Q(valor_total__isnull=True))
+                        
+                        if mes_referencia:
+                            q_conditions.append(Q(mes_referencia=mes_referencia))
+                        else:
+                            q_conditions.append(Q(mes_referencia__isnull=True) | Q(mes_referencia=''))
+                        
+                        if ano_referencia:
+                            q_conditions.append(Q(ano_referencia=ano_referencia))
+                        else:
+                            q_conditions.append(Q(ano_referencia__isnull=True))
+                        
+                        if data_abertura:
+                            q_conditions.append(Q(data_abertura_requisicao=data_abertura))
+                        else:
+                            q_conditions.append(Q(data_abertura_requisicao__isnull=True))
+                        
+                        if uso_contabil:
+                            q_conditions.append(Q(uso_contabil=uso_contabil))
+                        else:
+                            q_conditions.append(Q(uso_contabil__isnull=True) | Q(uso_contabil=''))
+                        
+                        # Garantir que não tem numero_requisicao_compra nem numero_pedido_compra
+                        q_conditions.append(Q(numero_requisicao_compra__isnull=True) | Q(numero_requisicao_compra=''))
+                        q_conditions.append(Q(numero_pedido_compra__isnull=True) | Q(numero_pedido_compra=''))
+                        
+                        # Combinar todas as condições com AND
+                        if q_conditions:
+                            query = reduce(and_, q_conditions)
+                            existing = ProjecaoGasto.objects.filter(query).first()
+                        else:
+                            existing = None
                         
                         if existing:
-                            # Criar hash único para identificar esta duplicata
-                            duplicate_key = f"ped_{numero_pedido_compra}_{row_num}"
-                            
-                            # Se check_duplicates_only, apenas coletar a duplicata
-                            if check_duplicates_only:
-                                potential_duplicates.append({
-                                    'row_num': row_num,
-                                    'key': duplicate_key,
-                                    'match_type': 'numero_pedido_compra',
-                                    'match_value': numero_pedido_compra,
-                                    'new_data': projecao_data,
-                                    'existing_id': existing.id,
-                                    'existing': existing,
-                                })
-                                continue  # Pular para próxima linha
-                            
-                            # Se está na lista de IDs para pular, pular
-                            if skip_duplicate_ids and duplicate_key in skip_duplicate_ids:
-                                projecao_obj = existing
-                                created = False
-                                continue
-                            
                             if update_existing:
                                 # Atualizar registro existente
                                 for key, value in projecao_data.items():
@@ -3708,54 +3698,14 @@ def upload_projecao_gastos_from_file(file, update_existing=False, check_duplicat
                                 created = False
                                 updated_count += 1
                             else:
-                                # Coletar duplicata para revisão
-                                potential_duplicates.append({
-                                    'row_num': row_num,
-                                    'key': duplicate_key,
-                                    'match_type': 'numero_pedido_compra',
-                                    'match_value': numero_pedido_compra,
-                                    'new_data': projecao_data,
-                                    'existing_id': existing.id,
-                                    'existing': existing,
-                                })
-                                # Não criar nem atualizar - aguardar confirmação do usuário
-                                continue
+                                # Ignorar duplicata
+                                projecao_obj = existing
+                                created = False
                         else:
                             # Criar novo registro
-                            # Verificar se já existe (pode haver duplicatas no banco)
-                            try:
-                                projecao_obj = ProjecaoGasto.objects.create(**projecao_data)
-                                created = True
-                                created_count += 1
-                            except Exception as create_error:
-                                # Se falhar por constraint unique ou se já existe duplicata
-                                error_str = str(create_error).lower()
-                                if 'unique' in error_str or 'duplicate' in error_str or 'get() returned more than one' in error_str:
-                                    # Tentar encontrar registro existente novamente (pode ter sido criado entre a verificação e agora)
-                                    existing_retry = ProjecaoGasto.objects.filter(numero_pedido_compra=numero_pedido_compra).order_by('-created_at').first()
-                                    if existing_retry:
-                                        projecao_obj = existing_retry
-                                        created = False
-                                    else:
-                                        # Se não encontrou, re-lançar o erro original
-                                        raise create_error
-                                else:
-                                    raise create_error
-                    
-                    # Tentativa 3: Se não tem números únicos, criar como novo (não fazer matching)
-                    # Usuário pediu para usar apenas numero_requisicao_compra e numero_pedido_compra
-                    else:
-                        # Sem números únicos, criar como novo registro
-                        try:
                             projecao_obj = ProjecaoGasto.objects.create(**projecao_data)
                             created = True
                             created_count += 1
-                        except Exception as create_error:
-                            error_str = str(create_error).lower()
-                            if 'unique' in error_str or 'duplicate' in error_str:
-                                errors.append(f"Linha {row_num}: Erro ao criar registro - {str(create_error)}")
-                            else:
-                                raise create_error
                     
                         
                 except Exception as e:
@@ -3764,18 +3714,18 @@ def upload_projecao_gastos_from_file(file, update_existing=False, check_duplicat
                     print(f"Erro ao processar linha {row_num}: {error_msg}")
                     continue
         
-        return created_count, updated_count, errors, potential_duplicates
+        return created_count, updated_count, errors
     
     except ValidationError as e:
         errors.append(str(e))
-        return 0, 0, errors, []
+        return 0, 0, errors
     except Exception as e:
         error_detail = f"Erro geral ao processar arquivo: {str(e)}"
         errors.append(error_detail)
         print(f"Erro geral: {error_detail}")
         import traceback
         traceback.print_exc()
-        return 0, 0, errors, []
+        return 0, 0, errors
 
 
 def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:

@@ -2563,58 +2563,8 @@ def importar_projecao_gastos(request):
         update_existing = request.POST.get('update_existing', 'off') == 'on'
         
         try:
-            # Primeiro, verificar duplicatas sem importar
-            _, _, _, potential_duplicates = upload_projecao_gastos_from_file(
-                file, 
-                update_existing=False,
-                check_duplicates_only=True
-            )
-            
-            # Se há duplicatas, redirecionar para página de revisão
-            if potential_duplicates:
-                # Salvar dados do arquivo na sessão para processar depois
-                file.seek(0)
-                import base64
-                from decimal import Decimal
-                from datetime import date, datetime
-                
-                file_content = file.read()
-                file_data = {
-                    'name': file.name,
-                    'content': base64.b64encode(file_content).decode('utf-8'),
-                    'update_existing': update_existing,
-                }
-                request.session['projecao_gastos_file_data'] = file_data
-                
-                # Converter dados para formato JSON-serializable
-                duplicates_serializable = []
-                for dup in potential_duplicates:
-                    # Converter new_data para formato serializável
-                    new_data_serializable = {}
-                    for key, value in dup['new_data'].items():
-                        if isinstance(value, Decimal):
-                            new_data_serializable[key] = str(value)
-                        elif isinstance(value, (date, datetime)):
-                            new_data_serializable[key] = value.isoformat() if value else None
-                        elif value is None:
-                            new_data_serializable[key] = None
-                        else:
-                            new_data_serializable[key] = value
-                    
-                    duplicates_serializable.append({
-                        'row_num': dup['row_num'],
-                        'key': dup['key'],
-                        'match_type': dup['match_type'],
-                        'match_value': dup['match_value'],
-                        'new_data': new_data_serializable,
-                        'existing_id': dup['existing_id'],
-                    })
-                
-                request.session['projecao_gastos_duplicates'] = duplicates_serializable
-                return redirect('revisar_duplicatas_projecao_gastos')
-            
-            # Se não há duplicatas, fazer upload normalmente
-            created_count, updated_count, errors, _ = upload_projecao_gastos_from_file(
+            # Fazer upload dos dados
+            created_count, updated_count, errors = upload_projecao_gastos_from_file(
                 file, 
                 update_existing=update_existing
             )
@@ -2646,132 +2596,6 @@ def importar_projecao_gastos(request):
         'active_page': 'importar_projecao_gastos'
     }
     return render(request, 'importar/importar_projecao_gastos.html', context)
-
-
-def revisar_duplicatas_projecao_gastos(request):
-    """Página para revisar duplicatas encontradas durante importação"""
-    from app.models import ProjecaoGasto
-    from decimal import Decimal
-    from datetime import datetime, date
-    
-    # Recuperar dados da sessão
-    duplicates_data = request.session.get('projecao_gastos_duplicates', [])
-    file_data = request.session.get('projecao_gastos_file_data', None)
-    
-    if not duplicates_data or not file_data:
-        messages.error(request, 'Sessão expirada. Por favor, faça o upload novamente.')
-        return redirect('importar_projecao_gastos')
-    
-    # Carregar registros existentes e converter dados serializados de volta
-    duplicates = []
-    for dup_data in duplicates_data:
-        try:
-            existing = ProjecaoGasto.objects.get(id=dup_data['existing_id'])
-            
-            # Converter new_data de volta para tipos apropriados (se necessário para exibição)
-            new_data = dup_data['new_data'].copy()
-            # Converter strings de Decimal de volta para Decimal se necessário
-            if 'valor_total' in new_data and new_data['valor_total']:
-                try:
-                    new_data['valor_total'] = Decimal(str(new_data['valor_total']))
-                except (ValueError, TypeError):
-                    pass
-            
-            # Converter strings de data de volta para date se necessário
-            if 'data_abertura_requisicao' in new_data and new_data['data_abertura_requisicao']:
-                if isinstance(new_data['data_abertura_requisicao'], str):
-                    try:
-                        new_data['data_abertura_requisicao'] = datetime.fromisoformat(new_data['data_abertura_requisicao']).date()
-                    except (ValueError, AttributeError):
-                        pass
-            
-            duplicates.append({
-                'row_num': dup_data['row_num'],
-                'key': dup_data['key'],
-                'match_type': dup_data['match_type'],
-                'match_value': dup_data['match_value'],
-                'new_data': new_data,
-                'existing': existing,
-            })
-        except ProjecaoGasto.DoesNotExist:
-            continue
-    
-    context = {
-        'page_title': 'Revisar Duplicatas - Projeção de Gastos',
-        'active_page': 'importar_projecao_gastos',
-        'duplicates': duplicates,
-        'update_existing': file_data.get('update_existing', False),
-    }
-    return render(request, 'importar/revisar_duplicatas_projecao_gastos.html', context)
-
-
-def processar_duplicatas_projecao_gastos(request):
-    """Processa a confirmação do usuário sobre duplicatas e completa a importação"""
-    from app.utils import upload_projecao_gastos_from_file
-    import base64
-    from io import BytesIO
-    from django.core.files.uploadedfile import InMemoryUploadedFile
-    
-    if request.method != 'POST':
-        messages.error(request, 'Método inválido.')
-        return redirect('importar_projecao_gastos')
-    
-    # Recuperar dados da sessão
-    duplicates_data = request.session.get('projecao_gastos_duplicates', [])
-    file_data = request.session.get('projecao_gastos_file_data', None)
-    
-    if not file_data:
-        messages.error(request, 'Sessão expirada. Por favor, faça o upload novamente.')
-        return redirect('importar_projecao_gastos')
-    
-    # Obter IDs de duplicatas que o usuário confirmou para pular
-    skip_duplicate_keys = request.POST.getlist('skip_duplicates')
-    update_existing = file_data.get('update_existing', False)
-    
-    # Recriar arquivo a partir dos dados da sessão
-    file_content = base64.b64decode(file_data['content'])
-    file_obj = BytesIO(file_content)
-    uploaded_file = InMemoryUploadedFile(
-        file_obj, None, file_data['name'], 
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        len(file_content), None
-    )
-    
-    try:
-        # Fazer upload com os IDs para pular
-        created_count, updated_count, errors, _ = upload_projecao_gastos_from_file(
-            uploaded_file,
-            update_existing=update_existing,
-            skip_duplicate_ids=skip_duplicate_keys
-        )
-        
-        # Limpar sessão
-        if 'projecao_gastos_duplicates' in request.session:
-            del request.session['projecao_gastos_duplicates']
-        if 'projecao_gastos_file_data' in request.session:
-            del request.session['projecao_gastos_file_data']
-        
-        # Preparar mensagens
-        if errors:
-            for error in errors[:10]:
-                messages.warning(request, error)
-            if len(errors) > 10:
-                messages.warning(request, f'... e mais {len(errors) - 10} erros.')
-        
-        if created_count > 0:
-            messages.success(request, f'{created_count} projeção(ões) de gasto(s) criada(s) com sucesso!')
-        if updated_count > 0:
-            messages.info(request, f'{updated_count} projeção(ões) de gasto(s) atualizada(s)!')
-        if len(skip_duplicate_keys) > 0:
-            messages.info(request, f'{len(skip_duplicate_keys)} registro(s) duplicado(s) foram ignorados conforme sua seleção.')
-        
-    except Exception as e:
-        error_msg = f'Erro ao processar importação: {str(e)}'
-        messages.error(request, error_msg)
-        import traceback
-        traceback.print_exc()
-    
-    return redirect('importar_projecao_gastos')
 
 
 def importar_controle_nf_e_rc(request):
@@ -4712,9 +4536,86 @@ def consultar_notas_fiscais(request):
     from decimal import Decimal
     from datetime import datetime
     
+    # Função auxiliar para parse de datas
+    def parse_date(date_str):
+        """Tenta fazer parse de data em vários formatos"""
+        if not date_str:
+            return None
+        date_str = str(date_str).strip()
+        if not date_str:
+            return None
+        formats = ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d', '%d.%m.%Y']
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_str, fmt).date()
+            except ValueError:
+                continue
+        return None
+    
+    # Obter filtros de ano e meses (múltiplos)
+    ano_filtro = request.GET.get('ano', None)
+    meses_filtro = request.GET.getlist('mes')  # getlist para múltiplos valores
+    
+    # Valores padrão: ano atual e todos os meses (None)
+    hoje = datetime.now()
+    if not ano_filtro:
+        ano_filtro = str(hoje.year)
+    
+    # Converter para inteiro
+    try:
+        ano_filtro = int(ano_filtro)
+    except (ValueError, TypeError):
+        ano_filtro = hoje.year
+    
+    # Converter meses para inteiros e validar
+    meses_filtro_int = []
+    if meses_filtro:
+        for mes in meses_filtro:
+            try:
+                mes_int = int(mes)
+                if 1 <= mes_int <= 12:
+                    meses_filtro_int.append(mes_int)
+            except (ValueError, TypeError):
+                continue
+        # Remover duplicatas e ordenar
+        meses_filtro_int = sorted(list(set(meses_filtro_int)))
+    
+    # Se não há meses selecionados, usar todos os meses
+    meses_para_mostrar = meses_filtro_int if meses_filtro_int else list(range(1, 13))
+    
+    # Obter anos disponíveis (baseado em data_emissao)
+    anos_disponiveis = []
+    todas_notas_anos = NotaFiscal.objects.exclude(data_emissao__isnull=True).exclude(data_emissao='')
+    for nota in todas_notas_anos:
+        data_emissao = parse_date(nota.data_emissao)
+        if data_emissao:
+            anos_disponiveis.append(data_emissao.year)
+    anos_disponiveis = sorted(list(set(anos_disponiveis)), reverse=True)
+    if not anos_disponiveis:
+        anos_disponiveis = [hoje.year]
+    if hoje.year not in anos_disponiveis:
+        anos_disponiveis.insert(0, hoje.year)
+    
     # Busca geral
     search_query = request.GET.get('search', '').strip()
     notas_list = NotaFiscal.objects.all()
+    
+    # Filtrar por ano e mês (data_emissao ou data_autorizacao)
+    notas_filtradas_por_data = []
+    for nota in notas_list:
+        data_emissao = parse_date(nota.data_emissao)
+        data_autorizacao = parse_date(nota.data_autorizacao)
+        data_ref = data_emissao or data_autorizacao
+        
+        if data_ref and data_ref.year == ano_filtro:
+            if not meses_filtro_int or data_ref.month in meses_filtro_int:
+                notas_filtradas_por_data.append(nota.id)
+    
+    if notas_filtradas_por_data:
+        notas_list = notas_list.filter(id__in=notas_filtradas_por_data)
+    else:
+        # Se não há notas no ano/mês, retornar queryset vazio
+        notas_list = NotaFiscal.objects.none()
     
     # Aplicar busca geral
     if search_query:
@@ -4759,13 +4660,17 @@ def consultar_notas_fiscais(request):
     if filtro_situacao:
         notas_list = notas_list.filter(situacao__icontains=filtro_situacao)
     
-    filtro_data_emissao_inicio = request.GET.get('filtro_data_emissao_inicio', '').strip()
-    if filtro_data_emissao_inicio:
-        notas_list = notas_list.filter(data_emissao__icontains=filtro_data_emissao_inicio)
+    filtro_uso_contabil = request.GET.get('filtro_uso_contabil', '').strip()
+    if filtro_uso_contabil:
+        notas_list = notas_list.filter(uso_contabil__icontains=filtro_uso_contabil)
     
-    filtro_data_emissao_fim = request.GET.get('filtro_data_emissao_fim', '').strip()
-    if filtro_data_emissao_fim:
-        notas_list = notas_list.filter(data_emissao__icontains=filtro_data_emissao_fim)
+    filtro_data_emissao = request.GET.get('filtro_data_emissao', '').strip()
+    if filtro_data_emissao:
+        notas_list = notas_list.filter(data_emissao__icontains=filtro_data_emissao)
+    
+    filtro_data_autorizacao = request.GET.get('filtro_data_autorizacao', '').strip()
+    if filtro_data_autorizacao:
+        notas_list = notas_list.filter(data_autorizacao__icontains=filtro_data_autorizacao)
     
     filtro_total_min = request.GET.get('filtro_total_min', '').strip()
     if filtro_total_min:
@@ -4783,6 +4688,33 @@ def consultar_notas_fiscais(request):
         except (ValueError, TypeError):
             pass
     
+    # Obter valores únicos para os dropdowns de filtros (baseado nos dados já filtrados - ANTES da paginação)
+    # Isso garante que os filtros mostrem apenas valores que existem na tabela filtrada
+    situacoes_unicas_filtradas = notas_list.exclude(
+        situacao__isnull=True
+    ).exclude(
+        situacao=''
+    ).values_list('situacao', flat=True).distinct().order_by('situacao')
+    
+    uso_contabil_unicos_filtrados = notas_list.exclude(
+        uso_contabil__isnull=True
+    ).exclude(
+        uso_contabil=''
+    ).values_list('uso_contabil', flat=True).distinct().order_by('uso_contabil')
+    
+    # Obter datas únicas dos dados filtrados
+    datas_emissao_unicas = notas_list.exclude(
+        data_emissao__isnull=True
+    ).exclude(
+        data_emissao=''
+    ).values_list('data_emissao', flat=True).distinct().order_by('data_emissao')
+    
+    datas_autorizacao_unicas = notas_list.exclude(
+        data_autorizacao__isnull=True
+    ).exclude(
+        data_autorizacao=''
+    ).values_list('data_autorizacao', flat=True).distinct().order_by('data_autorizacao')
+    
     # Ordenar por data de emissão (mais recente primeiro)
     notas_list = notas_list.order_by('-data_emissao', '-created_at')
     
@@ -4791,7 +4723,7 @@ def consultar_notas_fiscais(request):
     page_number = request.GET.get('page', 1)
     notas = paginator.get_page(page_number)
     
-    # Estatísticas
+    # Estatísticas (todas as notas, não apenas as filtradas)
     total_count = NotaFiscal.objects.count()
     emitentes_count = NotaFiscal.objects.exclude(emitente__isnull=True).exclude(emitente='').values('emitente').distinct().count()
     unidades_count = NotaFiscal.objects.exclude(unidade__isnull=True).exclude(unidade='').values('unidade').distinct().count()
@@ -4802,12 +4734,18 @@ def consultar_notas_fiscais(request):
         if nota.total_nota:
             valor_total += nota.total_nota
     
-    # Obter valores únicos para os dropdowns de filtros
+    # Manter valores únicos gerais para estatísticas (todos os dados)
     situacoes_unicas = NotaFiscal.objects.exclude(
         situacao__isnull=True
     ).exclude(
         situacao=''
     ).values_list('situacao', flat=True).distinct().order_by('situacao')
+    
+    uso_contabil_unicos = NotaFiscal.objects.exclude(
+        uso_contabil__isnull=True
+    ).exclude(
+        uso_contabil=''
+    ).values_list('uso_contabil', flat=True).distinct().order_by('uso_contabil')
     
     unidades_unicas = NotaFiscal.objects.exclude(
         nome_unidade__isnull=True
@@ -4824,15 +4762,25 @@ def consultar_notas_fiscais(request):
         'unidades_count': unidades_count,
         'valor_total': valor_total,
         'situacoes_unicas': situacoes_unicas,
+        'situacoes_unicas_filtradas': situacoes_unicas_filtradas,
+        'uso_contabil_unicos': uso_contabil_unicos,
+        'uso_contabil_unicos_filtrados': uso_contabil_unicos_filtrados,
+        'datas_emissao_unicas': datas_emissao_unicas,
+        'datas_autorizacao_unicas': datas_autorizacao_unicas,
         'unidades_unicas': unidades_unicas,
+        # Filtros de ano e mês
+        'ano_filtro': ano_filtro,
+        'meses_filtro': meses_filtro_int,
+        'anos_disponiveis': anos_disponiveis,
         # Preservar filtros no contexto
         'search_query': search_query,
         'filtro_nota': filtro_nota,
         'filtro_emitente': filtro_emitente,
         'filtro_unidade': filtro_unidade,
         'filtro_situacao': filtro_situacao,
-        'filtro_data_emissao_inicio': filtro_data_emissao_inicio,
-        'filtro_data_emissao_fim': filtro_data_emissao_fim,
+        'filtro_uso_contabil': filtro_uso_contabil,
+        'filtro_data_emissao': filtro_data_emissao,
+        'filtro_data_autorizacao': filtro_data_autorizacao,
         'filtro_total_min': filtro_total_min,
         'filtro_total_max': filtro_total_max,
     }
@@ -11463,22 +11411,30 @@ def dados_orcamento(request):
     # Buscar todos os dados de orçamento
     todos_dados = DadosOrcamento.objects.all().order_by('ano', 'mes', 'conta_orcamentaria')
     
-    # Organizar por ano e mês
-    anos_dados = []
-    anos_unicos = sorted(set(todos_dados.values_list('ano', flat=True)), reverse=True)
-    
     meses_nomes = {
         1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
         5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
         9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
     }
     
-    for ano in anos_unicos:
+    # Anos que sempre devem aparecer (2025 e 2026)
+    anos_obrigatorios = [2025, 2026]
+    
+    # Obter anos únicos dos dados existentes
+    anos_com_dados = sorted(set(todos_dados.values_list('ano', flat=True)), reverse=True)
+    
+    # Combinar anos obrigatórios com anos que têm dados, removendo duplicatas
+    todos_anos = sorted(list(set(anos_obrigatorios + anos_com_dados)), reverse=True)
+    
+    # Organizar por ano e mês
+    anos_dados = []
+    
+    for ano in todos_anos:
         dados_ano = todos_dados.filter(ano=ano)
-        meses_unicos = sorted(set(dados_ano.values_list('mes', flat=True)))
         
+        # Sempre criar estrutura para todos os 12 meses
         meses_data = []
-        for mes in meses_unicos:
+        for mes in range(1, 13):
             dados_mes = dados_ano.filter(mes=mes)
             meses_data.append({
                 'mes': mes,
@@ -11488,22 +11444,6 @@ def dados_orcamento(request):
         
         anos_dados.append({
             'ano': ano,
-            'meses': meses_data
-        })
-    
-    # Se não houver dados, criar estrutura para o ano atual
-    if not anos_dados:
-        from datetime import datetime
-        ano_atual = datetime.now().year
-        meses_data = []
-        for mes in range(1, 13):
-            meses_data.append({
-                'mes': mes,
-                'mes_nome': meses_nomes.get(mes, f'Mês {mes}'),
-                'dados': []
-            })
-        anos_dados.append({
-            'ano': ano_atual,
             'meses': meses_data
         })
     
@@ -11637,7 +11577,7 @@ def analise_geral_orcamento(request):
     )['total'] or Decimal('0')
     
     # ========== NOTAS FISCAIS ==========
-    # Filtrar notas fiscais por data de emissão ou vencimento
+    # Filtrar notas fiscais por data de emissão ou vencimento (para notas gerais)
     notas_filtradas = []
     todas_notas = NotaFiscal.objects.all()
     for nota in todas_notas:
@@ -11653,6 +11593,44 @@ def analise_geral_orcamento(request):
     total_notas = len(notas_filtradas)
     valor_total_notas = sum(
         (nota.total_nota or Decimal('0')) for nota in notas_filtradas
+    )
+    
+    # Notas fiscais com situacao = "LANÇADA" e uso_contabil = "242" 
+    # IMPORTANTE: Para estas notas, usar data_autorizacao para determinar o mês
+    # Se data_autorizacao não estiver disponível, usar data_emissao ou data_vencimento como fallback
+    notas_autorizadas_242_filtradas = []
+    todas_notas_autorizadas = NotaFiscal.objects.filter(
+        Q(situacao__icontains='LANÇADA') | Q(situacao__icontains='LANCADA')
+    ).filter(
+        uso_contabil='242'
+    )
+    
+    for nota in todas_notas_autorizadas:
+        # Prioridade: usar data_autorizacao para determinar o mês
+        data_autorizacao = parse_date(nota.data_autorizacao)
+        data_ref = data_autorizacao
+        
+        # Se não houver data_autorizacao, usar data_emissao ou data_vencimento como fallback
+        if not data_ref:
+            data_emissao = parse_date(nota.data_emissao)
+            data_vencimento = parse_date(nota.data_vencimento)
+            data_ref = data_emissao or data_vencimento
+        
+        # Se não houver filtro de mês, incluir todas as notas do ano (ou sem data)
+        if not meses_filtro_int:
+            if not data_ref:
+                # Se não há data de referência, incluir (assumindo que é do ano filtrado)
+                notas_autorizadas_242_filtradas.append(nota)
+            elif data_ref.year == ano_filtro:
+                notas_autorizadas_242_filtradas.append(nota)
+        else:
+            # Filtrar por ano e mês específicos
+            if data_ref and data_ref.year == ano_filtro:
+                if data_ref.month in meses_filtro_int:
+                    notas_autorizadas_242_filtradas.append(nota)
+    
+    valor_total_notas_lancadas = sum(
+        (nota.total_nota or Decimal('0')) for nota in notas_autorizadas_242_filtradas
     )
     
     # Notas relacionadas a projeções
@@ -11678,6 +11656,9 @@ def analise_geral_orcamento(request):
     if valor_total_requisicoes < 0:
         valor_total_requisicoes = abs(valor_total_requisicoes)
     
+    # Valor total de requisições para o card (já filtrado por ano/mês)
+    valor_total_requisicoes_filtrado = valor_total_requisicoes
+    
     # ========== KPIs ==========
     # Total de gastos (projeções + notas + requisições)
     total_gastos = valor_total_projecoes + valor_total_notas + valor_total_requisicoes
@@ -11690,87 +11671,166 @@ def analise_geral_orcamento(request):
     # Saldo disponível
     saldo_disponivel = total_orcamento_disponivel - total_gastos
     
+    # Saldo Parcial = Orçamento Disponível - Requisições - Notas Fiscais LANÇADA
+    saldo_parcial = total_orcamento_disponivel - valor_total_requisicoes_filtrado - valor_total_notas_lancadas
+    
     # Percentual de projeções com NF relacionada
     percentual_projecoes_com_nf = 0
     if total_projecoes > 0:
         percentual_projecoes_com_nf = (projecoes_com_nf / total_projecoes) * 100
     
-    # ========== EVOLUÇÃO TEMPORAL ==========
-    meses_nomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
-                   'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-    meses_labels = []
-    meses_orcamento = []
-    meses_gastos = []
-    meses_saldo = []
+    # ========== EVOLUÇÃO TEMPORAL (DIÁRIA CUMULATIVA) ==========
+    from calendar import monthrange
     
-    for mes in range(1, 13):
-        meses_labels.append(meses_nomes[mes-1])
-        # Orçamento do mês
+    dias_labels = []
+    dias_orcamento = []
+    dias_requisicoes = []
+    dias_notas_fiscais = []
+    dias_saldo = []
+    
+    # Criar dicionário de orçamento por mês (para distribuir nos dias)
+    orcamento_por_mes = {}
+    for mes in meses_para_mostrar:
         orc_mes = DadosOrcamento.objects.filter(
             ano=ano_filtro, mes=mes
         ).aggregate(total=Sum('valor_orcamento'))['total'] or Decimal('0')
-        meses_orcamento.append(float(orc_mes))
-        
-        # Gastos do mês
-        gastos_mes = Decimal('0')
-        # Projeções
-        meses_str = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
-                     'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO']
-        proj_mes = ProjecaoGasto.objects.filter(
-            ano_referencia=ano_filtro,
-            mes_referencia=meses_str[mes-1]
-        ).aggregate(total=Sum('valor_total'))['total'] or Decimal('0')
-        gastos_mes += proj_mes
-        
-        # Notas fiscais do mês
-        notas_mes = sum(
-            (nota.total_nota or Decimal('0'))
-            for nota in NotaFiscal.objects.all()
-            if (parse_date(nota.data_emissao) and 
-                parse_date(nota.data_emissao).year == ano_filtro and
-                parse_date(nota.data_emissao).month == mes)
-        )
-        gastos_mes += Decimal(str(notas_mes))
-        
-        # Requisições do mês
-        req_mes = RequisicaoAlmoxarifado.objects.filter(
-            data_requisicao__year=ano_filtro,
-            data_requisicao__month=mes
-        ).aggregate(total=Sum('vlr_movto_estoq'))['total'] or Decimal('0')
-        if req_mes < 0:
-            req_mes = abs(req_mes)
-        gastos_mes += req_mes
-        
-        meses_gastos.append(float(gastos_mes))
-        meses_saldo.append(float(orc_mes - gastos_mes))
+        orcamento_por_mes[mes] = orc_mes
     
-    # ========== DISTRIBUIÇÃO POR SETOR (PROJEÇÕES) ==========
-    projecoes_por_setor = projecoes_filtradas.exclude(
-        setor__isnull=True
-    ).exclude(setor='').values('setor').annotate(
-        total=Count('id'),
-        valor_total=Sum('valor_total')
-    ).order_by('-valor_total')[:10]
+    # Variáveis acumulativas
+    req_acumulado = Decimal('0')
+    notas_acumulado = Decimal('0')
     
-    setores_labels = [item['setor'][:30] for item in projecoes_por_setor]
-    setores_data = [float(item['valor_total'] or 0) for item in projecoes_por_setor]
+    # Gerar todos os dias dos meses filtrados
+    for mes in meses_para_mostrar:
+        # Obter número de dias no mês
+        num_dias = monthrange(ano_filtro, mes)[1]
+        
+        for dia in range(1, num_dias + 1):
+            data_atual = datetime(ano_filtro, mes, dia)
+            dias_labels.append(data_atual.strftime('%d/%m'))
+            
+            # Orçamento do dia (usar o valor mensal para todos os dias do mês - fixo)
+            orc_dia = orcamento_por_mes.get(mes, Decimal('0'))
+            dias_orcamento.append(float(orc_dia))
+            
+            # Requisições do dia (RequisicaoAlmoxarifado) - valor do dia
+            req_dia = RequisicaoAlmoxarifado.objects.filter(
+                data_requisicao__year=ano_filtro,
+                data_requisicao__month=mes,
+                data_requisicao__day=dia
+            ).aggregate(total=Sum('vlr_movto_estoq'))['total'] or Decimal('0')
+            if req_dia < 0:
+                req_dia = abs(req_dia)
+            # Acumular
+            req_acumulado += req_dia
+            dias_requisicoes.append(float(req_acumulado))
+            
+            # Notas Fiscais do dia (situacao="LANÇADA" e uso_contabil="242") - valor do dia
+            # IMPORTANTE: Usar data_autorizacao para determinar o dia/mês
+            notas_dia = Decimal('0')
+            todas_notas_dia = NotaFiscal.objects.filter(
+                Q(situacao__icontains='LANÇADA') | Q(situacao__icontains='LANCADA')
+            ).filter(
+                uso_contabil='242'
+            )
+            
+            for nota in todas_notas_dia:
+                # Usar data_autorizacao para determinar o dia/mês
+                data_autorizacao = parse_date(nota.data_autorizacao)
+                if data_autorizacao and data_autorizacao.year == ano_filtro and data_autorizacao.month == mes and data_autorizacao.day == dia:
+                    notas_dia += (nota.total_nota or Decimal('0'))
+            # Acumular
+            notas_acumulado += notas_dia
+            dias_notas_fiscais.append(float(notas_acumulado))
+            
+            # Saldo do dia (Orçamento - Requisições Acumuladas - Notas Fiscais Acumuladas)
+            saldo_dia = orc_dia - req_acumulado - notas_acumulado
+            dias_saldo.append(float(saldo_dia))
+    
+    # Manter variáveis antigas para compatibilidade
+    meses_labels = dias_labels
+    meses_orcamento = dias_orcamento
+    meses_requisicoes = dias_requisicoes
+    meses_notas_fiscais = dias_notas_fiscais
+    meses_saldo = dias_saldo
+    
+    # ========== PREPARAR NOTAS PARA GRÁFICOS ==========
+    # Combinar todas as notas filtradas por ano/mês
+    # Incluir notas filtradas por data_emissao/vencimento E notas filtradas por data_autorizacao
+    notas_para_graficos_ids = set()
+    notas_para_graficos = []
+    
+    # Adicionar notas filtradas por data_autorizacao (LANÇADAS com uso 242)
+    for nota in notas_autorizadas_242_filtradas:
+        if nota.id not in notas_para_graficos_ids:
+            notas_para_graficos.append(nota)
+            notas_para_graficos_ids.add(nota.id)
+    
+    # Adicionar outras notas filtradas por data_emissao/vencimento (evitando duplicatas)
+    for nota in notas_filtradas:
+        if nota.id not in notas_para_graficos_ids:
+            notas_para_graficos.append(nota)
+            notas_para_graficos_ids.add(nota.id)
+    
+    # ========== DISTRIBUIÇÃO POR SETOR ==========
+    # Combinar dados de projeções, notas fiscais e requisições filtradas por ano/mês
+    setores_dict = defaultdict(lambda: {'count': 0, 'valor': Decimal('0')})
+    
+    # Projeções (já filtradas por ano/mês)
+    for proj in projecoes_filtradas:
+        if proj.setor and proj.setor.strip():
+            setor = proj.setor.strip()[:30]
+            setores_dict[setor]['count'] += 1
+            setores_dict[setor]['valor'] += (proj.valor_total or Decimal('0'))
+    
+    # Notas fiscais - usar centro_atividade como setor (se disponível)
+    for nota in notas_para_graficos:
+        setor = None
+        if nota.centro_atividade and nota.centro_atividade.strip():
+            setor = nota.centro_atividade.strip()[:30]
+        elif nota.nome_centro_atividade and nota.nome_centro_atividade.strip():
+            setor = nota.nome_centro_atividade.strip()[:30]
+        
+        if setor:
+            setores_dict[setor]['count'] += 1
+            setores_dict[setor]['valor'] += (nota.total_nota or Decimal('0'))
+    
+    # Requisições - não têm setor diretamente, mas podem ter informações relacionadas
+    # (por enquanto, não incluímos requisições no gráfico de setores)
+    
+    # Ordenar por valor e pegar top 10
+    setores_sorted = sorted(
+        setores_dict.items(),
+        key=lambda x: x[1]['valor'],
+        reverse=True
+    )[:10]
+    
+    # Garantir que sempre temos listas (mesmo que vazias)
+    setores_labels = [item[0] for item in setores_sorted] if setores_sorted else []
+    setores_data = [float(item[1]['valor']) for item in setores_sorted] if setores_sorted else []
     
     # ========== DISTRIBUIÇÃO POR USO CONTÁBIL ==========
+    # Usar apenas dados filtrados por ano/mês
     uso_contabil_dict = defaultdict(lambda: {'count': 0, 'valor': Decimal('0')})
     
-    # Projeções
+    # Projeções (já filtradas por ano/mês)
     for proj in projecoes_filtradas:
         if proj.uso_contabil:
             uso_contabil_dict[proj.uso_contabil]['count'] += 1
             uso_contabil_dict[proj.uso_contabil]['valor'] += (proj.valor_total or Decimal('0'))
     
-    # Notas fiscais
-    for nota in notas_filtradas:
+    # Notas fiscais - usar as notas já preparadas acima
+    for nota in notas_para_graficos:
         if nota.uso_contabil:
             uso_contabil_dict[nota.uso_contabil]['count'] += 1
             uso_contabil_dict[nota.uso_contabil]['valor'] += (nota.total_nota or Decimal('0'))
     
-    # Requisições
+    for nota in notas_para_graficos:
+        if nota.uso_contabil:
+            uso_contabil_dict[nota.uso_contabil]['count'] += 1
+            uso_contabil_dict[nota.uso_contabil]['valor'] += (nota.total_nota or Decimal('0'))
+    
+    # Requisições (já filtradas por ano/mês)
     for req in requisicoes_filtradas:
         if req.descr_uso_ctb:
             uso_contabil_dict[req.descr_uso_ctb]['count'] += 1
@@ -11789,16 +11849,17 @@ def analise_geral_orcamento(request):
     uso_contabil_data = [float(item[1]['valor']) for item in uso_contabil_sorted]
     
     # ========== TOP FORNECEDORES ==========
+    # Usar apenas dados filtrados por ano/mês
     fornecedores_dict = defaultdict(lambda: {'count': 0, 'valor': Decimal('0')})
     
-    # Projeções
+    # Projeções (já filtradas por ano/mês)
     for proj in projecoes_filtradas:
         if proj.fornecedor_nome_fantasia:
             fornecedores_dict[proj.fornecedor_nome_fantasia]['count'] += 1
             fornecedores_dict[proj.fornecedor_nome_fantasia]['valor'] += (proj.valor_total or Decimal('0'))
     
-    # Notas fiscais
-    for nota in notas_filtradas:
+    # Notas fiscais - usar as mesmas notas filtradas usadas no gráfico de uso contábil
+    for nota in notas_para_graficos:
         if nota.nome_fantasia_emitente:
             fornecedores_dict[nota.nome_fantasia_emitente]['count'] += 1
             fornecedores_dict[nota.nome_fantasia_emitente]['valor'] += (nota.total_nota or Decimal('0'))
@@ -11853,10 +11914,14 @@ def analise_geral_orcamento(request):
         'valor_notas_relacionadas': valor_notas_relacionadas,
         'total_requisicoes': total_requisicoes,
         'valor_total_requisicoes': valor_total_requisicoes,
+        'valor_total_requisicoes_filtrado': valor_total_requisicoes_filtrado,
+        'valor_total_notas_lancadas': valor_total_notas_lancadas,
+        'saldo_parcial': saldo_parcial,
         # Gráficos
         'meses_labels': json.dumps(meses_labels, ensure_ascii=False),
         'meses_orcamento': json.dumps(meses_orcamento, ensure_ascii=False),
-        'meses_gastos': json.dumps(meses_gastos, ensure_ascii=False),
+        'meses_requisicoes': json.dumps(meses_requisicoes, ensure_ascii=False),
+        'meses_notas_fiscais': json.dumps(meses_notas_fiscais, ensure_ascii=False),
         'meses_saldo': json.dumps(meses_saldo, ensure_ascii=False),
         'setores_labels': json.dumps(setores_labels, ensure_ascii=False),
         'setores_data': json.dumps(setores_data, ensure_ascii=False),
@@ -11875,7 +11940,51 @@ def consultar_projecao_gastos(request):
     from decimal import Decimal
     from django.db.models import Q
     from django.core.paginator import Paginator
+    from datetime import datetime
     
+    # ========== FILTRO DE ANO E MÊS (igual analise_geral_orcamento) ==========
+    ano_filtro = request.GET.get('ano', None)
+    meses_filtro = request.GET.getlist('mes')  # getlist para múltiplos valores
+    
+    # Valores padrão: ano atual e todos os meses (None)
+    hoje = datetime.now()
+    if not ano_filtro:
+        ano_filtro = str(hoje.year)
+    
+    # Converter para inteiro
+    try:
+        ano_filtro = int(ano_filtro)
+    except (ValueError, TypeError):
+        ano_filtro = hoje.year
+    
+    # Converter meses para inteiros e validar
+    meses_filtro_int = []
+    if meses_filtro:
+        for mes in meses_filtro:
+            try:
+                mes_int = int(mes)
+                if 1 <= mes_int <= 12:
+                    meses_filtro_int.append(mes_int)
+            except (ValueError, TypeError):
+                continue
+        # Remover duplicatas e ordenar
+        meses_filtro_int = sorted(list(set(meses_filtro_int)))
+    
+    # Se não há meses selecionados, usar todos os meses
+    meses_para_mostrar = meses_filtro_int if meses_filtro_int else list(range(1, 13))
+    
+    # Anos disponíveis para o filtro
+    anos_disponiveis_set = set()
+    anos_ref = ProjecaoGasto.objects.exclude(ano_referencia__isnull=True).values_list('ano_referencia', flat=True).distinct()
+    for ano in anos_ref:
+        if ano:
+            anos_disponiveis_set.add(int(ano))
+    anos_disponiveis_set.add(hoje.year)
+    anos_disponiveis = sorted(list(anos_disponiveis_set), reverse=True)
+    if not anos_disponiveis:
+        anos_disponiveis = [hoje.year]
+    
+    # ========== FILTROS DE PROJEÇÕES ==========
     try:
         # Busca geral
         search_query = request.GET.get('search', '').strip()
@@ -11886,6 +11995,16 @@ def consultar_projecao_gastos(request):
         print(traceback.format_exc())
         projecoes_list = ProjecaoGasto.objects.none()
         search_query = ''
+    
+    # Aplicar filtro de ano
+    projecoes_list = projecoes_list.filter(ano_referencia=ano_filtro)
+    
+    # Aplicar filtro de meses
+    if meses_filtro_int:
+        meses_str = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
+                     'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO']
+        meses_selecionados_str = [meses_str[m-1] for m in meses_filtro_int]
+        projecoes_list = projecoes_list.filter(mes_referencia__in=meses_selecionados_str)
     
     # Aplicar busca geral
     if search_query:
@@ -11909,7 +12028,7 @@ def consultar_projecao_gastos(request):
                 Q(solicitante__icontains=search_query)
             )
     
-    # Filtros específicos
+    # Filtros específicos (mantidos para compatibilidade com filtros da tabela)
     filtro_setor = request.GET.get('filtro_setor', '').strip()
     if filtro_setor:
         projecoes_list = projecoes_list.filter(setor__icontains=filtro_setor)
@@ -11920,18 +12039,6 @@ def consultar_projecao_gastos(request):
             Q(fornecedor_nome_fantasia__icontains=filtro_fornecedor) |
             Q(fornecedor_cnpj__icontains=filtro_fornecedor)
         )
-    
-    filtro_ano = request.GET.get('filtro_ano', '').strip()
-    if filtro_ano:
-        try:
-            ano = int(filtro_ano)
-            projecoes_list = projecoes_list.filter(ano_referencia=ano)
-        except (ValueError, TypeError):
-            pass
-    
-    filtro_mes = request.GET.get('filtro_mes', '').strip()
-    if filtro_mes:
-        projecoes_list = projecoes_list.filter(mes_referencia__icontains=filtro_mes)
     
     filtro_numero_requisicao = request.GET.get('filtro_numero_requisicao', '').strip()
     if filtro_numero_requisicao:
@@ -11976,22 +12083,12 @@ def consultar_projecao_gastos(request):
         paginator = Paginator(empty_list, 50)
         projecoes = paginator.page(1)
     
-    # Obter valores únicos para os dropdowns de filtros
+    # Obter valores únicos para os dropdowns de filtros da tabela
     setores_unicos = ProjecaoGasto.objects.exclude(
         setor__isnull=True
     ).exclude(
         setor=''
     ).values_list('setor', flat=True).distinct().order_by('setor')
-    
-    anos_unicos = ProjecaoGasto.objects.exclude(
-        ano_referencia__isnull=True
-    ).values_list('ano_referencia', flat=True).distinct().order_by('-ano_referencia')
-    
-    meses_unicos = ProjecaoGasto.objects.exclude(
-        mes_referencia__isnull=True
-    ).exclude(
-        mes_referencia=''
-    ).values_list('mes_referencia', flat=True).distinct().order_by('mes_referencia')
     
     context = {
         'page_title': 'Consultar Projeção de Gastos',
@@ -11999,99 +12096,18 @@ def consultar_projecao_gastos(request):
         'projecoes': projecoes,
         'search_query': search_query or '',
         'setores_unicos': setores_unicos or [],
-        'anos_unicos': anos_unicos or [],
-        'meses_unicos': meses_unicos or [],
         'filtro_setor': filtro_setor or '',
         'filtro_fornecedor': filtro_fornecedor or '',
-        'filtro_ano': filtro_ano or '',
-        'filtro_mes': filtro_mes or '',
         'filtro_numero_requisicao': filtro_numero_requisicao or '',
         'filtro_valor_min': filtro_valor_min or '',
         'filtro_valor_max': filtro_valor_max or '',
+        # Filtros de ano/mês (igual analise_geral_orcamento)
+        'ano_filtro': ano_filtro,
+        'meses_filtro': meses_filtro_int,
+        'anos_disponiveis': anos_disponiveis,
     }
     
     return render(request, 'orcamento/consultar_projecao_gastos.html', context)
-
-
-def deletar_projecao_gasto(request, projecao_id):
-    """Deletar uma projeção de gasto"""
-    from app.models import ProjecaoGasto
-    from django.contrib import messages
-    from django.shortcuts import redirect
-    from django.urls import reverse
-    
-    if request.method == 'POST':
-        try:
-            projecao = ProjecaoGasto.objects.get(id=projecao_id)
-            descricao = projecao.descricao or f"Projeção #{projecao.id}"
-            projecao.delete()
-            messages.success(request, f'Projeção de gasto "{descricao[:50]}" excluída com sucesso!')
-        except ProjecaoGasto.DoesNotExist:
-            messages.error(request, 'Projeção de gasto não encontrada.')
-        except Exception as e:
-            messages.error(request, f'Erro ao excluir projeção de gasto: {str(e)}')
-    
-    # Redirecionar de volta para a página de consulta, preservando filtros da URL anterior
-    next_url = request.GET.get('next', None)
-    if next_url:
-        return redirect(next_url)
-    
-    # Se não houver next, construir URL com filtros preservados
-    redirect_url = reverse('consultar_projecao_gastos')
-    params = request.GET.copy()
-    if 'next' in params:
-        del params['next']
-    if params:
-        redirect_url += '?' + params.urlencode()
-    
-    return redirect(redirect_url)
-
-
-def deletar_projecao_gasto_em_massa(request):
-    """Deletar múltiplas projeções de gasto de uma vez"""
-    from app.models import ProjecaoGasto
-    from django.contrib import messages
-    from django.shortcuts import redirect
-    from django.urls import reverse
-    
-    if request.method == 'POST':
-        ids = request.POST.getlist('ids')
-        
-        if not ids:
-            messages.error(request, 'Nenhum registro selecionado para exclusão.')
-        else:
-            try:
-                # Converter IDs para inteiros e filtrar registros existentes
-                ids_int = []
-                for id_str in ids:
-                    try:
-                        ids_int.append(int(id_str))
-                    except (ValueError, TypeError):
-                        continue
-                
-                if not ids_int:
-                    messages.error(request, 'IDs inválidos fornecidos.')
-                else:
-                    # Buscar e deletar registros
-                    projecoes = ProjecaoGasto.objects.filter(id__in=ids_int)
-                    count = projecoes.count()
-                    
-                    if count == 0:
-                        messages.warning(request, 'Nenhum registro encontrado para exclusão.')
-                    else:
-                        # Deletar em lote
-                        projecoes.delete()
-                        messages.success(request, f'{count} projeção(ões) de gasto(s) excluída(s) com sucesso!')
-            except Exception as e:
-                messages.error(request, f'Erro ao excluir projeções de gasto: {str(e)}')
-    
-    # Redirecionar de volta para a página de consulta, preservando filtros da URL anterior
-    next_url = request.GET.get('next') or request.POST.get('next')
-    if next_url:
-        return redirect(next_url)
-    
-    # Se não houver next, redirecionar para a página de consulta
-    return redirect('consultar_projecao_gastos')
 
 
 def analise_projecao_gastos(request):
