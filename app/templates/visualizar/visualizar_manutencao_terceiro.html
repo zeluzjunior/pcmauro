@@ -1,0 +1,274 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Visualizar Manutenção Terceiro - {{ manutencao.titulo }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_manutencao_terceiros' %}" class="text-white">Manutenções Terceiros</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Visualizar</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="bi bi-house-gear me-2"></i>Visualizar Manutenção Terceiro
+                </h1>
+                <p class="lead">Detalhes completos da manutenção: {{ manutencao.titulo }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message|safe }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <!-- Informações Principais -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Informações Principais
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label fw-bold">Título</label>
+                                <p class="form-control-plaintext fs-5">
+                                    <strong>{{ manutencao.titulo }}</strong>
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">OS</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutencao.os %}
+                                        <span class="badge bg-secondary">{{ manutencao.os }}</span>
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Empresa</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutencao.empresa %}
+                                        <i class="fas fa-building me-2"></i>{{ manutencao.empresa }}
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label fw-bold">Descrição</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutencao.descricao %}
+                                        {{ manutencao.descricao|linebreaks }}
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações de Compra -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-shopping-cart me-2"></i>Informações de Compra
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Pedido de Compra</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutencao.pedidodecompra %}
+                                        <i class="fas fa-file-invoice me-2"></i>{{ manutencao.pedidodecompra }}
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Requisição de Compra</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutencao.requisicaodecompra %}
+                                        <i class="fas fa-clipboard-list me-2"></i>{{ manutencao.requisicaodecompra }}
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações Técnicas -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-cogs me-2"></i>Informações Técnicas
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Máquina</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutencao.maquina %}
+                                        <span class="badge bg-info">{{ manutencao.maquina.cd_maquina }}</span>
+                                        <br><small class="text-muted">{{ manutencao.maquina.descr_maquina }}</small>
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Tipo</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutencao.tipo %}
+                                        <span class="badge bg-warning text-dark">{{ manutencao.get_tipo_display }}</span>
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Manutentor</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutencao.manutentor %}
+                                        <i class="fas fa-user-tie me-2"></i>{{ manutencao.manutentor.Nome|default:manutencao.manutentor.Matricula }}
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">OS Importada</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutencao.os_importada %}
+                                        <i class="fas fa-file-import me-2"></i>{{ manutencao.os_importada }}
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações de Data -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-calendar-alt me-2"></i>Informações de Data
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Data</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutencao.data %}
+                                        <i class="fas fa-calendar me-2"></i>{{ manutencao.data|date:"d/m/Y H:i" }}
+                                    {% else %}
+                                        <span class="text-muted">Não informado</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Data de Criação</label>
+                                <p class="form-control-plaintext">
+                                    <i class="fas fa-calendar-plus me-2"></i>{{ manutencao.created_at|date:"d/m/Y H:i" }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações do Sistema -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Informações do Sistema
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Data de Criação</label>
+                                <p class="form-control-plaintext">
+                                    <i class="fas fa-calendar-plus me-2"></i>{{ manutencao.created_at|date:"d/m/Y H:i" }}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Última Atualização</label>
+                                <p class="form-control-plaintext">
+                                    <i class="fas fa-calendar-edit me-2"></i>{{ manutencao.updated_at|date:"d/m/Y H:i" }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between flex-wrap gap-2">
+                            <a href="{% url 'consultar_manutencao_terceiros' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Voltar para Lista
+                            </a>
+                            <div class="btn-group">
+                                <a href="{% url 'editar_manutencao_terceiro' manutencao.id %}" class="btn btn-primary">
+                                    <i class="fas fa-edit me-2"></i>Editar Manutenção
+                                </a>
+                                <button type="button" class="btn btn-danger" onclick="confirmarDeletar({{ manutencao.id }}, '{{ manutencao.titulo|escapejs }}')">
+                                    <i class="fas fa-trash me-2"></i>Deletar Manutenção
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Delete Form (hidden) -->
+<form id="deleteForm" method="post" style="display: none;">
+    {% csrf_token %}
+</form>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmarDeletar(manutencaoId, titulo) {
+    if (confirm('Tem certeza que deseja deletar a manutenção de terceiro "' + titulo + '"?\n\nEsta ação não pode ser desfeita.')) {
+        const form = document.getElementById('deleteForm');
+        form.action = '{% url "deletar_manutencao_terceiro" 0 %}'.replace('0', manutencaoId);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}
+

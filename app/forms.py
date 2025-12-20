@@ -333,7 +333,6 @@ class CentroAtividadeForm(forms.ModelForm):
             'indice',
             'encarregado_responsavel',
             'local',
-            'imagem',
             'observacoes',
         ]
         widgets = {
@@ -367,11 +366,6 @@ class CentroAtividadeForm(forms.ModelForm):
                 'maxlength': '255',
                 'placeholder': 'Local do Centro de Atividade (ex: FRIGORÍFICO, INDÚSTRIA, UTILIDADES, EXTERNA, APOIO)'
             }),
-            'imagem': forms.TextInput(attrs={
-                'class': 'form-control',
-                'maxlength': '500',
-                'placeholder': 'Caminho da imagem (ex: fotos_home/imagem.jpg)'
-            }),
             'observacoes': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 2,
@@ -385,7 +379,6 @@ class CentroAtividadeForm(forms.ModelForm):
             'indice': 'Índice',
             'encarregado_responsavel': 'Encarregado Responsável',
             'local': 'Local',
-            'imagem': 'Caminho da Imagem',
             'observacoes': 'Observações',
         }
     

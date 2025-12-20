@@ -9946,6 +9946,80 @@ def cadastrar_manutencao_terceiro(request):
     return render(request, 'cadastrar/cadastrar_manutencao_terceiro.html', context)
 
 
+def visualizar_manutencao_terceiro(request, manutencao_id):
+    """Visualizar detalhes de uma manutenção de terceiro específica"""
+    from app.models import ManutencaoTerceiro
+    
+    try:
+        manutencao = ManutencaoTerceiro.objects.select_related('maquina', 'manutentor', 'os_importada').get(id=manutencao_id)
+    except ManutencaoTerceiro.DoesNotExist:
+        messages.error(request, 'Manutenção de terceiro não encontrada.')
+        return redirect('consultar_manutencao_terceiros')
+    
+    context = {
+        'page_title': f'Visualizar Manutenção Terceiro - {manutencao.titulo}',
+        'active_page': 'consultar_manutencao_terceiros',
+        'manutencao': manutencao,
+    }
+    return render(request, 'visualizar/visualizar_manutencao_terceiro.html', context)
+
+
+def editar_manutencao_terceiro(request, manutencao_id):
+    """Editar uma manutenção de terceiro existente"""
+    from app.forms import ManutencaoTerceiroForm
+    from app.models import ManutencaoTerceiro
+    
+    try:
+        manutencao = ManutencaoTerceiro.objects.get(id=manutencao_id)
+    except ManutencaoTerceiro.DoesNotExist:
+        messages.error(request, 'Manutenção de terceiro não encontrada.')
+        return redirect('consultar_manutencao_terceiros')
+    
+    if request.method == 'POST':
+        form = ManutencaoTerceiroForm(request.POST, instance=manutencao)
+        
+        if form.is_valid():
+            try:
+                manutencao = form.save()
+                messages.success(request, f'Manutenção de terceiro "{manutencao.titulo}" atualizada com sucesso!')
+                return redirect('visualizar_manutencao_terceiro', manutencao_id=manutencao.id)
+            except Exception as e:
+                messages.error(request, f'Erro ao atualizar manutenção de terceiro: {str(e)}')
+        else:
+            handle_form_errors(form, request)
+    else:
+        form = ManutencaoTerceiroForm(instance=manutencao)
+    
+    context = {
+        'page_title': f'Editar Manutenção Terceiro - {manutencao.titulo}',
+        'active_page': 'consultar_manutencao_terceiros',
+        'form': form,
+        'manutencao': manutencao,
+    }
+    return render(request, 'editar/editar_manutencao_terceiro.html', context)
+
+
+def deletar_manutencao_terceiro(request, manutencao_id):
+    """Deletar uma manutenção de terceiro"""
+    if request.method != 'POST':
+        messages.error(request, 'Método não permitido.')
+        return redirect('consultar_manutencao_terceiros')
+    
+    from app.models import ManutencaoTerceiro
+    
+    try:
+        manutencao = ManutencaoTerceiro.objects.get(id=manutencao_id)
+        titulo = manutencao.titulo
+        manutencao.delete()
+        messages.success(request, f'Manutenção de terceiro "{titulo}" deletada com sucesso!')
+    except ManutencaoTerceiro.DoesNotExist:
+        messages.error(request, 'Manutenção de terceiro não encontrada.')
+    except Exception as e:
+        messages.error(request, f'Erro ao deletar manutenção de terceiro: {str(e)}')
+    
+    return redirect('consultar_manutencao_terceiros')
+
+
 def cadastrar_manutentor(request):
     """Cadastrar novo manutentor"""
     from app.forms import ManutentorForm
@@ -10519,6 +10593,189 @@ def cadastrar_visita(request):
         'form': form
     }
     return render(request, 'cadastrar/cadastrar_visita.html', context)
+
+
+def editar_visita(request, visita_id):
+    """Editar uma visita existente"""
+    from app.forms import VisitasForm
+    from app.models import Visitas
+    
+    try:
+        visita = Visitas.objects.get(id=visita_id)
+    except Visitas.DoesNotExist:
+        messages.error(request, 'Visita não encontrada.')
+        return redirect('consultar_visitas')
+    
+    if request.method == 'POST':
+        form = VisitasForm(request.POST, request.FILES, instance=visita)
+        
+        if form.is_valid():
+            try:
+                visita = form.save()
+                messages.success(request, f'Visita "{visita.titulo}" atualizada com sucesso!')
+                return redirect('consultar_visitas')
+            except Exception as e:
+                messages.error(request, f'Erro ao atualizar visita: {str(e)}')
+        else:
+            handle_form_errors(form, request)
+    else:
+        form = VisitasForm(instance=visita)
+    
+    context = {
+        'page_title': f'Editar Visita - {visita.titulo}',
+        'active_page': 'consultar_visitas',
+        'form': form,
+        'visita': visita,
+    }
+    return render(request, 'editar/editar_visita.html', context)
+
+
+def deletar_visita(request, visita_id):
+    """Deletar uma visita"""
+    if request.method != 'POST':
+        messages.error(request, 'Método não permitido.')
+        return redirect('consultar_visitas')
+    
+    from app.models import Visitas
+    
+    try:
+        visita = Visitas.objects.get(id=visita_id)
+        titulo = visita.titulo
+        visita.delete()
+        messages.success(request, f'Visita "{titulo}" deletada com sucesso!')
+    except Visitas.DoesNotExist:
+        messages.error(request, 'Visita não encontrada.')
+    except Exception as e:
+        messages.error(request, f'Erro ao deletar visita: {str(e)}')
+    
+    return redirect('consultar_visitas')
+
+
+def visualizar_visita(request, visita_id):
+    """Visualizar detalhes de uma visita específica"""
+    from app.models import Visitas
+    
+    try:
+        visita = Visitas.objects.get(id=visita_id)
+    except Visitas.DoesNotExist:
+        messages.error(request, 'Visita não encontrada.')
+        return redirect('consultar_visitas')
+    
+    context = {
+        'page_title': f'Visualizar Visita - {visita.titulo}',
+        'active_page': 'consultar_visitas',
+        'visita': visita,
+    }
+    return render(request, 'visualizar/visualizar_visita.html', context)
+
+
+def agenda_geral(request):
+    """Página de agenda geral com FullCalendar"""
+    context = {
+        'page_title': 'Agenda Geral',
+        'active_page': 'agenda_geral',
+    }
+    return render(request, 'agenda_geral.html', context)
+
+
+def api_eventos_calendario(request):
+    """API endpoint para retornar eventos do calendário em formato JSON"""
+    from app.models import Visitas, ManutencaoTerceiro, AgendamentoCronograma
+    from django.http import JsonResponse
+    from datetime import datetime
+    
+    # Obter filtros da query string
+    tipos_eventos = request.GET.getlist('tipos[]', [])
+    data_inicio = request.GET.get('start', None)
+    data_fim = request.GET.get('end', None)
+    
+    eventos = []
+    
+    # Se nenhum tipo foi selecionado ou 'visitas' está selecionado
+    if not tipos_eventos or 'visitas' in tipos_eventos:
+        visitas = Visitas.objects.filter(data__isnull=False)
+        if data_inicio and data_fim:
+            try:
+                start = datetime.fromisoformat(data_inicio.replace('Z', '+00:00'))
+                end = datetime.fromisoformat(data_fim.replace('Z', '+00:00'))
+                visitas = visitas.filter(data__gte=start, data__lte=end)
+            except:
+                pass
+        
+        for visita in visitas:
+            eventos.append({
+                'id': f'visita_{visita.id}',
+                'title': f'Visita: {visita.titulo}',
+                'start': visita.data.isoformat() if visita.data else None,
+                'color': '#0dcaf0',  # Cyan
+                'textColor': '#000',
+                'extendedProps': {
+                    'tipo': 'visita',
+                    'descricao': visita.descricao or '',
+                    'url': f'/visitas/visualizar/{visita.id}/'
+                }
+            })
+    
+    # Se nenhum tipo foi selecionado ou 'manutencao_terceiro' está selecionado
+    if not tipos_eventos or 'manutencao_terceiro' in tipos_eventos:
+        manutencoes = ManutencaoTerceiro.objects.filter(data__isnull=False)
+        if data_inicio and data_fim:
+            try:
+                start = datetime.fromisoformat(data_inicio.replace('Z', '+00:00'))
+                end = datetime.fromisoformat(data_fim.replace('Z', '+00:00'))
+                manutencoes = manutencoes.filter(data__gte=start, data__lte=end)
+            except:
+                pass
+        
+        for manutencao in manutencoes:
+            eventos.append({
+                'id': f'manutencao_{manutencao.id}',
+                'title': f'Manutenção: {manutencao.titulo}',
+                'start': manutencao.data.isoformat() if manutencao.data else None,
+                'color': '#ff9800',  # Orange
+                'textColor': '#000',
+                'extendedProps': {
+                    'tipo': 'manutencao_terceiro',
+                    'empresa': manutencao.empresa or '',
+                    'maquina': manutencao.maquina.cd_maquina if manutencao.maquina else '',
+                    'url': f'/manutencao-terceiro/visualizar/{manutencao.id}/'
+                }
+            })
+    
+    # Se nenhum tipo foi selecionado ou 'agendamento' está selecionado
+    if not tipos_eventos or 'agendamento' in tipos_eventos:
+        agendamentos = AgendamentoCronograma.objects.filter(data_planejada__isnull=False)
+        if data_inicio and data_fim:
+            try:
+                start = datetime.fromisoformat(data_inicio.replace('Z', '+00:00')).date()
+                end = datetime.fromisoformat(data_fim.replace('Z', '+00:00')).date()
+                agendamentos = agendamentos.filter(data_planejada__gte=start, data_planejada__lte=end)
+            except:
+                pass
+        
+        for agendamento in agendamentos:
+            if agendamento.tipo_agendamento == 'maquina' and agendamento.maquina:
+                titulo = f'Agendamento: {agendamento.maquina.cd_maquina}'
+            elif agendamento.tipo_agendamento == 'plano' and agendamento.plano_preventiva:
+                titulo = f'Plano: {agendamento.plano_preventiva.numero_plano}'
+            else:
+                titulo = f'Agendamento: {agendamento.nome_grupo or "Sem nome"}'
+            
+            eventos.append({
+                'id': f'agendamento_{agendamento.id}',
+                'title': titulo,
+                'start': agendamento.data_planejada.isoformat() if agendamento.data_planejada else None,
+                'color': '#198754',  # Green
+                'textColor': '#fff',
+                'extendedProps': {
+                    'tipo': 'agendamento',
+                    'tipo_agendamento': agendamento.tipo_agendamento,
+                    'observacoes': agendamento.observacoes or '',
+                    'url': f'/agendamentos/consultar/'
+                }
+            })
+    
+    return JsonResponse(eventos, safe=False)
 
 
 def gerenciar_projeto(request):

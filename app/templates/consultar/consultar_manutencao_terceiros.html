@@ -15,6 +15,89 @@
         background-color: #f8f9fa;
         z-index: 10;
     }
+    
+    /* Improved button styling */
+    .action-buttons {
+        display: flex;
+        gap: 0.25rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .action-buttons .btn {
+        min-width: 38px;
+        height: 38px;
+        padding: 0.375rem 0.5rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.375rem;
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .action-buttons .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+    
+    .action-buttons .btn-info {
+        background-color: #0dcaf0;
+        border-color: #0dcaf0;
+        color: white;
+    }
+    
+    .action-buttons .btn-info:hover {
+        background-color: #0aa2c0;
+        border-color: #0aa2c0;
+        color: white;
+    }
+    
+    .action-buttons .btn-primary {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+    
+    .action-buttons .btn-primary:hover {
+        background-color: #0b5ed7;
+        border-color: #0a58ca;
+    }
+    
+    .action-buttons .btn-danger {
+        background-color: #dc3545;
+        border-color: #dc3545;
+    }
+    
+    .action-buttons .btn-danger:hover {
+        background-color: #bb2d3b;
+        border-color: #b02a37;
+    }
+    
+    .action-buttons .btn i {
+        font-size: 0.9rem;
+    }
+    
+    /* Tooltip enhancement */
+    .action-buttons .btn[title]:hover::after {
+        content: attr(title);
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 0.25rem 0.5rem;
+        background-color: #333;
+        color: white;
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        z-index: 1000;
+        margin-bottom: 0.25rem;
+        pointer-events: none;
+    }
+    
+    .action-buttons .btn {
+        position: relative;
+    }
 </style>
 {% endblock %}
 
@@ -45,7 +128,7 @@
         <div class="row mb-4">
             <div class="col-md-12">
                 <form method="get" action="{% url 'consultar_manutencao_terceiros' %}" class="d-flex">
-                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por título, OS, empresa, pedido de compra, requisição ou descrição..." value="{{ request.GET.search }}">
+                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por título, OS, empresa, pedido de compra ou descrição..." value="{{ request.GET.search }}">
                     <button type="submit" class="btn btn-outline-primary">
                         <i class="fas fa-search"></i> Buscar
                     </button>
@@ -101,17 +184,6 @@
                                             <option value="">Todas as máquinas</option>
                                             {% for maquina_id, maquina_desc in maquinas_unicas %}
                                                 <option value="{{ maquina_id }}" {% if filtro_maquina == maquina_id|stringformat:"s" %}selected{% endif %}>{{ maquina_desc|truncatewords:5 }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    
-                                    <!-- Filtro por Manutentor -->
-                                    <div class="col-md-3">
-                                        <label for="filtro_manutentor" class="form-label">Manutentor</label>
-                                        <select class="form-select" id="filtro_manutentor" name="filtro_manutentor">
-                                            <option value="">Todos os manutentores</option>
-                                            {% for manutentor_cad, manutentor_nome in manutentores_unicos %}
-                                                <option value="{{ manutentor_cad }}" {% if filtro_manutentor == manutentor_cad %}selected{% endif %}>{{ manutentor_nome|truncatewords:3 }}</option>
                                             {% endfor %}
                                         </select>
                                     </div>
@@ -191,9 +263,7 @@
                                 <th>Empresa</th>
                                 <th>Máquina</th>
                                 <th>Tipo</th>
-                                <th>Manutentor</th>
                                 <th>Pedido Compra</th>
-                                <th>Requisição Compra</th>
                                 <th>Data</th>
                                 <th>Ações</th>
                             </tr>
@@ -214,16 +284,10 @@
                                     <input type="text" class="filter-input" placeholder="Filtrar Tipo..." data-column="4">
                                 </th>
                                 <th class="filter-header">
-                                    <input type="text" class="filter-input" placeholder="Filtrar Manutentor..." data-column="5">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Pedido..." data-column="5">
                                 </th>
                                 <th class="filter-header">
-                                    <input type="text" class="filter-input" placeholder="Filtrar Pedido..." data-column="6">
-                                </th>
-                                <th class="filter-header">
-                                    <input type="text" class="filter-input" placeholder="Filtrar Requisição..." data-column="7">
-                                </th>
-                                <th class="filter-header">
-                                    <input type="text" class="filter-input" placeholder="Filtrar Data..." data-column="8">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Data..." data-column="6">
                                 </th>
                                 <th class="filter-header">
                                     <!-- Sem filtro na coluna de ações -->
@@ -255,22 +319,8 @@
                                         <span class="badge bg-warning text-dark">{{ manutencao.tipo }}</span>
                                     </td>
                                     <td>
-                                        {% if manutencao.manutentor %}
-                                            {{ manutencao.manutentor.Nome|truncatewords:3 }}
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </td>
-                                    <td>
                                         {% if manutencao.pedidodecompra %}
                                             {{ manutencao.pedidodecompra|truncatewords:2 }}
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if manutencao.requisicaodecompra %}
-                                            {{ manutencao.requisicaodecompra|truncatewords:2 }}
                                         {% else %}
                                             -
                                         {% endif %}
@@ -283,15 +333,23 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <a href="{% url 'cadastrar_manutencao_terceiro' %}" class="btn btn-sm btn-primary" title="Visualizar detalhes">
-                                            <i class="fas fa-eye me-1"></i>Ver
-                                        </a>
+                                        <div class="action-buttons" role="group">
+                                            <a href="{% url 'visualizar_manutencao_terceiro' manutencao.id %}" class="btn btn-sm btn-info" title="Visualizar detalhes">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'editar_manutencao_terceiro' manutencao.id %}" class="btn btn-sm btn-primary" title="Editar registro">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button type="button" class="btn btn-sm btn-danger" title="Deletar registro" onclick="confirmarDeletar({{ manutencao.id }}, '{{ manutencao.titulo|escapejs }}')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
                             {% else %}
                                 <tr>
-                                    <td colspan="10" class="text-center py-5">
+                                    <td colspan="8" class="text-center py-5">
                                         <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
                                         <p class="text-muted">Nenhuma manutenção encontrada.</p>
                                         <a href="{% url 'cadastrar_manutencao_terceiro' %}" class="btn btn-primary">
@@ -342,6 +400,12 @@
         {% endif %}
     </div>
 </section>
+
+<!-- Delete Form (hidden) -->
+<form id="deleteForm" method="post" style="display: none;">
+    {% csrf_token %}
+</form>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -417,6 +481,15 @@ document.addEventListener('DOMContentLoaded', function() {
         tableContainer.parentElement.appendChild(clearBtnContainer);
     }
 });
+
+// Delete confirmation function
+function confirmarDeletar(manutencaoId, titulo) {
+    if (confirm('Tem certeza que deseja deletar a manutenção de terceiro "' + titulo + '"?\n\nEsta ação não pode ser desfeita.')) {
+        const form = document.getElementById('deleteForm');
+        form.action = '{% url "deletar_manutencao_terceiro" 0 %}'.replace('0', manutencaoId);
+        form.submit();
+    }
+}
 </script>
 {% endblock %}
 

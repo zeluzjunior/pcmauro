@@ -339,6 +339,14 @@
 
                         <li class="border-top my-3"></li>
                         
+                        <!-- Agenda Geral -->
+                        <li class="mb-1">
+                            <a href="{% url 'agenda_geral' %}" class="btn btn-toggle align-items-center rounded">
+                                <i class="bi bi-table me-2"></i>
+                                <span class="btn-toggle-text">Agenda Geral</span>
+                            </a>
+                        </li>
+                        
                         <!-- manutenção de terceiros -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#terceiro-collapse" aria-expanded="false">
@@ -347,7 +355,7 @@
                             </button>
                             <div class="collapse" id="terceiro-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'cadastrar_manutencao_terceiro' %}" class="link-dark rounded">Cadastrar Mant. de Terceiros</a></li>
+                                    <li><a href="{% url 'cadastrar_manutencao_terceiro' %}" class="link-dark rounded"><i class="bi bi-house-gear me-2"></i>Cadastrar Mant. de Terceiros</a></li>
                                     <li><a href="{% url 'consultar_manutencao_terceiros' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Mant. de Terceiros</a></li>
                                 </ul>
                             </div>
@@ -360,7 +368,7 @@
                             </button>
                             <div class="collapse" id="visitas-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'cadastrar_visita' %}" class="link-dark rounded">Nova Visita</a></li>
+                                    <li><a href="{% url 'cadastrar_visita' %}" class="link-dark rounded"><i class="bi bi-house-add-fill me-2"></i>Nova Visita</a></li>
                                     <li><a href="{% url 'consultar_visitas' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Visitas</a></li>
                                 </ul>
                             </div>
@@ -429,7 +437,7 @@
                                  <li>
                                     <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#orcamento-notas-fiscais-collapse" aria-expanded="false">
                                         <i class="fas fa-chart-line"></i>
-                                        Análise: Notas Fiscais
+                                        Notas Fiscais
                                     </button>
                                     <div class="collapse" id="orcamento-notas-fiscais-collapse">
                                         <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">

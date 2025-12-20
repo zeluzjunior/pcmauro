@@ -166,6 +166,7 @@
                                 <th>Número do Contato</th>
                                 <th>Documento</th>
                                 <th>Criado em</th>
+                                <th>Ações</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -212,6 +213,19 @@
                                     {% endif %}
                                 </td>
                                 <td>{{ visita.created_at|date:"d/m/Y H:i" }}</td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{% url 'visualizar_visita' visita.id %}" class="btn btn-sm btn-info" title="Visualizar">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'editar_visita' visita.id %}" class="btn btn-sm btn-primary" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-sm btn-danger" title="Deletar" onclick="confirmarDeletar({{ visita.id }}, '{{ visita.titulo|escapejs }}')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -261,5 +275,23 @@
         {% endif %}
     </div>
 </section>
+
+<!-- Delete Form (hidden) -->
+<form id="deleteForm" method="post" style="display: none;">
+    {% csrf_token %}
+</form>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmarDeletar(visitaId, titulo) {
+    if (confirm('Tem certeza que deseja deletar a visita "' + titulo + '"?\n\nEsta ação não pode ser desfeita.')) {
+        const form = document.getElementById('deleteForm');
+        form.action = '{% url "deletar_visita" 0 %}'.replace('0', visitaId);
+        form.submit();
+    }
+}
+</script>
 {% endblock %}
 

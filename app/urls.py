@@ -126,10 +126,16 @@ urlpatterns = [
     # Manutenção Terceiro
     path('manutencao-terceiro/cadastrar/', views.cadastrar_manutencao_terceiro, name="cadastrar_manutencao_terceiro"),
     path('manutencao-terceiro/consultar/', views.consultar_manutencao_terceiros, name="consultar_manutencao_terceiros"),
+    path('manutencao-terceiro/visualizar/<int:manutencao_id>/', views.visualizar_manutencao_terceiro, name="visualizar_manutencao_terceiro"),
+    path('manutencao-terceiro/editar/<int:manutencao_id>/', views.editar_manutencao_terceiro, name="editar_manutencao_terceiro"),
+    path('manutencao-terceiro/deletar/<int:manutencao_id>/', views.deletar_manutencao_terceiro, name="deletar_manutencao_terceiro"),
     
     # Visitas
     path('visitas/consultar/', views.consultar_visitas, name="consultar_visitas"),
     path('visitas/cadastrar/', views.cadastrar_visita, name="cadastrar_visita"),
+    path('visitas/visualizar/<int:visita_id>/', views.visualizar_visita, name="visualizar_visita"),
+    path('visitas/editar/<int:visita_id>/', views.editar_visita, name="editar_visita"),
+    path('visitas/deletar/<int:visita_id>/', views.deletar_visita, name="deletar_visita"),
     
     # Agendamentos (mantido para compatibilidade)
     path('agendamentos/consultar/', views.consultar_agendamentos, name="consultar_agendamentos"),
@@ -139,10 +145,14 @@ urlpatterns = [
     path('administrador/gerenciar/', views.gerenciar_projeto, name="gerenciar_projeto"),
     path('administrador/limpar-tabela/', views.limpar_tabela, name="limpar_tabela"),
     
+    # Agenda Geral
+    path('agenda-geral/', views.agenda_geral, name="agenda_geral"),
+    
     # API Endpoints
     path('api/search-maquinas/', views.api_search_maquinas, name="api_search_maquinas"),
     path('api/search-planos-pcm/', views.api_search_planos_pcm, name="api_search_planos_pcm"),
     path('api/salvar-agendamentos-cronograma/', views.salvar_agendamentos_cronograma, name="salvar_agendamentos_cronograma"),
     path('api/dados-diarios-requisicoes/', views.api_dados_diarios_requisicoes, name="api_dados_diarios_requisicoes"),
     path('api/meses-por-ano/', views.api_meses_por_ano, name="api_meses_por_ano"),
+    path('api/eventos-calendario/', views.api_eventos_calendario, name="api_eventos_calendario"),
 ]
