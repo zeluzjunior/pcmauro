@@ -1,58 +1,110 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Consultar Manutenções Preventivas{% endblock %}
+{% block title %}Consultar Ordens Preventivas{% endblock %}
 
 {% block extra_css %}
 <style>
     .table-container {
         max-height: 600px;
         overflow-y: auto;
+        overflow-x: auto;
     }
-    .table thead th {
+    .table thead th:not(.filter-header) {
         position: sticky;
         top: 0;
-        background-color: #f8f9fa;
+        background-color: #0d6efd;
+        color: white;
         z-index: 10;
+        font-weight: 600;
+        padding: 12px 8px;
+        border-bottom: 2px solid #0a58ca;
+        white-space: nowrap;
+    }
+    .table thead th.filter-header {
+        position: sticky;
+        top: 48px;
+        background-color: #e9ecef;
+        z-index: 9;
+        padding: 8px !important;
+        border-bottom: 1px solid #dee2e6;
     }
     .filter-input {
         width: 100%;
-        padding: 4px 8px;
-        font-size: 0.875rem;
-        border: 1px solid #dee2e6;
+        padding: 6px 10px;
+        font-size: 0.85rem;
+        border: 1px solid #ced4da;
         border-radius: 4px;
-        margin-top: 4px;
+        background-color: white;
+        transition: all 0.2s ease;
     }
     .filter-input:focus {
         outline: none;
         border-color: #0d6efd;
         box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        background-color: #fff;
     }
-    .filter-header {
-        padding: 8px !important;
-    }
-    .filter-row th {
+    .filter-row {
         background-color: #e9ecef;
-        padding: 4px 8px !important;
+    }
+    .table tbody td {
+        padding: 10px 8px;
+        vertical-align: middle;
+        font-size: 0.9rem;
+    }
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+        transition: background-color 0.2s ease;
+    }
+    .table tbody tr {
+        border-bottom: 1px solid #e9ecef;
+    }
+    .table {
+        margin-bottom: 0;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .badge {
+        font-size: 0.75rem;
+        padding: 4px 8px;
+        font-weight: 500;
+    }
+    .table td strong {
+        color: #0d6efd;
+        font-weight: 600;
+    }
+    @media (max-width: 768px) {
+        .table-container {
+            max-height: 500px;
+        }
+        .table thead th,
+        .table tbody td {
+            font-size: 0.8rem;
+            padding: 8px 4px;
+        }
+        .filter-input {
+            font-size: 0.75rem;
+            padding: 4px 6px;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <!-- Page Header -->
-<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 153, 0, 0.171)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
     <div class="container">
         <div class="row">
             <div class="col-12">
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
-                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar</li>
                         <li class="breadcrumb-item active text-white" aria-current="page">Manutenções Preventivas</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar Ordens</li>
                     </ol>
                 </nav>
-                <h1 class="display-4 fw-bold mt-3">Consultar Manutenções Preventivas</h1>
-                <p class="lead">Visualize todos os planos de manutenção preventiva cadastrados no sistema</p>
+                <h1 class="display-4 fw-bold mt-3"><i class="bi bi-search me-2"></i>Consultar Ordens Preventivas</h1>
+                <p class="lead">Visualize todas as ordens de serviço preventivas cadastradas no sistema</p>
             </div>
         </div>
     </div>
@@ -61,22 +113,12 @@
 <!-- Main Content -->
 <section class="py-5">
     <div class="container">
-        <!-- Actions Bar -->
-        <div class="row mb-4">
-            <div class="col-md-12">
-                <form method="get" action="{% url 'consultar_manutencoes_preventivas' %}" id="searchForm" class="d-flex">
-                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por máquina, tarefa, funcionário ou setor..." value="{{ search_query|default:'' }}">
-                    <button type="submit" class="btn btn-outline-primary">
-                        <i class="fas fa-search"></i> Buscar
-                    </button>
-                </form>
-            </div>
-        </div>
+
 
         <!-- Statistics -->
         <div class="row mb-4">
             <div class="col-md-3">
-                <div class="card bg-success text-white">
+                <div class="card bg-primary text-white">
                     <div class="card-body">
                         <h5 class="card-title">Total</h5>
                         <p class="card-text display-6">{{ total_count }}</p>
@@ -87,238 +129,344 @@
                 <div class="card bg-info text-white">
                     <div class="card-body">
                         <h5 class="card-title">Mostrando</h5>
-                        <p class="card-text display-6">{{ planos|length }}</p>
+                        <p class="card-text display-6">{{ ordens|length }}</p>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card bg-warning text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Máquinas</h5>
-                        <p class="card-text display-6">{{ maquinas_count }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-primary text-white">
+                <div class="card bg-success text-white">
                     <div class="card-body">
                         <h5 class="card-title">Setores</h5>
                         <p class="card-text display-6">{{ setores_count }}</p>
                     </div>
                 </div>
             </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Unidades</h5>
+                        <p class="card-text display-6">{{ unidades_count }}</p>
+                    </div>
+                </div>
+            </div>
         </div>
+
+        <!-- Actions Bar -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <form method="get" action="{% url 'consultar_manutencoes_preventivas' %}" class="d-flex">
+                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por OS, máquina, funcionário ou descrição..." value="{{ request.GET.search }}">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                </form>
+            </div>
+        </div>
+        <!-- Filtros Avançados -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-secondary text-white">
+                        <button class="btn btn-link text-white text-decoration-none p-0 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="false" aria-controls="filtrosCollapse">
+                            <h5 class="mb-0">
+                                <i class="fas fa-filter me-2"></i>Filtros Avançados
+                                <i class="fas fa-chevron-down float-end"></i>
+                            </h5>
+                        </button>
+                    </div>
+                    <div class="collapse" id="filtrosCollapse">
+                        <div class="card-body">
+                            <form method="get" id="filtrosForm">
+                                <!-- Preservar busca geral -->
+                                <input type="hidden" name="search" value="{{ request.GET.search }}">
+                                
+                                <div class="row g-3">
+                                    <!-- Filtro por Setor -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_setor" class="form-label">Setor de Manutenção</label>
+                                        <select class="form-select" id="filtro_setor" name="filtro_setor">
+                                            <option value="">Todos os setores</option>
+                                            {% for setor in setores_unicos %}
+                                                <option value="{{ setor }}" {% if filtro_setor == setor %}selected{% endif %}>{{ setor|truncatewords:5 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Unidade -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_unidade" class="form-label">Unidade</label>
+                                        <select class="form-select" id="filtro_unidade" name="filtro_unidade">
+                                            <option value="">Todas as unidades</option>
+                                            {% for unidade in unidades_unicas %}
+                                                <option value="{{ unidade }}" {% if filtro_unidade == unidade %}selected{% endif %}>{{ unidade|truncatewords:5 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Tipo de OS -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_tipo_os" class="form-label">Tipo de Ordem de Serviço</label>
+                                        <select class="form-select" id="filtro_tipo_os" name="filtro_tipo_os">
+                                            <option value="">Todos os tipos</option>
+                                            {% for tipo in tipos_os_unicos %}
+                                                <option value="{{ tipo }}" {% if filtro_tipo_os == tipo %}selected{% endif %}>{{ tipo|truncatewords:5 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Situação -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_situacao" class="form-label">Situação da Ordem</label>
+                                        <select class="form-select" id="filtro_situacao" name="filtro_situacao">
+                                            <option value="">Todas as situações</option>
+                                            {% for situacao in situacoes_unicas %}
+                                                <option value="{{ situacao }}" {% if filtro_situacao == situacao %}selected{% endif %}>{{ situacao|truncatewords:5 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Filtro por Funcionário Solicitante -->
+                                    <div class="col-md-4">
+                                        <label for="filtro_solicitante" class="form-label">Funcionário Solicitante</label>
+                                        <input type="text" class="form-control" id="filtro_solicitante" name="filtro_solicitante" placeholder="Nome do solicitante..." value="{{ filtro_solicitante }}">
+                                    </div>
+                                    
+                                    <!-- Filtro por Funcionário Executor -->
+                                    <div class="col-md-4">
+                                        <label for="filtro_executor" class="form-label">Funcionário Executor</label>
+                                        <input type="text" class="form-control" id="filtro_executor" name="filtro_executor" placeholder="Nome do executor..." value="{{ filtro_executor }}">
+                                    </div>
+                                    
+                                    <!-- Filtro por Código da Máquina -->
+                                    <div class="col-md-4">
+                                        <label for="filtro_maquina" class="form-label">Código da Máquina</label>
+                                        <input type="text" class="form-control" id="filtro_maquina" name="filtro_maquina" placeholder="Código da máquina..." value="{{ filtro_maquina }}">
+                                    </div>
+                                    
+                                    <!-- Filtro por Data de Entrada -->
+                                    <div class="col-md-6">
+                                        <label class="form-label">Data de Entrada (Período)</label>
+                                        <div class="row g-2">
+                                            <div class="col-6">
+                                                <input type="date" class="form-control" id="data_entrada_inicio" name="data_entrada_inicio" value="{{ data_entrada_inicio }}" placeholder="Data inicial">
+                                            </div>
+                                            <div class="col-6">
+                                                <input type="date" class="form-control" id="data_entrada_fim" name="data_entrada_fim" value="{{ data_entrada_fim }}" placeholder="Data final">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Filtro por Status da Ordem -->
+                                    <div class="col-md-6">
+                                        <label class="form-label">Status da Ordem</label>
+                                        <div class="mt-2">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="filtro_ordens_abertas" name="filtro_ordens_abertas" value="1" {% if filtro_ordens_abertas == '1' %}checked{% endif %}>
+                                                <label class="form-check-label" for="filtro_ordens_abertas">
+                                                    Ordens Abertas
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="filtro_ordens_fechadas" name="filtro_ordens_fechadas" value="1" {% if filtro_ordens_fechadas == '1' %}checked{% endif %}>
+                                                <label class="form-check-label" for="filtro_ordens_fechadas">
+                                                    Ordens Fechadas
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Botões de Ação -->
+                                    <div class="col-md-6 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary me-2">
+                                            <i class="fas fa-filter me-2"></i>Aplicar Filtros
+                                        </button>
+                                        <a href="{% url 'consultar_manutencoes_preventivas' %}" class="btn btn-outline-secondary">
+                                            <i class="fas fa-times me-2"></i>Limpar Filtros
+                                        </a>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
 
         <!-- Table -->
         <div class="card shadow-sm">
-            <div class="card-header bg-success text-white">
+            <div class="card-header bg-primary text-white">
                 <h5 class="mb-0">
-                    <i class="fas fa-calendar-check me-2"></i>Lista de Planos Preventiva
+                    <i class="bi bi-tools me-2"></i>Lista de Ordens Preventivas
                 </h5>
             </div>
             <div class="card-body p-0">
-                <form method="get" action="{% url 'consultar_manutencoes_preventivas' %}" id="filterForm">
-                    <!-- Preservar busca geral -->
-                    <input type="hidden" name="search" value="{{ search_query|default:'' }}">
-                    
-                    <div class="table-container">
-                        <table class="table table-hover table-striped mb-0" id="planosTable">
-                            <thead>
+                <div class="table-container">
+                    <table class="table table-hover mb-0" id="preventivasTable">
+                        <thead>
+                            <tr>
+                                <th style="min-width: 100px;">OS</th>
+                                <th style="min-width: 120px;">Máquina</th>
+                                <th style="min-width: 200px;">Descrição</th>
+                                <th style="min-width: 150px;">Setor</th>
+                                <th style="min-width: 150px;">Solicitante</th>
+                                <th style="min-width: 150px;">Executor</th>
+                                <th style="min-width: 120px;">Data Entrada</th>
+                                <th style="min-width: 140px;">Data Encerramento</th>
+                                <th style="min-width: 150px;">Tipo</th>
+                                <th style="min-width: 120px;">Situação</th>
+                            </tr>
+                            <tr class="filter-row">
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar OS..." data-column="0">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Máquina..." data-column="1">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Descrição..." data-column="2">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Setor..." data-column="3">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Solicitante..." data-column="4">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Executor..." data-column="5">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Data Entrada..." data-column="6">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Data Encerramento..." data-column="7">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Tipo..." data-column="8">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Situação..." data-column="9">
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if ordens %}
+                                {% for ordem in ordens %}
                                 <tr>
-                                    <th>Máquina</th>
-                                    <th>Plano</th>
-                                    <th>Seq. Manutenção</th>
-                                    <th>Data Execução</th>
-                                    <th>Período (dias)</th>
-                                    <th>Seq. Tarefa</th>
-                                    <th>Descrição Tarefa</th>
-                                    <th>DESCR_SEQPLAMANU</th>
-                                    <th>Funcionário</th>
-                                    <th>Setor</th>
-                                    <th>Unidade</th>
-                                    <th>Ações</th>
+                                    <td>
+                                        <strong class="text-primary">{{ ordem.cd_ordemserv }}</strong>
+                                    </td>
+                                    <td>
+                                        {% if ordem.cd_maquina %}
+                                            <span class="badge bg-dark">{{ ordem.cd_maquina }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="text-dark">{{ ordem.descr_maquina|default:"-"|truncatewords:10 }}</span>
+                                    </td>
+                                    <td>
+                                        {% if ordem.cd_setormanut %}
+                                            <span class="badge bg-info text-white">{{ ordem.cd_setormanut }}</span>
+                                            {% if ordem.descr_setormanut %}
+                                                <br><small class="text-muted d-block mt-1">{{ ordem.descr_setormanut|truncatewords:6 }}</small>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ordem.nm_func_solic_os %}
+                                            <span class="text-dark">{{ ordem.nm_func_solic_os|truncatewords:4 }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ordem.nm_func_exec %}
+                                            <span class="text-dark">{{ ordem.nm_func_exec|truncatewords:4 }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ordem.dt_entrada %}
+                                            <span class="text-dark">{{ ordem.dt_entrada }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ordem.dt_encordmanu %}
+                                            <span class="text-success">{{ ordem.dt_encordmanu }}</span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Aberta</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ordem.descr_tpordservtv %}
+                                            <span class="badge bg-success text-white">{{ ordem.descr_tpordservtv|truncatewords:3 }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ordem.descr_sitordsetv %}
+                                            {% if "FECHADA" in ordem.descr_sitordsetv|upper or "ENCERRADA" in ordem.descr_sitordsetv|upper %}
+                                                <span class="badge bg-success text-white">{{ ordem.descr_sitordsetv|truncatewords:2 }}</span>
+                                            {% elif "ABERTA" in ordem.descr_sitordsetv|upper or "EM ANDAMENTO" in ordem.descr_sitordsetv|upper %}
+                                                <span class="badge bg-warning text-dark">{{ ordem.descr_sitordsetv|truncatewords:2 }}</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary text-white">{{ ordem.descr_sitordsetv|truncatewords:2 }}</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
                                 </tr>
-                                <tr class="filter-row">
-                                    <th class="filter-header">
-                                        <input type="text" name="filter_maquina" class="filter-input" placeholder="Filtrar Máquina..." value="{{ filter_maquina|default:'' }}">
-                                    </th>
-                                    <th class="filter-header">
-                                        <input type="text" name="filter_plano" class="filter-input" placeholder="Filtrar Plano..." value="{{ filter_plano|default:'' }}">
-                                    </th>
-                                    <th class="filter-header">
-                                        <input type="text" name="filter_seq_manutencao" class="filter-input" placeholder="Filtrar Seq..." value="{{ filter_seq_manutencao|default:'' }}">
-                                    </th>
-                                    <th class="filter-header">
-                                        <input type="text" name="filter_data" class="filter-input" placeholder="Filtrar Data..." value="{{ filter_data|default:'' }}">
-                                    </th>
-                                    <th class="filter-header">
-                                        <input type="text" name="filter_periodo" class="filter-input" placeholder="Filtrar Período..." value="{{ filter_periodo|default:'' }}">
-                                    </th>
-                                    <th class="filter-header">
-                                        <input type="text" name="filter_seq_tarefa" class="filter-input" placeholder="Filtrar Seq Tarefa..." value="{{ filter_seq_tarefa|default:'' }}">
-                                    </th>
-                                    <th class="filter-header">
-                                        <input type="text" name="filter_tarefa" class="filter-input" placeholder="Filtrar Tarefa..." value="{{ filter_tarefa|default:'' }}">
-                                    </th>
-                                    <th class="filter-header">
-                                        <input type="text" name="filter_descr_seqplamanu" class="filter-input" placeholder="Filtrar DESCR_SEQPLAMANU..." value="{{ filter_descr_seqplamanu|default:'' }}">
-                                    </th>
-                                    <th class="filter-header">
-                                        <input type="text" name="filter_funcionario" class="filter-input" placeholder="Filtrar Funcionário..." value="{{ filter_funcionario|default:'' }}">
-                                    </th>
-                                    <th class="filter-header">
-                                        <input type="text" name="filter_setor" class="filter-input" placeholder="Filtrar Setor..." value="{{ filter_setor|default:'' }}">
-                                    </th>
-                                    <th class="filter-header">
-                                        <input type="text" name="filter_unidade" class="filter-input" placeholder="Filtrar Unidade..." value="{{ filter_unidade|default:'' }}">
-                                    </th>
-                                    <th class="filter-header">
-                                        <!-- Sem filtro na coluna de ações -->
-                                    </th>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="10" class="text-center py-5">
+                                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                        <p class="text-muted">Nenhuma ordem preventiva encontrada.</p>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {% if planos %}
-                                    {% for plano in planos %}
-                                    <tr>
-                                        <td>
-                                            <strong>{{ plano.cd_maquina|default:"-" }}</strong>
-                                            {% if plano.descr_maquina %}
-                                                <br><small class="text-muted">{{ plano.descr_maquina|truncatewords:8 }}</small>
-                                            {% endif %}
-                                            {% if plano.maquina %}
-                                                <br><a href="{% url 'visualizar_maquina' plano.maquina.id %}" class="btn btn-sm btn-outline-primary mt-1">
-                                                    <i class="fas fa-industry"></i> Ver Máquina
-                                                </a>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <strong>{{ plano.numero_plano|default:"-" }}</strong>
-                                            {% if plano.descr_plano %}
-                                                <br><small class="text-muted">{{ plano.descr_plano }}</small>
-                                            {% endif %}
-                                        </td>
-                                        <td>{{ plano.sequencia_manutencao|default:"-" }}</td>
-                                        <td>
-                                            {% if plano.dt_execucao %}
-                                                {{ plano.dt_execucao }}
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if plano.quantidade_periodo %}
-                                                <span class="badge bg-info">{{ plano.quantidade_periodo }}</span>
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                        <td>{{ plano.sequencia_tarefa|default:"-" }}</td>
-                                        <td style="word-wrap: break-word; white-space: normal; max-width: 250px;">
-                                            {% if plano.descr_tarefa %}
-                                                <small>{{ plano.descr_tarefa|truncatewords:12 }}</small>
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if plano.descr_seqplamanu %}
-                                                <span class="badge bg-success" title="{{ plano.descr_seqplamanu }}">
-                                                    {{ plano.descr_seqplamanu|truncatewords:8 }}
-                                                </span>
-                                                {% if plano.roteiro_preventiva %}
-                                                    <br><small class="text-muted">
-                                                        <i class="fas fa-link"></i> Roteiro ID: {{ plano.roteiro_preventiva.id }}
-                                                    </small>
-                                                {% endif %}
-                                            {% else %}
-                                                <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if plano.nome_funcionario %}
-                                                <strong>{{ plano.nome_funcionario|truncatewords:3 }}</strong>
-                                                {% if plano.cd_funcionario %}
-                                                    <br><small class="text-muted">Cód: {{ plano.cd_funcionario }}</small>
-                                                {% endif %}
-                                            {% elif plano.cd_funcionario %}
-                                                <small class="text-muted">Cód: {{ plano.cd_funcionario }}</small>
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if plano.cd_setor %}
-                                                <span class="badge bg-secondary">{{ plano.cd_setor }}</span>
-                                                {% if plano.descr_setor %}
-                                                    <br><small class="text-muted">{{ plano.descr_setor|truncatewords:4 }}</small>
-                                                {% endif %}
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if plano.nome_unid %}
-                                                {{ plano.nome_unid|truncatewords:3 }}
-                                                {% if plano.cd_unid %}
-                                                    <br><small class="text-muted">({{ plano.cd_unid }})</small>
-                                                {% endif %}
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <a href="{% url 'visualizar_manutencao_preventiva' plano.id %}" class="btn btn-sm btn-success" title="Visualizar plano preventiva">
-                                                <i class="fas fa-eye"></i> Ver
-                                            </a>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                {% else %}
-                                    <tr>
-                                        <td colspan="11" class="text-center py-5">
-                                            <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
-                                            <p class="text-muted">Nenhum plano preventiva encontrado.</p>
-                                            <a href="{% url 'importar_plano_preventiva' %}" class="btn btn-primary">
-                                                <i class="fas fa-upload me-2"></i>Importar Planos Preventiva
-                                            </a>
-                                        </td>
-                                    </tr>
-                                {% endif %}
-                            </tbody>
-                        </table>
-                    </div>
-                </form>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
         <!-- Pagination -->
-        {% if planos.has_other_pages %}
+        {% if ordens.has_other_pages %}
         <div class="row mt-4">
             <div class="col-12">
                 <nav aria-label="Page navigation">
                     <ul class="pagination justify-content-center">
-                        {% if planos.has_previous %}
+                        {% if ordens.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_plano %}filter_plano={{ filter_plano }}&{% endif %}{% if filter_seq_manutencao %}filter_seq_manutencao={{ filter_seq_manutencao }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_periodo %}filter_periodo={{ filter_periodo }}&{% endif %}{% if filter_seq_tarefa %}filter_seq_tarefa={{ filter_seq_tarefa }}&{% endif %}{% if filter_tarefa %}filter_tarefa={{ filter_tarefa }}&{% endif %}{% if filter_funcionario %}filter_funcionario={{ filter_funcionario }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor }}&{% endif %}{% if filter_unidade %}filter_unidade={{ filter_unidade }}&{% endif %}page=1">Primeira</a>
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1">Primeira</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_plano %}filter_plano={{ filter_plano }}&{% endif %}{% if filter_seq_manutencao %}filter_seq_manutencao={{ filter_seq_manutencao }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_periodo %}filter_periodo={{ filter_periodo }}&{% endif %}{% if filter_seq_tarefa %}filter_seq_tarefa={{ filter_seq_tarefa }}&{% endif %}{% if filter_tarefa %}filter_tarefa={{ filter_tarefa }}&{% endif %}{% if filter_funcionario %}filter_funcionario={{ filter_funcionario }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor }}&{% endif %}{% if filter_unidade %}filter_unidade={{ filter_unidade }}&{% endif %}page={{ planos.previous_page_number }}">Anterior</a>
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ ordens.previous_page_number }}">Anterior</a>
                             </li>
                         {% endif %}
                         
                         <li class="page-item active">
                             <span class="page-link">
-                                Página {{ planos.number }} de {{ planos.paginator.num_pages }}
+                                Página {{ ordens.number }} de {{ ordens.paginator.num_pages }}
                             </span>
                         </li>
                         
-                        {% if planos.has_next %}
+                        {% if ordens.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_plano %}filter_plano={{ filter_plano }}&{% endif %}{% if filter_seq_manutencao %}filter_seq_manutencao={{ filter_seq_manutencao }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_periodo %}filter_periodo={{ filter_periodo }}&{% endif %}{% if filter_seq_tarefa %}filter_seq_tarefa={{ filter_seq_tarefa }}&{% endif %}{% if filter_tarefa %}filter_tarefa={{ filter_tarefa }}&{% endif %}{% if filter_funcionario %}filter_funcionario={{ filter_funcionario }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor }}&{% endif %}{% if filter_unidade %}filter_unidade={{ filter_unidade }}&{% endif %}page={{ planos.next_page_number }}">Próxima</a>
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ ordens.next_page_number }}">Próxima</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_maquina %}filter_maquina={{ filter_maquina }}&{% endif %}{% if filter_plano %}filter_plano={{ filter_plano }}&{% endif %}{% if filter_seq_manutencao %}filter_seq_manutencao={{ filter_seq_manutencao }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_periodo %}filter_periodo={{ filter_periodo }}&{% endif %}{% if filter_seq_tarefa %}filter_seq_tarefa={{ filter_seq_tarefa }}&{% endif %}{% if filter_tarefa %}filter_tarefa={{ filter_tarefa }}&{% endif %}{% if filter_funcionario %}filter_funcionario={{ filter_funcionario }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor }}&{% endif %}{% if filter_unidade %}filter_unidade={{ filter_unidade }}&{% endif %}page={{ planos.paginator.num_pages }}">Última</a>
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ ordens.paginator.num_pages }}">Última</a>
                             </li>
                         {% endif %}
                     </ul>
@@ -332,21 +480,76 @@
 
 {% block extra_js %}
 <script>
-// Auto-submit form when filter inputs change
 document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('preventivasTable');
     const filterInputs = document.querySelectorAll('.filter-input');
-    const filterForm = document.getElementById('filterForm');
     
-    filterInputs.forEach(input => {
-        let timeout;
-        input.addEventListener('input', function() {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => {
-                filterForm.submit();
-            }, 500); // Wait 500ms after user stops typing
+    if (!table || !filterInputs.length) return;
+    
+    // Função para filtrar a tabela
+    function filterTable() {
+        const filters = [];
+        filterInputs.forEach(input => {
+            const columnIndex = parseInt(input.getAttribute('data-column'));
+            const filterValue = input.value.toLowerCase().trim();
+            filters[columnIndex] = filterValue;
         });
+        
+        const rows = table.querySelectorAll('tbody tr');
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            let showRow = true;
+            
+            // Verificar cada coluna
+            for (let i = 0; i < filters.length; i++) {
+                if (filters[i]) {
+                    const cell = row.cells[i];
+                    if (cell) {
+                        const cellText = cell.textContent.toLowerCase().trim();
+                        if (!cellText.includes(filters[i])) {
+                            showRow = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (showRow) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+    
+    // Adicionar event listeners aos campos de filtro
+    filterInputs.forEach(input => {
+        input.addEventListener('input', filterTable);
+        input.addEventListener('keyup', filterTable);
     });
+    
+    // Botão para limpar todos os filtros
+    const clearFiltersBtn = document.createElement('button');
+    clearFiltersBtn.type = 'button';
+    clearFiltersBtn.className = 'btn btn-sm btn-outline-secondary mt-2';
+    clearFiltersBtn.innerHTML = '<i class="fas fa-times me-1"></i>Limpar Filtros';
+    clearFiltersBtn.addEventListener('click', function() {
+        filterInputs.forEach(input => {
+            input.value = '';
+        });
+        filterTable();
+    });
+    
+    // Adicionar botão de limpar filtros após a tabela
+    const tableContainer = document.querySelector('.table-container');
+    if (tableContainer) {
+        const clearBtnContainer = document.createElement('div');
+        clearBtnContainer.className = 'p-2 border-top';
+        clearBtnContainer.appendChild(clearFiltersBtn);
+        tableContainer.parentElement.appendChild(clearBtnContainer);
+    }
 });
 </script>
 {% endblock %}
-

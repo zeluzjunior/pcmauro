@@ -294,7 +294,52 @@
                                 </ul>
                             </div>
                         </li>
+
+                        <!--- lubrificações -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded" data-bs-toggle="collapse" data-bs-target="#lubrificacao-collapse" aria-expanded="false">
+                                <i class="bi bi-fuel-pump-diesel me-2"></i>
+                                <span class="btn-toggle-text">Lubrificações (SIGA)</span>
+                            </button>
+                            <div class="collapse" id="lubrificacao-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li>
+                                        <a href="{% url 'analise_lubrificacao' %}" class="link-dark rounded">
+                                            <i class="bi bi-paint-bucket me-2"></i>
+                                            Análise de Lubrificação</a>
+                                    </li>
+                                    <li>
+                                        <a href="{% url 'consultar_ordens_lubrificacao' %}" class="link-dark rounded">
+                                            <i class="bi bi-search me-2"></i>
+                                            Consultar Ordens de Lubrificação</a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </li>
             
+                        <!--- Calibração -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded" data-bs-toggle="collapse" data-bs-target="#calibracao-collapse" aria-expanded="false">
+                                <i class="bi bi-thermometer-snow me-2"></i>
+                                <span class="btn-toggle-text">Calibração (SIGA)</span>
+                            </button>
+                            <div class="collapse" id="calibracao-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li>
+                                        <a href="{% url 'analise_calibracao' %}" class="link-dark rounded">
+                                            <i class="bi bi-paint-bucket me-2"></i>
+                                            Análise de Calibrações</a>
+                                    </li>
+                                    <li>
+                                        <a href="{% url 'consultar_calibracoes' %}" class="link-dark rounded">
+                                            <i class="bi bi-search me-2"></i>
+                                            Consultar Ordens de Calibração</a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </li>
+
+
                         <li class="border-top my-3"></li>
                         <!-- Planejamento de Manutenção -->
                         <li class="mb-1">
@@ -389,8 +434,6 @@
                                 </ul>
                             </div>
                         </li>
-
-                        <li class="border-top my-3"></li>
 
                         <!-- Requisições - Almoxarifado -->
                         <li class="mb-1">

@@ -417,6 +417,263 @@ def upload_ordens_corretivas_from_file(file, update_existing=False) -> Tuple[int
         return 0, 0, errors
 
 
+def upload_ordens_preventivas_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:
+    """
+    Faz upload de ordens de serviço preventivas a partir de um arquivo CSV ou Excel
+    
+    Args:
+        file: Arquivo Django UploadedFile
+        update_existing: Se True, atualiza registros existentes. Se False, ignora duplicados.
+    
+    Returns:
+        Tupla (created_count, updated_count, errors)
+    """
+    from app.models import OrdemServicoPreventiva, OrdemServicoPreventivaFicha
+    
+    errors = []
+    created_count = 0
+    updated_count = 0
+    
+    # Determinar tipo de arquivo
+    file_name = file.name.lower()
+    
+    try:
+        # Ler arquivo baseado na extensão
+        if file_name.endswith(('.xlsx', '.xls', '.xlsm')):
+            data = read_excel_file(file)
+        elif file_name.endswith('.csv'):
+            # Tentar diferentes encodings - começar com latin-1 (mais comum para arquivos brasileiros)
+            # O arquivo usa delimitador ponto e vírgula (;) conforme instruções na página
+            data = None
+            encodings_to_try = ['latin-1', 'iso-8859-1', 'utf-8', 'cp1252']
+            
+            for encoding in encodings_to_try:
+                try:
+                    file.seek(0)  # Resetar arquivo para o início
+                    data = read_csv_file(file, encoding=encoding, delimiter=';')
+                    break  # Se conseguir ler, sair do loop
+                except (UnicodeDecodeError, ValidationError) as e:
+                    if encoding == encodings_to_try[-1]:  # Se for o último encoding
+                        raise ValidationError(f"Erro ao ler arquivo CSV: Não foi possível decodificar o arquivo com nenhum encoding testado (latin-1, iso-8859-1, utf-8, cp1252). Erro original: {str(e)}")
+                    continue  # Tentar próximo encoding
+                except Exception as e:
+                    # Outros erros (não relacionados a encoding)
+                    raise ValidationError(f"Erro ao ler arquivo CSV: {str(e)}")
+            
+            if data is None:
+                raise ValidationError("Erro ao ler arquivo CSV: Não foi possível processar o arquivo.")
+        else:
+            raise ValidationError("Formato de arquivo não suportado. Use .xlsx, .xls, .xlsm ou .csv")
+        
+        if not data:
+            raise ValidationError("Arquivo vazio ou sem dados válidos")
+        
+        # Processar dados em transação
+        with transaction.atomic():
+            for row_num, row_data in enumerate(data, start=2):  # Começar em 2 (linha 1 é cabeçalho)
+                try:
+                    # Verificar se a linha está vazia ou tem apenas valores vazios
+                    if not any(str(v).strip() if v else '' for v in row_data.values()):
+                        continue
+                    
+                    # Mapear colunas do CSV para campos do modelo
+                    # Unidade
+                    cd_unid = _safe_int(row_data.get('CD_UNID') or row_data.get('cd_unid') or row_data.get('Cd_Unid'))
+                    nome_unid = _safe_str(row_data.get('NOME_UNID') or row_data.get('nome_unid') or row_data.get('Nome_Unid'), max_length=255)
+                    cd_unid_exec = _safe_int(row_data.get('CD_UNID_EXEC') or row_data.get('cd_unid_exec') or row_data.get('Cd_Unid_Exec'))
+                    nome_unid_exec = _safe_str(row_data.get('NOME_UNID_EXEC') or row_data.get('nome_unid_exec') or row_data.get('Nome_Unid_Exec'), max_length=255)
+                    
+                    # Setor de Manutenção
+                    cd_setormanut = _safe_str(row_data.get('CD_SETORMANUT') or row_data.get('cd_setormanut') or row_data.get('Cd_Setormanut'), max_length=50)
+                    descr_setormanut = _safe_str(row_data.get('DESCR_SETORMANUT') or row_data.get('descr_setormanut') or row_data.get('Descr_Setormanut'), max_length=255)
+                    
+                    # Centro de Atividade
+                    cd_tpcentativ = _safe_int(row_data.get('CD_TPCENTATIV') or row_data.get('cd_tpcentativ') or row_data.get('Cd_Tpcentativ'))
+                    descr_abrev_tpcentativ = _safe_str(row_data.get('DESCR_ABREV_TPCENTATIV') or row_data.get('descr_abrev_tpcentativ') or row_data.get('Descr_Abrev_Tpcentativ'), max_length=255)
+                    
+                    # Máquina
+                    cd_maquina = _safe_int(row_data.get('CD_MAQUINA') or row_data.get('cd_maquina') or row_data.get('Cd_Maquina'))
+                    descr_maquina = _safe_str(row_data.get('DESCR_MAQUINA') or row_data.get('descr_maquina') or row_data.get('Descr_Maquina'), max_length=500)
+                    
+                    # Ordem de Serviço
+                    cd_ordemserv = _safe_int(row_data.get('CD_ORDEMSERV') or row_data.get('cd_ordemserv') or row_data.get('Cd_Ordemserv'))
+                    
+                    # Validar que temos pelo menos código da ordem de serviço
+                    if not cd_ordemserv:
+                        errors.append(f"Linha {row_num}: Código da ordem de serviço (CD_ORDEMSERV) é obrigatório")
+                        continue
+                    
+                    # Preparar dados para criação/atualização
+                    ordem_data = {
+                        'cd_unid': cd_unid,
+                        'nome_unid': nome_unid,
+                        'cd_unid_exec': cd_unid_exec,
+                        'nome_unid_exec': nome_unid_exec,
+                        'cd_setormanut': cd_setormanut,
+                        'descr_setormanut': descr_setormanut,
+                        'cd_tpcentativ': cd_tpcentativ,
+                        'descr_abrev_tpcentativ': descr_abrev_tpcentativ,
+                        'cd_ordemserv': cd_ordemserv,
+                        'cd_maquina': cd_maquina,
+                        'descr_maquina': descr_maquina,
+                    }
+                    
+                    # Datas
+                    dt_entrada = _safe_str(row_data.get('DT_ENTRADA') or row_data.get('dt_entrada') or row_data.get('Dt_Entrada'), max_length=50)
+                    dt_abertura_solicita = _safe_str(row_data.get('DT_ABERTURA_SOLICITA') or row_data.get('dt_abertura_solicita') or row_data.get('Dt_Abertura_Solicita'), max_length=50)
+                    dt_encordmanu = _safe_str(row_data.get('DT_ENCORDMANU') or row_data.get('dt_encordmanu') or row_data.get('Dt_Encordmanu'), max_length=50)
+                    dt_aberordser = _safe_str(row_data.get('DT_ABERORDSER') or row_data.get('dt_aberordser') or row_data.get('Dt_Aberordser'), max_length=50)
+                    dt_iniparmanu = _safe_str(row_data.get('DT_INIPARMANU') or row_data.get('dt_iniparmanu') or row_data.get('Dt_Iniparmanu'), max_length=50)
+                    dt_fimparmanu = _safe_str(row_data.get('DT_FIMPARMANU') or row_data.get('dt_fimparmanu') or row_data.get('Dt_Fimparmanu'), max_length=50)
+                    dt_prev_exec = _safe_str(row_data.get('DT_PREV_EXEC') or row_data.get('dt_prev_exec') or row_data.get('Dt_Prev_Exec'), max_length=50)
+                    
+                    if dt_entrada:
+                        ordem_data['dt_entrada'] = dt_entrada
+                    if dt_abertura_solicita:
+                        ordem_data['dt_abertura_solicita'] = dt_abertura_solicita
+                    if dt_encordmanu:
+                        ordem_data['dt_encordmanu'] = dt_encordmanu
+                    if dt_aberordser:
+                        ordem_data['dt_aberordser'] = dt_aberordser
+                    if dt_iniparmanu:
+                        ordem_data['dt_iniparmanu'] = dt_iniparmanu
+                    if dt_fimparmanu:
+                        ordem_data['dt_fimparmanu'] = dt_fimparmanu
+                    if dt_prev_exec:
+                        ordem_data['dt_prev_exec'] = dt_prev_exec
+                    
+                    # Funcionários
+                    cd_func_solic_os = _safe_str(row_data.get('CD_FUNC_SOLIC_OS') or row_data.get('cd_func_solic_os') or row_data.get('Cd_Func_Solic_Os'), max_length=100)
+                    nm_func_solic_os = _safe_str(row_data.get('NM_FUNC_SOLIC_OS') or row_data.get('nm_func_solic_os') or row_data.get('Nm_Func_Solic_Os'), max_length=255)
+                    cd_func_exec = _safe_str(row_data.get('CD_FUNC_EXEC') or row_data.get('cd_func_exec') or row_data.get('Cd_Func_Exec'), max_length=100)
+                    nm_func_exec = _safe_str(row_data.get('NM_FUNC_EXEC') or row_data.get('nm_func_exec') or row_data.get('Nm_Func_Exec'), max_length=255)
+                    
+                    if cd_func_solic_os:
+                        ordem_data['cd_func_solic_os'] = cd_func_solic_os
+                    if nm_func_solic_os:
+                        ordem_data['nm_func_solic_os'] = nm_func_solic_os
+                    if cd_func_exec:
+                        ordem_data['cd_func_exec'] = cd_func_exec
+                    if nm_func_exec:
+                        ordem_data['nm_func_exec'] = nm_func_exec
+                    
+                    # Descrições
+                    descr_queixa = _safe_str(row_data.get('DESCR_QUEIXA') or row_data.get('descr_queixa') or row_data.get('Descr_Queixa'))
+                    exec_tarefas = _safe_str(row_data.get('EXEC_TAREFAS') or row_data.get('exec_tarefas') or row_data.get('Exec_Tarefas'))
+                    descr_obsordserv = _safe_str(row_data.get('DESCR_OBSORDSERV') or row_data.get('descr_obsordserv') or row_data.get('Descr_Obsordserv'))
+                    
+                    if descr_queixa:
+                        ordem_data['descr_queixa'] = descr_queixa
+                    if exec_tarefas:
+                        ordem_data['exec_tarefas'] = exec_tarefas
+                    if descr_obsordserv:
+                        ordem_data['descr_obsordserv'] = descr_obsordserv
+                    
+                    # Tipo de Ordem de Serviço
+                    cd_tpordservtv = _safe_int(row_data.get('CD_TPORDSERTV') or row_data.get('cd_tpordservtv') or row_data.get('Cd_Tpordservtv'))
+                    descr_tpordservtv = _safe_str(row_data.get('DESCR_TPORDSERTV') or row_data.get('descr_tpordservtv') or row_data.get('Descr_Tpordservtv'), max_length=255)
+                    descr_sitordsetv = _safe_str(row_data.get('DESCR_SITORDSETV') or row_data.get('descr_sitordsetv') or row_data.get('Descr_Sitordsetv'), max_length=255)
+                    
+                    if cd_tpordservtv:
+                        ordem_data['cd_tpordservtv'] = cd_tpordservtv
+                    if descr_tpordservtv:
+                        ordem_data['descr_tpordservtv'] = descr_tpordservtv
+                    if descr_sitordsetv:
+                        ordem_data['descr_sitordsetv'] = descr_sitordsetv
+                    
+                    # Recomendações e Sequência
+                    descr_recomenos = _safe_str(row_data.get('DESCR_RECOMENOS') or row_data.get('descr_recomenos') or row_data.get('Descr_Recomenos'))
+                    descr_seqplamanu = _safe_str(row_data.get('DESCR_SEQPLAMANU') or row_data.get('descr_seqplamanu') or row_data.get('Descr_Seqplamanu'), max_length=255)
+                    
+                    if descr_recomenos:
+                        ordem_data['descr_recomenos'] = descr_recomenos
+                    if descr_seqplamanu:
+                        ordem_data['descr_seqplamanu'] = descr_seqplamanu
+                    
+                    # Tipo de Manutenção
+                    cd_tpmanuttv = _safe_int(row_data.get('CD_TPMANUTTV') or row_data.get('cd_tpmanuttv') or row_data.get('Cd_Tpmanuttv'))
+                    descr_tpmanuttv = _safe_str(row_data.get('DESCR_TPMANUTTV') or row_data.get('descr_tpmanuttv') or row_data.get('Descr_Tpmanuttv'), max_length=255)
+                    
+                    if cd_tpmanuttv:
+                        ordem_data['cd_tpmanuttv'] = cd_tpmanuttv
+                    if descr_tpmanuttv:
+                        ordem_data['descr_tpmanuttv'] = descr_tpmanuttv
+                    
+                    # Classificação Origem OS
+                    cd_clasorigos = _safe_int(row_data.get('CD_CLASORIGOS') or row_data.get('cd_clasorigos') or row_data.get('Cd_Clasorigos'))
+                    descr_clasorigos = _safe_str(row_data.get('DESCR_CLASORIGOS') or row_data.get('descr_clasorigos') or row_data.get('Descr_Clasorigos'), max_length=255)
+                    
+                    if cd_clasorigos:
+                        ordem_data['cd_clasorigos'] = cd_clasorigos
+                    if descr_clasorigos:
+                        ordem_data['descr_clasorigos'] = descr_clasorigos
+                    
+                    # Criar ou atualizar registro
+                    if update_existing:
+                        ordem_obj, created = OrdemServicoPreventiva.objects.update_or_create(
+                            cd_ordemserv=cd_ordemserv,
+                            defaults=ordem_data
+                        )
+                        if created:
+                            created_count += 1
+                        else:
+                            updated_count += 1
+                    else:
+                        ordem_obj, created = OrdemServicoPreventiva.objects.get_or_create(
+                            cd_ordemserv=cd_ordemserv,
+                            defaults=ordem_data
+                        )
+                        if created:
+                            created_count += 1
+                    
+                    # Criar Ficha de Manutenção se os campos estiverem presentes no CSV
+                    cd_func_exec_os = _safe_str(row_data.get('CD_FUNC_EXEC_OS') or row_data.get('cd_func_exec_os') or row_data.get('Cd_Func_Exec_Os'), max_length=100)
+                    nm_func_exec_os = _safe_str(row_data.get('NM_FUNC_EXEC_OS') or row_data.get('nm_func_exec_os') or row_data.get('Nm_Func_Exec_Os'), max_length=255)
+                    dt_ficapomanu = _safe_str(row_data.get('DT_FICAPOMANU') or row_data.get('dt_ficapomanu') or row_data.get('Dt_Ficapomanu'), max_length=50)
+                    dt_inic_iteficmanu = _safe_str(row_data.get('DT_INIC_ITEFICMANU') or row_data.get('dt_inic_iteficmanu') or row_data.get('Dt_Inic_Iteficmanu'), max_length=50)
+                    dt_fim_iteficmanu = _safe_str(row_data.get('DT_FIM_ITEFICMANU') or row_data.get('dt_fim_iteficmanu') or row_data.get('Dt_Fim_Iteficmanu'), max_length=50)
+                    
+                    # Criar ficha apenas se houver pelo menos um campo de ficha preenchido
+                    if cd_func_exec_os or nm_func_exec_os or dt_ficapomanu or dt_inic_iteficmanu or dt_fim_iteficmanu:
+                        ficha_data = {
+                            'ordem_servico': ordem_obj,
+                        }
+                        if cd_func_exec_os:
+                            ficha_data['cd_func_exec_os'] = cd_func_exec_os
+                        if nm_func_exec_os:
+                            ficha_data['nm_func_exec_os'] = nm_func_exec_os
+                        if dt_ficapomanu:
+                            ficha_data['dt_ficapomanu'] = dt_ficapomanu
+                        if dt_inic_iteficmanu:
+                            ficha_data['dt_inic_iteficmanu'] = dt_inic_iteficmanu
+                        if dt_fim_iteficmanu:
+                            ficha_data['dt_fim_iteficmanu'] = dt_fim_iteficmanu
+                        
+                        # Criar ficha (permitir múltiplas fichas para a mesma ordem)
+                        try:
+                            OrdemServicoPreventivaFicha.objects.create(**ficha_data)
+                        except Exception as e:
+                            errors.append(f"Linha {row_num}: Erro ao criar ficha de manutenção - {str(e)}")
+                    
+                except Exception as e:
+                    error_msg = f"Linha {row_num}: Erro ao processar registro - {str(e)}"
+                    errors.append(error_msg)
+                    print(f"Erro na linha {row_num}: {e}")
+                    import traceback
+                    traceback.print_exc()
+        
+        return created_count, updated_count, errors
+    
+    except ValidationError as e:
+        errors.append(str(e))
+        return 0, 0, errors
+    except Exception as e:
+        error_detail = f"Erro geral ao processar arquivo: {str(e)}"
+        errors.append(error_detail)
+        print(f"Erro geral: {error_detail}")  # Debug
+        return 0, 0, errors
+
+
 def upload_maquinas_from_file(file, update_existing=False, update_fields=None) -> Tuple[int, int, List[str], List]:
     """
     Faz upload de mÃ¡quinas a partir de um arquivo CSV ou Excel

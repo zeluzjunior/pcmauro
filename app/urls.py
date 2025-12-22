@@ -103,6 +103,15 @@ urlpatterns = [
    
     # Manutenção Corretiva
     path('analise/corretiva-outros/', views.analise_corretiva_outros, name="analise_corretiva_outros"),
+    
+    # Lubrificações
+    path('lubrificacao/analise/', views.analise_lubrificacao, name="analise_lubrificacao"),
+    path('lubrificacao/consultar-ordens/', views.consultar_ordens_lubrificacao, name="consultar_ordens_lubrificacao"),
+    
+    # Calibrações
+    path('calibracao/analise/', views.analise_calibracao, name="analise_calibracao"),
+    path('calibracao/consultar/', views.consultar_calibracoes, name="consultar_calibracoes"),
+    
     # Manutenção Preventiva
     path('ordens-de-servico/analise-preventivas/', views.analise_ordens_preventivas, name="analise_ordens_preventivas"),
     path('ordens-de-servico/analise/', views.analise_ordens_de_servico, name="analise_ordens_de_servico"),

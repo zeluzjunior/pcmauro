@@ -133,7 +133,7 @@
                 <i class="fas fa-info-circle me-2"></i>Visão Geral
             </h4>
             <p class="mb-0">
-                Esta página apresenta análises de faltantes baseadas nos números das ordens de serviço.
+                Esta página apresenta análises de faltantes baseadas nos números das ordens de serviço (corretivas e preventivas).
             </p>
         </div>
 
@@ -263,13 +263,41 @@
                                     <span class="badge bg-danger fs-6 px-3 py-2">{{ intervalo.faltantes }}</span>
                                 </td>
                                 <td class="text-center">
-                                    <div class="progress" style="height: 25px;">
-                                        <div class="progress-bar bg-success" role="progressbar" 
-                                             style="width: {{ intervalo.percentual_completo }}%" 
-                                             aria-valuenow="{{ intervalo.percentual_completo }}" 
-                                             aria-valuemin="0" 
-                                             aria-valuemax="100">
-                                            <strong>{{ intervalo.percentual_completo }}%</strong>
+                                    <div class="d-flex align-items-center justify-content-center">
+                                        <div class="progress" style="height: 30px; width: 100%; max-width: 200px; position: relative; border-radius: 15px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                            {% if intervalo.percentual_completo >= 99 %}
+                                                <div class="progress-bar bg-success" role="progressbar" 
+                                                     style="width: {{ intervalo.percentual_completo }}%; background: linear-gradient(90deg, #198754 0%, #20c997 100%) !important; transition: width 0.6s ease;" 
+                                                     aria-valuenow="{{ intervalo.percentual_completo }}" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="100">
+                                                    <strong style="color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); font-size: 0.9rem;">{{ intervalo.percentual_completo }}%</strong>
+                                                </div>
+                                            {% elif intervalo.percentual_completo >= 95 %}
+                                                <div class="progress-bar bg-info" role="progressbar" 
+                                                     style="width: {{ intervalo.percentual_completo }}%; background: linear-gradient(90deg, #0dcaf0 0%, #0aa2c0 100%) !important; transition: width 0.6s ease;" 
+                                                     aria-valuenow="{{ intervalo.percentual_completo }}" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="100">
+                                                    <strong style="color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); font-size: 0.9rem;">{{ intervalo.percentual_completo }}%</strong>
+                                                </div>
+                                            {% elif intervalo.percentual_completo >= 90 %}
+                                                <div class="progress-bar bg-warning" role="progressbar" 
+                                                     style="width: {{ intervalo.percentual_completo }}%; background: linear-gradient(90deg, #ffc107 0%, #ff9800 100%) !important; transition: width 0.6s ease;" 
+                                                     aria-valuenow="{{ intervalo.percentual_completo }}" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="100">
+                                                    <strong style="color: #333; text-shadow: 1px 1px 2px rgba(255,255,255,0.5); font-size: 0.9rem;">{{ intervalo.percentual_completo }}%</strong>
+                                                </div>
+                                            {% else %}
+                                                <div class="progress-bar bg-danger" role="progressbar" 
+                                                     style="width: {{ intervalo.percentual_completo }}%; background: linear-gradient(90deg, #dc3545 0%, #c82333 100%) !important; transition: width 0.6s ease;" 
+                                                     aria-valuenow="{{ intervalo.percentual_completo }}" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="100">
+                                                    <strong style="color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); font-size: 0.9rem;">{{ intervalo.percentual_completo }}%</strong>
+                                                </div>
+                                            {% endif %}
                                         </div>
                                     </div>
                                 </td>
@@ -319,7 +347,8 @@
                         <h6 class="text-primary mb-3"><i class="fas fa-question-circle me-2"></i>Como funciona?</h6>
                         <p class="mb-3">
                             Esta análise verifica se todos os números sequenciais de <code>cd_ordemserv</code> 
-                            estão presentes no banco de dados, desde o menor número até o maior número encontrado.
+                            estão presentes no banco de dados (tabelas OrdemServicoCorretiva e OrdemServicoPreventiva), 
+                            desde o menor número até o maior número encontrado.
                         </p>
                         <h6 class="text-success mb-3"><i class="fas fa-chart-line me-2"></i>Métricas</h6>
                         <ul class="list-unstyled">

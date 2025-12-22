@@ -238,6 +238,121 @@ class OrdemServicoCorretivaFicha(models.Model):
     def __str__(self):
         return f"Ficha OS {self.ordem_servico.cd_ordemserv} - {self.nm_func_exec_os or 'Sem executor'}"
 
+class OrdemServicoPreventiva(models.Model):
+    """Modelo para armazenar ordens de serviço preventivas fechadas"""
+    # Unidade
+    cd_unid = models.IntegerField('Código Unidade', blank=True, null=True)
+    nome_unid = models.CharField('Nome Unidade', max_length=255, blank=True, null=True)
+    cd_unid_exec = models.IntegerField('Código Unidade Execução', blank=True, null=True)
+    nome_unid_exec = models.CharField('Nome Unidade Execução', max_length=255, blank=True, null=True)
+    
+    # Setor de Manutenção
+    cd_setormanut = models.CharField('Código Setor Manutenção', max_length=50, blank=True, null=True)
+    descr_setormanut = models.CharField('Descrição Setor Manutenção', max_length=255, blank=True, null=True)
+    
+    # Centro de Atividade
+    cd_tpcentativ = models.IntegerField('Código Tipo Centro Atividade', blank=True, null=True)
+    descr_abrev_tpcentativ = models.CharField('Descrição Abrev Centro Atividade', max_length=255, blank=True, null=True)
+    
+    # Máquina
+    cd_maquina = models.BigIntegerField('Código Máquina', blank=True, null=True, db_index=True)
+    descr_maquina = models.CharField('Descrição Máquina', max_length=500, blank=True, null=True)
+    
+    # Ordem de Serviço
+    cd_ordemserv = models.BigIntegerField('Código Ordem Serviço', unique=True, db_index=True)
+    
+    # Datas de Entrada e Abertura 
+    dt_entrada = models.CharField('Data Entrada', max_length=50, blank=True, null=True)
+    dt_abertura_solicita = models.CharField('Data Abertura Solicitação', max_length=50, blank=True, null=True)
+    
+    # Funcionário Solicitante
+    cd_func_solic_os = models.CharField('Código Funcionário Solicitante OS', max_length=100, blank=True, null=True)
+    nm_func_solic_os = models.CharField('Nome Funcionário Solicitante OS', max_length=255, blank=True, null=True)
+    
+    # Descrição da Queixa
+    descr_queixa = models.TextField('Descrição Queixa', blank=True, null=True)
+    
+    # Execução de Tarefas
+    exec_tarefas = models.TextField('Execução Tarefas', blank=True, null=True)
+    
+    # Funcionário Executor
+    cd_func_exec = models.CharField('Código Funcionário Executor', max_length=100, blank=True, null=True)
+    nm_func_exec = models.CharField('Nome Funcionário Executor', max_length=255, blank=True, null=True)
+    
+    # Observações da Ordem de Serviço
+    descr_obsordserv = models.TextField('Descrição Observações Ordem Serviço', blank=True, null=True)
+    
+    # Datas de Encerramento e Abertura
+    dt_encordmanu = models.CharField('Data Encerramento Ordem Manutenção', max_length=50, blank=True, null=True)
+    dt_aberordser = models.CharField('Data Abertura Ordem Serviço', max_length=50, blank=True, null=True)
+    
+    # Datas de Parada de Manutenção
+    dt_iniparmanu = models.CharField('Data Início Parada Manutenção', max_length=50, blank=True, null=True)
+    dt_fimparmanu = models.CharField('Data Fim Parada Manutenção', max_length=50, blank=True, null=True)
+    
+    # Data Prevista Execução
+    dt_prev_exec = models.CharField('Data Prevista Execução', max_length=50, blank=True, null=True)
+    
+    # Tipo de Ordem de Serviço
+    cd_tpordservtv = models.IntegerField('Código Tipo Ordem Serviço', blank=True, null=True)
+    descr_tpordservtv = models.CharField('Descrição Tipo Ordem Serviço', max_length=255, blank=True, null=True)
+    descr_sitordsetv = models.CharField('Descrição Situação Ordem Serviço', max_length=255, blank=True, null=True)
+    
+    # Recomendações e Sequência
+    descr_recomenos = models.TextField('Descrição Recomendações OS', blank=True, null=True)
+    descr_seqplamanu = models.CharField('Descrição Sequência Plano Manutenção', max_length=255, blank=True, null=True)
+    
+    # Tipo de Manutenção
+    cd_tpmanuttv = models.IntegerField('Código Tipo Manutenção', blank=True, null=True)
+    descr_tpmanuttv = models.CharField('Descrição Tipo Manutenção', max_length=255, blank=True, null=True)
+    
+    # Classificação Origem OS
+    cd_clasorigos = models.IntegerField('Código Classificação Origem OS', blank=True, null=True)
+    descr_clasorigos = models.CharField('Descrição Classificação Origem OS', max_length=255, blank=True, null=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Ordem de Serviço Preventiva'
+        verbose_name_plural = 'Ordens de Serviço Preventivas'
+        ordering = ['-cd_ordemserv']
+
+    def __str__(self):
+        return f"{self.cd_ordemserv} - {self.descr_maquina or 'Sem descrição'}"
+
+class OrdemServicoPreventivaFicha(models.Model):
+    """Modelo para armazenar fichas de manutenção associadas a ordens de serviço preventivas.
+    Permite múltiplas fichas para a mesma ordem de serviço."""
+    ordem_servico = models.ForeignKey(
+        OrdemServicoPreventiva, 
+        on_delete=models.CASCADE, 
+        verbose_name='Ordem de Serviço', 
+        related_name='fichas'
+    )
+    
+    # Funcionário Executor OS
+    cd_func_exec_os = models.CharField('Código Funcionário Executor OS', max_length=100, blank=True, null=True)
+    nm_func_exec_os = models.CharField('Nome Funcionário Executor OS', max_length=255, blank=True, null=True)
+    
+    # Datas de Ficha de Manutenção
+    dt_ficapomanu = models.CharField('Data Ficha Ponto Manutenção', max_length=50, blank=True, null=True)
+    dt_inic_iteficmanu = models.CharField('Data Início Item Ficha Manutenção', max_length=50, blank=True, null=True)
+    dt_fim_iteficmanu = models.CharField('Data Fim Item Ficha Manutenção', max_length=50, blank=True, null=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Ficha de Manutenção Preventiva'
+        verbose_name_plural = 'Fichas de Manutenção Preventivas'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Ficha OS {self.ordem_servico.cd_ordemserv} - {self.nm_func_exec_os or 'Sem executor'}"
+
 class CentroAtividade(models.Model):
     """Modelo para armazenar informações de Centros de Atividade (CA)"""
     ca = models.IntegerField('CA', unique=True, db_index=True)
