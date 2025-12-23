@@ -57,7 +57,6 @@ urlpatterns = [
     path('plano-pcm/<int:plano_id>/remover-documento/<int:associacao_id>/', views.remover_documento_plano_pcm, name="remover_documento_plano_pcm"),
     path('planejamento/analise-geral-pcm/', views.analise_geral_plano_preventiva_pcm, name="analise_geral_plano_preventiva_pcm"),
     path('planejamento/agrupar-acoes-plano-por-data/', views.agrupar_acoes_do_plano_por_data, name="agrupar_acoes_do_plano_por_data"),
-    path('planejamento/agrupar-preventiva-por-data/', views.agrupar_preventiva_por_data, name="agrupar_preventiva_por_data"),
     path('planejamento/criar-cronograma-planejado-preventiva/', views.criar_cronograma_planejado_preventiva, name="criar_cronograma_planejado_preventiva"),
     path('plano-preventiva/visualizar/<int:plano_id>/', views.visualizar_manutencao_preventiva, name="visualizar_manutencao_preventiva"),
     path('roteiros-preventiva/consultar/', views.consultar_roteiro_preventiva, name="consultar_roteiro_preventiva"),

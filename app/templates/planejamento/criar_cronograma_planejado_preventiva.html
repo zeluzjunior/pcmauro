@@ -50,6 +50,50 @@
     #maquinaSelect option:hover {
         background-color: #f0f0f0;
     }
+    
+    /* Preview do Cronograma */
+    .preview-month {
+        margin-bottom: 20px;
+    }
+    .preview-month-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 10px 15px;
+        border-radius: 8px 8px 0 0;
+        font-weight: bold;
+    }
+    .preview-month-body {
+        border: 1px solid #dee2e6;
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        padding: 15px;
+        background: #f8f9fa;
+    }
+    .preview-date-item {
+        display: inline-block;
+        margin: 5px;
+        padding: 8px 12px;
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        font-size: 0.9rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .preview-date-item:hover {
+        background: #e7f3ff;
+        border-color: #0d6efd;
+    }
+    .preview-stats {
+        background: #e7f3ff;
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 15px;
+    }
+    .preview-empty {
+        text-align: center;
+        padding: 20px;
+        color: #6c757d;
+    }
 </style>
 {% endblock %}
 
@@ -183,6 +227,50 @@
                                         <div class="text-muted text-center py-3">
                                             Nenhum item selecionado ainda. Selecione máquinas ou planos acima e clique em "Adicionar à Lista".
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Preview do Cronograma -->
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <div class="card border-warning" id="previewScheduleCard" style="display: none;">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-calendar-check me-2"></i>Preview do Cronograma Anual
+                                        <span class="badge bg-dark text-white ms-2" id="previewTotalDates">0</span>
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="previewScheduleContent">
+                                        <p class="text-muted mb-3">
+                                            <i class="fas fa-info-circle me-2"></i>
+                                            Configure a data planejada e periodicidade acima para visualizar o cronograma.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Preview do Cronograma -->
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <div class="card border-warning" id="previewScheduleCard" style="display: none;">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-calendar-check me-2"></i>Preview do Cronograma Anual
+                                        <span class="badge bg-dark text-white ms-2" id="previewTotalDates">0</span>
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="previewScheduleContent">
+                                        <p class="text-muted mb-3">
+                                            <i class="fas fa-info-circle me-2"></i>
+                                            Configure a data planejada e periodicidade acima para visualizar o cronograma.
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -781,6 +869,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Atualizar visibilidade das máquinas após mudanças na lista
         updateMaquinasVisibility();
+        
+        // Atualizar preview do cronograma
+        updateSchedulePreview();
     }
     
     // Função para remover item da lista
@@ -854,7 +945,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Preview de periodicidade
+    // Preview de periodicidade (mantido para compatibilidade)
     function updatePeriodicidadePreview() {
         const dataPlanejada = document.getElementById('dataPlanejada').value;
         const periodicidade = parseInt(document.getElementById('periodicidade').value) || 0;
@@ -888,10 +979,165 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             previewDiv.style.display = 'none';
         }
+        
+        // Atualizar preview do cronograma completo
+        updateSchedulePreview();
     }
     
-    document.getElementById('dataPlanejada')?.addEventListener('change', updatePeriodicidadePreview);
-    document.getElementById('periodicidade')?.addEventListener('input', updatePeriodicidadePreview);
+    // Função para atualizar o preview completo do cronograma
+    function updateSchedulePreview() {
+        const dataPlanejada = document.getElementById('dataPlanejada').value;
+        const periodicidade = parseInt(document.getElementById('periodicidade').value) || null;
+        const nomeGrupo = document.getElementById('nomeGrupo').value.trim();
+        const previewCard = document.getElementById('previewScheduleCard');
+        const previewContent = document.getElementById('previewScheduleContent');
+        const previewTotalDates = document.getElementById('previewTotalDates');
+        
+        // Verificar se há condições mínimas para mostrar o preview
+        if (!dataPlanejada || selectedItems.length === 0) {
+            previewCard.style.display = 'none';
+            return;
+        }
+        
+        // Calcular todas as datas
+        const dataInicial = new Date(dataPlanejada);
+        const anoAtual = dataInicial.getFullYear();
+        const fimDoAno = new Date(anoAtual, 11, 31); // 31 de dezembro
+        
+        let todasDatas = [];
+        
+        if (periodicidade && periodicidade > 0) {
+            // Com periodicidade: gerar todas as datas até o fim do ano
+            let dataAtual = new Date(dataInicial);
+            while (dataAtual <= fimDoAno) {
+                todasDatas.push(new Date(dataAtual));
+                dataAtual = new Date(dataAtual);
+                dataAtual.setDate(dataAtual.getDate() + periodicidade);
+            }
+        } else {
+            // Sem periodicidade: apenas a data inicial
+            todasDatas = [new Date(dataInicial)];
+        }
+        
+        // Agrupar datas por mês
+        const datasPorMes = {};
+        const mesesNomes = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                           'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+        
+        todasDatas.forEach(function(data) {
+            const mes = data.getMonth();
+            const ano = data.getFullYear();
+            const chaveMes = `${ano}-${mes}`;
+            
+            if (!datasPorMes[chaveMes]) {
+                datasPorMes[chaveMes] = [];
+            }
+            datasPorMes[chaveMes].push(data);
+        });
+        
+        // Ordenar meses
+        const mesesOrdenados = Object.keys(datasPorMes).sort();
+        
+        // Gerar HTML do preview
+        let html = '';
+        
+        // Estatísticas
+        const totalItens = selectedItems.length;
+        const totalAgendamentos = todasDatas.length * totalItens;
+        
+        html += `
+            <div class="preview-stats">
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>Itens Selecionados:</strong> ${totalItens}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Total de Datas:</strong> ${todasDatas.length}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Total de Agendamentos:</strong> ${totalAgendamentos}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Periodicidade:</strong> ${periodicidade ? periodicidade + ' dias' : 'Único'}
+                    </div>
+                </div>
+                ${nomeGrupo ? `<div class="mt-2"><strong>Nome do Grupo:</strong> ${nomeGrupo}</div>` : ''}
+            </div>
+        `;
+        
+        // Preview por mês
+        if (mesesOrdenados.length > 0) {
+            html += '<div class="row">';
+            mesesOrdenados.forEach(function(chaveMes) {
+                const [ano, mes] = chaveMes.split('-').map(Number);
+                const datasMes = datasPorMes[chaveMes].sort((a, b) => a - b);
+                
+                html += `
+                    <div class="col-md-6 col-lg-4 preview-month">
+                        <div class="preview-month-header">
+                            ${mesesNomes[mes]} ${ano}
+                            <span class="badge bg-light text-dark ms-2">${datasMes.length} data(s)</span>
+                        </div>
+                        <div class="preview-month-body">
+                            ${datasMes.map(function(data) {
+                                const diaSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][data.getDay()];
+                                return `
+                                    <span class="preview-date-item" title="${data.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}">
+                                        <strong>${data.getDate()}</strong> (${diaSemana})
+                                    </span>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+        } else {
+            html += '<div class="preview-empty">Nenhuma data calculada.</div>';
+        }
+        
+        // Resumo dos itens
+        html += `
+            <div class="mt-4">
+                <h6><i class="fas fa-list me-2"></i>Itens que serão agendados:</h6>
+                <ul class="list-group">
+                    ${selectedItems.map(function(item) {
+                        return `
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas ${item.tipo === 'maquina' ? 'fa-cogs text-primary' : 'fa-clipboard-list text-success'} me-2"></i>
+                                    <small>${item.texto}</small>
+                                </div>
+                                <span class="badge bg-info">${todasDatas.length} agendamento(s)</span>
+                            </li>
+                        `;
+                    }).join('')}
+                </ul>
+            </div>
+        `;
+        
+        previewContent.innerHTML = html;
+        previewTotalDates.textContent = totalAgendamentos;
+        previewCard.style.display = 'block';
+    }
+    
+    // Event listeners para atualizar preview
+    document.getElementById('dataPlanejada')?.addEventListener('change', function() {
+        updatePeriodicidadePreview();
+        updateSchedulePreview();
+    });
+    document.getElementById('periodicidade')?.addEventListener('input', function() {
+        updatePeriodicidadePreview();
+        updateSchedulePreview();
+    });
+    document.getElementById('nomeGrupo')?.addEventListener('input', updateSchedulePreview);
+    
+    // Atualizar preview quando a lista de itens mudar
+    const originalUpdateSelectedItemsList = updateSelectedItemsList;
+    updateSelectedItemsList = function() {
+        originalUpdateSelectedItemsList();
+        updateSchedulePreview();
+    };
     
     // Salvar agendamentos
     document.getElementById('salvarAgendamentos')?.addEventListener('click', function() {
