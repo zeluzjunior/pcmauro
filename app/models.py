@@ -1343,7 +1343,7 @@ class DadosOrcamento(models.Model):
     def __str__(self):
         return f"{self.ano}/{self.mes:02d} - {self.conta_orcamentaria}"
 
-class ControleRCeNF(models.Model):
+class ControleRCeNF(models.Model): # Planilha de Controle RC e NF
     """Modelo para armazenar dados do controle de RC e NF"""
     # Dados básicos
     solicitante = models.CharField('Solicitante', max_length=255, blank=True, null=True)

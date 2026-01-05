@@ -3985,7 +3985,7 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
         return 0, 0, errors
 
 
-def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:
+def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int, int, List[str], List[dict]]:
     """
     Faz upload de controle RC e NF a partir de um arquivo Excel
     
@@ -3994,13 +3994,14 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
         update_existing: Se True, atualiza registros existentes. Se False, ignora duplicados.
     
     Returns:
-        Tupla (created_count, updated_count, errors)
+        Tupla (created_count, updated_count, errors, duplicates)
     """
     from app.models import ControleRCeNF
     from datetime import datetime, date
     from decimal import Decimal, InvalidOperation
     
     errors = []
+    duplicates = []
     created_count = 0
     updated_count = 0
     
@@ -4093,12 +4094,45 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                         continue
                     
                     # Buscar registro existente (usar RC como identificador único, ou NF Saída se não tiver RC)
+                    existing = None
+                    duplicate_reason = None
+                    campos_duplicados = {}
+                    
                     if rc:
                         existing = ControleRCeNF.objects.filter(rc=rc).first()
+                        if existing:
+                            duplicate_reason = "RC já existe no banco de dados"
+                            campos_duplicados = {'RC': rc}
+                            # Verificar se outros campos também coincidem
+                            if nf_saida and existing.nf_saida == nf_saida:
+                                campos_duplicados['NF Saída'] = nf_saida
+                            pedido_excel = _safe_str(row_data.get('PEDIDO'))
+                            if pedido_excel and existing.pedido == pedido_excel:
+                                campos_duplicados['Pedido'] = pedido_excel
                     else:
-                        existing = ControleRCeNF.objects.filter(nf_saida=nf_saida).first()
+                        if nf_saida:
+                            existing = ControleRCeNF.objects.filter(nf_saida=nf_saida).first()
+                            if existing:
+                                duplicate_reason = "NF Saída já existe no banco de dados"
+                                campos_duplicados = {'NF Saída': nf_saida}
                     
                     if existing and not update_existing:
+                        # Registrar como duplicata
+                        duplicates.append({
+                            'linha_excel': row_num,
+                            'rc': rc or 'N/A',
+                            'nf_saida': nf_saida or 'N/A',
+                            'empresa': _safe_str(row_data.get('EMPRESA')) or 'N/A',
+                            'solicitante': _safe_str(row_data.get('SOLICITANTE')) or 'N/A',
+                            'pedido': _safe_str(row_data.get('PEDIDO')) or 'N/A',
+                            'motivo': duplicate_reason,
+                            'campos_duplicados': campos_duplicados,
+                            'registro_existente_id': existing.id,
+                            'registro_existente_rc': existing.rc or 'N/A',
+                            'registro_existente_nf': existing.nf_saida or 'N/A',
+                            'registro_existente_empresa': existing.empresa or 'N/A',
+                            'registro_existente_pedido': existing.pedido or 'N/A',
+                        })
                         continue
                     
                     # Preparar dados
@@ -4151,7 +4185,7 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                     traceback.print_exc()
                     continue
         
-        return created_count, updated_count, errors
+        return created_count, updated_count, errors, duplicates
         
     except Exception as e:
         error_detail = f"Erro ao processar arquivo: {str(e)}"
@@ -4159,4 +4193,4 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
         print(f"Erro geral: {error_detail}")
         import traceback
         traceback.print_exc()
-        return 0, 0, errors
+        return 0, 0, errors, []

@@ -2732,7 +2732,7 @@ def importar_controle_nf_e_rc(request):
         
         try:
             # Fazer upload dos dados
-            created_count, updated_count, errors = upload_controle_rc_e_nf_from_file(
+            created_count, updated_count, errors, duplicates = upload_controle_rc_e_nf_from_file(
                 file, 
                 update_existing=update_existing
             )
@@ -2750,15 +2750,24 @@ def importar_controle_nf_e_rc(request):
             if updated_count > 0:
                 messages.success(request, f'{updated_count} registro(s) atualizado(s) com sucesso!')
             
-            if created_count == 0 and updated_count == 0 and not errors:
+            if duplicates:
+                messages.info(request, f'{len(duplicates)} registro(s) duplicado(s) encontrado(s) e não foram importados. Veja detalhes abaixo.')
+            
+            if created_count == 0 and updated_count == 0 and not errors and not duplicates:
                 messages.info(request, 'Nenhum registro foi importado. Verifique se o arquivo contém dados válidos.')
                 
         except Exception as e:
             messages.error(request, f'Erro ao importar arquivo: {str(e)}')
+            duplicates = []
+    
+    # Se não houve POST ou houve erro, inicializar duplicates vazio
+    if request.method != 'POST' or 'duplicates' not in locals():
+        duplicates = []
     
     context = {
         'page_title': 'Importar Controle RC e NF',
-        'active_page': 'importar_controle_nf_e_rc'
+        'active_page': 'importar_controle_nf_e_rc',
+        'duplicates': duplicates,
     }
     
     return render(request, 'importar/importar_controle_nf_e_rc.html', context)
@@ -8613,8 +8622,7 @@ def consultar_corretivas_outros(request):
     filtro_executor = request.GET.get('filtro_executor', '')
     if filtro_executor:
         ordens_list = ordens_list.filter(
-            Q(nm_func_exec__icontains=filtro_executor) |
-            Q(nm_func_exec_os__icontains=filtro_executor)
+            Q(nm_func_exec__icontains=filtro_executor)
         )
     
     # Filtro por Código da Máquina
@@ -9896,8 +9904,7 @@ def consultar_ordens_lubrificacao(request):
     filtro_executor = request.GET.get('filtro_executor', '')
     if filtro_executor:
         ordens_list = ordens_list.filter(
-            Q(nm_func_exec__icontains=filtro_executor) |
-            Q(nm_func_exec_os__icontains=filtro_executor)
+            Q(nm_func_exec__icontains=filtro_executor)
         )
     
     # Filtro por Código da Máquina
@@ -10762,7 +10769,7 @@ def analise_manutentores(request):
     
     for nome in manutentores_nomes:
         ordens_count = OrdemServicoCorretiva.objects.filter(
-            Q(nm_func_exec__icontains=nome) | Q(nm_func_exec_os__icontains=nome)
+            Q(nm_func_exec__icontains=nome)
         ).count()
         fichas_count = OrdemServicoCorretivaFicha.objects.filter(
             nm_func_exec_os__icontains=nome
@@ -10831,7 +10838,7 @@ def analise_manutentores(request):
     for manutentor in Manutentor.objects.all():
         if manutentor.Nome:
             ordens_count = OrdemServicoCorretiva.objects.filter(
-                Q(nm_func_exec__icontains=manutentor.Nome) | Q(nm_func_exec_os__icontains=manutentor.Nome)
+                Q(nm_func_exec__icontains=manutentor.Nome)
             ).count()
             fichas_count = OrdemServicoCorretivaFicha.objects.filter(
                 nm_func_exec_os__icontains=manutentor.Nome
@@ -10871,6 +10878,11 @@ def analise_manutentores(request):
         'top_manutentores_manutencoes': top_manutentores_manutencoes,
     }
     return render(request, 'analise/analise_manutentores.html', context)
+
+
+def configuracao_manutentores(request):
+    """Página de configuração de manutentores"""
+    return render(request, 'manutentor/configuracao_manutentores.html')
 
 
 def visualizar_manutentor(request, matricula):
@@ -14325,6 +14337,88 @@ def consultar_planilha_rc(request):
         uso=''
     ).values_list('uso', flat=True).distinct().order_by('uso')
     
+    # Detectar duplicatas
+    # Duplicatas são detectadas baseadas em combinações de campos chave
+    duplicatas_analise = []
+    
+    # 1. Duplicatas por RC + NF Saída (mesma RC e mesma NF)
+    duplicatas_rc_nf = ControleRCeNF.objects.values('rc', 'nf_saida').annotate(
+        count=Count('id')
+    ).filter(count__gt=1).exclude(rc__isnull=True).exclude(rc='').exclude(nf_saida__isnull=True).exclude(nf_saida='')
+    
+    for dup in duplicatas_rc_nf:
+        registros = ControleRCeNF.objects.filter(rc=dup['rc'], nf_saida=dup['nf_saida']).order_by('id')
+        ids = list(registros.values_list('id', flat=True))
+        duplicatas_analise.append({
+            'tipo': 'RC + NF Saída',
+            'campos': {'RC': dup['rc'], 'NF Saída': dup['nf_saida']},
+            'quantidade': dup['count'],
+            'ids': ids,
+            'registros': registros,
+            'motivo': f"Registros com RC '{dup['rc']}' e NF Saída '{dup['nf_saida']}' aparecem {dup['count']} vezes no banco de dados."
+        })
+    
+    # 2. Duplicatas por RC + Pedido (mesma RC e mesmo Pedido)
+    duplicatas_rc_pedido = ControleRCeNF.objects.values('rc', 'pedido').annotate(
+        count=Count('id')
+    ).filter(count__gt=1).exclude(rc__isnull=True).exclude(rc='').exclude(pedido__isnull=True).exclude(pedido='')
+    
+    for dup in duplicatas_rc_pedido:
+        # Verificar se já não foi incluído na análise anterior
+        if not any(d['tipo'] == 'RC + Pedido' and d['campos']['RC'] == dup['rc'] and d['campos']['Pedido'] == dup['pedido'] for d in duplicatas_analise):
+            registros = ControleRCeNF.objects.filter(rc=dup['rc'], pedido=dup['pedido']).order_by('id')
+            ids = list(registros.values_list('id', flat=True))
+            duplicatas_analise.append({
+                'tipo': 'RC + Pedido',
+                'campos': {'RC': dup['rc'], 'Pedido': dup['pedido']},
+                'quantidade': dup['count'],
+                'ids': ids,
+                'registros': registros,
+                'motivo': f"Registros com RC '{dup['rc']}' e Pedido '{dup['pedido']}' aparecem {dup['count']} vezes no banco de dados."
+            })
+    
+    # 3. Duplicatas por NF Saída + Pedido (mesma NF e mesmo Pedido)
+    duplicatas_nf_pedido = ControleRCeNF.objects.values('nf_saida', 'pedido').annotate(
+        count=Count('id')
+    ).filter(count__gt=1).exclude(nf_saida__isnull=True).exclude(nf_saida='').exclude(pedido__isnull=True).exclude(pedido='')
+    
+    for dup in duplicatas_nf_pedido:
+        # Verificar se já não foi incluído
+        if not any(d['tipo'] == 'NF Saída + Pedido' and d['campos']['NF Saída'] == dup['nf_saida'] and d['campos']['Pedido'] == dup['pedido'] for d in duplicatas_analise):
+            registros = ControleRCeNF.objects.filter(nf_saida=dup['nf_saida'], pedido=dup['pedido']).order_by('id')
+            ids = list(registros.values_list('id', flat=True))
+            duplicatas_analise.append({
+                'tipo': 'NF Saída + Pedido',
+                'campos': {'NF Saída': dup['nf_saida'], 'Pedido': dup['pedido']},
+                'quantidade': dup['count'],
+                'ids': ids,
+                'registros': registros,
+                'motivo': f"Registros com NF Saída '{dup['nf_saida']}' e Pedido '{dup['pedido']}' aparecem {dup['count']} vezes no banco de dados."
+            })
+    
+    # 4. Duplicatas por RC apenas (mesma RC, mas pode ter NFs diferentes)
+    duplicatas_rc_apenas = ControleRCeNF.objects.values('rc').annotate(
+        count=Count('id')
+    ).filter(count__gt=1).exclude(rc__isnull=True).exclude(rc='')
+    
+    for dup in duplicatas_rc_apenas:
+        # Verificar se já não foi incluído em análises anteriores
+        if not any(d['campos'].get('RC') == dup['rc'] for d in duplicatas_analise):
+            registros = ControleRCeNF.objects.filter(rc=dup['rc']).order_by('id')
+            ids = list(registros.values_list('id', flat=True))
+            nfs_unicas = registros.exclude(nf_saida__isnull=True).exclude(nf_saida='').values_list('nf_saida', flat=True).distinct()
+            if len(nfs_unicas) == 1:
+                # Se todas têm a mesma NF, já foi detectado acima
+                continue
+            duplicatas_analise.append({
+                'tipo': 'RC (múltiplas ocorrências)',
+                'campos': {'RC': dup['rc']},
+                'quantidade': dup['count'],
+                'ids': ids,
+                'registros': registros,
+                'motivo': f"RC '{dup['rc']}' aparece {dup['count']} vezes no banco de dados com diferentes NFs ou Pedidos."
+            })
+    
     context = {
         'page_title': 'Consultar Planilha RC',
         'active_page': 'consultar_planilha_rc',
@@ -14345,6 +14439,7 @@ def consultar_planilha_rc(request):
         'filtro_uso': filtro_uso,
         'filtro_valor_min': filtro_valor_min,
         'filtro_valor_max': filtro_valor_max,
+        'duplicatas_analise': duplicatas_analise,
     }
     
     return render(request, 'orcamento/consultar_planilha_rc.html', context)

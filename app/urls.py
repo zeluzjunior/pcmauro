@@ -126,6 +126,7 @@ urlpatterns = [
     path('manutentor/analise/', views.analise_manutentores, name="analise_manutentores"),
     path('manutentor/cadastrar/', views.cadastrar_manutentor, name="cadastrar_manutentor"),
     path('manutentor/consultar/', views.consultar_manutentores, name="consultar_manutentores"),
+    path('manutentor/configuracao/', views.configuracao_manutentores, name="configuracao_manutentores"),
     path('manutentor/visualizar/<str:matricula>/', views.visualizar_manutentor, name="visualizar_manutentor"),
     path('manutentor/editar/<str:matricula>/', views.editar_manutentor, name="editar_manutentor"),
     path('manutentor/<str:matricula>/adicionar-maquina/', views.adicionar_maquina_manutentor, name="adicionar_maquina_manutentor"),

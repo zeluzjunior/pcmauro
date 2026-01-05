@@ -142,13 +142,13 @@
                                 {% for local in locais %}
                                 <tr>
                                     <td><strong>{{ local.local }}</strong></td>
-                                    <td>{{ local.centro_atividade.descricao|default:"-"|truncatewords:10 }}</td>
+                                    <td>{{ local.descricao|default:"-"|truncatewords:10 }}</td>
                                     <td>
-                                        <span class="badge bg-primary">{{ local.centro_atividade.ca }}</span>
+                                        <span class="badge bg-primary">{{ local.ca }}</span>
                                     </td>
                                     <td>
-                                        {% if local.centro_atividade.sigla %}
-                                            <span class="badge bg-secondary">{{ local.centro_atividade.sigla }}</span>
+                                        {% if local.sigla %}
+                                            <span class="badge bg-secondary">{{ local.sigla }}</span>
                                         {% else %}
                                             -
                                         {% endif %}
@@ -166,7 +166,7 @@
                                             <a href="{% url 'visualizar_local' local.id %}" class="btn btn-sm btn-primary" title="Visualizar detalhes">
                                                 <i class="fas fa-eye me-1"></i>Visualizar
                                             </a>
-                                            <a href="{% url 'visualizar_centro_de_atividade' local.centro_atividade.id %}" class="btn btn-sm btn-info" title="Ver Centro de Atividade">
+                                            <a href="{% url 'visualizar_centro_de_atividade' local.id %}" class="btn btn-sm btn-info" title="Ver Centro de Atividade">
                                                 <i class="fas fa-building me-1"></i>Ver CA
                                             </a>
                                         </div>
