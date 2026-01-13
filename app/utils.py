@@ -4085,23 +4085,42 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                         if idx < len(headers) and headers[idx]:
                             row_data[headers[idx]] = cell.value
                     
-                    # Verificar se tem dados mínimos (RC ou NF Saída)
+                    # Obter ID do Excel (identificador único)
+                    id_excel = _safe_str(row_data.get('ID'))
+                    
+                    # Verificar se tem dados mínimos (ID é obrigatório, mas manter compatibilidade com RC/NF Saída)
                     rc = _safe_str(row_data.get('RC'))
                     nf_saida = _safe_str(row_data.get('NF SAÍDA'))
                     
-                    # Se não tem RC nem NF Saída, pular
-                    if not rc and not nf_saida:
+                    # Se não tem ID nem RC nem NF Saída, pular
+                    if not id_excel and not rc and not nf_saida:
                         continue
                     
-                    # Buscar registro existente (usar RC como identificador único, ou NF Saída se não tiver RC)
+                    # Buscar registro existente (usar ID como identificador único principal)
                     existing = None
                     duplicate_reason = None
                     campos_duplicados = {}
                     
-                    if rc:
+                    # Prioridade 1: Usar ID do Excel (identificador único)
+                    if id_excel:
+                        existing = ControleRCeNF.objects.filter(id_excel=id_excel).first()
+                        if existing:
+                            duplicate_reason = "ID já existe no banco de dados"
+                            campos_duplicados = {'ID': id_excel}
+                            # Verificar se outros campos também coincidem
+                            if rc and existing.rc == rc:
+                                campos_duplicados['RC'] = rc
+                            if nf_saida and existing.nf_saida == nf_saida:
+                                campos_duplicados['NF Saída'] = nf_saida
+                            pedido_excel = _safe_str(row_data.get('PEDIDO'))
+                            if pedido_excel and existing.pedido == pedido_excel:
+                                campos_duplicados['Pedido'] = pedido_excel
+                    
+                    # Fallback: Se não encontrou por ID, tentar por RC (compatibilidade com dados antigos)
+                    if not existing and rc:
                         existing = ControleRCeNF.objects.filter(rc=rc).first()
                         if existing:
-                            duplicate_reason = "RC já existe no banco de dados"
+                            duplicate_reason = "RC já existe no banco de dados (sem ID no Excel)"
                             campos_duplicados = {'RC': rc}
                             # Verificar se outros campos também coincidem
                             if nf_saida and existing.nf_saida == nf_saida:
@@ -4109,17 +4128,19 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                             pedido_excel = _safe_str(row_data.get('PEDIDO'))
                             if pedido_excel and existing.pedido == pedido_excel:
                                 campos_duplicados['Pedido'] = pedido_excel
-                    else:
-                        if nf_saida:
-                            existing = ControleRCeNF.objects.filter(nf_saida=nf_saida).first()
-                            if existing:
-                                duplicate_reason = "NF Saída já existe no banco de dados"
-                                campos_duplicados = {'NF Saída': nf_saida}
+                    
+                    # Fallback: Se não encontrou por ID nem RC, tentar por NF Saída (compatibilidade com dados antigos)
+                    if not existing and nf_saida:
+                        existing = ControleRCeNF.objects.filter(nf_saida=nf_saida).first()
+                        if existing:
+                            duplicate_reason = "NF Saída já existe no banco de dados (sem ID no Excel)"
+                            campos_duplicados = {'NF Saída': nf_saida}
                     
                     if existing and not update_existing:
                         # Registrar como duplicata
                         duplicates.append({
                             'linha_excel': row_num,
+                            'id_excel': id_excel or 'N/A',
                             'rc': rc or 'N/A',
                             'nf_saida': nf_saida or 'N/A',
                             'empresa': _safe_str(row_data.get('EMPRESA')) or 'N/A',
@@ -4128,6 +4149,7 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                             'motivo': duplicate_reason,
                             'campos_duplicados': campos_duplicados,
                             'registro_existente_id': existing.id,
+                            'registro_existente_id_excel': existing.id_excel or 'N/A',
                             'registro_existente_rc': existing.rc or 'N/A',
                             'registro_existente_nf': existing.nf_saida or 'N/A',
                             'registro_existente_empresa': existing.empresa or 'N/A',
@@ -4137,6 +4159,7 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                     
                     # Preparar dados
                     data_dict = {
+                        'id_excel': id_excel,  # ID é obrigatório, mas pode ser None para compatibilidade
                         'solicitante': _safe_str(row_data.get('SOLICITANTE')),
                         'empresa': _safe_str(row_data.get('EMPRESA')),
                         'nf_saida': nf_saida,
@@ -4174,8 +4197,25 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                         updated_count += 1
                     else:
                         # Criar novo registro
-                        ControleRCeNF.objects.create(**data_dict)
-                        created_count += 1
+                        # Se não tem ID do Excel, gerar um baseado na linha (para compatibilidade)
+                        if not data_dict.get('id_excel'):
+                            data_dict['id_excel'] = f"IMPORT_{row_num}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                        try:
+                            ControleRCeNF.objects.create(**data_dict)
+                            created_count += 1
+                        except Exception as e:
+                            # Se falhar por ID duplicado, tentar atualizar
+                            if 'id_excel' in str(e).lower() or 'unique' in str(e).lower():
+                                existing_by_id = ControleRCeNF.objects.filter(id_excel=data_dict['id_excel']).first()
+                                if existing_by_id:
+                                    for key, value in data_dict.items():
+                                        setattr(existing_by_id, key, value)
+                                    existing_by_id.save()
+                                    updated_count += 1
+                                else:
+                                    raise
+                            else:
+                                raise
                         
                 except Exception as e:
                     error_msg = f"Linha {row_num}: {str(e)}"

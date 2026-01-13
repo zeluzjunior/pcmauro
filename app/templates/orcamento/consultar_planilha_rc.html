@@ -57,6 +57,7 @@
     .col-solicitante { min-width: 150px; }
     .col-nf { min-width: 100px; }
     .col-descricao { min-width: 250px; }
+    .col-id { min-width: 100px; }
     .col-rc { min-width: 120px; }
     .col-pedido { min-width: 120px; }
     .col-valor { min-width: 120px; text-align: right; }
@@ -157,6 +158,7 @@
                                 <table class="table table-hover table-striped mb-0">
                                     <thead>
                                         <tr>
+                                            <th class="col-id">ID</th>
                                             <th class="col-empresa">Empresa</th>
                                             <th class="col-solicitante">Solicitante</th>
                                             <th class="col-nf">NF Saída</th>
@@ -175,6 +177,9 @@
                                     </thead>
                                     <thead class="filter-row">
                                         <tr>
+                                            <th class="filter-header">
+                                                <input type="text" name="filtro_id" class="filter-input" placeholder="Filtrar ID..." value="{{ filtro_id|default:'' }}" onchange="document.getElementById('filterForm').submit();">
+                                            </th>
                                             <th class="filter-header">
                                                 <select name="filtro_empresa" class="filter-input" onchange="document.getElementById('filterForm').submit();">
                                                     <option value="">Todas</option>
@@ -229,6 +234,9 @@
                                     <tbody>
                                         {% for controle in controles %}
                                         <tr>
+                                            <td class="col-id">
+                                                <strong class="text-primary">{{ controle.id_excel|default:"-" }}</strong>
+                                            </td>
                                             <td class="col-empresa">
                                                 <strong>{{ controle.empresa|default:"-" }}</strong>
                                             </td>
@@ -300,7 +308,7 @@
                                         </tr>
                                         {% empty %}
                                         <tr>
-                                            <td colspan="14" class="text-center text-muted py-4">
+                                            <td colspan="15" class="text-center text-muted py-4">
                                                 <i class="fas fa-inbox fa-2x mb-2"></i>
                                                 <p>Nenhum registro encontrado.</p>
                                             </td>

@@ -93,6 +93,7 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th>Linha Excel</th>
+                                        <th>ID</th>
                                         <th>RC</th>
                                         <th>NF Saída</th>
                                         <th>Empresa</th>
@@ -108,6 +109,13 @@
                                     <tr>
                                         <td>
                                             <span class="badge bg-secondary">{{ dup.linha_excel }}</span>
+                                        </td>
+                                        <td>
+                                            {% if dup.id_excel != 'N/A' %}
+                                                <strong class="text-primary">{{ dup.id_excel }}</strong>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
                                         </td>
                                         <td>
                                             {% if dup.rc != 'N/A' %}
@@ -148,6 +156,7 @@
                                             </a>
                                             <br>
                                             <small class="text-muted">
+                                                ID: {{ dup.registro_existente_id_excel }}<br>
                                                 RC: {{ dup.registro_existente_rc }}<br>
                                                 NF: {{ dup.registro_existente_nf }}
                                             </small>
@@ -161,8 +170,9 @@
                         <div class="mt-3">
                             <h6><i class="fas fa-lightbulb me-2"></i>Como os duplicados são detectados:</h6>
                             <ul class="mb-0">
-                                <li><strong>Por RC:</strong> Se o arquivo Excel contém uma linha com um RC que já existe no banco de dados, ela é considerada duplicada.</li>
-                                <li><strong>Por NF Saída:</strong> Se não houver RC, o sistema verifica se a NF Saída já existe no banco de dados.</li>
+                                <li><strong>Por ID (Prioridade):</strong> O sistema primeiro verifica se o ID do Excel já existe no banco de dados. Este é o identificador único principal.</li>
+                                <li><strong>Por RC (Fallback):</strong> Se não houver ID no Excel, o sistema verifica se o RC já existe no banco de dados (compatibilidade com dados antigos).</li>
+                                <li><strong>Por NF Saída (Fallback):</strong> Se não houver ID nem RC, o sistema verifica se a NF Saída já existe no banco de dados (compatibilidade com dados antigos).</li>
                                 <li><strong>Campos adicionais:</strong> O sistema também verifica se outros campos como Pedido coincidem para confirmar a duplicação.</li>
                             </ul>
                         </div>
@@ -194,6 +204,7 @@
                         
                         <h6 class="mt-4">Colunas Esperadas:</h6>
                         <ul>
+                            <li><strong>ID</strong> - <span class="text-danger">Identificador único do registro (obrigatório)</span></li>
                             <li><strong>SOLICITANTE</strong> - Nome do solicitante</li>
                             <li><strong>EMPRESA</strong> - Nome da empresa</li>
                             <li><strong>NF SAÍDA</strong> - Número da nota fiscal de saída</li>
@@ -225,7 +236,7 @@
                         
                         <div class="alert alert-warning mt-4">
                             <i class="fas fa-exclamation-triangle me-2"></i>
-                            <strong>Importante:</strong> O campo <strong>RC</strong> (ou <strong>NF SAÍDA</strong> se não houver RC) é usado como identificador único. Se um registro com o mesmo número já existir no banco de dados e a opção "Atualizar registros existentes" estiver marcada, os dados serão atualizados. Caso contrário, a linha será ignorada.
+                            <strong>Importante:</strong> O campo <strong>ID</strong> é o identificador único principal usado para identificar e diferenciar registros. Se um registro com o mesmo ID já existir no banco de dados e a opção "Atualizar registros existentes" estiver marcada, os dados serão atualizados. Caso contrário, a linha será ignorada. Se o ID não estiver presente no Excel, o sistema tentará usar RC ou NF Saída como fallback (compatibilidade com dados antigos).
                         </div>
                     </div>
                 </div>

@@ -41,6 +41,18 @@
     .year-section {
         margin-bottom: 40px;
     }
+    /* Estilos para edição inline de saldo semanal */
+    .saldo-display {
+        min-height: 30px;
+        display: flex;
+        align-items: center;
+    }
+    .saldo-edit {
+        min-height: 30px;
+    }
+    .inline-money-input {
+        font-size: 0.875rem;
+    }
 </style>
 {% endblock %}
 
@@ -213,32 +225,124 @@
                                         </h6>
                                     </div>
                                     <div class="card-body">
-                                        <div class="table-responsive">
-                                            <table class="table table-hover">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Conta Orçamentária</th>
-                                                        <th>Valor do Orçamento</th>
-                                                        <th>Valor Final Desejado</th>
-                                                        <th>Última Atualização</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {% for dado in mes_data.dados %}
-                                                    <tr>
-                                                        <td><strong>{{ dado.conta_orcamentaria }}</strong></td>
-                                                        <td>{{ dado.valor_orcamento|currency_br }}</td>
-                                                        <td>{{ dado.valor_final_desejado|currency_br }}</td>
-                                                        <td>
-                                                            <small class="text-muted">
-                                                                {{ dado.updated_at|date:"d/m/Y H:i" }}
-                                                            </small>
-                                                        </td>
-                                                    </tr>
-                                                    {% endfor %}
-                                                </tbody>
-                                            </table>
+                                        {% for item in mes_data.dados %}
+                                        {% with dado=item.dado saldos_semanais=item.saldos_semanais %}
+                                        <div class="card mb-3 border-secondary">
+                                            <div class="card-header bg-secondary text-white">
+                                                <div class="row align-items-center">
+                                                    <div class="col-md-6">
+                                                        <strong>{{ dado.conta_orcamentaria }}</strong>
+                                                    </div>
+                                                    <div class="col-md-3 text-end">
+                                                        <small>Orçamento: {{ dado.valor_orcamento|currency_br }}</small>
+                                                    </div>
+                                                    <div class="col-md-3 text-end">
+                                                        <a href="{% url 'editar_dados_orcamento' dado.id %}" class="btn btn-sm btn-warning" title="Editar registro">
+                                                            <i class="fas fa-edit"></i> Editar
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row mb-2">
+                                                    <div class="col-md-4">
+                                                        <strong>Valor Final Desejado:</strong> {{ dado.valor_final_desejado|currency_br }}
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <small class="text-muted">
+                                                            Última atualização: {{ dado.updated_at|date:"d/m/Y H:i" }}
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Weekly Balance Section -->
+                                                {% if mes_data.semanas %}
+                                                <div class="mt-3">
+                                                    <h6 class="border-bottom pb-2 mb-3">
+                                                        <i class="fas fa-calendar-week me-2"></i>Saldo Orçamentário Desejado por Semana
+                                                    </h6>
+                                                    <div class="table-responsive">
+                                                        <table class="table table-sm table-bordered">
+                                                            <thead class="table-light">
+                                                                <tr>
+                                                                    <th>Semana</th>
+                                                                    <th>Período</th>
+                                                                    <th>Saldo Orçamentário Desejado</th>
+                                                                    <th style="min-width: 120px;">Ações</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {% for semana in mes_data.semanas %}
+                                                                {% with saldo_info=saldos_semanais|get_item:semana.id %}
+                                                                <tr id="row_semana_{{ dado.id }}_{{ semana.id }}">
+                                                                    <td><strong>{{ semana.semana }}</strong></td>
+                                                                    <td>
+                                                                        {% if semana.inicio and semana.fim %}
+                                                                            {{ semana.inicio|date:"d/m/Y" }} a {{ semana.fim|date:"d/m/Y" }}
+                                                                        {% else %}
+                                                                            <span class="text-muted">-</span>
+                                                                        {% endif %}
+                                                                    </td>
+                                                                    <td>
+                                                                        <div id="display_saldo_{{ dado.id }}_{{ semana.id }}" class="saldo-display">
+                                                                            {% if saldo_info %}
+                                                                                <strong class="text-success">{{ saldo_info.saldo.saldo_orcamentario_desejado|currency_br }}</strong>
+                                                                            {% else %}
+                                                                                <span class="text-muted">Não definido</span>
+                                                                            {% endif %}
+                                                                        </div>
+                                                                        <div id="edit_saldo_{{ dado.id }}_{{ semana.id }}" class="saldo-edit" style="display: none;">
+                                                                            <form method="post" action="{% url 'dados_orcamento' %}" class="d-inline">
+                                                                                {% csrf_token %}
+                                                                                <input type="hidden" name="action" value="save_weekly_balance">
+                                                                                <input type="hidden" name="ano" value="{{ ano_data.ano }}">
+                                                                                <input type="hidden" name="mes" value="{{ mes_data.mes }}">
+                                                                                <input type="hidden" name="conta_orcamentaria" value="{{ dado.conta_orcamentaria }}">
+                                                                                <input type="hidden" name="semana_id" value="{{ semana.id }}">
+                                                                                <div class="input-group input-group-sm">
+                                                                                    <span class="input-group-text">R$</span>
+                                                                                    <input type="text" 
+                                                                                           class="form-control money-input inline-money-input" 
+                                                                                           name="saldo_orcamentario_desejado" 
+                                                                                           value="{% if saldo_info %}{{ saldo_info.valor_formatado }}{% else %}{% endif %}"
+                                                                                           placeholder="0,00"
+                                                                                           autocomplete="off"
+                                                                                           style="max-width: 150px;">
+                                                                                    <button type="submit" class="btn btn-sm btn-success" title="Salvar">
+                                                                                        <i class="fas fa-check"></i>
+                                                                                    </button>
+                                                                                    <button type="button" class="btn btn-sm btn-secondary cancel-edit" data-dado-id="{{ dado.id }}" data-semana-id="{{ semana.id }}" title="Cancelar">
+                                                                                        <i class="fas fa-times"></i>
+                                                                                    </button>
+                                                                                </div>
+                                                                            </form>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td>
+                                                                        <button type="button" 
+                                                                                class="btn btn-sm btn-outline-primary edit-saldo-btn" 
+                                                                                data-dado-id="{{ dado.id }}" 
+                                                                                data-semana-id="{{ semana.id }}"
+                                                                                title="Editar saldo para esta semana">
+                                                                            <i class="fas fa-edit"></i> {% if saldo_info %}Editar{% else %}Definir{% endif %}
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                                {% endwith %}
+                                                                {% endfor %}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                                {% else %}
+                                                <div class="alert alert-info mt-3">
+                                                    <i class="fas fa-info-circle me-2"></i>Nenhuma semana cadastrada para este mês. Importe as semanas 52 primeiro.
+                                                </div>
+                                                {% endif %}
+                                            </div>
                                         </div>
+                                        {% endwith %}
+                                        {% endfor %}
                                     </div>
                                 </div>
                                 {% else %}
@@ -295,10 +399,65 @@
         return decimal.replace('.', ',');
     }
     
-    // Aplicar máscara em todos os inputs de dinheiro
-    document.querySelectorAll('.money-input').forEach(input => {
+    // Função para aplicar máscara a um input específico
+    function applyMoneyMask(input, isModal = false) {
+        // Verificar se já tem máscara aplicada
+        if (input.hasAttribute('data-mask-applied')) {
+            return;
+        }
+        
+        // Marcar como aplicado
+        input.setAttribute('data-mask-applied', 'true');
+        
+        // Inicializar valor se necessário (apenas se já tiver valor)
+        if (input.value && input.value.trim() !== '' && !input.value.includes(',')) {
+            let numValue = parseFloat(input.value.replace(',', '.')) || 0;
+            if (numValue > 0) {
+                let cents = Math.round(numValue * 100);
+                input.value = formatMoney(cents.toString());
+            }
+        }
+        
+        // Para inputs em modais, usar abordagem completamente diferente - sem formatação em tempo real
+        if (isModal) {
+            // Limpar valor inicial se estiver vazio ou zero
+            if (!input.value || input.value === '0,00' || input.value === '0') {
+                input.value = '';
+            }
+            
+            // Permitir digitação livre - apenas validar caracteres no keypress
+            input.addEventListener('keypress', function(e) {
+                // Permitir números
+                if (e.key.match(/[0-9]/)) {
+                    return;
+                }
+                // Bloquear outros caracteres (exceto controles que são tratados no keydown)
+                e.preventDefault();
+            }, { once: false });
+            
+            // Não fazer formatação em tempo real - deixar o usuário digitar números livremente
+            // Apenas formatar quando perder o foco
+            input.addEventListener('blur', function() {
+                let value = this.value.replace(/\D/g, '');
+                if (value && value !== '0' && value !== '') {
+                    this.value = formatMoney(value);
+                } else {
+                    this.value = '';
+                }
+            }, { once: false });
+            
+            // Não aplicar nenhum outro listener para modais - especialmente não o input event
+            return;
+        }
+        
+        // Para inputs não-modais, usar formatação em tempo real
+        let isFormatting = false;
+        
         // Ao digitar
         input.addEventListener('input', function(e) {
+            if (isFormatting) return;
+            isFormatting = true;
+            
             let cursorPosition = this.selectionStart;
             let oldValue = this.value;
             let oldLength = oldValue.length;
@@ -325,28 +484,37 @@
             
             // Usa setTimeout para garantir que o cursor seja posicionado após o DOM atualizar
             setTimeout(() => {
-                this.setSelectionRange(newPosition, newPosition);
+                try {
+                    this.setSelectionRange(newPosition, newPosition);
+                } catch (e) {
+                    // Ignorar erros de seleção
+                }
+                isFormatting = false;
             }, 0);
         });
         
         // Ao perder o foco, garante que está formatado
         input.addEventListener('blur', function() {
+            if (isFormatting) return;
             if (this.value && this.value.replace(/\D/g, '') !== '0') {
+                isFormatting = true;
                 this.value = formatMoney(this.value);
-            } else {
+                setTimeout(() => { isFormatting = false; }, 100);
+            } else if (!this.value || this.value.replace(/\D/g, '') === '0') {
                 this.value = '';
             }
         });
         
         // Ao focar, seleciona tudo para facilitar edição
         input.addEventListener('focus', function() {
-            // Pequeno delay para garantir que o select funcione
             setTimeout(() => {
-                this.select();
-            }, 0);
+                if (this.value && !isFormatting) {
+                    this.select();
+                }
+            }, 100);
         });
         
-        // Previne caracteres não numéricos (exceto vírgula e ponto que serão tratados)
+        // Previne caracteres não numéricos
         input.addEventListener('keypress', function(e) {
             // Permite números, backspace, delete, tab, escape, enter
             if (e.key.match(/[0-9]/) || 
@@ -355,6 +523,66 @@
             }
             // Previne outros caracteres
             e.preventDefault();
+        });
+    }
+    
+    // Aplicar máscara em todos os inputs de dinheiro visíveis na página inicial (não modais)
+    document.addEventListener('DOMContentLoaded', function() {
+        // Aplicar apenas aos inputs que não estão dentro de modais
+        document.querySelectorAll('.money-input:not(.modal-money-input)').forEach(input => {
+            applyMoneyMask(input, false);
+        });
+    });
+    
+    // Funcionalidade de edição inline para saldo semanal
+    document.addEventListener('DOMContentLoaded', function() {
+        // Aplicar máscara aos inputs inline
+        document.querySelectorAll('.inline-money-input').forEach(input => {
+            applyMoneyMask(input, false);
+        });
+        
+        // Handler para botão de editar
+        document.querySelectorAll('.edit-saldo-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                let dadoId = this.getAttribute('data-dado-id');
+                let semanaId = this.getAttribute('data-semana-id');
+                
+                // Esconder display e mostrar formulário de edição
+                let displayDiv = document.getElementById('display_saldo_' + dadoId + '_' + semanaId);
+                let editDiv = document.getElementById('edit_saldo_' + dadoId + '_' + semanaId);
+                
+                if (displayDiv && editDiv) {
+                    displayDiv.style.display = 'none';
+                    editDiv.style.display = 'block';
+                    
+                    // Focar no input após um pequeno delay
+                    setTimeout(() => {
+                        let input = editDiv.querySelector('.inline-money-input');
+                        if (input) {
+                            input.focus();
+                            // Não selecionar - deixar o cursor no final
+                            input.setSelectionRange(input.value.length, input.value.length);
+                        }
+                    }, 50);
+                }
+            });
+        });
+        
+        // Handler para botão de cancelar
+        document.querySelectorAll('.cancel-edit').forEach(btn => {
+            btn.addEventListener('click', function() {
+                let dadoId = this.getAttribute('data-dado-id');
+                let semanaId = this.getAttribute('data-semana-id');
+                
+                // Esconder formulário de edição e mostrar display
+                let displayDiv = document.getElementById('display_saldo_' + dadoId + '_' + semanaId);
+                let editDiv = document.getElementById('edit_saldo_' + dadoId + '_' + semanaId);
+                
+                if (displayDiv && editDiv) {
+                    editDiv.style.display = 'none';
+                    displayDiv.style.display = 'flex';
+                }
+            });
         });
     });
     

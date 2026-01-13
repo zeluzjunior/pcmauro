@@ -380,6 +380,7 @@ if (evolucaoEl) {
     const mesesRequisicoes = {{ meses_requisicoes|safe }};
     const mesesNotasFiscais = {{ meses_notas_fiscais|safe }};
     const mesesSaldo = {{ meses_saldo|safe }};
+    const mesesSaldoSemanal = {{ meses_saldo_semanal|safe }};
     
     new Chart(evolucaoCtx, {
         type: 'line',
@@ -417,6 +418,16 @@ if (evolucaoEl) {
                     backgroundColor: 'rgba(25, 135, 84, 0.1)',
                     tension: 0.4,
                     fill: false
+                },
+                {
+                    label: 'Saldo Orçamentário Desejado (Semanal)',
+                    data: mesesSaldoSemanal,
+                    borderColor: '#6f42c1',
+                    backgroundColor: 'rgba(111, 66, 193, 0.1)',
+                    tension: 0.4,
+                    fill: false,
+                    borderDash: [5, 5],
+                    borderWidth: 2
                 }
             ]
         },

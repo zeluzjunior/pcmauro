@@ -41,6 +41,7 @@ urlpatterns = [
     path('consultar/notas-fiscais/', views.consultar_notas_fiscais, name="consultar_notas_fiscais"),
     path('notas-fiscais/visualizar/<int:nota_id>/', views.visualizar_nota_fiscal, name="visualizar_nota_fiscal"),
     path('orcamento/dados-orcamento/', views.dados_orcamento, name="dados_orcamento"),
+    path('orcamento/dados-orcamento/editar/<int:registro_id>/', views.editar_dados_orcamento, name="editar_dados_orcamento"),
     path('orcamento/analise-geral/', views.analise_geral_orcamento, name="analise_geral_orcamento"),
     path('orcamento/consultar-projecao-gastos/', views.consultar_projecao_gastos, name="consultar_projecao_gastos"),
     path('orcamento/analise-projecao-gastos/', views.analise_projecao_gastos, name="analise_projecao_gastos"),

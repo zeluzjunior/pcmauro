@@ -12265,13 +12265,15 @@ def atualizar_foto_detalhada(request, item_id):
 
 def dados_orcamento(request):
     """Página para gerenciar dados de orçamento por ano, mês e conta orçamentária"""
-    from app.models import DadosOrcamento, ProjecaoGasto, NotaFiscal
+    from app.models import DadosOrcamento, ProjecaoGasto, NotaFiscal, Semana52, SaldoOrcamentarioSemanal
     from django.db.models import Count, Sum
     from collections import defaultdict
     from decimal import Decimal
+    from datetime import datetime, date
+    from calendar import monthrange
     
-    # Processar POST para criar novo registro
-    if request.method == 'POST':
+    # Processar POST para criar/atualizar registro mensal
+    if request.method == 'POST' and 'action' not in request.POST:
         try:
             ano = int(request.POST.get('ano'))
             mes = int(request.POST.get('mes'))
@@ -12308,6 +12310,44 @@ def dados_orcamento(request):
         
         return redirect('dados_orcamento')
     
+    # Processar POST para salvar saldo semanal
+    if request.method == 'POST' and request.POST.get('action') == 'save_weekly_balance':
+        try:
+            ano = int(request.POST.get('ano'))
+            mes = int(request.POST.get('mes'))
+            conta_orcamentaria = request.POST.get('conta_orcamentaria', '').strip()
+            semana_id = int(request.POST.get('semana_id'))
+            saldo_str = request.POST.get('saldo_orcamentario_desejado', '0').replace(',', '.')
+            
+            if not conta_orcamentaria:
+                messages.error(request, 'Conta orçamentária é obrigatória.')
+            else:
+                try:
+                    saldo = Decimal(saldo_str)
+                    semana = Semana52.objects.get(id=semana_id)
+                    
+                    # Criar ou atualizar saldo semanal
+                    saldo_semanal, created = SaldoOrcamentarioSemanal.objects.update_or_create(
+                        ano=ano,
+                        mes=mes,
+                        conta_orcamentaria=conta_orcamentaria,
+                        semana=semana,
+                        defaults={
+                            'saldo_orcamentario_desejado': saldo,
+                        }
+                    )
+                    
+                    if created:
+                        messages.success(request, f'Saldo semanal criado com sucesso!')
+                    else:
+                        messages.info(request, f'Saldo semanal atualizado com sucesso!')
+                except (ValueError, Semana52.DoesNotExist) as e:
+                    messages.error(request, f'Erro ao processar saldo semanal: {str(e)}')
+        except (ValueError, TypeError) as e:
+            messages.error(request, f'Erro ao processar dados: {str(e)}')
+        
+        return redirect('dados_orcamento')
+    
     # Buscar todos os dados de orçamento
     todos_dados = DadosOrcamento.objects.all().order_by('ano', 'mes', 'conta_orcamentaria')
     
@@ -12326,20 +12366,59 @@ def dados_orcamento(request):
     # Combinar anos obrigatórios com anos que têm dados, removendo duplicatas
     todos_anos = sorted(list(set(anos_obrigatorios + anos_com_dados)), reverse=True)
     
-    # Organizar por ano e mês
+    # Organizar por ano e mês, incluindo semanas
     anos_dados = []
     
     for ano in todos_anos:
         dados_ano = todos_dados.filter(ano=ano)
         
+        # Buscar todas as semanas do ano
+        semanas_ano = Semana52.objects.filter(
+            inicio__year=ano
+        ).order_by('inicio')
+        
         # Sempre criar estrutura para todos os 12 meses
         meses_data = []
         for mes in range(1, 13):
             dados_mes = dados_ano.filter(mes=mes)
+            
+            # Buscar semanas que pertencem a este mês
+            # Uma semana pertence ao mês se a data de início ou fim está no mês
+            semanas_mes = []
+            for semana in semanas_ano:
+                if semana.inicio:
+                    # Se a semana começa ou termina neste mês, ela pertence ao mês
+                    if semana.inicio.month == mes or (semana.fim and semana.fim.month == mes):
+                        # Buscar saldos semanais para cada registro deste mês
+                        semanas_mes.append(semana)
+            
+            # Para cada registro de dados, buscar saldos semanais
+            dados_com_saldos = []
+            for dado in dados_mes:
+                saldos_semanais = SaldoOrcamentarioSemanal.objects.filter(
+                    ano=ano,
+                    mes=mes,
+                    conta_orcamentaria=dado.conta_orcamentaria
+                ).select_related('semana').order_by('semana__inicio')
+                
+                # Criar dicionário de saldos por semana_id para fácil acesso
+                saldos_dict = {}
+                for saldo in saldos_semanais:
+                    saldos_dict[saldo.semana_id] = {
+                        'saldo': saldo,
+                        'valor_formatado': f"{saldo.saldo_orcamentario_desejado:.2f}".replace('.', ',')
+                    }
+                
+                dados_com_saldos.append({
+                    'dado': dado,
+                    'saldos_semanais': saldos_dict
+                })
+            
             meses_data.append({
                 'mes': mes,
                 'mes_nome': meses_nomes.get(mes, f'Mês {mes}'),
-                'dados': list(dados_mes)
+                'dados': dados_com_saldos,
+                'semanas': semanas_mes
             })
         
         anos_dados.append({
@@ -12366,11 +12445,87 @@ def dados_orcamento(request):
     return render(request, 'orcamento/dados_orcamento.html', context)
 
 
+def editar_dados_orcamento(request, registro_id):
+    """Editar um registro de dados de orçamento existente"""
+    from app.models import DadosOrcamento
+    from decimal import Decimal
+    
+    try:
+        registro = DadosOrcamento.objects.get(id=registro_id)
+    except DadosOrcamento.DoesNotExist:
+        messages.error(request, 'Registro não encontrado.')
+        return redirect('dados_orcamento')
+    
+    if request.method == 'POST':
+        try:
+            ano = int(request.POST.get('ano'))
+            mes = int(request.POST.get('mes'))
+            conta_orcamentaria = request.POST.get('conta_orcamentaria', '').strip()
+            valor_orcamento_str = request.POST.get('valor_orcamento', '0').replace(',', '.')
+            valor_final_desejado_str = request.POST.get('valor_final_desejado', '0').replace(',', '.')
+            
+            if not conta_orcamentaria:
+                messages.error(request, 'Conta orçamentária é obrigatória.')
+            else:
+                try:
+                    valor_orcamento = Decimal(valor_orcamento_str)
+                    valor_final_desejado = Decimal(valor_final_desejado_str)
+                    
+                    # Verificar se já existe outro registro com a mesma combinação (ano, mes, conta_orcamentaria)
+                    # mas com ID diferente (para evitar conflito de unique_together)
+                    registro_existente = DadosOrcamento.objects.filter(
+                        ano=ano,
+                        mes=mes,
+                        conta_orcamentaria=conta_orcamentaria
+                    ).exclude(id=registro_id).first()
+                    
+                    if registro_existente:
+                        messages.error(request, f'Já existe um registro para {conta_orcamentaria} em {ano}/{mes:02d}.')
+                    else:
+                        # Atualizar registro
+                        registro.ano = ano
+                        registro.mes = mes
+                        registro.conta_orcamentaria = conta_orcamentaria
+                        registro.valor_orcamento = valor_orcamento
+                        registro.valor_final_desejado = valor_final_desejado
+                        registro.save()
+                        
+                        messages.success(request, f'Registro atualizado com sucesso para {conta_orcamentaria}!')
+                        return redirect('dados_orcamento')
+                except ValueError:
+                    messages.error(request, 'Valores inválidos. Use números válidos.')
+        except (ValueError, TypeError) as e:
+            messages.error(request, f'Erro ao processar dados: {str(e)}')
+    
+    meses_nomes = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+    
+    # Formatar valores monetários para o template (formato brasileiro: 1234,56)
+    # Converter Decimal para string com 2 casas decimais e substituir ponto por vírgula
+    valor_orcamento_formatado = f"{registro.valor_orcamento:.2f}".replace('.', ',')
+    valor_final_desejado_formatado = f"{registro.valor_final_desejado:.2f}".replace('.', ',')
+    
+    context = {
+        'page_title': 'Editar Dados de Orçamento',
+        'active_page': 'dados_orcamento',
+        'registro': registro,
+        'meses_nomes': meses_nomes,
+        'valor_orcamento_formatado': valor_orcamento_formatado,
+        'valor_final_desejado_formatado': valor_final_desejado_formatado,
+    }
+    
+    return render(request, 'orcamento/editar_dados_orcamento.html', context)
+
+
 def analise_geral_orcamento(request):
     """Página de análise geral de orçamento com filtros de ano e mês"""
     from app.models import (
         DadosOrcamento, ProjecaoGasto, NotaFiscal, 
-        RequisicaoAlmoxarifado, RelacaoProjecaoNotaFiscal
+        RequisicaoAlmoxarifado, RelacaoProjecaoNotaFiscal,
+        SaldoOrcamentarioSemanal, Semana52
     )
     from django.db.models import Sum, Count, Q, Avg
     from datetime import datetime, timedelta
@@ -12477,17 +12632,15 @@ def analise_geral_orcamento(request):
     )['total'] or Decimal('0')
     
     # ========== NOTAS FISCAIS ==========
-    # Filtrar notas fiscais por data de emissão ou vencimento (para notas gerais)
+    # IMPORTANTE: Usar APENAS data_emissao para determinar o mês de pagamento previsto
+    # A data_emissao indica em qual mês a nota deve ser prevista para pagamento
     notas_filtradas = []
     todas_notas = NotaFiscal.objects.all()
     for nota in todas_notas:
         data_emissao = parse_date(nota.data_emissao)
-        data_vencimento = parse_date(nota.data_vencimento)
+        # Usar APENAS data_emissao para determinar o mês
         if data_emissao and data_emissao.year == ano_filtro:
             if not meses_filtro_int or data_emissao.month in meses_filtro_int:
-                notas_filtradas.append(nota)
-        elif data_vencimento and data_vencimento.year == ano_filtro:
-            if not meses_filtro_int or data_vencimento.month in meses_filtro_int:
                 notas_filtradas.append(nota)
     
     total_notas = len(notas_filtradas)
@@ -12496,8 +12649,8 @@ def analise_geral_orcamento(request):
     )
     
     # Notas fiscais com situacao = "LANÇADA" e uso_contabil = "242" 
-    # IMPORTANTE: Para estas notas, usar data_autorizacao para determinar o mês
-    # Se data_autorizacao não estiver disponível, usar data_emissao ou data_vencimento como fallback
+    # IMPORTANTE: Usar APENAS data_emissao para determinar o mês de pagamento previsto
+    # A data_emissao indica em qual mês a nota deve ser prevista para pagamento
     notas_autorizadas_242_filtradas = []
     todas_notas_autorizadas = NotaFiscal.objects.filter(
         Q(situacao__icontains='LANÇADA') | Q(situacao__icontains='LANCADA')
@@ -12506,27 +12659,20 @@ def analise_geral_orcamento(request):
     )
     
     for nota in todas_notas_autorizadas:
-        # Prioridade: usar data_autorizacao para determinar o mês
-        data_autorizacao = parse_date(nota.data_autorizacao)
-        data_ref = data_autorizacao
-        
-        # Se não houver data_autorizacao, usar data_emissao ou data_vencimento como fallback
-        if not data_ref:
-            data_emissao = parse_date(nota.data_emissao)
-            data_vencimento = parse_date(nota.data_vencimento)
-            data_ref = data_emissao or data_vencimento
+        # Usar APENAS data_emissao para determinar o mês
+        data_emissao = parse_date(nota.data_emissao)
         
         # Se não houver filtro de mês, incluir todas as notas do ano (ou sem data)
         if not meses_filtro_int:
-            if not data_ref:
-                # Se não há data de referência, incluir (assumindo que é do ano filtrado)
+            if not data_emissao:
+                # Se não há data_emissao, incluir (assumindo que é do ano filtrado)
                 notas_autorizadas_242_filtradas.append(nota)
-            elif data_ref.year == ano_filtro:
+            elif data_emissao.year == ano_filtro:
                 notas_autorizadas_242_filtradas.append(nota)
         else:
-            # Filtrar por ano e mês específicos
-            if data_ref and data_ref.year == ano_filtro:
-                if data_ref.month in meses_filtro_int:
+            # Filtrar por ano e mês específicos baseado em data_emissao
+            if data_emissao and data_emissao.year == ano_filtro:
+                if data_emissao.month in meses_filtro_int:
                     notas_autorizadas_242_filtradas.append(nota)
     
     valor_total_notas_lancadas = sum(
@@ -12626,7 +12772,7 @@ def analise_geral_orcamento(request):
             dias_requisicoes.append(float(req_acumulado))
             
             # Notas Fiscais do dia (situacao="LANÇADA" e uso_contabil="242") - valor do dia
-            # IMPORTANTE: Usar data_autorizacao para determinar o dia/mês
+            # IMPORTANTE: Usar APENAS data_emissao para determinar o dia/mês de pagamento previsto
             notas_dia = Decimal('0')
             todas_notas_dia = NotaFiscal.objects.filter(
                 Q(situacao__icontains='LANÇADA') | Q(situacao__icontains='LANCADA')
@@ -12635,9 +12781,9 @@ def analise_geral_orcamento(request):
             )
             
             for nota in todas_notas_dia:
-                # Usar data_autorizacao para determinar o dia/mês
-                data_autorizacao = parse_date(nota.data_autorizacao)
-                if data_autorizacao and data_autorizacao.year == ano_filtro and data_autorizacao.month == mes and data_autorizacao.day == dia:
+                # Usar data_emissao para determinar o dia/mês
+                data_emissao = parse_date(nota.data_emissao)
+                if data_emissao and data_emissao.year == ano_filtro and data_emissao.month == mes and data_emissao.day == dia:
                     notas_dia += (nota.total_nota or Decimal('0'))
             # Acumular
             notas_acumulado += notas_dia
@@ -12646,6 +12792,45 @@ def analise_geral_orcamento(request):
             # Saldo do dia (Orçamento - Requisições Acumuladas - Notas Fiscais Acumuladas)
             saldo_dia = orc_dia - req_acumulado - notas_acumulado
             dias_saldo.append(float(saldo_dia))
+    
+    # ========== SALDO ORÇAMENTÁRIO SEMANAL ==========
+    # Buscar todos os SaldoOrcamentarioSemanal para o ano e meses filtrados
+    saldos_semanais_filtrados = SaldoOrcamentarioSemanal.objects.filter(
+        ano=ano_filtro,
+        mes__in=meses_para_mostrar
+    ).select_related('semana')
+    
+    # Agrupar por semana (usando a data de início da semana) e somar os valores
+    # Criar um dicionário: (data_inicio_semana, data_fim_semana) -> soma dos saldos
+    saldos_por_semana = {}
+    
+    for saldo_semanal in saldos_semanais_filtrados:
+        if saldo_semanal.semana and saldo_semanal.semana.inicio and saldo_semanal.semana.fim:
+            # Usar tupla (inicio, fim) como chave
+            chave_semana = (saldo_semanal.semana.inicio, saldo_semanal.semana.fim)
+            # Verificar se a semana pertence ao ano filtrado
+            if saldo_semanal.semana.inicio.year == ano_filtro:
+                if chave_semana not in saldos_por_semana:
+                    saldos_por_semana[chave_semana] = Decimal('0')
+                saldos_por_semana[chave_semana] += (saldo_semanal.saldo_orcamentario_desejado or Decimal('0'))
+    
+    # Criar lista de saldos semanais para cada dia
+    # Para cada dia, verificar se ele pertence a alguma semana e usar o valor correspondente
+    dias_saldo_semanal = []
+    
+    for mes in meses_para_mostrar:
+        num_dias = monthrange(ano_filtro, mes)[1]
+        for dia in range(1, num_dias + 1):
+            data_atual = datetime(ano_filtro, mes, dia).date()
+            
+            # Encontrar a semana que contém este dia
+            saldo_semana_atual = Decimal('0')
+            for (data_inicio_semana, data_fim_semana), valor_semana in saldos_por_semana.items():
+                if data_inicio_semana <= data_atual <= data_fim_semana:
+                    saldo_semana_atual = valor_semana
+                    break
+            
+            dias_saldo_semanal.append(float(saldo_semana_atual))
     
     # Manter variáveis antigas para compatibilidade
     meses_labels = dias_labels
@@ -12666,7 +12851,7 @@ def analise_geral_orcamento(request):
             notas_para_graficos.append(nota)
             notas_para_graficos_ids.add(nota.id)
     
-    # Adicionar outras notas filtradas por data_emissao/vencimento (evitando duplicatas)
+    # Adicionar outras notas filtradas por data_emissao (evitando duplicatas)
     for nota in notas_filtradas:
         if nota.id not in notas_para_graficos_ids:
             notas_para_graficos.append(nota)
@@ -12823,6 +13008,7 @@ def analise_geral_orcamento(request):
         'meses_requisicoes': json.dumps(meses_requisicoes, ensure_ascii=False),
         'meses_notas_fiscais': json.dumps(meses_notas_fiscais, ensure_ascii=False),
         'meses_saldo': json.dumps(meses_saldo, ensure_ascii=False),
+        'meses_saldo_semanal': json.dumps(dias_saldo_semanal, ensure_ascii=False),
         'setores_labels': json.dumps(setores_labels, ensure_ascii=False),
         'setores_data': json.dumps(setores_data, ensure_ascii=False),
         'uso_contabil_labels': json.dumps(uso_contabil_labels, ensure_ascii=False),
@@ -13383,18 +13569,17 @@ def analise_notas_fiscais(request):
         if nota.situacao and nota.situacao.strip()
     )))
 
-    # --- Queryset Filtrado (baseado em data_emissao ou data_vencimento) ---
+    # --- Queryset Filtrado (baseado APENAS em data_emissao) ---
+    # IMPORTANTE: Usar APENAS data_emissao para determinar o mês de pagamento previsto
+    # A data_emissao indica em qual mês a nota deve ser prevista para pagamento
     notas_filtradas = []
     for nota in todas_notas_list:
         data_emissao = parse_date(nota.data_emissao)
-        data_vencimento = parse_date(nota.data_vencimento)
         
-        # Usar data_emissao como prioridade, senão data_vencimento
-        data_ref = data_emissao or data_vencimento
-        
+        # Usar APENAS data_emissao para determinar o mês
         # Filtro de ano e mês
-        if data_ref and data_ref.year == ano_filtro:
-            if not meses_filtro_int or data_ref.month in meses_filtro_int:
+        if data_emissao and data_emissao.year == ano_filtro:
+            if not meses_filtro_int or data_emissao.month in meses_filtro_int:
                 # Filtro de uso_contabil (exato, case-insensitive)
                 if uso_contabil_filtro:
                     if not nota.uso_contabil or nota.uso_contabil.strip().lower() != uso_contabil_filtro.lower():
@@ -13518,19 +13703,17 @@ def analise_notas_fiscais(request):
         label = f"{meses_nomes_curtos[mes_num-1]}/{str(ano_filtro)[2:]}"
         evolucao_labels.append(label)
         
-        # Quantidade de notas no mês
+        # Quantidade de notas no mês (usar APENAS data_emissao)
         qtd_mes = sum(
             1 for nota in notas_filtradas
-            if (parse_date(nota.data_emissao) and parse_date(nota.data_emissao).month == mes_num) or
-               (not parse_date(nota.data_emissao) and parse_date(nota.data_vencimento) and parse_date(nota.data_vencimento).month == mes_num)
+            if parse_date(nota.data_emissao) and parse_date(nota.data_emissao).month == mes_num
         )
         evolucao_quantidade_data.append(qtd_mes)
         
-        # Valor total do mês
+        # Valor total do mês (usar APENAS data_emissao)
         valor_mes = sum(
             (nota.total_nota or Decimal(0)) for nota in notas_filtradas
-            if (parse_date(nota.data_emissao) and parse_date(nota.data_emissao).month == mes_num) or
-               (not parse_date(nota.data_emissao) and parse_date(nota.data_vencimento) and parse_date(nota.data_vencimento).month == mes_num)
+            if parse_date(nota.data_emissao) and parse_date(nota.data_emissao).month == mes_num
         )
         evolucao_valor_data.append(float(valor_mes))
 
@@ -14227,6 +14410,7 @@ def consultar_planilha_rc(request):
         try:
             search_num = Decimal(search_query.replace(',', '.'))
             controles_list = controles_list.filter(
+                Q(id_excel__icontains=search_query) |
                 Q(solicitante__icontains=search_query) |
                 Q(empresa__icontains=search_query) |
                 Q(nf_saida__icontains=search_query) |
@@ -14239,6 +14423,7 @@ def consultar_planilha_rc(request):
             )
         except (ValueError, TypeError):
             controles_list = controles_list.filter(
+                Q(id_excel__icontains=search_query) |
                 Q(solicitante__icontains=search_query) |
                 Q(empresa__icontains=search_query) |
                 Q(nf_saida__icontains=search_query) |
@@ -14250,6 +14435,10 @@ def consultar_planilha_rc(request):
             )
     
     # Filtros específicos
+    filtro_id = request.GET.get('filtro_id', '').strip()
+    if filtro_id:
+        controles_list = controles_list.filter(id_excel__icontains=filtro_id)
+    
     filtro_empresa = request.GET.get('filtro_empresa', '').strip()
     if filtro_empresa:
         controles_list = controles_list.filter(empresa__icontains=filtro_empresa)

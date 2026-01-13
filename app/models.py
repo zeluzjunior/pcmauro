@@ -1343,8 +1343,43 @@ class DadosOrcamento(models.Model):
     def __str__(self):
         return f"{self.ano}/{self.mes:02d} - {self.conta_orcamentaria}"
 
+
+class SaldoOrcamentarioSemanal(models.Model):
+    """Modelo para armazenar o saldo orçamentário desejado por semana"""
+    # Relacionamento com DadosOrcamento (ano, mês, conta orçamentária)
+    ano = models.IntegerField('Ano', db_index=True)
+    mes = models.IntegerField('Mês', choices=DadosOrcamento.MES_CHOICES, db_index=True)
+    conta_orcamentaria = models.CharField('Conta Orçamentária', max_length=255, db_index=True)
+    
+    # Relacionamento com Semana52
+    semana = models.ForeignKey(Semana52, on_delete=models.CASCADE, related_name='saldos_orcamentarios', verbose_name='Semana')
+    
+    # Valor do saldo orçamentário desejado para esta semana
+    saldo_orcamentario_desejado = models.DecimalField('Saldo Orçamentário Desejado', max_digits=15, decimal_places=2, default=0)
+    
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Saldo Orçamentário Semanal'
+        verbose_name_plural = 'Saldos Orçamentários Semanais'
+        ordering = ['ano', 'mes', 'conta_orcamentaria', 'semana__inicio']
+        unique_together = [['ano', 'mes', 'conta_orcamentaria', 'semana']]
+        indexes = [
+            models.Index(fields=['ano', 'mes', 'conta_orcamentaria']),
+            models.Index(fields=['semana']),
+        ]
+    
+    def __str__(self):
+        return f"{self.ano}/{self.mes:02d} - {self.conta_orcamentaria} - {self.semana.semana}: {self.saldo_orcamentario_desejado}"
+
+
 class ControleRCeNF(models.Model): # Planilha de Controle RC e NF
     """Modelo para armazenar dados do controle de RC e NF"""
+    # ID único do Excel (identificador único do registro na planilha)
+    # Nullable inicialmente para permitir migração de dados existentes
+    id_excel = models.CharField('ID', max_length=100, unique=True, blank=True, null=True, db_index=True, help_text='ID único do registro na planilha Excel')
+    
     # Dados básicos
     solicitante = models.CharField('Solicitante', max_length=255, blank=True, null=True)
     empresa = models.CharField('Empresa', max_length=255, blank=True, null=True)
@@ -1387,6 +1422,7 @@ class ControleRCeNF(models.Model): # Planilha de Controle RC e NF
         verbose_name_plural = 'Controles RC e NF'
         ordering = ['-data_rc', '-created_at']
         indexes = [
+            models.Index(fields=['id_excel']),
             models.Index(fields=['nf_saida']),
             models.Index(fields=['rc']),
             models.Index(fields=['pedido']),
@@ -1394,4 +1430,4 @@ class ControleRCeNF(models.Model): # Planilha de Controle RC e NF
         ]
     
     def __str__(self):
-        return f"RC: {self.rc or 'N/A'} - NF: {self.nf_saida or 'N/A'} - {self.empresa or 'N/A'}"
+        return f"ID: {self.id_excel or 'N/A'} - RC: {self.rc or 'N/A'} - NF: {self.nf_saida or 'N/A'} - {self.empresa or 'N/A'}"

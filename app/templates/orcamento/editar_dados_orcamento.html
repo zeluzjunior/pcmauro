@@ -1,0 +1,307 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Editar Dados de Orçamento{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'dados_orcamento' %}" class="text-white">Dados de Orçamento</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Editar Registro</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-edit me-2"></i>Editar Dados de Orçamento
+                </h1>
+                <p class="lead">Atualize os dados do registro de orçamento</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-edit me-2"></i>Editar Registro
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="" class="row g-3">
+                            {% csrf_token %}
+                            
+                            <div class="col-md-6">
+                                <label for="ano" class="form-label">
+                                    <strong>Ano</strong> <span class="text-danger">*</span>
+                                </label>
+                                <input type="number" 
+                                       class="form-control" 
+                                       id="ano" 
+                                       name="ano" 
+                                       value="{{ registro.ano }}"
+                                       required
+                                       min="2000"
+                                       max="2100">
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="mes" class="form-label">
+                                    <strong>Mês</strong> <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-select" id="mes" name="mes" required>
+                                    {% for mes_num, mes_nome in meses_nomes.items %}
+                                        <option value="{{ mes_num }}" {% if registro.mes == mes_num %}selected{% endif %}>
+                                            {{ mes_nome }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-12">
+                                <label for="conta_orcamentaria" class="form-label">
+                                    <strong>Conta Orçamentária</strong> <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="conta_orcamentaria" 
+                                       name="conta_orcamentaria" 
+                                       value="{{ registro.conta_orcamentaria }}"
+                                       required
+                                       placeholder="Ex: 3.1.1.01.001">
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="valor_orcamento" class="form-label">
+                                    <strong>Valor do Orçamento</strong> <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">R$</span>
+                                    <input type="text" 
+                                           class="form-control money-input" 
+                                           id="valor_orcamento" 
+                                           name="valor_orcamento" 
+                                           value="{{ valor_orcamento_formatado }}"
+                                           required
+                                           placeholder="0,00"
+                                           data-field="valor_orcamento">
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="valor_final_desejado" class="form-label">
+                                    <strong>Valor Final Desejado</strong> <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">R$</span>
+                                    <input type="text" 
+                                           class="form-control money-input" 
+                                           id="valor_final_desejado" 
+                                           name="valor_final_desejado" 
+                                           value="{{ valor_final_desejado_formatado }}"
+                                           required
+                                           placeholder="0,00"
+                                           data-field="valor_final_desejado">
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>Informações do Registro:</strong><br>
+                                    Criado em: {{ registro.created_at|date:"d/m/Y H:i" }}<br>
+                                    Última atualização: {{ registro.updated_at|date:"d/m/Y H:i" }}
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between mt-4">
+                                    <a href="{% url 'dados_orcamento' %}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left me-2"></i>Cancelar
+                                    </a>
+                                    <button type="submit" class="btn btn-warning">
+                                        <i class="fas fa-save me-2"></i>Atualizar Registro
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+// Brazilian currency input mask
+(function() {
+    'use strict';
+    
+    function formatMoney(value) {
+        // Remove tudo que não é número
+        let numbers = value.replace(/\D/g, '');
+        
+        // Se não tiver números, retorna vazio
+        if (!numbers || numbers === '0') return '';
+        
+        // Converte para centavos
+        let cents = parseInt(numbers);
+        
+        // Formata como reais e centavos
+        let reais = Math.floor(cents / 100);
+        let centavos = cents % 100;
+        
+        // Formata com separadores brasileiros (ponto para milhares, vírgula para decimais)
+        let formatted = reais.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0}) + ',' + centavos.toString().padStart(2, '0');
+        
+        return formatted;
+    }
+    
+    function parseMoney(value) {
+        // Remove tudo exceto números
+        let numbers = value.replace(/\D/g, '');
+        
+        if (!numbers) return '0,00';
+        
+        // Converte para decimal (divide por 100 para ter centavos)
+        let decimal = (parseInt(numbers) / 100).toFixed(2);
+        
+        // Substitui ponto por vírgula para o backend
+        return decimal.replace('.', ',');
+    }
+    
+    // Função para inicializar valores formatados
+    function initializeMoneyInputs() {
+        document.querySelectorAll('.money-input').forEach(input => {
+            // Se o valor já está no formato correto (com vírgula), formatar
+            let currentValue = input.value;
+            if (currentValue && currentValue.includes(',')) {
+                // Já está formatado, apenas garantir que está correto
+                let numbers = currentValue.replace(/\D/g, '');
+                if (numbers) {
+                    input.value = formatMoney(numbers);
+                }
+            } else if (currentValue && !isNaN(parseFloat(currentValue))) {
+                // Está em formato numérico, converter para formato brasileiro
+                let numValue = parseFloat(currentValue);
+                let cents = Math.round(numValue * 100);
+                input.value = formatMoney(cents.toString());
+            }
+        });
+    }
+    
+    // Inicializar ao carregar a página
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeMoneyInputs();
+    });
+    
+    // Aplicar máscara em todos os inputs de dinheiro
+    document.querySelectorAll('.money-input').forEach(input => {
+        // Ao digitar
+        input.addEventListener('input', function(e) {
+            let cursorPosition = this.selectionStart;
+            let oldValue = this.value;
+            let oldLength = oldValue.length;
+            
+            // Formata o valor
+            let formatted = formatMoney(this.value);
+            this.value = formatted;
+            
+            // Ajusta a posição do cursor
+            let newLength = this.value.length;
+            let lengthDiff = newLength - oldLength;
+            
+            // Calcula nova posição do cursor
+            let newPosition = cursorPosition + lengthDiff;
+            
+            // Se estava no final, mantém no final
+            if (cursorPosition === oldLength) {
+                newPosition = this.value.length;
+            } else {
+                // Ajusta posição considerando a formatação
+                if (newPosition < 0) newPosition = 0;
+                if (newPosition > this.value.length) newPosition = this.value.length;
+            }
+            
+            // Usa setTimeout para garantir que o cursor seja posicionado após o DOM atualizar
+            setTimeout(() => {
+                this.setSelectionRange(newPosition, newPosition);
+            }, 0);
+        });
+        
+        // Ao perder o foco, garante que está formatado
+        input.addEventListener('blur', function() {
+            if (this.value && this.value.replace(/\D/g, '') !== '0') {
+                this.value = formatMoney(this.value);
+            } else {
+                this.value = '';
+            }
+        });
+        
+        // Ao focar, seleciona tudo para facilitar edição
+        input.addEventListener('focus', function() {
+            // Pequeno delay para garantir que o select funcione
+            setTimeout(() => {
+                this.select();
+            }, 0);
+        });
+        
+        // Previne caracteres não numéricos (exceto vírgula e ponto que serão tratados)
+        input.addEventListener('keypress', function(e) {
+            // Permite números, backspace, delete, tab, escape, enter
+            if (e.key.match(/[0-9]/) || 
+                ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                return;
+            }
+            // Previne outros caracteres
+            e.preventDefault();
+        });
+    });
+    
+    // Antes de submeter o formulário, converter para formato numérico
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            // Converter todos os campos de dinheiro para formato numérico
+            this.querySelectorAll('.money-input').forEach(input => {
+                // Converter valor formatado para formato numérico (com vírgula)
+                let numericValue = parseMoney(input.value);
+                
+                // Atualizar o valor do input para o formato numérico
+                input.value = numericValue;
+            });
+        });
+    });
+})();
+</script>
+{% endblock %}
