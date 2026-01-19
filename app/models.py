@@ -1101,7 +1101,7 @@ class NotaFiscal(models.Model):
     unidade_autorizacao = models.CharField('Unidade Autorização', max_length=50, blank=True, null=True)
     nome_unidade_autorizacao = models.CharField('Nome Unidade Autorização', max_length=255, blank=True, null=True)
     
-    # Dados do Centro de Atividade
+    # Dados do Centro de Atividade  
     centro_atividade = models.CharField('Centro Atividade', max_length=50, blank=True, null=True)
     nome_centro_atividade = models.CharField('Nome Centro Atividade', max_length=255, blank=True, null=True)
     
@@ -1172,10 +1172,14 @@ class Visitas(models.Model):
 
 class ProjecaoGasto(models.Model):
     """Modelo para armazenar informações de projeções de gastos e requisições de serviço"""
+    # ID do Excel (identificador único do Excel)
+    id_excel = models.IntegerField('ID Excel', unique=True, db_index=True, null=False)  # ID do Excel - identificador único para identificação individual
+    
     # Dados básicos
     setor = models.CharField('Setor', max_length=100, blank=True, null=True, db_index=True)  # SETOR do Excel
     solicitante = models.CharField('Solicitante', max_length=100, blank=True, null=True)  # SOLICITANTE (CNPJ)
     descricao = models.CharField('Descrição do Serviço', max_length=500, blank=True, null=True)  # DESCRIÇÃO DO SERVIÇO
+    tipo_solicitacao = models.CharField('Tipo de Solicitação', max_length=100, blank=True, null=True, db_index=True)  # TIPO DE SOLICITAÇÃO do Excel
     
     # Dados financeiros
     valor_total = models.DecimalField('Valor Total', max_digits=15, decimal_places=2, blank=True, null=True)  # VALOR TOTAL
@@ -1236,9 +1240,10 @@ class ProjecaoGasto(models.Model):
         ]
     
     def __str__(self):
-        tipo_str = self.tipo or 'Sem tipo'
+        id_str = f"ID {self.id_excel}" if self.id_excel else "Sem ID"
+        tipo_str = self.tipo_solicitacao or self.tipo or 'Sem tipo'
         descricao_str = self.descricao or 'Sem descrição'
-        return f"{tipo_str} - {descricao_str[:50]}"
+        return f"{id_str} - {tipo_str} - {descricao_str[:50]}"
 
 class RelacaoProjecaoNotaFiscal(models.Model):
     """Modelo para armazenar relações confirmadas entre Projeções de Gastos e Notas Fiscais"""
@@ -1343,7 +1348,6 @@ class DadosOrcamento(models.Model):
     def __str__(self):
         return f"{self.ano}/{self.mes:02d} - {self.conta_orcamentaria}"
 
-
 class SaldoOrcamentarioSemanal(models.Model):
     """Modelo para armazenar o saldo orçamentário desejado por semana"""
     # Relacionamento com DadosOrcamento (ano, mês, conta orçamentária)
@@ -1372,7 +1376,6 @@ class SaldoOrcamentarioSemanal(models.Model):
     
     def __str__(self):
         return f"{self.ano}/{self.mes:02d} - {self.conta_orcamentaria} - {self.semana.semana}: {self.saldo_orcamentario_desejado}"
-
 
 class ControleRCeNF(models.Model): # Planilha de Controle RC e NF
     """Modelo para armazenar dados do controle de RC e NF"""
@@ -1431,3 +1434,63 @@ class ControleRCeNF(models.Model): # Planilha de Controle RC e NF
     
     def __str__(self):
         return f"ID: {self.id_excel or 'N/A'} - RC: {self.rc or 'N/A'} - NF: {self.nf_saida or 'N/A'} - {self.empresa or 'N/A'}"
+
+class ParadaMaquina(models.Model):
+    """Modelo para armazenar paradas de máquinas"""
+    # Dados da Unidade
+    unid = models.IntegerField('Unidade', blank=True, null=True)
+    nome_unidade = models.CharField('Nome Unidade', max_length=255, blank=True, null=True)
+    
+    # Dados da Linha de Produção
+    linha_producao = models.IntegerField('Linha de Produção', blank=True, null=True)
+    descr_linha_producao = models.CharField('Descrição Linha de Produção', max_length=255, blank=True, null=True)
+    turno = models.CharField('Turno', max_length=10, blank=True, null=True)
+    
+    # Data da Parada
+    data = models.DateField('Data', blank=True, null=True, db_index=True)
+    
+    # Dados do Item
+    cod_item = models.CharField('Código Item', max_length=100, blank=True, null=True)
+    descr_item = models.CharField('Descrição Item', max_length=500, blank=True, null=True)
+    
+    # Dados do Grupo de Recurso
+    cod_grupo_recurso = models.IntegerField('Código Grupo de Recurso', blank=True, null=True)
+    grupo_recurso = models.CharField('Grupo Recurso', max_length=255, blank=True, null=True)
+    
+    # Dados da Parada
+    cod_parada = models.CharField('Código Parada', max_length=50, blank=True, null=True)
+    descr_parada = models.CharField('Descrição Parada', max_length=255, blank=True, null=True)
+    nro = models.CharField('Número', max_length=50, blank=True, null=True)
+    
+    # Dados do Recurso
+    cod_recurso = models.IntegerField('Código Recurso', blank=True, null=True)
+    descr_recurso = models.CharField('Descrição Recurso', max_length=255, blank=True, null=True)
+    
+    # Horários
+    horario_inicial = models.TimeField('Horário Inicial', blank=True, null=True)
+    horario_final = models.TimeField('Horário Final', blank=True, null=True)
+    dif_hora = models.DecimalField('Diferença Hora', max_digits=10, decimal_places=8, blank=True, null=True)
+    
+    # Capacidade
+    capacidade = models.DecimalField('Capacidade', max_digits=15, decimal_places=3, blank=True, null=True)
+    
+    # Motivo e Ação
+    motivo = models.TextField('Motivo', blank=True, null=True)
+    acao = models.TextField('Ação', blank=True, null=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Parada de Máquina'
+        verbose_name_plural = 'Paradas de Máquinas'
+        ordering = ['-data', '-horario_inicial']
+        indexes = [
+            models.Index(fields=['data']),
+            models.Index(fields=['cod_recurso']),
+            models.Index(fields=['linha_producao']),
+        ]
+    
+    def __str__(self):
+        return f"Parada {self.cod_recurso} - {self.data} {self.horario_inicial}"

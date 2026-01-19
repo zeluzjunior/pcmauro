@@ -1,0 +1,316 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Consultar Paradas de Máquina{% endblock %}
+
+{% block extra_css %}
+<style>
+    .table-container {
+        max-height: 70vh;
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+    .table {
+        width: 100%;
+        table-layout: auto;
+    }
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+        white-space: nowrap;
+        vertical-align: middle;
+        text-align: center;
+        padding: 12px 8px;
+    }
+    .table tbody td {
+        vertical-align: middle;
+        padding: 10px 8px;
+    }
+    .col-data { min-width: 120px; }
+    .col-hora { min-width: 100px; }
+    .col-codigo { min-width: 100px; }
+    .col-descricao { min-width: 250px; }
+    .col-numero { min-width: 80px; text-align: right; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar Paradas de Máquina</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Consultar Paradas de Máquina</h1>
+                <p class="lead">Visualize e consulte todas as paradas de máquinas registradas</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <!-- Filter Section (Accordion) -->
+        <div class="accordion mb-4" style="background-color: #f8f9fa; border-radius: 8px; padding: 20px;">
+            <div class="accordion-item border-0 bg-transparent">
+                <h2 class="accordion-header" id="headingFilter">
+                    <button class="accordion-button {% if not ano_filtro and not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if ano_filtro or meses_filtro %}true{% else %}false{% endif %}" aria-controls="collapseFilter">
+                        <i class="fas fa-filter me-2"></i>Filtros de Data
+                    </button>
+                </h2>
+                <div id="collapseFilter" class="accordion-collapse collapse {% if ano_filtro or meses_filtro %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
+                    <div class="accordion-body">
+                        <form method="GET" class="row g-3 align-items-end" action="{% url 'consultar_paradas_maquina' %}">
+                            <!-- Preservar busca geral -->
+                            <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                            
+                            <div class="col-md-2">
+                                <label for="ano_filtro" class="form-label">Ano:</label>
+                                <select class="form-select" id="ano_filtro" name="ano">
+                                    {% for ano in anos_disponiveis %}
+                                        <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="mes_filtro" class="form-label">Mês(es):</label>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="selecionarTodos" onclick="toggleAllMonths(true)">
+                                            <label class="form-check-label" for="selecionarTodos">Selecionar Todos</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="desmarcarTodos" onclick="toggleAllMonths(false)">
+                                            <label class="form-check-label" for="desmarcarTodos">Desmarcar Todos</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    {% for mes_num, mes_nome in meses_choices %}
+                                        <div class="col-md-3 col-sm-4 col-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input mes-checkbox" type="checkbox" id="mes_{{ mes_num }}" name="mes" value="{{ mes_num }}"
+                                                    {% if mes_num in meses_filtro %}checked{% endif %}>
+                                                <label class="form-check-label" for="mes_{{ mes_num }}">{{ mes_nome }}</label>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="col-md-4 d-flex justify-content-end align-items-end">
+                                <button type="submit" class="btn btn-primary me-2"><i class="fas fa-filter me-1"></i>Aplicar Filtros</button>
+                                <a href="{% url 'consultar_paradas_maquina' %}" class="btn btn-outline-secondary"><i class="fas fa-sync-alt me-1"></i>Limpar</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <form method="get" action="{% url 'consultar_paradas_maquina' %}" class="d-flex">
+                    <!-- Preservar filtros de data -->
+                    <input type="hidden" name="ano" value="{{ ano_filtro }}">
+                    {% for mes in meses_filtro %}
+                        <input type="hidden" name="mes" value="{{ mes }}">
+                    {% endfor %}
+                    
+                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por item, recurso, parada, motivo..." value="{{ search_query|default:'' }}">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total de Paradas</h5>
+                        <p class="card-text display-6">{{ total_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Recursos Únicos</h5>
+                        <p class="card-text display-6">{{ recursos_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Linhas de Produção</h5>
+                        <p class="card-text display-6">{{ linhas_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Horas Paradas</h5>
+                        <p class="card-text display-6">{{ total_horas_paradas|floatformat:2 }}h</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>Paradas de Máquina
+                            <small class="ms-2">({{ paradas.paginator.count }} registro{{ paradas.paginator.count|pluralize }})</small>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-container">
+                            <table class="table table-hover table-striped mb-0">
+                                <thead>
+                                    <tr>
+                                        <th class="col-data">Data</th>
+                                        <th class="col-hora">Horário Inicial</th>
+                                        <th class="col-hora">Horário Final</th>
+                                        <th class="col-numero">Dif. Hora</th>
+                                        <th class="col-codigo">Cód. Recurso</th>
+                                        <th class="col-descricao">Descrição Recurso</th>
+                                        <th class="col-codigo">Cód. Parada</th>
+                                        <th class="col-descricao">Descrição Parada</th>
+                                        <th class="col-codigo">Linha Produção</th>
+                                        <th class="col-descricao">Descrição Linha</th>
+                                        <th class="col-codigo">Turno</th>
+                                        <th class="col-codigo">Cód. Item</th>
+                                        <th class="col-descricao">Descrição Item</th>
+                                        <th class="col-numero">Capacidade</th>
+                                        <th class="col-descricao">Motivo</th>
+                                        <th class="col-descricao">Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for parada in paradas %}
+                                    <tr>
+                                        <td>{{ parada.data|date:"d/m/Y"|default:"-" }}</td>
+                                        <td>{{ parada.horario_inicial|time:"H:i"|default:"-" }}</td>
+                                        <td>{{ parada.horario_final|time:"H:i"|default:"-" }}</td>
+                                        <td class="text-end">
+                                            {% if parada.dif_hora %}
+                                                {{ parada.dif_hora|floatformat:2 }}h
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if parada.cod_recurso %}
+                                                <span class="badge bg-primary">{{ parada.cod_recurso }}</span>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ parada.descr_recurso|default:"-"|truncatewords:10 }}</td>
+                                        <td>{{ parada.cod_parada|default:"-" }}</td>
+                                        <td>{{ parada.descr_parada|default:"-"|truncatewords:10 }}</td>
+                                        <td>
+                                            {% if parada.linha_producao %}
+                                                <span class="badge bg-info">{{ parada.linha_producao }}</span>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ parada.descr_linha_producao|default:"-"|truncatewords:10 }}</td>
+                                        <td>{{ parada.turno|default:"-" }}</td>
+                                        <td>{{ parada.cod_item|default:"-" }}</td>
+                                        <td>{{ parada.descr_item|default:"-"|truncatewords:10 }}</td>
+                                        <td class="text-end">
+                                            {% if parada.capacidade %}
+                                                {{ parada.capacidade|floatformat:3 }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ parada.motivo|default:"-"|truncatewords:15 }}</td>
+                                        <td>{{ parada.acao|default:"-"|truncatewords:15 }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="16" class="text-center text-muted py-5">
+                                            <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+                                            Nenhuma parada de máquina encontrada.
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if paradas.has_other_pages %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if paradas.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if ano_filtro %}ano={{ ano_filtro }}&{% endif %}{% for mes in meses_filtro %}mes={{ mes }}&{% endfor %}page=1">Primeira</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if ano_filtro %}ano={{ ano_filtro }}&{% endif %}{% for mes in meses_filtro %}mes={{ mes }}&{% endfor %}page={{ paradas.previous_page_number }}">Anterior</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Página {{ paradas.number }} de {{ paradas.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if paradas.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if ano_filtro %}ano={{ ano_filtro }}&{% endif %}{% for mes in meses_filtro %}mes={{ mes }}&{% endfor %}page={{ paradas.next_page_number }}">Próxima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if ano_filtro %}ano={{ ano_filtro }}&{% endif %}{% for mes in meses_filtro %}mes={{ mes }}&{% endfor %}page={{ paradas.paginator.num_pages }}">Última</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Toggle all months checkboxes
+function toggleAllMonths(selectAll) {
+    const checkboxes = document.querySelectorAll('.mes-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll;
+    });
+}
+</script>
+{% endblock %}

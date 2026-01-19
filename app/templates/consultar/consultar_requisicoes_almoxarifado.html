@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load form_extras %}
 
 {% block title %}Consultar Requisições Almoxarifado{% endblock %}
 
@@ -85,10 +86,74 @@
 <!-- Main Content -->
 <section class="py-5">
     <div class="container-fluid px-5">
+        <!-- Filter Section (Accordion) -->
+        <div class="accordion mb-4" style="background-color: #f8f9fa; border-radius: 8px; padding: 20px;">
+            <div class="accordion-item border-0 bg-transparent">
+                <h2 class="accordion-header" id="headingFilter">
+                    <button class="accordion-button {% if not ano_filtro and not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if ano_filtro or meses_filtro %}true{% else %}false{% endif %}" aria-controls="collapseFilter">
+                        <i class="fas fa-filter me-2"></i>Filtros de Data
+                    </button>
+                </h2>
+                <div id="collapseFilter" class="accordion-collapse collapse {% if ano_filtro or meses_filtro %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
+                    <div class="accordion-body">
+                        <form method="GET" class="row g-3 align-items-end" action="{% url 'consultar_requisicoes_almoxarifado' %}">
+                            <!-- Preservar busca geral -->
+                            <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                            
+                            <div class="col-md-2">
+                                <label for="ano_filtro" class="form-label">Ano:</label>
+                                <select class="form-select" id="ano_filtro" name="ano">
+                                    {% for ano in anos_disponiveis %}
+                                        <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="mes_filtro" class="form-label">Mês(es):</label>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="selecionarTodos" onclick="toggleAllMonths(true)">
+                                            <label class="form-check-label" for="selecionarTodos">Selecionar Todos</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="desmarcarTodos" onclick="toggleAllMonths(false)">
+                                            <label class="form-check-label" for="desmarcarTodos">Desmarcar Todos</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    {% for mes_num, mes_nome in meses_choices %}
+                                        <div class="col-md-3 col-sm-4 col-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input mes-checkbox" type="checkbox" id="mes_{{ mes_num }}" name="mes" value="{{ mes_num }}"
+                                                    {% if mes_num in meses_filtro %}checked{% endif %}>
+                                                <label class="form-check-label" for="mes_{{ mes_num }}">{{ mes_nome }}</label>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="col-md-4 d-flex justify-content-end align-items-end">
+                                <button type="submit" class="btn btn-primary me-2"><i class="fas fa-filter me-1"></i>Aplicar Filtros</button>
+                                <a href="{% url 'consultar_requisicoes_almoxarifado' %}" class="btn btn-outline-secondary"><i class="fas fa-sync-alt me-1"></i>Limpar</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Search Bar -->
         <div class="row mb-4">
             <div class="col-12">
                 <form method="get" action="{% url 'consultar_requisicoes_almoxarifado' %}" class="d-flex">
+                    <!-- Preservar filtros de data -->
+                    <input type="hidden" name="ano" value="{{ ano_filtro }}">
+                    {% for mes in meses_filtro %}
+                        <input type="hidden" name="mes" value="{{ mes }}">
+                    {% endfor %}
+                    
                     <input type="text" name="search" class="form-control me-2" placeholder="Buscar por item, descrição, centro de atividade..." value="{{ search_query|default:'' }}">
                     <button type="submit" class="btn btn-outline-primary">
                         <i class="fas fa-search"></i> Buscar
@@ -127,7 +192,7 @@
                 <div class="card bg-warning text-white">
                     <div class="card-body">
                         <h5 class="card-title">Valor Total</h5>
-                        <p class="card-text display-6">R$ {{ valor_total|floatformat:2 }}</p>
+                        <p class="card-text display-6 format-money" data-value="{{ valor_total|default:0 }}">{{ valor_total|currency_br }}</p>
                     </div>
                 </div>
             </div>
@@ -137,21 +202,37 @@
         <div class="row">
             <div class="col-12">
                 <div class="card shadow-sm">
-                    <div class="card-header bg-secondary text-white">
+                    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">
                             <i class="fas fa-table me-2"></i>Requisições Almoxarifado
                             <small class="ms-2">({{ requisicoes.paginator.count }} registro{{ requisicoes.paginator.count|pluralize }})</small>
                         </h5>
+                        {% if requisicoes %}
+                            <form method="post" action="{% url 'deletar_requisicoes_almoxarifado' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" id="bulkDeleteForm" style="display: none;" onsubmit="return confirm('Tem certeza que deseja deletar as requisições selecionadas? Esta ação não pode ser desfeita.');">
+                                {% csrf_token %}
+                                <div id="bulkDeleteInputs"></div>
+                                <button type="submit" class="btn btn-sm btn-danger" id="bulkDeleteBtn">
+                                    <i class="fas fa-trash me-1"></i>Deletar Selecionadas (<span id="selectedCount">0</span>)
+                                </button>
+                            </form>
+                        {% endif %}
                     </div>
                     <div class="card-body p-0">
                         <form method="get" action="{% url 'consultar_requisicoes_almoxarifado' %}" id="filterForm">
-                            <!-- Preservar busca geral -->
+                            <!-- Preservar busca geral e filtros de data -->
                             <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                            <input type="hidden" name="ano" value="{{ ano_filtro }}">
+                            {% for mes in meses_filtro %}
+                                <input type="hidden" name="mes" value="{{ mes }}">
+                            {% endfor %}
                             
                             <div class="table-container">
                                 <table class="table table-hover table-striped mb-0">
                                     <thead>
                                         <tr>
+                                            <th style="width: 40px;">
+                                                <input type="checkbox" id="selectAll" title="Selecionar todos">
+                                            </th>
                                             <th class="col-data">Data Requisição</th>
                                             <th class="col-item">Código Item</th>
                                             <th class="col-descricao">Descrição Item</th>
@@ -165,6 +246,7 @@
                                             <th class="col-descricao">Local Físico</th>
                                         </tr>
                                         <tr class="filter-row">
+                                            <th></th>
                                             <th>
                                                 <input type="date" name="filter_data" class="filter-input" value="{{ filter_data|default:'' }}" placeholder="Data">
                                             </th>
@@ -196,11 +278,15 @@
                                             <th>
                                                 <input type="text" name="filter_local" class="filter-input" value="{{ filter_local|default:'' }}" placeholder="Local">
                                             </th>
+                                            <th>Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for requisicao in requisicoes %}
                                         <tr>
+                                            <td>
+                                                <input type="checkbox" class="requisicao-checkbox" value="{{ requisicao.id }}" name="requisicao_ids">
+                                            </td>
                                             <td>{{ requisicao.data_requisicao|date:"d/m/Y" }}</td>
                                             <td><span class="badge bg-primary">{{ requisicao.cd_item }}</span></td>
                                             <td>{{ requisicao.descr_item|default:"-" }}</td>
@@ -213,14 +299,14 @@
                                             </td>
                                             <td class="text-end">
                                                 {% if requisicao.vlr_movto_estoq %}
-                                                    R$ {{ requisicao.vlr_movto_estoq|floatformat:2 }}
+                                                    <span class="format-money" data-value="{{ requisicao.vlr_movto_estoq }}">{{ requisicao.vlr_movto_estoq|currency_br }}</span>
                                                 {% else %}
                                                     -
                                                 {% endif %}
                                             </td>
                                             <td class="text-end">
                                                 {% if requisicao.valor_total %}
-                                                    R$ {{ requisicao.valor_total|floatformat:2 }}
+                                                    <span class="format-money" data-value="{{ requisicao.valor_total }}">{{ requisicao.valor_total|currency_br }}</span>
                                                 {% else %}
                                                     -
                                                 {% endif %}
@@ -230,10 +316,19 @@
                                             <td>{{ requisicao.cd_usu_atend|default:"-" }}</td>
                                             <td>{{ requisicao.descr_operacao|default:"-" }}</td>
                                             <td>{{ requisicao.descr_local_fisic|default:"-" }}</td>
+                                            <td>
+                                                <form method="post" action="{% url 'deletar_requisicoes_almoxarifado' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja deletar esta requisição? Esta ação não pode ser desfeita.');">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="requisicao_id" value="{{ requisicao.id }}">
+                                                    <button type="submit" class="btn btn-sm btn-danger" title="Deletar">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
                                         </tr>
                                         {% empty %}
                                         <tr>
-                                            <td colspan="11" class="text-center text-muted py-5">
+                                            <td colspan="13" class="text-center text-muted py-5">
                                                 <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
                                                 Nenhuma requisição encontrada.
                                             </td>
@@ -302,6 +397,113 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 500); // Wait 500ms after user stops typing
         });
     });
+});
+
+// Toggle all months checkboxes
+function toggleAllMonths(selectAll) {
+    const checkboxes = document.querySelectorAll('.mes-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll;
+    });
+}
+
+// Função para formatar moeda no padrão brasileiro
+function formatarMoedaBR(valor) {
+    if (typeof valor !== 'number') {
+        valor = parseFloat(String(valor).replace(/\./g, '').replace(',', '.'));
+        if (isNaN(valor)) return 'R$ 0,00';
+    }
+    return 'R$ ' + valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Formatar valores monetários após carregamento da página
+document.addEventListener('DOMContentLoaded', function() {
+    // Aplicar formatação brasileira aos valores monetários
+    document.querySelectorAll('.format-money').forEach(function(element) {
+        const valor = parseFloat(element.getAttribute('data-value') || element.textContent.replace('R$', '').replace(/\./g, '').replace(',', '.').trim());
+        if (!isNaN(valor)) {
+            element.textContent = formatarMoedaBR(valor);
+        }
+    });
+    
+    // Funcionalidade de seleção múltipla para deleção em lote
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const requisicaoCheckboxes = document.querySelectorAll('.requisicao-checkbox');
+    const bulkDeleteForm = document.getElementById('bulkDeleteForm');
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    const bulkDeleteInputs = document.getElementById('bulkDeleteInputs');
+    const selectedCountSpan = document.getElementById('selectedCount');
+    
+    // Função para atualizar o contador e mostrar/ocultar o botão de deleção em lote
+    function updateBulkDeleteUI() {
+        const selectedCheckboxes = document.querySelectorAll('.requisicao-checkbox:checked');
+        const count = selectedCheckboxes.length;
+        
+        if (selectedCountSpan) {
+            selectedCountSpan.textContent = count;
+        }
+        
+        if (bulkDeleteForm && bulkDeleteBtn) {
+            if (count > 0) {
+                bulkDeleteForm.style.display = 'inline-block';
+            } else {
+                bulkDeleteForm.style.display = 'none';
+            }
+        }
+        
+        // Atualizar estado do "Selecionar todos"
+        if (selectAllCheckbox && requisicaoCheckboxes.length > 0) {
+            const allChecked = requisicaoCheckboxes.length === selectedCheckboxes.length;
+            const someChecked = selectedCheckboxes.length > 0 && selectedCheckboxes.length < requisicaoCheckboxes.length;
+            selectAllCheckbox.checked = allChecked;
+            selectAllCheckbox.indeterminate = someChecked;
+        }
+    }
+    
+    // Listener para "Selecionar todos"
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            requisicaoCheckboxes.forEach(function(checkbox) {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            updateBulkDeleteUI();
+        });
+    }
+    
+    // Listeners para checkboxes individuais
+    requisicaoCheckboxes.forEach(function(checkbox) {
+        checkbox.addEventListener('change', function() {
+            updateBulkDeleteUI();
+        });
+    });
+    
+    // Listener para o formulário de deleção em lote
+    if (bulkDeleteForm) {
+        bulkDeleteForm.addEventListener('submit', function(e) {
+            const selectedCheckboxes = document.querySelectorAll('.requisicao-checkbox:checked');
+            
+            if (selectedCheckboxes.length === 0) {
+                e.preventDefault();
+                alert('Por favor, selecione pelo menos uma requisição para deletar.');
+                return false;
+            }
+            
+            // Limpar inputs anteriores
+            bulkDeleteInputs.innerHTML = '';
+            
+            // Criar inputs hidden para cada requisição selecionada
+            selectedCheckboxes.forEach(function(checkbox) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'requisicoes_ids';
+                input.value = checkbox.value;
+                bulkDeleteInputs.appendChild(input);
+            });
+        });
+    }
+    
+    // Inicializar UI
+    updateBulkDeleteUI();
 });
 </script>
 {% endblock %}

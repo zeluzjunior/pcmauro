@@ -2044,6 +2044,16 @@ def _safe_decimal(value, default=None):
         if not value_str:
             return default
         
+        # Remover prefixo R$ (pode estar antes ou depois do sinal negativo)
+        # Exemplos: "R$ 40,01", "-R$ 40,01", "R$ -40,01"
+        import re
+        value_str = re.sub(r'R\$\s*', '', value_str, flags=re.IGNORECASE)
+        value_str = value_str.strip()
+        
+        # Se vazio apÃ³s remover R$, retornar default
+        if not value_str:
+            return default
+        
         # Verificar se hÃ¡ vÃ­rgula (formato europeu)
         if ',' in value_str:
             # Verificar se hÃ¡ ponto antes da vÃ­rgula (separador de milhares)
@@ -3338,8 +3348,24 @@ def upload_requisicoes_almoxarifado_from_file(file, data_requisicao, update_exis
                     # Mapear colunas do CSV para campos do modelo
                     # O CSV tem: CD_UNID;NOME_UNID;CD_USO_CTB;DESCR_USO_CTB;...
                     
+                    # Função auxiliar para buscar valor com múltiplas variações de nome (incluindo espaços)
+                    def _get_value(row_data, *keys):
+                        """Busca valor no row_data tentando múltiplas chaves (case-insensitive, com/sem espaços)"""
+                        for key in keys:
+                            # Tentar exato
+                            if key in row_data:
+                                val = row_data[key]
+                                if val is not None and str(val).strip():
+                                    return val
+                            # Tentar case-insensitive e com espaços normalizados
+                            for row_key, row_val in row_data.items():
+                                if row_key and row_key.strip().upper() == key.strip().upper():
+                                    if row_val is not None and str(row_val).strip():
+                                        return row_val
+                        return None
+                    
                     # Validar que temos pelo menos cÃ³digo do item
-                    cd_item = _safe_int(row_data.get('CD_ITEM') or row_data.get('cd_item') or row_data.get('Cd_Item'))
+                    cd_item = _safe_int(_get_value(row_data, 'CD_ITEM', 'cd_item', 'Cd_Item'))
                     if not cd_item:
                         errors.append(f"Linha {row_num}: CÃ³digo do item (CD_ITEM) Ã© obrigatÃ³rio")
                         continue
@@ -3347,29 +3373,29 @@ def upload_requisicoes_almoxarifado_from_file(file, data_requisicao, update_exis
                     # Preparar dados para criaÃ§Ã£o/atualizaÃ§Ã£o
                     requisicao_data = {
                         'data_requisicao': data_requisicao,
-                        'cd_unid': _safe_int(row_data.get('CD_UNID') or row_data.get('cd_unid') or row_data.get('Cd_Unid')),
-                        'nome_unid': _safe_str(row_data.get('NOME_UNID') or row_data.get('nome_unid') or row_data.get('Nome_Unid'), max_length=255),
-                        'cd_uso_ctb': _safe_int(row_data.get('CD_USO_CTB') or row_data.get('cd_uso_ctb') or row_data.get('Cd_Uso_Ctb')),
-                        'descr_uso_ctb': _safe_str(row_data.get('DESCR_USO_CTB') or row_data.get('descr_uso_ctb') or row_data.get('Descr_Uso_Ctb'), max_length=255),
-                        'cd_depo': _safe_int(row_data.get('CD_DEPO') or row_data.get('cd_depo') or row_data.get('Cd_Depo')),
-                        'descr_depo': _safe_str(row_data.get('DESCR_DEPO') or row_data.get('descr_depo') or row_data.get('Descr_Depo'), max_length=255),
-                        'cd_local_fisic': _safe_int(row_data.get('CD_LOCAL_FISIC') or row_data.get('cd_local_fisic') or row_data.get('Cd_Local_Fisic')),
-                        'descr_local_fisic': _safe_str(row_data.get('DESCR_LOCAL_FISIC') or row_data.get('descr_local_fisic') or row_data.get('Descr_Local_Fisic'), max_length=255),
+                        'cd_unid': _safe_int(_get_value(row_data, 'CD_UNID', 'cd_unid', 'Cd_Unid')),
+                        'nome_unid': _safe_str(_get_value(row_data, 'NOME_UNID', 'nome_unid', 'Nome_Unid'), max_length=255),
+                        'cd_uso_ctb': _safe_int(_get_value(row_data, 'CD_USO_CTB', 'cd_uso_ctb', 'Cd_Uso_Ctb')),
+                        'descr_uso_ctb': _safe_str(_get_value(row_data, 'DESCR_USO_CTB', 'descr_uso_ctb', 'Descr_Uso_Ctb'), max_length=255),
+                        'cd_depo': _safe_int(_get_value(row_data, 'CD_DEPO', 'cd_depo', 'Cd_Depo')),
+                        'descr_depo': _safe_str(_get_value(row_data, 'DESCR_DEPO', 'descr_depo', 'Descr_Depo'), max_length=255),
+                        'cd_local_fisic': _safe_int(_get_value(row_data, 'CD_LOCAL_FISIC', 'cd_local_fisic', 'Cd_Local_Fisic')),
+                        'descr_local_fisic': _safe_str(_get_value(row_data, 'DESCR_LOCAL_FISIC', 'descr_local_fisic', 'Descr_Local_Fisic'), max_length=255),
                         'cd_item': cd_item,
-                        'cd_embalagem': _safe_str(row_data.get('CD_EMBALAGEM') or row_data.get('cd_embalagem') or row_data.get('Cd_Embalagem'), max_length=50),
-                        'descr_item': _safe_str(row_data.get('DESCR_ITEM') or row_data.get('descr_item') or row_data.get('Descr_Item'), max_length=500),
-                        'cd_operacao': _safe_int(row_data.get('CD_OPERACAO') or row_data.get('cd_operacao') or row_data.get('Cd_Operacao')),
-                        'descr_operacao': _safe_str(row_data.get('DESCR_OPERACAO') or row_data.get('descr_operacao') or row_data.get('Descr_Operacao'), max_length=255),
-                        'cd_unid_medida': _safe_str(row_data.get('CD_UNID_MEDIDA') or row_data.get('cd_unid_medida') or row_data.get('Cd_Unid_Medida'), max_length=50),
-                        'qtde_movto_estoq': _safe_decimal(row_data.get('QTDE_MOVTO_ESTOQ') or row_data.get('qtde_movto_estoq') or row_data.get('Qtde_Movto_Estoq')),
-                        'vlr_movto_estoq': _safe_decimal(row_data.get('VLR_MOVTO_ESTOQ') or row_data.get('vlr_movto_estoq') or row_data.get('Vlr_Movto_Estoq')),
-                        'vlr_movto_estoq_reav': _safe_decimal(row_data.get('VLR_MOVTO_ESTOQ_REAV') or row_data.get('vlr_movto_estoq_reav') or row_data.get('Vlr_Movto_Estoq_Reav')),
-                        'cd_unid_baixa': _safe_int(row_data.get('CD_UNID_BAIXA') or row_data.get('cd_unid_baixa') or row_data.get('Cd_Unid_Baixa')),
-                        'cd_centro_ativ': _safe_int(row_data.get('CD_CENTRO_ATIV') or row_data.get('cd_centro_ativ') or row_data.get('Cd_Centro_Ativ')),
-                        'cd_usu_criou': _safe_str(row_data.get('CD_USU_CRIOU') or row_data.get('cd_usu_criou') or row_data.get('Cd_Usu_Criou'), max_length=255),
-                        'cd_usu_atend': _safe_str(row_data.get('CD_USU_ATEND') or row_data.get('cd_usu_atend') or row_data.get('Cd_Usu_Atend'), max_length=255),
-                        'obs_rm': _safe_str(row_data.get('OBS RM') or row_data.get('obs_rm') or row_data.get('Obs_Rm')),
-                        'obs_item': _safe_str(row_data.get('OBS ITEM') or row_data.get('obs_item') or row_data.get('Obs_Item')),
+                        'cd_embalagem': _safe_str(_get_value(row_data, 'CD_EMBALAGEM', 'cd_embalagem', 'Cd_Embalagem'), max_length=50),
+                        'descr_item': _safe_str(_get_value(row_data, 'DESCR_ITEM', 'descr_item', 'Descr_Item'), max_length=500),
+                        'cd_operacao': _safe_int(_get_value(row_data, 'CD_OPERACAO', 'cd_operacao', 'Cd_Operacao')),
+                        'descr_operacao': _safe_str(_get_value(row_data, 'DESCR_OPERACAO', 'descr_operacao', 'Descr_Operacao'), max_length=255),
+                        'cd_unid_medida': _safe_str(_get_value(row_data, 'CD_UNID_MEDIDA', 'cd_unid_medida', 'Cd_Unid_Medida'), max_length=50),
+                        'qtde_movto_estoq': _safe_decimal(_get_value(row_data, 'QTDE_MOVTO_ESTOQ', 'qtde_movto_estoq', 'Qtde_Movto_Estoq')),
+                        'vlr_movto_estoq': _safe_decimal(_get_value(row_data, 'VLR_MOVTO_ESTOQ', 'vlr_movto_estoq', 'Vlr_Movto_Estoq')),
+                        'vlr_movto_estoq_reav': _safe_decimal(_get_value(row_data, 'VLR_MOVTO_ESTOQ_REAV', 'vlr_movto_estoq_reav', 'Vlr_Movto_Estoq_Reav')),
+                        'cd_unid_baixa': _safe_int(_get_value(row_data, 'CD_UNID_BAIXA', 'cd_unid_baixa', 'Cd_Unid_Baixa')),
+                        'cd_centro_ativ': _safe_int(_get_value(row_data, 'CD_CENTRO_ATIV', 'cd_centro_ativ', 'Cd_Centro_Ativ')),
+                        'cd_usu_criou': _safe_str(_get_value(row_data, 'CD_USU_CRIOU', 'cd_usu_criou', 'Cd_Usu_Criou'), max_length=255),
+                        'cd_usu_atend': _safe_str(_get_value(row_data, 'CD_USU_ATEND', 'cd_usu_atend', 'Cd_Usu_Atend'), max_length=255),
+                        'obs_rm': _safe_str(_get_value(row_data, 'OBS RM', 'obs_rm', 'Obs_Rm')),
+                        'obs_item': _safe_str(_get_value(row_data, 'OBS ITEM', 'obs_item', 'Obs_Item')),
                     }
                     
                     # Criar ou atualizar registro
@@ -3754,6 +3780,17 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                     if not any(str(v).strip() if v else '' for v in row_data.values()):
                         continue
                     
+                    # Ler ID do Excel (obrigatório - chave primária)
+                    id_excel_raw = find_column_value(row_data, ['ID', 'id', 'Id'])
+                    if not id_excel_raw:
+                        errors.append(f"Linha {row_num}: ID não encontrado. Linha ignorada.")
+                        continue
+                    try:
+                        id_excel = int(float(str(id_excel_raw).strip()))  # Converter para int (trata floats como 1.0 -> 1)
+                    except (ValueError, TypeError):
+                        errors.append(f"Linha {row_num}: ID inválido '{id_excel_raw}'. Linha ignorada.")
+                        continue
+                    
                     # Mapear colunas do Excel para campos do modelo
                     setor = _safe_str(find_column_value(row_data, ['SETOR ', 'SETOR', 'setor']), max_length=100)
                     solicitante = _safe_str(find_column_value(row_data, ['SOLICITANTE', 'solicitante']), max_length=100)
@@ -3764,6 +3801,7 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                     previsao_execucao = _safe_str(find_column_value(row_data, ['PREVISÃO \nP/ EXECUÇÃO', 'PREVISÃO P/ EXECUÇÃO', 'PREVIS�O \nP/ EXECU��O']), max_length=50)
                     uso_contabil = _safe_str(find_column_value(row_data, ['USO \nCONTÁBIL', 'USO CONTÁBIL', 'USO \nCONT�BIL']), max_length=100)
                     numero_nf = _safe_str(find_column_value(row_data, ['NÚMERO DA \nNOTA FISCAL', 'NÚMERO DA NOTA FISCAL', 'N�MERO DA \nNOTA FISCAL']), max_length=100)
+                    tipo_solicitacao = _safe_str(find_column_value(row_data, ['TIPO DE \nSOLICITAÇÃO', 'TIPO DE SOLICITAÇÃO', 'TIPO DE \nSOLICITACAO', 'TIPO DE SOLICITACAO']), max_length=100)
                     numero_ordem_servico = _safe_str(find_column_value(row_data, ['ORDEM \nDE SERVIÇO', 'ORDEM DE SERVIÇO', 'ORDEM \nDE SERVI�O']), max_length=100)
                     data_abertura = _safe_date(find_column_value(row_data, ['DATA DE ABERTURA \nDA REQUISIÇÃO', 'DATA DE ABERTURA DA REQUISIÇÃO', 'DATA DE ABERTURA \nDA REQUISI��O']))
                     numero_requisicao_compra = _safe_str(find_column_value(row_data, ['NÚMERO DA REQUISIÇÃO \nDE COMPRA', 'NÚMERO DA REQUISIÇÃO DE COMPRA', 'N�EMRO DA REQUISI��O \nDE COMPRA']), max_length=100)
@@ -3781,6 +3819,7 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                         'setor': setor,
                         'solicitante': solicitante,
                         'descricao': descricao,
+                        'tipo_solicitacao': tipo_solicitacao,
                         'valor_total': valor_total,
                         'data_abertura_requisicao': data_abertura,
                         'previsao_execucao': previsao_execucao,
@@ -3802,166 +3841,29 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                         'fornecedor': fornecedor_nome,  # Mapear para campo legado
                         'data_requisicao': data_abertura,  # Mapear para campo legado
                         'numero_requisicao': numero_requisicao_compra,  # Mapear para campo legado
+                        'tipo': tipo_solicitacao,  # Mapear tipo_solicitacao para campo legado 'tipo'
                     }
                     
-                    # Estratégia de detecção de duplicatas:
-                    # 1. Primeiro tenta numero_requisicao_compra (se disponível)
-                    # 2. Depois tenta numero_pedido_compra (se disponível)
-                    # 3. Se nenhum estiver disponível, usa uma combinação de campos para criar uma "impressão digital"
-                    
-                    import hashlib
-                    
-                    # Função para criar hash de identificação única baseado em múltiplos campos
-                    def criar_fingerprint(setor, descricao, fornecedor_nome, fornecedor_cnpj, valor_total, 
-                                         mes_ref, ano_ref, data_abertura, uso_contabil):
-                        """Cria um hash único baseado em campos que identificam um trabalho único"""
-                        # Normalizar valores para comparação
-                        campos = [
-                            str(setor or '').strip().upper(),
-                            str(descricao or '').strip().upper(),
-                            str(fornecedor_nome or '').strip().upper(),
-                            str(fornecedor_cnpj or '').strip().replace('.', '').replace('/', '').replace('-', ''),
-                            str(valor_total or '0').strip(),
-                            str(mes_ref or '').strip(),
-                            str(ano_ref or '').strip(),
-                            str(data_abertura or '').strip(),
-                            str(uso_contabil or '').strip().upper(),
-                        ]
-                        # Criar string única e gerar hash
-                        fingerprint_str = '|'.join(campos)
-                        return hashlib.md5(fingerprint_str.encode('utf-8')).hexdigest()
-                    
+                    # Usar id_excel como chave primária para identificação individual
+                    # Estratégia: usar id_excel para identificar registros únicos
                     projecao_obj = None
                     created = False
                     
-                    # Tentativa 1: Usar numero_requisicao_compra como chave única
-                    if numero_requisicao_compra:
-                        if update_existing:
-                            projecao_obj, created = ProjecaoGasto.objects.update_or_create(
-                                numero_requisicao_compra=numero_requisicao_compra,
-                                defaults=projecao_data
-                            )
-                            if created:
-                                created_count += 1
-                            else:
-                                updated_count += 1
-                        else:
-                            projecao_obj, created = ProjecaoGasto.objects.get_or_create(
-                                numero_requisicao_compra=numero_requisicao_compra,
-                                defaults=projecao_data
-                            )
-                            if created:
-                                created_count += 1
-                    
-                    # Tentativa 2: Se não encontrou e tem numero_pedido_compra, usar esse
-                    elif numero_pedido_compra:
-                        if update_existing:
-                            projecao_obj, created = ProjecaoGasto.objects.update_or_create(
-                                numero_pedido_compra=numero_pedido_compra,
-                                defaults=projecao_data
-                            )
-                            if created:
-                                created_count += 1
-                            else:
-                                updated_count += 1
-                        else:
-                            projecao_obj, created = ProjecaoGasto.objects.get_or_create(
-                                numero_pedido_compra=numero_pedido_compra,
-                                defaults=projecao_data
-                            )
-                            if created:
-                                created_count += 1
-                    
-                    # Tentativa 3: Se não tem números únicos, usar fingerprint baseado em múltiplos campos
-                    else:
-                        fingerprint = criar_fingerprint(
-                            setor, descricao, fornecedor_nome, fornecedor_cnpj, valor_total,
-                            mes_referencia, ano_referencia, data_abertura, uso_contabil
+                    if update_existing:
+                        projecao_obj, created = ProjecaoGasto.objects.update_or_create(
+                            id_excel=id_excel,
+                            defaults=projecao_data
                         )
-                        
-                        # Buscar registros existentes que correspondem ao fingerprint
-                        # Verificar se existe registro com mesma combinação de campos chave
-                        from django.db.models import Q
-                        from functools import reduce
-                        from operator import and_
-                        
-                        # Construir lista de condições Q
-                        q_conditions = []
-                        
-                        # Adicionar condições para cada campo (só se o campo tiver valor)
-                        if setor:
-                            q_conditions.append(Q(setor=setor))
+                        if created:
+                            created_count += 1
                         else:
-                            q_conditions.append(Q(setor__isnull=True) | Q(setor=''))
-                        
-                        if descricao:
-                            q_conditions.append(Q(descricao=descricao))
-                        else:
-                            q_conditions.append(Q(descricao__isnull=True) | Q(descricao=''))
-                        
-                        if fornecedor_nome:
-                            q_conditions.append(Q(fornecedor_nome_fantasia=fornecedor_nome))
-                        else:
-                            q_conditions.append(Q(fornecedor_nome_fantasia__isnull=True) | Q(fornecedor_nome_fantasia=''))
-                        
-                        if fornecedor_cnpj:
-                            q_conditions.append(Q(fornecedor_cnpj=fornecedor_cnpj))
-                        else:
-                            q_conditions.append(Q(fornecedor_cnpj__isnull=True) | Q(fornecedor_cnpj=''))
-                        
-                        if valor_total:
-                            q_conditions.append(Q(valor_total=valor_total))
-                        else:
-                            q_conditions.append(Q(valor_total__isnull=True))
-                        
-                        if mes_referencia:
-                            q_conditions.append(Q(mes_referencia=mes_referencia))
-                        else:
-                            q_conditions.append(Q(mes_referencia__isnull=True) | Q(mes_referencia=''))
-                        
-                        if ano_referencia:
-                            q_conditions.append(Q(ano_referencia=ano_referencia))
-                        else:
-                            q_conditions.append(Q(ano_referencia__isnull=True))
-                        
-                        if data_abertura:
-                            q_conditions.append(Q(data_abertura_requisicao=data_abertura))
-                        else:
-                            q_conditions.append(Q(data_abertura_requisicao__isnull=True))
-                        
-                        if uso_contabil:
-                            q_conditions.append(Q(uso_contabil=uso_contabil))
-                        else:
-                            q_conditions.append(Q(uso_contabil__isnull=True) | Q(uso_contabil=''))
-                        
-                        # Garantir que não tem numero_requisicao_compra nem numero_pedido_compra
-                        q_conditions.append(Q(numero_requisicao_compra__isnull=True) | Q(numero_requisicao_compra=''))
-                        q_conditions.append(Q(numero_pedido_compra__isnull=True) | Q(numero_pedido_compra=''))
-                        
-                        # Combinar todas as condições com AND
-                        if q_conditions:
-                            query = reduce(and_, q_conditions)
-                            existing = ProjecaoGasto.objects.filter(query).first()
-                        else:
-                            existing = None
-                        
-                        if existing:
-                            if update_existing:
-                                # Atualizar registro existente
-                                for key, value in projecao_data.items():
-                                    setattr(existing, key, value)
-                                existing.save()
-                                projecao_obj = existing
-                                created = False
-                                updated_count += 1
-                            else:
-                                # Ignorar duplicata
-                                projecao_obj = existing
-                                created = False
-                        else:
-                            # Criar novo registro
-                            projecao_obj = ProjecaoGasto.objects.create(**projecao_data)
-                            created = True
+                            updated_count += 1
+                    else:
+                        projecao_obj, created = ProjecaoGasto.objects.get_or_create(
+                            id_excel=id_excel,
+                            defaults=projecao_data
+                        )
+                        if created:
                             created_count += 1
                     
                         
@@ -4234,3 +4136,179 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
         import traceback
         traceback.print_exc()
         return 0, 0, errors, []
+
+
+def upload_paradas_maquina_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:
+    """
+    Faz upload de paradas de máquinas a partir de um arquivo CSV
+    
+    Args:
+        file: Arquivo Django UploadedFile (CSV)
+        update_existing: Se True, atualiza registros existentes. Se False, ignora duplicados.
+    
+    Returns:
+        Tupla (created_count, updated_count, errors)
+    """
+    from app.models import ParadaMaquina
+    from datetime import datetime, date, time
+    import re
+    
+    errors = []
+    created_count = 0
+    updated_count = 0
+    
+    # Determinar tipo de arquivo
+    file_name = file.name.lower()
+    
+    try:
+        # Ler arquivo CSV (usar delimitador ponto e vírgula)
+        if not file_name.endswith('.csv'):
+            raise ValidationError("Formato de arquivo não suportado. Use .csv")
+        
+        # Tentar diferentes encodings
+        data = None
+        encodings_to_try = ['latin-1', 'iso-8859-1', 'utf-8', 'cp1252']
+        
+        for encoding in encodings_to_try:
+            try:
+                file.seek(0)
+                data = read_csv_file(file, encoding=encoding, delimiter=';')
+                break
+            except (UnicodeDecodeError, ValidationError) as e:
+                if encoding == encodings_to_try[-1]:
+                    raise ValidationError(f"Erro ao ler arquivo CSV: Não foi possível decodificar o arquivo com nenhum encoding testado. Erro original: {str(e)}")
+                continue
+            except Exception as e:
+                raise ValidationError(f"Erro ao ler arquivo CSV: {str(e)}")
+        
+        if data is None:
+            raise ValidationError("Erro ao ler arquivo CSV: Não foi possível processar o arquivo.")
+        
+        if not data:
+            raise ValidationError("Arquivo vazio ou sem dados válidos")
+        
+        # Helper function para obter valor do row_data
+        def _get_value(row_data, *keys):
+            """Tenta obter um valor de row_data usando várias chaves, primeiro exato, depois case-insensitive e com strip."""
+            for key in keys:
+                if key in row_data:
+                    return row_data[key]
+                normalized_key = key.strip().lower()
+                for existing_key, value in row_data.items():
+                    if existing_key and existing_key.strip().lower() == normalized_key:
+                        return value
+            return None
+        
+        # Helper function para parse de data (DD/MM/YYYY)
+        def _parse_date(date_str):
+            """Parse data no formato DD/MM/YYYY"""
+            if not date_str:
+                return None
+            date_str = str(date_str).strip()
+            if not date_str:
+                return None
+            formats = ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d']
+            for fmt in formats:
+                try:
+                    return datetime.strptime(date_str, fmt).date()
+                except ValueError:
+                    continue
+            return None
+        
+        # Helper function para parse de hora (HH:MM)
+        def _parse_time(time_str):
+            """Parse hora no formato HH:MM"""
+            if not time_str:
+                return None
+            time_str = str(time_str).strip()
+            if not time_str:
+                return None
+            formats = ['%H:%M', '%H:%M:%S']
+            for fmt in formats:
+                try:
+                    return datetime.strptime(time_str, fmt).time()
+                except ValueError:
+                    continue
+            return None
+        
+        # Processar dados em transação
+        with transaction.atomic():
+            for row_num, row_data in enumerate(data, start=2):
+                try:
+                    # Verificar se a linha está vazia
+                    if not row_data or not any(str(v).strip() for v in row_data.values() if v):
+                        continue
+                    
+                    # Parse de data
+                    data_parada = _parse_date(_get_value(row_data, 'DATA', 'Data', 'data'))
+                    if not data_parada:
+                        errors.append(f"Linha {row_num}: Data inválida ou não fornecida")
+                        continue
+                    
+                    # Parse de horários
+                    horario_inicial = _parse_time(_get_value(row_data, 'HORARIO INICIAL', 'Horario Inicial', 'horario_inicial'))
+                    horario_final = _parse_time(_get_value(row_data, 'HORARIO FINAL', 'Horario Final', 'horario_final'))
+                    
+                    # Parse de códigos e valores
+                    cod_recurso = _safe_int(_get_value(row_data, 'CÓD. RECURSO', 'Cód. Recurso', 'cod_recurso'))
+                    
+                    # Verificar se já existe (usar data + cod_recurso + horario_inicial como chave única)
+                    existing = None
+                    if cod_recurso:
+                        existing = ParadaMaquina.objects.filter(
+                            data=data_parada,
+                            cod_recurso=cod_recurso,
+                            horario_inicial=horario_inicial
+                        ).first()
+                    
+                    # Se existe e não deve atualizar, pular
+                    if existing and not update_existing:
+                        continue
+                    
+                    # Preparar dados
+                    parada_data = {
+                        'unid': _safe_int(_get_value(row_data, 'UNID', 'Unid', 'unid')),
+                        'nome_unidade': _safe_str(_get_value(row_data, 'NOME_UNIDADE', 'Nome Unidade', 'nome_unidade'), max_length=255),
+                        'linha_producao': _safe_int(_get_value(row_data, 'LINHA_PRODUCAO', 'Linha Produção', 'linha_producao')),
+                        'descr_linha_producao': _safe_str(_get_value(row_data, 'DESCR_LINHA_PRODUCAO', 'Descr Linha Produção', 'descr_linha_producao'), max_length=255),
+                        'turno': _safe_str(_get_value(row_data, 'TURNO', 'Turno', 'turno'), max_length=10),
+                        'data': data_parada,
+                        'cod_item': _safe_str(_get_value(row_data, 'CÓD. ITEM', 'Cód. Item', 'cod_item'), max_length=100),
+                        'descr_item': _safe_str(_get_value(row_data, 'DESCR. ITEM', 'Descr. Item', 'descr_item'), max_length=500),
+                        'cod_grupo_recurso': _safe_int(_get_value(row_data, 'CÓD. GRUPO DE RECURSO', 'Cód. Grupo de Recurso', 'cod_grupo_recurso')),
+                        'grupo_recurso': _safe_str(_get_value(row_data, 'GRUPO RECURSO', 'Grupo Recurso', 'grupo_recurso'), max_length=255),
+                        'cod_parada': _safe_str(_get_value(row_data, 'CÓD. PARADA', 'Cód. Parada', 'cod_parada'), max_length=50),
+                        'descr_parada': _safe_str(_get_value(row_data, 'DESCR. PARADA', 'Descr. Parada', 'descr_parada'), max_length=255),
+                        'nro': _safe_str(_get_value(row_data, 'NRO', 'Nro', 'nro'), max_length=50),
+                        'cod_recurso': cod_recurso,
+                        'descr_recurso': _safe_str(_get_value(row_data, 'DESCR. RECURSO', 'Descr. Recurso', 'descr_recurso'), max_length=255),
+                        'horario_inicial': horario_inicial,
+                        'horario_final': horario_final,
+                        'dif_hora': _safe_decimal(_get_value(row_data, 'DIF. HORA', 'Dif. Hora', 'dif_hora')),
+                        'capacidade': _safe_decimal(_get_value(row_data, 'CAPACIDADE', 'Capacidade', 'capacidade')),
+                        'motivo': _safe_str(_get_value(row_data, 'MOTIVO', 'Motivo', 'motivo')),
+                        'acao': _safe_str(_get_value(row_data, 'AÇÃO', 'Ação', 'acao')),
+                    }
+                    
+                    # Criar ou atualizar
+                    if existing:
+                        for key, value in parada_data.items():
+                            setattr(existing, key, value)
+                        existing.save()
+                        updated_count += 1
+                    else:
+                        ParadaMaquina.objects.create(**parada_data)
+                        created_count += 1
+                        
+                except Exception as e:
+                    errors.append(f"Linha {row_num}: Erro ao processar - {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+                    continue
+        
+        return created_count, updated_count, errors
+        
+    except Exception as e:
+        error_detail = f"Erro ao processar arquivo: {str(e)}"
+        errors.append(error_detail)
+        return 0, 0, errors

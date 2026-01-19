@@ -49,19 +49,19 @@
                             </div>
                             <div class="mb-3">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="updateExisting" name="update_existing">
+                                    <input class="form-check-input" type="checkbox" id="updateExisting" name="update_existing" checked>
                                     <label class="form-check-label" for="updateExisting">
                                         <strong>Atualizar registros existentes</strong>
                                     </label>
                                     <div class="form-text">
                                         <i class="fas fa-info-circle me-1"></i>
-                                        Quando marcado, projeções existentes (identificadas pelo número da requisição de compra) serão atualizadas com os dados do arquivo. Quando desmarcado, apenas novas projeções serão criadas.
+                                        Quando marcado, projeções existentes (identificadas pelo ID do Excel) serão atualizadas com os dados do arquivo. Quando desmarcado, apenas novas projeções serão criadas.
                                     </div>
                                 </div>
                             </div>
                             
                             <div class="d-grid gap-2">
-                                <button type="submit" class="btn btn-primary btn-lg">
+                                <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
                                     <i class="fas fa-upload me-2"></i>Importar Arquivo
                                 </button>
                             </div>
@@ -110,7 +110,7 @@
                         
                         <div class="alert alert-warning mt-4">
                             <i class="fas fa-exclamation-triangle me-2"></i>
-                            <strong>Importante:</strong> O campo <strong>NÚMERO DA REQUISIÇÃO DE COMPRA</strong> é usado como identificador único. Se uma projeção com o mesmo número já existir no banco de dados e a opção "Atualizar registros existentes" estiver marcada, os dados serão atualizados. Caso contrário, a linha será ignorada.
+                            <strong>Importante:</strong> O campo <strong>ID</strong> do Excel é usado como identificador único. Se uma projeção com o mesmo ID já existir no banco de dados e a opção "Atualizar registros existentes" estiver marcada, os dados serão atualizados. Caso contrário, a linha será ignorada.
                         </div>
                     </div>
                 </div>
@@ -120,3 +120,28 @@
 </section>
 {% endblock %}
 
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('importarForm');
+    const updateCheckbox = document.getElementById('updateExisting');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    if (form && updateCheckbox && submitBtn) {
+        form.addEventListener('submit', function(e) {
+            // Se o checkbox de atualização estiver desmarcado, mostrar aviso
+            if (!updateCheckbox.checked) {
+                const confirmMessage = 'Você tem certeza que não quer Atualizar os dados? Esses dados partem do princípio que serão atualizados em todo Upload de um novo Arquivo.';
+                
+                if (!confirm(confirmMessage)) {
+                    // Usuário cancelou - prevenir envio do formulário
+                    e.preventDefault();
+                    return false;
+                }
+            }
+            // Se o checkbox estiver marcado ou o usuário confirmou, continuar com o envio
+        });
+    }
+});
+</script>
+{% endblock %}

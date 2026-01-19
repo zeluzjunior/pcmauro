@@ -24,9 +24,14 @@ urlpatterns = [
     path('importar/requisicoes-almoxarifado/', views.importar_requisicoes_almoxarifado, name="importar_requisicoes_almoxarifado"),
     path('importar/notas-fiscais/', views.importar_notas_fiscais, name="importar_notas_fiscais"),
     path('importar/controle-nf-e-rc/', views.importar_controle_nf_e_rc, name="importar_controle_nf_e_rc"),
+    path('importar/paradas-de-maquina/', views.importar_paradas_maquina, name="importar_paradas_maquina"),
     path('importar/locais-e-cas/', views.importar_locais_e_cas, name="importar_locais_e_cas"),
     path('importar/estoque/', views.importar_estoque, name="importar_estoque"),
     path('importar/projecao-gastos/', views.importar_projecao_gastos, name="importar_projecao_gastos"),
+    
+    # Ajuste Relatórios SIGA
+    path('ajuste-relatorios-siga/relatorio-nf-estf0198/', views.relatorio_nf_estf0198, name="relatorio_nf_estf0198"),
+    path('ajuste-relatorios-siga/relatorio-nf-estf0198/download/', views.download_relatorio_nf_estf0198, name="download_relatorio_nf_estf0198"),
     
     # Estoque
     path('estoque/consultar/', views.consultar_estoque, name="consultar_estoque"),
@@ -37,6 +42,10 @@ urlpatterns = [
     path('meus-planos-preventiva/consultar/', views.consultar_meu_plano, name="consultar_meu_plano"),
     path('consultar/52-semanas/', views.consultar_52_semanas, name="consultar_52_semanas"),
     path('consultar/requisicoes-almoxarifado/', views.consultar_requisicoes_almoxarifado, name="consultar_requisicoes_almoxarifado"),
+    path('consultar/requisicoes-almoxarifado/deletar/', views.deletar_requisicoes_almoxarifado, name="deletar_requisicoes_almoxarifado"),
+    path('consultar/paradas-de-maquina/', views.consultar_paradas_maquina, name="consultar_paradas_maquina"),
+    path('paradas-maquina/analise/', views.analise_paradas_maquina, name="analise_paradas_maquina"),
+    path('paradas-maquina/configuracao/', views.configuracao_parada_maquina, name="configuracao_parada_maquina"),
     path('almoxarifado/analise-requisicoes-data-importada/', views.analise_requisicoes_data_importada, name="analise_requisicoes_data_importada"),
     path('consultar/notas-fiscais/', views.consultar_notas_fiscais, name="consultar_notas_fiscais"),
     path('notas-fiscais/visualizar/<int:nota_id>/', views.visualizar_nota_fiscal, name="visualizar_nota_fiscal"),
@@ -163,6 +172,7 @@ urlpatterns = [
     path('api/search-planos-pcm/', views.api_search_planos_pcm, name="api_search_planos_pcm"),
     path('api/salvar-agendamentos-cronograma/', views.salvar_agendamentos_cronograma, name="salvar_agendamentos_cronograma"),
     path('api/dados-diarios-requisicoes/', views.api_dados_diarios_requisicoes, name="api_dados_diarios_requisicoes"),
+    path('api/dados-diarios-paradas/', views.api_dados_diarios_paradas, name="api_dados_diarios_paradas"),
     path('api/meses-por-ano/', views.api_meses_por_ano, name="api_meses_por_ano"),
     path('api/eventos-calendario/', views.api_eventos_calendario, name="api_eventos_calendario"),
 ]

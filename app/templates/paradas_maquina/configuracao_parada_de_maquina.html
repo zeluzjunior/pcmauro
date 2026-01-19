@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Configuração de Paradas de Máquina{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Paradas de Máquina</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Configuração</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Configuração de Paradas de Máquina</h1>
+                <p class="lead">Configure as opções e parâmetros de paradas de máquina</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Content will be added here -->
+    </div>
+</section>
+{% endblock %}

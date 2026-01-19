@@ -559,6 +559,11 @@ def analise_requisicoes(request):
                 mes_conditions |= Q(data_requisicao__month=mes)
             queryset_base = queryset_base.filter(mes_conditions)
     
+    # Separar requisições geradas por NF e requisições normais
+    mensagem_nf = "REQUISIÇÃO GERADA PELO PROCESSO DE ENTRADA DE NOTA FISCAL"
+    queryset_nf = queryset_base.filter(obs_rm__icontains=mensagem_nf)
+    queryset_normal = queryset_base.exclude(obs_rm__icontains=mensagem_nf)
+    
     # Debug: verificar quantos registros após filtro
     # total_antes = RequisicaoAlmoxarifado.objects.count()
     # total_depois = queryset_base.count()
@@ -567,6 +572,8 @@ def analise_requisicoes(request):
     # Estatísticas gerais (usando queryset filtrado)
     hoje = datetime.now().date()
     total_requisicoes = queryset_base.count()
+    total_requisicoes_nf = queryset_nf.count()
+    total_requisicoes_normal = queryset_normal.count()
     
     # Últimos 30 dias (apenas se não houver filtros)
     if not ano_filtro:
@@ -574,9 +581,17 @@ def analise_requisicoes(request):
         requisicoes_recentes = queryset_base.filter(
             data_requisicao__gte=data_30_dias_atras
         ).count()
+        requisicoes_recentes_nf = queryset_nf.filter(
+            data_requisicao__gte=data_30_dias_atras
+        ).count()
+        requisicoes_recentes_normal = queryset_normal.filter(
+            data_requisicao__gte=data_30_dias_atras
+        ).count()
     else:
         # Se há filtros, mostrar total filtrado
         requisicoes_recentes = total_requisicoes
+        requisicoes_recentes_nf = total_requisicoes_nf
+        requisicoes_recentes_normal = total_requisicoes_normal
     
     # Mês atual (apenas se não houver filtros)
     if not ano_filtro:
@@ -584,35 +599,86 @@ def analise_requisicoes(request):
         requisicoes_mes_atual = queryset_base.filter(
             data_requisicao__gte=primeiro_dia_mes
         ).count()
+        requisicoes_mes_atual_nf = queryset_nf.filter(
+            data_requisicao__gte=primeiro_dia_mes
+        ).count()
+        requisicoes_mes_atual_normal = queryset_normal.filter(
+            data_requisicao__gte=primeiro_dia_mes
+        ).count()
     else:
         # Se há filtros, mostrar total filtrado
         requisicoes_mes_atual = total_requisicoes
+        requisicoes_mes_atual_nf = total_requisicoes_nf
+        requisicoes_mes_atual_normal = total_requisicoes_normal
     
     # Itens únicos
     itens_unicos = queryset_base.values('cd_item').distinct().count()
+    itens_unicos_nf = queryset_nf.values('cd_item').distinct().count()
+    itens_unicos_normal = queryset_normal.values('cd_item').distinct().count()
     
     # Centros de atividade únicos
     centros_unicos = queryset_base.exclude(
         cd_centro_ativ__isnull=True
     ).values('cd_centro_ativ').distinct().count()
+    centros_unicos_nf = queryset_nf.exclude(
+        cd_centro_ativ__isnull=True
+    ).values('cd_centro_ativ').distinct().count()
+    centros_unicos_normal = queryset_normal.exclude(
+        cd_centro_ativ__isnull=True
+    ).values('cd_centro_ativ').distinct().count()
     
     # Calcular valor total (vlr_movto_estoq já é o valor total da linha, não precisa multiplicar por quantidade)
+    # IMPORTANTE: Apenas considerar cd_depo == 1 para custos (itens novos que geram gasto)
+    # cd_depo == 3 são itens reutilizados que não geram custo
     valor_total = Decimal('0.00')
+    valor_total_reused = Decimal('0.00')  # Valor dos itens reutilizados (cd_depo == 3)
     quantidade_total = Decimal('0.00')
+    
+    valor_total_nf = Decimal('0.00')
+    valor_total_reused_nf = Decimal('0.00')
+    quantidade_total_nf = Decimal('0.00')
+    
+    valor_total_normal = Decimal('0.00')
+    valor_total_reused_normal = Decimal('0.00')
+    quantidade_total_normal = Decimal('0.00')
+    
     for req in queryset_base:
         if req.vlr_movto_estoq:
             # vlr_movto_estoq já representa o valor total da transação (pode ser negativo para saídas)
-            valor_total += abs(req.vlr_movto_estoq)
+            if req.cd_depo == 1:
+                # Apenas cd_depo == 1 gera custo
+                valor_total += abs(req.vlr_movto_estoq)
+                if mensagem_nf in (req.obs_rm or ''):
+                    valor_total_nf += abs(req.vlr_movto_estoq)
+                else:
+                    valor_total_normal += abs(req.vlr_movto_estoq)
+            elif req.cd_depo == 3:
+                # cd_depo == 3 são itens reutilizados (não geram custo, mas vamos rastrear)
+                valor_total_reused += abs(req.vlr_movto_estoq)
+                if mensagem_nf in (req.obs_rm or ''):
+                    valor_total_reused_nf += abs(req.vlr_movto_estoq)
+                else:
+                    valor_total_reused_normal += abs(req.vlr_movto_estoq)
         if req.qtde_movto_estoq:
             quantidade_total += abs(req.qtde_movto_estoq)
+            if mensagem_nf in (req.obs_rm or ''):
+                quantidade_total_nf += abs(req.qtde_movto_estoq)
+            else:
+                quantidade_total_normal += abs(req.qtde_movto_estoq)
     
     # Valor médio por requisição
     valor_medio = valor_total / total_requisicoes if total_requisicoes > 0 else Decimal('0.00')
+    valor_medio_nf = valor_total_nf / total_requisicoes_nf if total_requisicoes_nf > 0 else Decimal('0.00')
+    valor_medio_normal = valor_total_normal / total_requisicoes_normal if total_requisicoes_normal > 0 else Decimal('0.00')
     
     # Evolução temporal (últimos 12 meses ou período filtrado)
     meses_labels = []
     meses_data = []
     meses_valor = []
+    meses_data_nf = []
+    meses_valor_nf = []
+    meses_data_normal = []
+    meses_valor_normal = []
     
     # Determinar período para evolução temporal
     if ano_filtro:
@@ -652,17 +718,39 @@ def analise_requisicoes(request):
             data_requisicao__lte=fim_mes
         ).count()
         
+        count_nf = queryset_nf.filter(
+            data_requisicao__gte=data_atual,
+            data_requisicao__lte=fim_mes
+        ).count()
+        
+        count_normal = queryset_normal.filter(
+            data_requisicao__gte=data_atual,
+            data_requisicao__lte=fim_mes
+        ).count()
+        
         valor_mes = Decimal('0.00')
+        valor_mes_nf = Decimal('0.00')
+        valor_mes_normal = Decimal('0.00')
+        
         for req in queryset_base.filter(
             data_requisicao__gte=data_atual,
             data_requisicao__lte=fim_mes
         ):
-            if req.vlr_movto_estoq:
+            if req.vlr_movto_estoq and req.cd_depo == 1:
+                # Apenas considerar cd_depo == 1 para custos
                 valor_mes += abs(req.vlr_movto_estoq)
+                if mensagem_nf in (req.obs_rm or ''):
+                    valor_mes_nf += abs(req.vlr_movto_estoq)
+                else:
+                    valor_mes_normal += abs(req.vlr_movto_estoq)
         
         meses_labels.append(data_atual.strftime('%b/%Y'))
         meses_data.append(count)
         meses_valor.append(float(valor_mes))
+        meses_data_nf.append(count_nf)
+        meses_valor_nf.append(float(valor_mes_nf))
+        meses_data_normal.append(count_normal)
+        meses_valor_normal.append(float(valor_mes_normal))
         
         # Próximo mês
         if data_atual.month == 12:
@@ -670,7 +758,7 @@ def analise_requisicoes(request):
         else:
             data_atual = data_atual.replace(month=data_atual.month + 1, day=1)
     
-    # Top 10 itens mais requisitados (por quantidade)
+    # Top 10 itens mais requisitados (por quantidade) - Geral
     top_itens_qtd = queryset_base.exclude(
         qtde_movto_estoq__isnull=True
     ).values('cd_item', 'descr_item').annotate(
@@ -686,16 +774,55 @@ def analise_requisicoes(request):
         top_itens_labels.append(f"{item['cd_item']} - {descr}")
         top_itens_data.append(abs(float(item['total_qtd'])))
     
-    # Top 10 itens por valor
+    # Top 10 itens mais requisitados (por quantidade) - NF
+    top_itens_qtd_nf = queryset_nf.exclude(
+        qtde_movto_estoq__isnull=True
+    ).values('cd_item', 'descr_item').annotate(
+        total_qtd=Sum('qtde_movto_estoq')
+    ).order_by('-total_qtd')[:10]
+    
+    top_itens_labels_nf = []
+    top_itens_data_nf = []
+    for item in top_itens_qtd_nf:
+        descr = item['descr_item'] or f"Item {item['cd_item']}"
+        if len(descr) > 40:
+            descr = descr[:37] + "..."
+        top_itens_labels_nf.append(f"{item['cd_item']} - {descr}")
+        top_itens_data_nf.append(abs(float(item['total_qtd'])))
+    
+    # Top 10 itens mais requisitados (por quantidade) - Normal
+    top_itens_qtd_normal = queryset_normal.exclude(
+        qtde_movto_estoq__isnull=True
+    ).values('cd_item', 'descr_item').annotate(
+        total_qtd=Sum('qtde_movto_estoq')
+    ).order_by('-total_qtd')[:10]
+    
+    top_itens_labels_normal = []
+    top_itens_data_normal = []
+    for item in top_itens_qtd_normal:
+        descr = item['descr_item'] or f"Item {item['cd_item']}"
+        if len(descr) > 40:
+            descr = descr[:37] + "..."
+        top_itens_labels_normal.append(f"{item['cd_item']} - {descr}")
+        top_itens_data_normal.append(abs(float(item['total_qtd'])))
+    
+    # Top 10 itens por valor - Geral
     top_itens_valor = []
     itens_valor_dict = defaultdict(lambda: Decimal('0.00'))
+    itens_valor_dict_nf = defaultdict(lambda: Decimal('0.00'))
+    itens_valor_dict_normal = defaultdict(lambda: Decimal('0.00'))
     
     for req in queryset_base.exclude(vlr_movto_estoq__isnull=True):
-        if req.vlr_movto_estoq:
+        if req.vlr_movto_estoq and req.cd_depo == 1:
+            # Apenas considerar cd_depo == 1 para custos
             # vlr_movto_estoq já representa o valor total da transação
             itens_valor_dict[req.cd_item] += abs(req.vlr_movto_estoq)
+            if mensagem_nf in (req.obs_rm or ''):
+                itens_valor_dict_nf[req.cd_item] += abs(req.vlr_movto_estoq)
+            else:
+                itens_valor_dict_normal[req.cd_item] += abs(req.vlr_movto_estoq)
     
-    # Ordenar e pegar top 10
+    # Ordenar e pegar top 10 - Geral
     sorted_itens = sorted(itens_valor_dict.items(), key=lambda x: x[1], reverse=True)[:10]
     
     top_itens_valor_labels = []
@@ -708,12 +835,39 @@ def analise_requisicoes(request):
         top_itens_valor_labels.append(f"{cd_item} - {descr}")
         top_itens_valor_data.append(float(valor))
     
+    # Ordenar e pegar top 10 - NF
+    sorted_itens_nf = sorted(itens_valor_dict_nf.items(), key=lambda x: x[1], reverse=True)[:10]
+    
+    top_itens_valor_labels_nf = []
+    top_itens_valor_data_nf = []
+    for cd_item, valor in sorted_itens_nf:
+        req = queryset_nf.filter(cd_item=cd_item).first()
+        descr = req.descr_item if req and req.descr_item else f"Item {cd_item}"
+        if len(descr) > 40:
+            descr = descr[:37] + "..."
+        top_itens_valor_labels_nf.append(f"{cd_item} - {descr}")
+        top_itens_valor_data_nf.append(float(valor))
+    
+    # Ordenar e pegar top 10 - Normal
+    sorted_itens_normal = sorted(itens_valor_dict_normal.items(), key=lambda x: x[1], reverse=True)[:10]
+    
+    top_itens_valor_labels_normal = []
+    top_itens_valor_data_normal = []
+    for cd_item, valor in sorted_itens_normal:
+        req = queryset_normal.filter(cd_item=cd_item).first()
+        descr = req.descr_item if req and req.descr_item else f"Item {cd_item}"
+        if len(descr) > 40:
+            descr = descr[:37] + "..."
+        top_itens_valor_labels_normal.append(f"{cd_item} - {descr}")
+        top_itens_valor_data_normal.append(float(valor))
+    
     # Distribuição por centro de atividade (top 10)
     centros_dict = defaultdict(lambda: {'count': 0, 'valor': Decimal('0.00')})
     
     for req in queryset_base.exclude(cd_centro_ativ__isnull=True):
         centros_dict[req.cd_centro_ativ]['count'] += 1
-        if req.vlr_movto_estoq:
+        if req.vlr_movto_estoq and req.cd_depo == 1:
+            # Apenas considerar cd_depo == 1 para custos
             # vlr_movto_estoq já representa o valor total da transação
             centros_dict[req.cd_centro_ativ]['valor'] += abs(req.vlr_movto_estoq)
     
@@ -732,7 +886,8 @@ def analise_requisicoes(request):
     
     for req in queryset_base.exclude(descr_operacao__isnull=True).exclude(descr_operacao=''):
         operacoes_dict[req.descr_operacao]['count'] += 1
-        if req.vlr_movto_estoq:
+        if req.vlr_movto_estoq and req.cd_depo == 1:
+            # Apenas considerar cd_depo == 1 para custos
             # vlr_movto_estoq já representa o valor total da transação
             operacoes_dict[req.descr_operacao]['valor'] += abs(req.vlr_movto_estoq)
     
@@ -754,7 +909,8 @@ def analise_requisicoes(request):
     
     for req in queryset_base.exclude(cd_usu_criou__isnull=True).exclude(cd_usu_criou=''):
         usuarios_dict[req.cd_usu_criou]['count'] += 1
-        if req.vlr_movto_estoq:
+        if req.vlr_movto_estoq and req.cd_depo == 1:
+            # Apenas considerar cd_depo == 1 para custos
             usuarios_dict[req.cd_usu_criou]['valor'] += abs(req.vlr_movto_estoq)
     
     sorted_usuarios = sorted(usuarios_dict.items(), key=lambda x: x[1]['count'], reverse=True)[:10]
@@ -796,20 +952,45 @@ def analise_requisicoes(request):
     dias_labels = []
     dias_data = []
     dias_valor = []
+    dias_valor_reused = []  # Valores dos itens reutilizados (cd_depo == 3)
+    dias_data_nf = []
+    dias_valor_nf = []
+    dias_data_normal = []
+    dias_valor_normal = []
     
     for dia in range(1, ultimo_dia_mes_atual.day + 1):
         data_dia = primeiro_dia_mes_atual.replace(day=dia)
         count = queryset_base.filter(data_requisicao=data_dia).count()
+        count_nf = queryset_nf.filter(data_requisicao=data_dia).count()
+        count_normal = queryset_normal.filter(data_requisicao=data_dia).count()
         
         valor_dia = Decimal('0.00')
+        valor_dia_reused = Decimal('0.00')
+        valor_dia_nf = Decimal('0.00')
+        valor_dia_normal = Decimal('0.00')
+        
         for req in queryset_base.filter(data_requisicao=data_dia):
             if req.vlr_movto_estoq:
                 # vlr_movto_estoq já representa o valor total da transação
-                valor_dia += abs(req.vlr_movto_estoq)
+                if req.cd_depo == 1:
+                    # Apenas cd_depo == 1 gera custo
+                    valor_dia += abs(req.vlr_movto_estoq)
+                    if mensagem_nf in (req.obs_rm or ''):
+                        valor_dia_nf += abs(req.vlr_movto_estoq)
+                    else:
+                        valor_dia_normal += abs(req.vlr_movto_estoq)
+                elif req.cd_depo == 3:
+                    # cd_depo == 3 são itens reutilizados (não geram custo, mas vamos rastrear)
+                    valor_dia_reused += abs(req.vlr_movto_estoq)
         
         dias_labels.append(data_dia.strftime('%d/%m'))
         dias_data.append(count)
         dias_valor.append(float(valor_dia))
+        dias_valor_reused.append(float(valor_dia_reused))
+        dias_data_nf.append(count_nf)
+        dias_valor_nf.append(float(valor_dia_nf))
+        dias_data_normal.append(count_normal)
+        dias_valor_normal.append(float(valor_dia_normal))
     
     # Determinar mês selecionado para o gráfico diário
     if ano_filtro and meses_filtro_int:
@@ -843,14 +1024,51 @@ def analise_requisicoes(request):
         'meses_labels': json.dumps(meses_labels),
         'meses_data': json.dumps(meses_data),
         'meses_valor': json.dumps(meses_valor),
+        'meses_data_nf': json.dumps(meses_data_nf),
+        'meses_valor_nf': json.dumps(meses_valor_nf),
+        'meses_data_normal': json.dumps(meses_data_normal),
+        'meses_valor_normal': json.dumps(meses_valor_normal),
         'dias_labels': json.dumps(dias_labels),
         'dias_data': json.dumps(dias_data),
         'dias_valor': json.dumps(dias_valor),
+        'dias_valor_reused': json.dumps(dias_valor_reused),
+        'dias_data_nf': json.dumps(dias_data_nf),
+        'dias_valor_nf': json.dumps(dias_valor_nf),
+        'dias_data_normal': json.dumps(dias_data_normal),
+        'dias_valor_normal': json.dumps(dias_valor_normal),
+        'valor_total_reused': valor_total_reused,
         'mes_selecionado': mes_selecionado_grafico,
         'top_itens_labels': json.dumps(top_itens_labels),
         'top_itens_data': json.dumps(top_itens_data),
         'top_itens_valor_labels': json.dumps(top_itens_valor_labels),
         'top_itens_valor_data': json.dumps(top_itens_valor_data),
+        # Estatísticas separadas NF vs Normal
+        'total_requisicoes_nf': total_requisicoes_nf,
+        'total_requisicoes_normal': total_requisicoes_normal,
+        'requisicoes_recentes_nf': requisicoes_recentes_nf,
+        'requisicoes_recentes_normal': requisicoes_recentes_normal,
+        'requisicoes_mes_atual_nf': requisicoes_mes_atual_nf,
+        'requisicoes_mes_atual_normal': requisicoes_mes_atual_normal,
+        'itens_unicos_nf': itens_unicos_nf,
+        'itens_unicos_normal': itens_unicos_normal,
+        'centros_unicos_nf': centros_unicos_nf,
+        'centros_unicos_normal': centros_unicos_normal,
+        'valor_total_nf': valor_total_nf,
+        'valor_total_normal': valor_total_normal,
+        'valor_total_reused_nf': valor_total_reused_nf,
+        'valor_total_reused_normal': valor_total_reused_normal,
+        'quantidade_total_nf': quantidade_total_nf,
+        'quantidade_total_normal': quantidade_total_normal,
+        'valor_medio_nf': valor_medio_nf,
+        'valor_medio_normal': valor_medio_normal,
+        'top_itens_labels_nf': json.dumps(top_itens_labels_nf),
+        'top_itens_data_nf': json.dumps(top_itens_data_nf),
+        'top_itens_labels_normal': json.dumps(top_itens_labels_normal),
+        'top_itens_data_normal': json.dumps(top_itens_data_normal),
+        'top_itens_valor_labels_nf': json.dumps(top_itens_valor_labels_nf),
+        'top_itens_valor_data_nf': json.dumps(top_itens_valor_data_nf),
+        'top_itens_valor_labels_normal': json.dumps(top_itens_valor_labels_normal),
+        'top_itens_valor_data_normal': json.dumps(top_itens_valor_data_normal),
         'centros_labels': json.dumps(centros_labels),
         'centros_data_count': json.dumps(centros_data_count),
         'centros_data_valor': json.dumps(centros_data_valor),
@@ -937,19 +1155,46 @@ def api_dados_diarios_requisicoes(request):
         
         dias_labels = []
         dias_data = []  # Requisições
-        dias_valor = []  # Valor das requisições
+        dias_valor = []  # Valor das requisições (apenas cd_depo == 1)
+        dias_valor_reused = []  # Valor dos itens reutilizados (cd_depo == 3)
+        dias_data_nf = []  # Requisições NF
+        dias_valor_nf = []  # Valor das requisições NF
+        dias_data_normal = []  # Requisições Normais
+        dias_valor_normal = []  # Valor das requisições Normais
         dias_manutencao_terceiro = []  # Manutenções Terceiro
         dias_visitas = []  # Visitas
+        
+        mensagem_nf = "REQUISIÇÃO GERADA PELO PROCESSO DE ENTRADA DE NOTA FISCAL"
         
         for dia in range(1, ultimo_dia.day + 1):
             data_dia = primeiro_dia.replace(day=dia)
             
             # Requisições de Almoxarifado
-            count = RequisicaoAlmoxarifado.objects.filter(data_requisicao=data_dia).count()
+            queryset_dia = RequisicaoAlmoxarifado.objects.filter(data_requisicao=data_dia)
+            queryset_dia_nf = queryset_dia.filter(obs_rm__icontains=mensagem_nf)
+            queryset_dia_normal = queryset_dia.exclude(obs_rm__icontains=mensagem_nf)
+            
+            count = queryset_dia.count()
+            count_nf = queryset_dia_nf.count()
+            count_normal = queryset_dia_normal.count()
+            
             valor_dia = Decimal('0.00')
-            for req in RequisicaoAlmoxarifado.objects.filter(data_requisicao=data_dia):
+            valor_dia_reused = Decimal('0.00')
+            valor_dia_nf = Decimal('0.00')
+            valor_dia_normal = Decimal('0.00')
+            
+            for req in queryset_dia:
                 if req.vlr_movto_estoq:
-                    valor_dia += abs(req.vlr_movto_estoq)
+                    if req.cd_depo == 1:
+                        # Apenas cd_depo == 1 gera custo
+                        valor_dia += abs(req.vlr_movto_estoq)
+                        if mensagem_nf in (req.obs_rm or ''):
+                            valor_dia_nf += abs(req.vlr_movto_estoq)
+                        else:
+                            valor_dia_normal += abs(req.vlr_movto_estoq)
+                    elif req.cd_depo == 3:
+                        # cd_depo == 3 são itens reutilizados (não geram custo, mas vamos rastrear)
+                        valor_dia_reused += abs(req.vlr_movto_estoq)
             
             # Manutenções Terceiro (filtrar por data, que é DateTimeField)
             manutencao_count = ManutencaoTerceiro.objects.filter(
@@ -964,6 +1209,11 @@ def api_dados_diarios_requisicoes(request):
             dias_labels.append(data_dia.strftime('%d/%m'))
             dias_data.append(count)
             dias_valor.append(float(valor_dia))
+            dias_valor_reused.append(float(valor_dia_reused))
+            dias_data_nf.append(count_nf)
+            dias_valor_nf.append(float(valor_dia_nf))
+            dias_data_normal.append(count_normal)
+            dias_valor_normal.append(float(valor_dia_normal))
             dias_manutencao_terceiro.append(manutencao_count)
             dias_visitas.append(visitas_count)
         
@@ -971,6 +1221,11 @@ def api_dados_diarios_requisicoes(request):
             'labels': dias_labels,
             'data': dias_data,
             'valor': dias_valor,
+            'valor_reused': dias_valor_reused,
+            'data_nf': dias_data_nf,
+            'valor_nf': dias_valor_nf,
+            'data_normal': dias_data_normal,
+            'valor_normal': dias_valor_normal,
             'manutencao_terceiro': dias_manutencao_terceiro,
             'visitas': dias_visitas
         })
@@ -2499,6 +2754,379 @@ def importar_notas_fiscais(request):
         'active_page': 'importar_notas_fiscais'
     }
     return render(request, 'importar/importar_notas_fiscais.html', context)
+
+
+def importar_paradas_maquina(request):
+    """Importar Paradas de Máquina page view"""
+    from app.utils import upload_paradas_maquina_from_file
+    from django.contrib import messages
+    
+    if request.method == 'POST':
+        # Verificar se há arquivo enviado
+        if 'file' not in request.FILES:
+            messages.error(request, 'Por favor, selecione um arquivo para importar.')
+            context = {
+                'page_title': 'Importar Paradas de Máquina',
+                'active_page': 'importar_paradas_maquina'
+            }
+            return render(request, 'importar/importar_paradas_de_maquina.html', context)
+        
+        file = request.FILES['file']
+        update_existing = request.POST.get('update_existing') == 'on'
+        only_new_records = request.POST.get('only_new_records') == 'on'
+        
+        # Se "only_new_records" estiver marcado, não atualizar existentes
+        if only_new_records:
+            update_existing = False
+        
+        # Processar arquivo
+        try:
+            created_count, updated_count, errors = upload_paradas_maquina_from_file(file, update_existing=update_existing)
+            
+            # Mensagens de sucesso
+            if created_count > 0:
+                messages.success(request, f'{created_count} parada(s) de máquina importada(s) com sucesso!')
+            if updated_count > 0:
+                messages.info(request, f'{updated_count} parada(s) de máquina atualizada(s).')
+            if created_count == 0 and updated_count == 0:
+                messages.warning(request, 'Nenhuma parada de máquina foi importada. Verifique se há novos registros no arquivo.')
+            
+            # Mensagens de erro
+            if errors:
+                for error in errors[:10]:  # Limitar a 10 erros para não sobrecarregar
+                    messages.error(request, error)
+                if len(errors) > 10:
+                    messages.error(request, f'... e mais {len(errors) - 10} erro(s). Verifique o console para mais detalhes.')
+        
+        except Exception as e:
+            messages.error(request, f'Erro ao processar arquivo: {str(e)}')
+    
+    context = {
+        'page_title': 'Importar Paradas de Máquina',
+        'active_page': 'importar_paradas_maquina'
+    }
+    return render(request, 'importar/importar_paradas_de_maquina.html', context)
+
+
+def relatorio_nf_estf0198(request):
+    """Relatório NF ESTF0198 page view - Ajuste de arquivo CSV"""
+    from django.http import HttpResponse
+    import csv
+    import io
+    import re
+    
+    if request.method == 'POST':
+        # Verificar se há arquivo enviado
+        if 'file' not in request.FILES:
+            messages.error(request, 'Por favor, selecione um arquivo CSV para processar.')
+            context = {
+                'page_title': 'Relatório NF ESTF0198',
+                'active_page': 'relatorio_nf_estf0198'
+            }
+            return render(request, 'analise_relatorios/relatorio_nf_estf0198.html', context)
+        
+        file = request.FILES['file']
+        
+        # Validar extensão do arquivo
+        file_name = file.name.lower()
+        if not file_name.endswith('.csv'):
+            messages.error(
+                request, 
+                f'<strong>Formato inválido:</strong> O arquivo "{file.name}" não é um arquivo CSV. Por favor, selecione um arquivo com extensão .csv'
+            )
+            context = {
+                'page_title': 'Relatório NF ESTF0198',
+                'active_page': 'relatorio_nf_estf0198'
+            }
+            return render(request, 'analise_relatorios/relatorio_nf_estf0198.html', context)
+        
+        try:
+            # Tentar diferentes encodings
+            encodings_to_try = ['latin-1', 'iso-8859-1', 'utf-8', 'cp1252']
+            content = None
+            encoding_used = None
+            
+            for encoding in encodings_to_try:
+                try:
+                    file.seek(0)
+                    content = file.read().decode(encoding)
+                    encoding_used = encoding
+                    break
+                except UnicodeDecodeError:
+                    continue
+            
+            if content is None:
+                raise ValueError("Não foi possível decodificar o arquivo com nenhum encoding testado")
+            
+            # Ler CSV manualmente primeiro para detectar problemas de formatação
+            # O csv.reader pode não lidar bem com aspas não balanceadas
+            lines = content.strip().split('\n')
+            if not lines:
+                raise ValueError("Arquivo CSV vazio")
+            
+            # Processar linha por linha manualmente para corrigir problemas
+            all_rows = []
+            for line in lines:
+                if not line.strip():
+                    continue
+                
+                # Tentar usar csv.reader primeiro
+                csv_line = io.StringIO(line)
+                try:
+                    reader = csv.reader(csv_line, delimiter=';')
+                    row = next(reader)
+                    all_rows.append(row)
+                except:
+                    # Se falhar, fazer split manual e depois corrigir
+                    row = line.split(';')
+                    all_rows.append(row)
+            
+            if not all_rows:
+                raise ValueError("Arquivo CSV vazio")
+            
+            # Ler cabeçalho
+            headers = [h.strip() for h in all_rows[0]]
+            
+            # Encontrar índice da coluna "Observações" (pode ter variações de encoding)
+            observacoes_index = None
+            for idx, header in enumerate(headers):
+                header_lower = header.lower()
+                # Normalizar para comparar (remover acentos)
+                import unicodedata
+                header_normalized = unicodedata.normalize('NFKD', header_lower).encode('ASCII', 'ignore').decode('ASCII')
+                if 'observa' in header_normalized:
+                    observacoes_index = idx
+                    break
+            
+            if observacoes_index is None:
+                # Tentar encontrar por posição (geralmente é a coluna 19 ou 20)
+                if len(headers) > 19:
+                    observacoes_index = 19  # Coluna T em Excel (0-indexed seria 19)
+            
+            # Processar linhas de dados
+            fixed_rows = [headers]  # Começar com cabeçalho
+            rows_processed = 0
+            rows_fixed = 0
+            
+            for row_num, row in enumerate(all_rows[1:], start=2):
+                if not row or not any(cell.strip() for cell in row):
+                    continue
+                
+                # Verificar se é linha de resumo (começa com "Unidade")
+                if row and len(row) > 0 and str(row[0]).strip().upper() == 'UNIDADE':
+                    # Garantir que linha de resumo tenha número correto de colunas
+                    while len(row) < len(headers):
+                        row.append('')
+                    fixed_rows.append(row)
+                    continue
+                
+                # Garantir que temos valores suficientes
+                while len(row) < len(headers):
+                    row.append('')
+                
+                # CORREÇÃO PRINCIPAL: Detectar e corrigir células com semicolons que deveriam ser separadores
+                # O problema: células como "texto;;data;;;" onde os ;; deveriam separar colunas
+                # Exemplo: "ASSISTENCIA T�CNICA DO TANQUE DE CO2. - 112582 - 14441;;09/01/2026;;;;"
+                # Deveria ser: "ASSISTENCIA..." na coluna atual, "" na próxima, "09/01/2026" na seguinte, etc.
+                
+                # Verificar cada célula a partir da coluna Observações
+                start_check_index = observacoes_index if observacoes_index is not None else 19
+                
+                # Processar célula por célula, começando da coluna Observações
+                col_idx = start_check_index
+                while col_idx < len(row) and col_idx < len(headers):
+                    cell_value = str(row[col_idx]).strip()
+                    
+                    # Detectar padrão de semicolons duplos/triplos que indicam campos concatenados
+                    if ';;' in cell_value:
+                        # Remover aspas não balanceadas primeiro
+                        if cell_value.startswith('"') and not cell_value.endswith('"'):
+                            if cell_value.count('"') == 1:
+                                cell_value = cell_value.lstrip('"')
+                        
+                        # Usar regex para dividir por 2 ou mais semicolons consecutivos
+                        import re
+                        # Encontrar todos os padrões de semicolons múltiplos e suas posições
+                        # Dividir a string preservando informações sobre quantos semicolons havia
+                        parts = []
+                        semicolon_counts = []
+                        
+                        # Encontrar todos os grupos de semicolons múltiplos
+                        matches = list(re.finditer(r';{2,}', cell_value))
+                        
+                        if matches:
+                            # Primeira parte (antes do primeiro grupo de semicolons)
+                            first_part = cell_value[:matches[0].start()].strip()
+                            if first_part:
+                                parts.append(first_part)
+                            
+                            # Processar cada grupo de semicolons e a parte seguinte
+                            for i, match in enumerate(matches):
+                                semicolon_count = len(match.group())  # Quantos semicolons (;; = 2, ;;; = 3, etc.)
+                                semicolon_counts.append(semicolon_count)
+                                
+                                # Parte após este grupo de semicolons
+                                start_pos = match.end()
+                                if i < len(matches) - 1:
+                                    end_pos = matches[i+1].start()
+                                else:
+                                    end_pos = len(cell_value)
+                                
+                                next_part = cell_value[start_pos:end_pos].strip()
+                                if next_part:
+                                    parts.append(next_part)
+                            
+                            # Se encontramos partes separadas, distribuir nas colunas
+                            if len(parts) > 1:
+                                # Primeira parte vai na coluna atual
+                                row[col_idx] = parts[0]
+                                
+                                # Distribuir partes restantes
+                                current_col = col_idx
+                                for part_idx, part in enumerate(parts[1:], start=1):
+                                    # Quantos semicolons havia antes desta parte?
+                                    if part_idx - 1 < len(semicolon_counts):
+                                        semicolon_count = semicolon_counts[part_idx - 1]
+                                        # ;; = 2 semicolons = 1 coluna vazia antes da próxima
+                                        # ;;; = 3 semicolons = 2 colunas vazias antes da próxima
+                                        # Então avançamos (semicolon_count - 1) colunas
+                                        current_col += (semicolon_count - 1)
+                                    
+                                    # Avançar para próxima coluna
+                                    current_col += 1
+                                    
+                                    # Garantir que não ultrapassamos os limites
+                                    if current_col < len(headers):
+                                        # Expandir row se necessário
+                                        while len(row) <= current_col:
+                                            row.append('')
+                                        # Preencher a coluna com a parte atual
+                                        row[current_col] = part
+                                
+                                rows_fixed += 1
+                                # Avançar para próxima coluna após processar todas as partes
+                                col_idx = current_col + 1
+                            else:
+                                # Não havia partes separadas, apenas limpar
+                                row[col_idx] = cell_value.strip()
+                                col_idx += 1
+                        else:
+                            # Não encontrou padrão, apenas limpar
+                            row[col_idx] = cell_value.strip()
+                            col_idx += 1
+                    else:
+                        # Limpar célula normalmente
+                        row[col_idx] = cell_value.strip()
+                        col_idx += 1
+                
+                # Garantir que temos o número correto de colunas
+                while len(row) < len(headers):
+                    row.append('')
+                # Truncar se tiver mais valores que headers
+                if len(row) > len(headers):
+                    row = row[:len(headers)]
+                
+                # Limpar todos os campos (remover espaços extras)
+                row = [str(cell).strip() for cell in row]
+                
+                fixed_rows.append(row)
+                rows_processed += 1
+            
+            # Criar novo CSV em memória
+            output = io.StringIO()
+            writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+            
+            for row in fixed_rows:
+                # Garantir que todas as linhas tenham o mesmo número de colunas
+                while len(row) < len(headers):
+                    row.append('')
+                # Truncar se tiver mais colunas
+                if len(row) > len(headers):
+                    row = row[:len(headers)]
+                writer.writerow(row)
+            
+            # Armazenar arquivo processado na sessão para download posterior
+            output.seek(0)
+            processed_content = output.getvalue()
+            
+            # Armazenar na sessão (codificar em base64 para garantir serialização)
+            import base64
+            processed_content_encoded = base64.b64encode(processed_content.encode(encoding_used)).decode('utf-8')
+            
+            request.session['relatorio_nf_processed_file'] = processed_content_encoded
+            request.session['relatorio_nf_encoding'] = encoding_used
+            request.session['relatorio_nf_filename'] = f"ajustado_{file.name}"
+            request.session['relatorio_nf_rows_processed'] = rows_processed
+            request.session['relatorio_nf_rows_fixed'] = rows_fixed
+            
+            messages.success(
+                request, 
+                f'<i class="fas fa-check-circle me-2"></i><strong>Arquivo processado com sucesso!</strong> '
+                f'{rows_processed} linha(s) processada(s), {rows_fixed} linha(s) corrigida(s). '
+                f'Clique no botão abaixo para baixar o arquivo ajustado.'
+            )
+            
+        except Exception as e:
+            messages.error(
+                request, 
+                f'<i class="fas fa-exclamation-triangle me-2"></i><strong>Erro ao processar arquivo:</strong> {str(e)}'
+            )
+            import traceback
+            print(f"Erro ao processar relatório NF ESTF0198: {traceback.format_exc()}")
+    
+    # Verificar se há arquivo processado na sessão
+    has_processed_file = 'relatorio_nf_processed_file' in request.session
+    rows_processed = request.session.get('relatorio_nf_rows_processed', 0)
+    rows_fixed = request.session.get('relatorio_nf_rows_fixed', 0)
+    
+    context = {
+        'page_title': 'Relatório NF ESTF0198',
+        'active_page': 'relatorio_nf_estf0198',
+        'has_processed_file': has_processed_file,
+        'rows_processed': rows_processed,
+        'rows_fixed': rows_fixed,
+    }
+    return render(request, 'analise_relatorios/relatorio_nf_estf0198.html', context)
+
+
+def download_relatorio_nf_estf0198(request):
+    """Download do arquivo CSV processado"""
+    from django.http import HttpResponse
+    import base64
+    
+    # Verificar se há arquivo processado na sessão
+    if 'relatorio_nf_processed_file' not in request.session:
+        messages.error(request, 'Nenhum arquivo processado encontrado. Por favor, processe um arquivo primeiro.')
+        return redirect('relatorio_nf_estf0198')
+    
+    try:
+        # Recuperar dados da sessão
+        processed_content_encoded = request.session.get('relatorio_nf_processed_file')
+        encoding_used = request.session.get('relatorio_nf_encoding', 'latin-1')
+        filename = request.session.get('relatorio_nf_filename', 'ajustado_relatorio.csv')
+        
+        # Decodificar conteúdo
+        processed_content = base64.b64decode(processed_content_encoded).decode(encoding_used)
+        
+        # Preparar resposta para download
+        response = HttpResponse(processed_content.encode(encoding_used), content_type=f'text/csv; charset={encoding_used}')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Limpar sessão após download (opcional - você pode manter se quiser permitir múltiplos downloads)
+        # del request.session['relatorio_nf_processed_file']
+        # del request.session['relatorio_nf_encoding']
+        # del request.session['relatorio_nf_filename']
+        
+        return response
+        
+    except Exception as e:
+        messages.error(
+            request, 
+            f'<i class="fas fa-exclamation-triangle me-2"></i><strong>Erro ao gerar download:</strong> {str(e)}'
+        )
+        import traceback
+        print(f"Erro ao fazer download do relatório NF ESTF0198: {traceback.format_exc()}")
+        return redirect('relatorio_nf_estf0198')
 
 
 def importar_requisicoes_almoxarifado(request):
@@ -4429,10 +5057,82 @@ def consultar_requisicoes_almoxarifado(request):
     """Consultar/listar requisições de almoxarifado com filtros avançados"""
     from app.models import RequisicaoAlmoxarifado
     from decimal import Decimal
+    from datetime import datetime
+    
+    # Função auxiliar para parse de datas
+    def parse_date(date_str):
+        """Tenta fazer parse de data em vários formatos"""
+        if not date_str:
+            return None
+        date_str = str(date_str).strip()
+        if not date_str:
+            return None
+        formats = ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d', '%d.%m.%Y']
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_str, fmt).date()
+            except ValueError:
+                continue
+        return None
+    
+    # Obter filtros de ano e meses (múltiplos)
+    ano_filtro = request.GET.get('ano', None)
+    meses_filtro = request.GET.getlist('mes')  # getlist para múltiplos valores
+    
+    # Valores padrão: ano atual e todos os meses (None)
+    hoje = datetime.now()
+    if not ano_filtro:
+        ano_filtro = str(hoje.year)
+    
+    # Converter para inteiro
+    try:
+        ano_filtro = int(ano_filtro)
+    except (ValueError, TypeError):
+        ano_filtro = hoje.year
+    
+    # Converter meses para inteiros e validar
+    meses_filtro_int = []
+    if meses_filtro:
+        for mes in meses_filtro:
+            try:
+                mes_int = int(mes)
+                if 1 <= mes_int <= 12:
+                    meses_filtro_int.append(mes_int)
+            except (ValueError, TypeError):
+                continue
+        # Remover duplicatas e ordenar
+        meses_filtro_int = sorted(list(set(meses_filtro_int)))
+    
+    # Se não há meses selecionados, usar todos os meses
+    meses_para_mostrar = meses_filtro_int if meses_filtro_int else list(range(1, 13))
     
     # Busca geral
     search_query = request.GET.get('search', '').strip()
-    requisicoes_list = RequisicaoAlmoxarifado.objects.all()
+    todas_requisicoes = RequisicaoAlmoxarifado.objects.all()
+    
+    # Obter anos disponíveis (baseado em data_requisicao)
+    anos_disponiveis = []
+    for requisicao in todas_requisicoes:
+        if requisicao.data_requisicao:
+            anos_disponiveis.append(requisicao.data_requisicao.year)
+    anos_disponiveis = sorted(list(set(anos_disponiveis)), reverse=True)
+    if not anos_disponiveis:
+        anos_disponiveis = [hoje.year]
+    if hoje.year not in anos_disponiveis:
+        anos_disponiveis.insert(0, hoje.year)
+    
+    # Filtrar por ano e mês (data_requisicao)
+    requisicoes_filtradas_por_data = []
+    for requisicao in todas_requisicoes:
+        if requisicao.data_requisicao and requisicao.data_requisicao.year == ano_filtro:
+            if not meses_filtro_int or requisicao.data_requisicao.month in meses_filtro_int:
+                requisicoes_filtradas_por_data.append(requisicao.id)
+    
+    if requisicoes_filtradas_por_data:
+        requisicoes_list = todas_requisicoes.filter(id__in=requisicoes_filtradas_por_data)
+    else:
+        # Se não há requisições no ano/mês, retornar queryset vazio
+        requisicoes_list = RequisicaoAlmoxarifado.objects.none()
     
     # Aplicar busca geral
     if search_query:
@@ -4446,11 +5146,10 @@ def consultar_requisicoes_almoxarifado(request):
             Q(descr_local_fisic__icontains=search_query)
         )
     
-    # Filtros específicos
+    # Filtros específicos (manter compatibilidade com filtros antigos)
     filter_data = request.GET.get('filter_data', '').strip()
     if filter_data:
         try:
-            from datetime import datetime
             data_obj = datetime.strptime(filter_data, '%Y-%m-%d').date()
             requisicoes_list = requisicoes_list.filter(data_requisicao=data_obj)
         except ValueError:
@@ -4511,23 +5210,33 @@ def consultar_requisicoes_almoxarifado(request):
     # Ordenar por data de requisição (mais recente primeiro) e código do item
     requisicoes_list = requisicoes_list.order_by('-data_requisicao', 'cd_item')
     
-    # Paginação
+    # Estatísticas baseadas nos dados FILTRADOS (antes da paginação)
+    total_count = requisicoes_list.count()
+    itens_count = requisicoes_list.values('cd_item').distinct().count()
+    centros_count = requisicoes_list.exclude(cd_centro_ativ__isnull=True).values('cd_centro_ativ').distinct().count()
+    
+    # Calcular valor total (soma de quantidade * valor, usando valores absolutos) dos dados filtrados
+    # IMPORTANTE: Apenas considerar cd_depo == 1 para custos (itens novos que geram gasto)
+    # cd_depo == 3 são itens reutilizados que não geram custo
+    valor_total = Decimal('0.00')
+    for req in requisicoes_list:
+        if req.qtde_movto_estoq and req.vlr_movto_estoq and req.cd_depo == 1:
+            # Apenas cd_depo == 1 gera custo
+            # Usar valor absoluto da quantidade (já que geralmente é negativa para saída)
+            qtd_abs = abs(req.qtde_movto_estoq)
+            valor_total += qtd_abs * abs(req.vlr_movto_estoq)
+    
+    # Paginação (após calcular estatísticas)
     paginator = Paginator(requisicoes_list, 100)  # 100 itens por página
     page_number = request.GET.get('page', 1)
     requisicoes = paginator.get_page(page_number)
     
-    # Estatísticas
-    total_count = RequisicaoAlmoxarifado.objects.count()
-    itens_count = RequisicaoAlmoxarifado.objects.values('cd_item').distinct().count()
-    centros_count = RequisicaoAlmoxarifado.objects.exclude(cd_centro_ativ__isnull=True).values('cd_centro_ativ').distinct().count()
-    
-    # Calcular valor total (soma de quantidade * valor, usando valores absolutos)
-    valor_total = Decimal('0.00')
-    for req in RequisicaoAlmoxarifado.objects.all():
-        if req.qtde_movto_estoq and req.vlr_movto_estoq:
-            # Usar valor absoluto da quantidade (já que geralmente é negativa para saída)
-            qtd_abs = abs(req.qtde_movto_estoq)
-            valor_total += qtd_abs * abs(req.vlr_movto_estoq)
+    # Meses para o template
+    meses_choices = [
+        (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
+        (5, 'Maio'), (6, 'Junho'), (7, 'Julho'), (8, 'Agosto'),
+        (9, 'Setembro'), (10, 'Outubro'), (11, 'Novembro'), (12, 'Dezembro'),
+    ]
     
     context = {
         'page_title': 'Consultar Requisições Almoxarifado',
@@ -4537,6 +5246,12 @@ def consultar_requisicoes_almoxarifado(request):
         'itens_count': itens_count,
         'centros_count': centros_count,
         'valor_total': valor_total,
+        # Filtros de data
+        'ano_filtro': ano_filtro,
+        'meses_filtro': meses_filtro_int,
+        'meses_para_mostrar': meses_para_mostrar,
+        'anos_disponiveis': anos_disponiveis,
+        'meses_choices': meses_choices,
         # Preservar filtros no contexto
         'search_query': search_query,
         'filter_data': filter_data,
@@ -4551,6 +5266,636 @@ def consultar_requisicoes_almoxarifado(request):
         'filter_local': filter_local,
     }
     return render(request, 'consultar/consultar_requisicoes_almoxarifado.html', context)
+
+
+def consultar_paradas_maquina(request):
+    """Consultar/listar paradas de máquinas com filtros de ano e mês"""
+    from app.models import ParadaMaquina
+    from datetime import datetime
+    from django.db.models import Q
+    from django.core.paginator import Paginator
+    
+    # Obter filtros de ano e meses (múltiplos)
+    ano_filtro = request.GET.get('ano', None)
+    meses_filtro = request.GET.getlist('mes')  # getlist para múltiplos valores
+    
+    # Valores padrão: ano atual e todos os meses (None)
+    hoje = datetime.now()
+    if not ano_filtro:
+        ano_filtro = str(hoje.year)
+    
+    # Converter para inteiro
+    try:
+        ano_filtro = int(ano_filtro)
+    except (ValueError, TypeError):
+        ano_filtro = hoje.year
+    
+    # Converter meses para inteiros e validar
+    meses_filtro_int = []
+    if meses_filtro:
+        for mes in meses_filtro:
+            try:
+                mes_int = int(mes)
+                if 1 <= mes_int <= 12:
+                    meses_filtro_int.append(mes_int)
+            except (ValueError, TypeError):
+                continue
+        # Remover duplicatas e ordenar
+        meses_filtro_int = sorted(list(set(meses_filtro_int)))
+    
+    # Se não há meses selecionados, usar todos os meses
+    meses_para_mostrar = meses_filtro_int if meses_filtro_int else list(range(1, 13))
+    
+    # Busca geral
+    search_query = request.GET.get('search', '').strip()
+    todas_paradas = ParadaMaquina.objects.all()
+    
+    # Obter anos disponíveis (baseado em data)
+    anos_disponiveis = []
+    for parada in todas_paradas:
+        if parada.data:
+            anos_disponiveis.append(parada.data.year)
+    anos_disponiveis = sorted(list(set(anos_disponiveis)), reverse=True)
+    if not anos_disponiveis:
+        anos_disponiveis = [hoje.year]
+    if hoje.year not in anos_disponiveis:
+        anos_disponiveis.insert(0, hoje.year)
+    
+    # Filtrar por ano e mês (data)
+    paradas_filtradas_por_data = []
+    for parada in todas_paradas:
+        if parada.data and parada.data.year == ano_filtro:
+            if not meses_filtro_int or parada.data.month in meses_filtro_int:
+                paradas_filtradas_por_data.append(parada.id)
+    
+    if paradas_filtradas_por_data:
+        paradas_list = todas_paradas.filter(id__in=paradas_filtradas_por_data)
+    else:
+        # Se não há paradas no ano/mês, retornar queryset vazio
+        paradas_list = ParadaMaquina.objects.none()
+    
+    # Aplicar busca geral
+    if search_query:
+        paradas_list = paradas_list.filter(
+            Q(cod_item__icontains=search_query) |
+            Q(descr_item__icontains=search_query) |
+            Q(cod_recurso__icontains=search_query) |
+            Q(descr_recurso__icontains=search_query) |
+            Q(cod_parada__icontains=search_query) |
+            Q(descr_parada__icontains=search_query) |
+            Q(descr_linha_producao__icontains=search_query) |
+            Q(grupo_recurso__icontains=search_query) |
+            Q(motivo__icontains=search_query) |
+            Q(acao__icontains=search_query)
+        )
+    
+    # Ordenar por data (mais recente primeiro) e horário inicial
+    paradas_list = paradas_list.order_by('-data', '-horario_inicial', 'cod_recurso')
+    
+    # Estatísticas baseadas nos dados FILTRADOS (antes da paginação)
+    total_count = paradas_list.count()
+    recursos_count = paradas_list.exclude(cod_recurso__isnull=True).values('cod_recurso').distinct().count()
+    linhas_count = paradas_list.exclude(linha_producao__isnull=True).values('linha_producao').distinct().count()
+    
+    # Calcular total de horas paradas (dif_hora)
+    total_horas_paradas = 0.0
+    for parada in paradas_list:
+        if parada.dif_hora:
+            total_horas_paradas += float(parada.dif_hora)
+    
+    # Paginação (após calcular estatísticas)
+    paginator = Paginator(paradas_list, 100)  # 100 itens por página
+    page_number = request.GET.get('page', 1)
+    paradas = paginator.get_page(page_number)
+    
+    # Meses para o template
+    meses_choices = [
+        (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
+        (5, 'Maio'), (6, 'Junho'), (7, 'Julho'), (8, 'Agosto'),
+        (9, 'Setembro'), (10, 'Outubro'), (11, 'Novembro'), (12, 'Dezembro'),
+    ]
+    
+    context = {
+        'page_title': 'Consultar Paradas de Máquina',
+        'active_page': 'consultar_paradas_maquina',
+        'paradas': paradas,
+        'total_count': total_count,
+        'recursos_count': recursos_count,
+        'linhas_count': linhas_count,
+        'total_horas_paradas': total_horas_paradas,
+        # Filtros de data
+        'ano_filtro': ano_filtro,
+        'meses_filtro': meses_filtro_int,
+        'meses_para_mostrar': meses_para_mostrar,
+        'anos_disponiveis': anos_disponiveis,
+        'meses_choices': meses_choices,
+        # Preservar filtros no contexto
+        'search_query': search_query,
+    }
+    
+    return render(request, 'paradas_maquina/consultar_paradas_de_maquina.html', context)
+
+
+def configuracao_parada_maquina(request):
+    """Página de configuração de paradas de máquina"""
+    context = {
+        'page_title': 'Configuração de Paradas de Máquina',
+        'active_page': 'configuracao_parada_maquina'
+    }
+    return render(request, 'paradas_maquina/configuracao_parada_de_maquina.html', context)
+
+
+def analise_paradas_maquina(request):
+    """Análise de paradas de máquinas com estatísticas e gráficos"""
+    from app.models import ParadaMaquina
+    from datetime import datetime, timedelta
+    from django.db.models import Sum, Count, Q, Avg
+    from collections import defaultdict
+    import json
+    from calendar import monthrange
+    from decimal import Decimal
+    
+    # Obter anos e meses disponíveis no banco de dados
+    anos_disponiveis = ParadaMaquina.objects.exclude(data__isnull=True).values_list('data__year', flat=True).distinct().order_by('-data__year')
+    meses_disponiveis = {}
+    for ano in anos_disponiveis:
+        meses = ParadaMaquina.objects.filter(data__year=ano).exclude(data__isnull=True).values_list('data__month', flat=True).distinct().order_by('data__month')
+        meses_disponiveis[ano] = list(meses)
+    
+    # Obter filtros de ano e meses (múltiplos)
+    ano_filtro = request.GET.get('ano', None)
+    meses_filtro = request.GET.getlist('mes')  # getlist para múltiplos valores
+    
+    # Valores padrão: ano atual e todos os meses
+    hoje = datetime.now()
+    if not ano_filtro:
+        ano_filtro = str(hoje.year)
+    
+    # Converter para inteiro
+    try:
+        ano_filtro = int(ano_filtro)
+    except (ValueError, TypeError):
+        ano_filtro = hoje.year
+    
+    # Converter meses para inteiros e validar
+    meses_filtro_int = []
+    if meses_filtro:
+        for mes in meses_filtro:
+            try:
+                mes_int = int(mes)
+                if 1 <= mes_int <= 12:
+                    meses_filtro_int.append(mes_int)
+            except (ValueError, TypeError):
+                continue
+        # Remover duplicatas e ordenar
+        meses_filtro_int = sorted(list(set(meses_filtro_int)))
+    
+    # Construir queryset base com filtros
+    queryset_base = ParadaMaquina.objects.exclude(data__isnull=True)
+    
+    # Aplicar filtro de ano
+    if ano_filtro:
+        queryset_base = queryset_base.filter(data__year=ano_filtro)
+        
+        # Aplicar filtro de meses (múltiplos)
+        if meses_filtro_int:
+            # Filtrar por múltiplos meses usando Q objects
+            mes_conditions = Q()
+            for mes in meses_filtro_int:
+                mes_conditions |= Q(data__month=mes)
+            queryset_base = queryset_base.filter(mes_conditions)
+    
+    # Estatísticas gerais (usando queryset filtrado)
+    hoje_date = hoje.date()
+    total_paradas = queryset_base.count()
+    
+    # Últimos 30 dias (apenas se não houver filtros)
+    if not ano_filtro:
+        data_30_dias_atras = hoje_date - timedelta(days=30)
+        paradas_recentes = queryset_base.filter(
+            data__gte=data_30_dias_atras
+        ).count()
+    else:
+        # Se há filtros, mostrar total filtrado
+        paradas_recentes = total_paradas
+    
+    # Mês atual (apenas se não houver filtros)
+    if not ano_filtro:
+        primeiro_dia_mes = hoje_date.replace(day=1)
+        paradas_mes_atual = queryset_base.filter(
+            data__gte=primeiro_dia_mes
+        ).count()
+    else:
+        # Se há filtros, mostrar total filtrado
+        paradas_mes_atual = total_paradas
+    
+    # Recursos únicos
+    recursos_unicos = queryset_base.exclude(cod_recurso__isnull=True).values('cod_recurso').distinct().count()
+    
+    # Linhas de produção únicas
+    linhas_unicas = queryset_base.exclude(linha_producao__isnull=True).values('linha_producao').distinct().count()
+    
+    # Calcular total de horas paradas (dif_hora)
+    total_horas_paradas = Decimal('0.00')
+    for parada in queryset_base:
+        if parada.dif_hora:
+            total_horas_paradas += Decimal(str(parada.dif_hora))
+    
+    # Média de horas paradas por parada
+    media_horas_paradas = total_horas_paradas / total_paradas if total_paradas > 0 else Decimal('0.00')
+    
+    # Evolução temporal (últimos 12 meses ou período filtrado)
+    meses_labels = []
+    meses_data = []
+    meses_horas = []
+    
+    # Determinar período para evolução temporal
+    if ano_filtro:
+        try:
+            periodo_inicio = datetime(ano_filtro, 1, 1).date()
+            if meses_filtro_int:
+                # Se há meses selecionados, usar apenas o primeiro e último mês selecionado
+                primeiro_mes = min(meses_filtro_int)
+                ultimo_mes = max(meses_filtro_int)
+                periodo_inicio = datetime(ano_filtro, primeiro_mes, 1).date()
+                ultimo_dia = monthrange(ano_filtro, ultimo_mes)[1]
+                periodo_fim = datetime(ano_filtro, ultimo_mes, ultimo_dia).date()
+                if periodo_fim > hoje_date:
+                    periodo_fim = hoje_date
+            else:
+                # Todos os meses do ano
+                periodo_fim = datetime(ano_filtro, 12, 31).date()
+                if periodo_fim > hoje_date:
+                    periodo_fim = hoje_date
+        except (ValueError, TypeError):
+            periodo_inicio = (hoje_date - timedelta(days=365)).replace(day=1)
+            periodo_fim = hoje_date
+    else:
+        periodo_inicio = (hoje_date - timedelta(days=365)).replace(day=1)
+        periodo_fim = hoje_date
+    
+    # Gerar meses do período
+    data_atual = periodo_inicio.replace(day=1)
+    while data_atual <= periodo_fim:
+        # Calcular último dia do mês
+        ultimo_dia_mes = monthrange(data_atual.year, data_atual.month)[1]
+        fim_mes_calc = datetime(data_atual.year, data_atual.month, ultimo_dia_mes).date()
+        fim_mes = fim_mes_calc if fim_mes_calc <= periodo_fim else periodo_fim
+        
+        count = queryset_base.filter(
+            data__gte=data_atual,
+            data__lte=fim_mes
+        ).count()
+        
+        horas_mes = Decimal('0.00')
+        for parada in queryset_base.filter(
+            data__gte=data_atual,
+            data__lte=fim_mes
+        ):
+            if parada.dif_hora:
+                horas_mes += Decimal(str(parada.dif_hora))
+        
+        meses_labels.append(data_atual.strftime('%b/%Y'))
+        meses_data.append(count)
+        meses_horas.append(float(horas_mes))
+        
+        # Próximo mês
+        if data_atual.month == 12:
+            data_atual = data_atual.replace(year=data_atual.year + 1, month=1, day=1)
+        else:
+            data_atual = data_atual.replace(month=data_atual.month + 1, day=1)
+    
+    # Top 10 recursos com mais paradas (por quantidade)
+    top_recursos_qtd = queryset_base.exclude(
+        cod_recurso__isnull=True
+    ).values('cod_recurso', 'descr_recurso').annotate(
+        total_count=Count('id')
+    ).order_by('-total_count')[:10]
+    
+    top_recursos_labels = []
+    top_recursos_data = []
+    for recurso in top_recursos_qtd:
+        descr = recurso['descr_recurso'] or f"Recurso {recurso['cod_recurso']}"
+        if len(descr) > 40:
+            descr = descr[:37] + "..."
+        top_recursos_labels.append(f"{recurso['cod_recurso']} - {descr}")
+        top_recursos_data.append(recurso['total_count'])
+    
+    # Top 10 recursos por horas paradas
+    recursos_horas_dict = defaultdict(lambda: Decimal('0.00'))
+    
+    for parada in queryset_base.exclude(cod_recurso__isnull=True):
+        if parada.dif_hora:
+            recursos_horas_dict[parada.cod_recurso] += Decimal(str(parada.dif_hora))
+    
+    # Ordenar e pegar top 10
+    sorted_recursos = sorted(recursos_horas_dict.items(), key=lambda x: x[1], reverse=True)[:10]
+    
+    top_recursos_horas_labels = []
+    top_recursos_horas_data = []
+    for cod_recurso, horas in sorted_recursos:
+        parada = queryset_base.filter(cod_recurso=cod_recurso).first()
+        descr = parada.descr_recurso if parada and parada.descr_recurso else f"Recurso {cod_recurso}"
+        if len(descr) > 40:
+            descr = descr[:37] + "..."
+        top_recursos_horas_labels.append(f"{cod_recurso} - {descr}")
+        top_recursos_horas_data.append(float(horas))
+    
+    # Top 10 paradas (cod_parada) por quantidade
+    top_paradas_qtd = queryset_base.exclude(
+        cod_parada__isnull=True
+    ).exclude(cod_parada='').values('cod_parada', 'descr_parada').annotate(
+        total_count=Count('id')
+    ).order_by('-total_count')[:10]
+    
+    top_paradas_labels = []
+    top_paradas_data = []
+    for parada in top_paradas_qtd:
+        descr = parada['descr_parada'] or f"Parada {parada['cod_parada']}"
+        if len(descr) > 40:
+            descr = descr[:37] + "..."
+        top_paradas_labels.append(f"{parada['cod_parada']} - {descr}")
+        top_paradas_data.append(parada['total_count'])
+    
+    # Distribuição por turno
+    turnos_dict = defaultdict(lambda: {'count': 0, 'horas': Decimal('0.00')})
+    
+    for parada in queryset_base.exclude(turno__isnull=True).exclude(turno=''):
+        turnos_dict[parada.turno]['count'] += 1
+        if parada.dif_hora:
+            turnos_dict[parada.turno]['horas'] += Decimal(str(parada.dif_hora))
+    
+    sorted_turnos = sorted(turnos_dict.items(), key=lambda x: x[1]['count'], reverse=True)
+    
+    turnos_labels = []
+    turnos_data_count = []
+    turnos_data_horas = []
+    for turno, dados in sorted_turnos:
+        turnos_labels.append(str(turno) if turno else 'Não informado')
+        turnos_data_count.append(dados['count'])
+        turnos_data_horas.append(float(dados['horas']))
+    
+    # Distribuição por linha de produção (top 10)
+    linhas_dict = defaultdict(lambda: {'count': 0, 'horas': Decimal('0.00')})
+    
+    for parada in queryset_base.exclude(linha_producao__isnull=True):
+        linhas_dict[parada.linha_producao]['count'] += 1
+        if parada.dif_hora:
+            linhas_dict[parada.linha_producao]['horas'] += Decimal(str(parada.dif_hora))
+    
+    sorted_linhas = sorted(linhas_dict.items(), key=lambda x: x[1]['count'], reverse=True)[:10]
+    
+    linhas_labels = []
+    linhas_data_count = []
+    linhas_data_horas = []
+    for linha_id, dados in sorted_linhas:
+        parada = queryset_base.filter(linha_producao=linha_id).first()
+        descr = parada.descr_linha_producao if parada and parada.descr_linha_producao else f"Linha {linha_id}"
+        if len(descr) > 30:
+            descr = descr[:27] + "..."
+        linhas_labels.append(f"{linha_id} - {descr}")
+        linhas_data_count.append(dados['count'])
+        linhas_data_horas.append(float(dados['horas']))
+    
+    # Paradas recentes (últimas 20)
+    paradas_recentes_list = queryset_base.order_by('-data', '-horario_inicial')[:20]
+    
+    # Dados diários para o mês selecionado (para o gráfico de evolução diária)
+    if ano_filtro and meses_filtro_int:
+        try:
+            # Usar o primeiro mês selecionado para o gráfico diário
+            mes = meses_filtro_int[0]
+            primeiro_dia_mes_atual = datetime(ano_filtro, mes, 1).date()
+            ultimo_dia_mes_atual = datetime(ano_filtro, mes, monthrange(ano_filtro, mes)[1]).date()
+            if ultimo_dia_mes_atual > hoje_date:
+                ultimo_dia_mes_atual = hoje_date
+        except (ValueError, TypeError):
+            primeiro_dia_mes_atual = hoje_date.replace(day=1)
+            if hoje_date.month == 12:
+                ultimo_dia_mes_atual = hoje_date.replace(year=hoje_date.year + 1, month=1, day=1) - timedelta(days=1)
+            else:
+                ultimo_dia_mes_atual = hoje_date.replace(month=hoje_date.month + 1, day=1) - timedelta(days=1)
+            if ultimo_dia_mes_atual > hoje_date:
+                ultimo_dia_mes_atual = hoje_date
+    else:
+        primeiro_dia_mes_atual = hoje_date.replace(day=1)
+        if hoje_date.month == 12:
+            ultimo_dia_mes_atual = hoje_date.replace(year=hoje_date.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            ultimo_dia_mes_atual = hoje_date.replace(month=hoje_date.month + 1, day=1) - timedelta(days=1)
+        if ultimo_dia_mes_atual > hoje_date:
+            ultimo_dia_mes_atual = hoje_date
+    
+    dias_labels = []
+    dias_data = []
+    dias_horas = []
+    
+    for dia in range(1, ultimo_dia_mes_atual.day + 1):
+        data_dia = primeiro_dia_mes_atual.replace(day=dia)
+        count = queryset_base.filter(data=data_dia).count()
+        
+        horas_dia = Decimal('0.00')
+        for parada in queryset_base.filter(data=data_dia):
+            if parada.dif_hora:
+                horas_dia += Decimal(str(parada.dif_hora))
+        
+        dias_labels.append(data_dia.strftime('%d/%m'))
+        dias_data.append(count)
+        dias_horas.append(float(horas_dia))
+    
+    # Determinar mês selecionado para o gráfico diário
+    if ano_filtro and meses_filtro_int:
+        mes_selecionado_grafico = f"{ano_filtro}-{str(meses_filtro_int[0]).zfill(2)}"
+    else:
+        mes_selecionado_grafico = hoje.strftime('%Y-%m')
+    
+    # Nomes dos meses em português
+    meses_nomes = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+    
+    # Obter lista de anos disponíveis
+    anos_disponiveis_list = list(anos_disponiveis)
+    if not anos_disponiveis_list:
+        anos_disponiveis_list = [hoje.year]
+    
+    context = {
+        'page_title': 'Análise de Paradas de Máquina',
+        'active_page': 'analise_paradas_maquina',
+        'total_paradas': total_paradas,
+        'paradas_recentes': paradas_recentes,
+        'paradas_mes_atual': paradas_mes_atual,
+        'recursos_unicos': recursos_unicos,
+        'linhas_unicas': linhas_unicas,
+        'total_horas_paradas': total_horas_paradas,
+        'media_horas_paradas': media_horas_paradas,
+        'meses_labels': json.dumps(meses_labels),
+        'meses_data': json.dumps(meses_data),
+        'meses_horas': json.dumps(meses_horas),
+        'dias_labels': json.dumps(dias_labels),
+        'dias_data': json.dumps(dias_data),
+        'dias_horas': json.dumps(dias_horas),
+        'mes_selecionado': mes_selecionado_grafico,
+        'top_recursos_labels': json.dumps(top_recursos_labels),
+        'top_recursos_data': json.dumps(top_recursos_data),
+        'top_recursos_horas_labels': json.dumps(top_recursos_horas_labels),
+        'top_recursos_horas_data': json.dumps(top_recursos_horas_data),
+        'top_paradas_labels': json.dumps(top_paradas_labels),
+        'top_paradas_data': json.dumps(top_paradas_data),
+        'turnos_labels': json.dumps(turnos_labels),
+        'turnos_data_count': json.dumps(turnos_data_count),
+        'turnos_data_horas': json.dumps(turnos_data_horas),
+        'linhas_labels': json.dumps(linhas_labels),
+        'linhas_data_count': json.dumps(linhas_data_count),
+        'linhas_data_horas': json.dumps(linhas_data_horas),
+        'paradas_recentes_list': paradas_recentes_list,
+        # Filtros
+        'anos_disponiveis': anos_disponiveis_list,
+        'meses_nomes': meses_nomes,
+        'ano_filtro': ano_filtro,
+        'meses_filtro': meses_filtro_int,
+    }
+    return render(request, 'paradas_maquina/analise_paradas_de_maquina.html', context)
+
+
+def api_dados_diarios_paradas(request):
+    """
+    API endpoint para obter dados diários de paradas de máquina para um mês específico.
+    Similar a api_dados_diarios_requisicoes, mas para ParadaMaquina.
+    """
+    from app.models import ParadaMaquina
+    from django.http import JsonResponse
+    from datetime import datetime
+    from calendar import monthrange
+    from decimal import Decimal
+    
+    try:
+        ano = int(request.GET.get('ano', datetime.now().year))
+        mes = int(request.GET.get('mes', datetime.now().month))
+        
+        primeiro_dia = datetime(ano, mes, 1).date()
+        ultimo_dia = datetime(ano, mes, monthrange(ano, mes)[1]).date()
+        
+        hoje = datetime.now().date()
+        if ultimo_dia > hoje:
+            ultimo_dia = hoje
+        
+        dias_labels = []
+        dias_data = []
+        dias_horas = []
+        
+        for dia in range(1, ultimo_dia.day + 1):
+            data_dia = primeiro_dia.replace(day=dia)
+            
+            # Paradas de Máquina
+            count = ParadaMaquina.objects.filter(data=data_dia).count()
+            horas_dia = Decimal('0.00')
+            for parada in ParadaMaquina.objects.filter(data=data_dia):
+                if parada.dif_hora:
+                    horas_dia += Decimal(str(parada.dif_hora))
+            
+            dias_labels.append(data_dia.strftime('%d/%m'))
+            dias_data.append(count)
+            dias_horas.append(float(horas_dia))
+        
+        return JsonResponse({
+            'labels': dias_labels,
+            'data': dias_data,
+            'horas': dias_horas
+        })
+        
+    except (ValueError, TypeError) as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+def deletar_requisicoes_almoxarifado(request):
+    """Deletar requisições de almoxarifado (individual ou em lote)"""
+    from app.models import RequisicaoAlmoxarifado
+    from django.urls import reverse
+    
+    if request.method != 'POST':
+        messages.error(request, 'Método não permitido.')
+        return redirect('consultar_requisicoes_almoxarifado')
+    
+    # Verificar se é deleção individual ou em lote
+    requisicao_id = request.POST.get('requisicao_id', None)
+    requisicoes_ids = request.POST.getlist('requisicoes_ids', [])
+    
+    deleted_count = 0
+    
+    try:
+        if requisicao_id:
+            # Deleção individual
+            try:
+                requisicao = RequisicaoAlmoxarifado.objects.get(id=requisicao_id)
+                requisicao.delete()
+                deleted_count = 1
+                messages.success(request, 'Requisição deletada com sucesso.')
+            except RequisicaoAlmoxarifado.DoesNotExist:
+                messages.error(request, 'Requisição não encontrada.')
+        
+        elif requisicoes_ids:
+            # Deleção em lote
+            try:
+                ids = [int(id) for id in requisicoes_ids if id]
+                if ids:
+                    deleted_count = RequisicaoAlmoxarifado.objects.filter(id__in=ids).delete()[0]
+                    if deleted_count > 0:
+                        messages.success(request, f'{deleted_count} requisição(ões) deletada(s) com sucesso.')
+                    else:
+                        messages.warning(request, 'Nenhuma requisição foi deletada.')
+                else:
+                    messages.error(request, 'Nenhuma requisição selecionada.')
+            except (ValueError, TypeError) as e:
+                messages.error(request, f'Erro ao processar IDs: {str(e)}')
+        else:
+            messages.error(request, 'Nenhuma requisição especificada para deletar.')
+    
+    except Exception as e:
+        messages.error(request, f'Erro ao deletar requisição(ões): {str(e)}')
+        import traceback
+        print(f"Erro ao deletar requisições: {traceback.format_exc()}")
+    
+    # Redirecionar mantendo os filtros
+    redirect_url = reverse('consultar_requisicoes_almoxarifado')
+    params = []
+    
+    # Preservar todos os parâmetros GET
+    if request.GET.get('ano'):
+        params.append(f"ano={request.GET.get('ano')}")
+    for mes in request.GET.getlist('mes'):
+        params.append(f"mes={mes}")
+    if request.GET.get('search'):
+        params.append(f"search={request.GET.get('search')}")
+    if request.GET.get('filter_data'):
+        params.append(f"filter_data={request.GET.get('filter_data')}")
+    if request.GET.get('filter_item'):
+        params.append(f"filter_item={request.GET.get('filter_item')}")
+    if request.GET.get('filter_descricao'):
+        params.append(f"filter_descricao={request.GET.get('filter_descricao')}")
+    if request.GET.get('filter_quantidade'):
+        params.append(f"filter_quantidade={request.GET.get('filter_quantidade')}")
+    if request.GET.get('filter_valor'):
+        params.append(f"filter_valor={request.GET.get('filter_valor')}")
+    if request.GET.get('filter_centro'):
+        params.append(f"filter_centro={request.GET.get('filter_centro')}")
+    if request.GET.get('filter_usuario_criou'):
+        params.append(f"filter_usuario_criou={request.GET.get('filter_usuario_criou')}")
+    if request.GET.get('filter_usuario_atend'):
+        params.append(f"filter_usuario_atend={request.GET.get('filter_usuario_atend')}")
+    if request.GET.get('filter_operacao'):
+        params.append(f"filter_operacao={request.GET.get('filter_operacao')}")
+    if request.GET.get('filter_local'):
+        params.append(f"filter_local={request.GET.get('filter_local')}")
+    if request.GET.get('page'):
+        params.append(f"page={request.GET.get('page')}")
+    
+    if params:
+        redirect_url += '?' + '&'.join(params)
+    
+    return redirect(redirect_url)
 
 
 def analise_requisicoes_data_importada(request):
@@ -12695,12 +14040,13 @@ def analise_geral_orcamento(request):
         data_requisicao__month__in=meses_para_mostrar
     )
     total_requisicoes = requisicoes_filtradas.count()
-    valor_total_requisicoes = requisicoes_filtradas.aggregate(
-        total=Sum('vlr_movto_estoq')
-    )['total'] or Decimal('0')
-    # Converter para positivo (geralmente são valores negativos)
-    if valor_total_requisicoes < 0:
-        valor_total_requisicoes = abs(valor_total_requisicoes)
+    # IMPORTANTE: Apenas considerar cd_depo == 1 para custos (itens novos que geram gasto)
+    # cd_depo == 3 são itens reutilizados que não geram custo
+    valor_total_requisicoes = Decimal('0.00')
+    for req in requisicoes_filtradas.filter(cd_depo=1):
+        if req.vlr_movto_estoq:
+            # vlr_movto_estoq já representa o valor total da transação (pode ser negativo para saídas)
+            valor_total_requisicoes += abs(req.vlr_movto_estoq)
     
     # Valor total de requisições para o card (já filtrado por ano/mês)
     valor_total_requisicoes_filtrado = valor_total_requisicoes
@@ -12760,13 +14106,16 @@ def analise_geral_orcamento(request):
             dias_orcamento.append(float(orc_dia))
             
             # Requisições do dia (RequisicaoAlmoxarifado) - valor do dia
-            req_dia = RequisicaoAlmoxarifado.objects.filter(
+            # IMPORTANTE: Apenas considerar cd_depo == 1 para custos (itens novos que geram gasto)
+            req_dia = Decimal('0.00')
+            for req in RequisicaoAlmoxarifado.objects.filter(
                 data_requisicao__year=ano_filtro,
                 data_requisicao__month=mes,
-                data_requisicao__day=dia
-            ).aggregate(total=Sum('vlr_movto_estoq'))['total'] or Decimal('0')
-            if req_dia < 0:
-                req_dia = abs(req_dia)
+                data_requisicao__day=dia,
+                cd_depo=1  # Apenas itens que geram custo
+            ):
+                if req.vlr_movto_estoq:
+                    req_dia += abs(req.vlr_movto_estoq)
             # Acumular
             req_acumulado += req_dia
             dias_requisicoes.append(float(req_acumulado))
@@ -13032,16 +14381,35 @@ def consultar_projecao_gastos(request):
     ano_filtro = request.GET.get('ano', None)
     meses_filtro = request.GET.getlist('mes')  # getlist para múltiplos valores
     
-    # Valores padrão: ano atual e todos os meses (None)
+    # Valores padrão: usar o ano mais recente dos dados ou ano atual
     hoje = datetime.now()
+    
+    # Anos disponíveis para o filtro
+    anos_disponiveis_set = set()
+    anos_ref = ProjecaoGasto.objects.exclude(ano_referencia__isnull=True).values_list('ano_referencia', flat=True).distinct()
+    for ano in anos_ref:
+        if ano:
+            anos_disponiveis_set.add(int(ano))
+    anos_disponiveis_set.add(hoje.year)
+    anos_disponiveis = sorted(list(anos_disponiveis_set), reverse=True)
+    if not anos_disponiveis:
+        anos_disponiveis = [hoje.year]
+    
+    # Se não há filtro de ano, usar o ano mais recente dos dados (ou ano atual se não houver dados)
     if not ano_filtro:
-        ano_filtro = str(hoje.year)
+        if anos_disponiveis:
+            ano_filtro = anos_disponiveis[0]  # Usar o ano mais recente
+        else:
+            ano_filtro = hoje.year
     
     # Converter para inteiro
     try:
         ano_filtro = int(ano_filtro)
     except (ValueError, TypeError):
-        ano_filtro = hoje.year
+        if anos_disponiveis:
+            ano_filtro = anos_disponiveis[0]
+        else:
+            ano_filtro = hoje.year
     
     # Converter meses para inteiros e validar
     meses_filtro_int = []
@@ -13059,17 +14427,6 @@ def consultar_projecao_gastos(request):
     # Se não há meses selecionados, usar todos os meses
     meses_para_mostrar = meses_filtro_int if meses_filtro_int else list(range(1, 13))
     
-    # Anos disponíveis para o filtro
-    anos_disponiveis_set = set()
-    anos_ref = ProjecaoGasto.objects.exclude(ano_referencia__isnull=True).values_list('ano_referencia', flat=True).distinct()
-    for ano in anos_ref:
-        if ano:
-            anos_disponiveis_set.add(int(ano))
-    anos_disponiveis_set.add(hoje.year)
-    anos_disponiveis = sorted(list(anos_disponiveis_set), reverse=True)
-    if not anos_disponiveis:
-        anos_disponiveis = [hoje.year]
-    
     # ========== FILTROS DE PROJEÇÕES ==========
     try:
         # Busca geral
@@ -13082,15 +14439,56 @@ def consultar_projecao_gastos(request):
         projecoes_list = ProjecaoGasto.objects.none()
         search_query = ''
     
-    # Aplicar filtro de ano
-    projecoes_list = projecoes_list.filter(ano_referencia=ano_filtro)
+    # Aplicar filtro de ano baseado em previsao_execucao
+    # Se o ano filtro foi definido explicitamente pelo usuário, filtrar apenas por esse ano
+    # Caso contrário, mostrar registros do ano mais recente OU registros sem ano_referencia
+    ano_filtro_explicito = request.GET.get('ano', None) is not None
+    if ano_filtro_explicito:
+        # Filtro explícito: filtrar por ano_referencia OU previsao_execucao contém o ano
+        q_ano = Q(ano_referencia=ano_filtro) | Q(previsao_execucao__icontains=str(ano_filtro))
+        projecoes_list = projecoes_list.filter(q_ano)
+    else:
+        # Sem filtro explícito: mostrar registros do ano mais recente OU registros sem ano_referencia
+        # Também incluir registros onde previsao_execucao contém o ano
+        q_ano = Q(ano_referencia=ano_filtro) | Q(ano_referencia__isnull=True) | Q(previsao_execucao__icontains=str(ano_filtro))
+        projecoes_list = projecoes_list.filter(q_ano)
     
-    # Aplicar filtro de meses
+    # Aplicar filtro de meses baseado em previsao_execucao
     if meses_filtro_int:
-        meses_str = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
-                     'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO']
-        meses_selecionados_str = [meses_str[m-1] for m in meses_filtro_int]
-        projecoes_list = projecoes_list.filter(mes_referencia__in=meses_selecionados_str)
+        # Mapear números de mês para nomes em português (usado em previsao_execucao)
+        meses_nomes = {
+            1: ['JANEIRO', 'JAN'],
+            2: ['FEVEREIRO', 'FEV'],
+            3: ['MARÇO', 'MARCO', 'MAR'],
+            4: ['ABRIL', 'ABR'],
+            5: ['MAIO', 'MAI'],
+            6: ['JUNHO', 'JUN'],
+            7: ['JULHO', 'JUL'],
+            8: ['AGOSTO', 'AGO'],
+            9: ['SETEMBRO', 'SET'],
+            10: ['OUTUBRO', 'OUT'],
+            11: ['NOVEMBRO', 'NOV'],
+            12: ['DEZEMBRO', 'DEZ']
+        }
+        
+        # Criar Q object para filtrar por mes_referencia (extraído durante import)
+        meses_selecionados_str = []
+        for m in meses_filtro_int:
+            meses_selecionados_str.append(str(m))  # Formato sem zero: '1', '2', ..., '12'
+            meses_selecionados_str.append(f"{m:02d}")  # Formato com zero: '01', '02', ..., '12'
+        meses_selecionados_str = list(set(meses_selecionados_str))
+        
+        # Criar Q object para filtrar por previsao_execucao diretamente (fallback)
+        q_previsao = Q()
+        for m in meses_filtro_int:
+            nomes_mes = meses_nomes.get(m, [])
+            for nome in nomes_mes:
+                # Buscar por nome do mês em previsao_execucao (case-insensitive)
+                q_previsao |= Q(previsao_execucao__icontains=nome)
+        
+        # Filtrar: mes_referencia OU previsao_execucao contém o mês
+        q_mes = Q(mes_referencia__in=meses_selecionados_str) | q_previsao
+        projecoes_list = projecoes_list.filter(q_mes)
     
     # Aplicar busca geral
     if search_query:

@@ -169,6 +169,7 @@
                             <li><a class="dropdown-item" href="#" data-consultar="manutentor"><i class="fas fa-user-tie me-2"></i>Consultar Manutentores</a></li>
                             <li><a class="dropdown-item" href="#" data-consultar="local"><i class="fas fa-map-marker-alt me-2"></i>Consultar Local ou CA</a></li>
                             <li><a class="dropdown-item" href="{% url 'consultar_estoque' %}"><i class="fas fa-boxes me-2"></i>Consultar Estoque</a></li>
+                            <li><a class="dropdown-item" href="{% url 'consultar_paradas_maquina' %}"><i class="fas fa-stop-circle me-2"></i>Consultar Paradas de Máquina</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{% url 'consultar_visitas' %}"><i class="fas fa-calendar-check me-2"></i>Consultar Visitas</a></li>
                         </ul>
@@ -377,6 +378,21 @@
                                     <li><a href="{% url 'analise_geral_plano_preventiva_pcm' %}" class="link-dark rounded">Análise Geral PCM</a></li>
                                     <li><a href="{% url 'consultar_meu_plano' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Meus Planos Preventiva do PCM</a></li>
                                     <li><a href="{% url 'criar_cronograma_planejado_preventiva' %}" class="link-dark rounded">Criar Calendário Plenejado de Preventivas</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
+                        <!-- Paradas de Máquinas -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#paradas-maquina-collapse" aria-expanded="false">
+                                <i class="bi bi-stop-circle me-2"></i>
+                                <span class="btn-toggle-text">Paradas de Máquinas</span>
+                            </button>
+                            <div class="collapse" id="paradas-maquina-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'analise_paradas_maquina' %}" class="link-dark rounded"><i class="fas fa-chart-line me-2"></i>Análise de Paradas de Máquinas</a></li>
+                                    <li><a href="{% url 'consultar_paradas_maquina' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Paradas de Máquinas</a></li>
+                                    <li><a href="{% url 'configuracao_parada_maquina' %}" class="link-dark rounded"><i class="fas fa-cog me-2"></i>Configuração</a></li>
                                 </ul>
                             </div>
                         </li>
@@ -613,6 +629,20 @@
                                     <li><a href="{% url 'importar_projecao_gastos' %}" class="link-dark rounded">Projeção de Gastos</a></li>
                                     <li><a href="{% url 'importar_notas_fiscais' %}" class="link-dark rounded">Notas Fiscais</a></li>
                                     <li><a href="{% url 'importar_controle_nf_e_rc' %}" class="link-dark rounded">Planilha de Controle RC e NF</a></li>
+                                    <li><a href="{% url 'importar_paradas_maquina' %}" class="link-dark rounded">Paradas de Máquina</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
+                        <!-- Ajuste Relatórios SIGA -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#ajuste-relatorios-siga-collapse" aria-expanded="false">
+                                <i class="bi bi-file-earmark-text me-2"></i>
+                                <span class="btn-toggle-text">Ajuste Relatórios SIGA</span>
+                            </button>
+                            <div class="collapse" id="ajuste-relatorios-siga-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'relatorio_nf_estf0198' %}" class="link-dark rounded">Relatório NF ESTF0198</a></li>
                                 </ul>
                             </div>
                         </li>

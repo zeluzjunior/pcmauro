@@ -224,158 +224,73 @@
         
         <!-- KPI Cards -->
         <div class="mb-5">
-            <div class="row mb-4">
-                <div class="col-md-3 mb-4">
+            <!-- Cards Gerais -->
+            <div class="row mb-3">
+                <div class="col-md-3 mb-3">
                     <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">
-                                        Total de Requisições
-                                        <i class="fas fa-info-circle ms-1" 
-                                           data-bs-toggle="tooltip" 
-                                           data-bs-placement="top" 
-                                           title="Número total de requisições de almoxarifado registradas no sistema"></i>
-                                    </h6>
-                                    <h2 class="mb-0 fw-bold">{{ total_requisicoes }}</h2>
-                                </div>
-                                <i class="fas fa-clipboard-list fa-3x text-primary opacity-25"></i>
-                            </div>
+                            <h6 class="text-muted mb-1 small">
+                                Total de Requisições
+                                <i class="fas fa-info-circle ms-1" 
+                                   data-bs-toggle="tooltip" 
+                                   data-bs-placement="top" 
+                                   title="Número total de requisições de almoxarifado registradas no sistema"></i>
+                            </h6>
+                            <h3 class="mb-1 fw-bold">{{ total_requisicoes }}</h3>
+                            <small class="text-muted">
+                                NF: {{ total_requisicoes_nf }} | Normal: {{ total_requisicoes_normal }}
+                            </small>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-4">
-                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">
-                                        Últimos 30 Dias
-                                        <i class="fas fa-info-circle ms-1" 
-                                           data-bs-toggle="tooltip" 
-                                           data-bs-placement="top" 
-                                           title="Número de requisições criadas nos últimos 30 dias"></i>
-                                    </h6>
-                                    <h2 class="mb-0 fw-bold">{{ requisicoes_recentes }}</h2>
-                                </div>
-                                <i class="fas fa-calendar-day fa-3x text-success opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-4">
-                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">
-                                        Mês Atual
-                                        <i class="fas fa-info-circle ms-1" 
-                                           data-bs-toggle="tooltip" 
-                                           data-bs-placement="top" 
-                                           title="Número de requisições criadas no mês atual"></i>
-                                    </h6>
-                                    <h2 class="mb-0 fw-bold">{{ requisicoes_mes_atual }}</h2>
-                                </div>
-                                <i class="fas fa-calendar-alt fa-3x text-warning opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-4">
-                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">
-                                        Itens Únicos
-                                        <i class="fas fa-info-circle ms-1" 
-                                           data-bs-toggle="tooltip" 
-                                           data-bs-placement="top" 
-                                           title="Número de itens diferentes que foram requisitados pelo menos uma vez"></i>
-                                    </h6>
-                                    <h2 class="mb-0 fw-bold">{{ itens_unicos }}</h2>
-                                </div>
-                                <i class="fas fa-boxes fa-3x text-info opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-md-3 mb-4">
+                <div class="col-md-3 mb-3">
                     <div class="card stat-card kpi-card kpi-danger shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">
-                                        Valor Total
-                                        <i class="fas fa-info-circle ms-1" 
-                                           data-bs-toggle="tooltip" 
-                                           data-bs-placement="top" 
-                                           title="Soma de todos os valores das requisições (valor total de todos os itens requisitados)"></i>
-                                    </h6>
-                                    <h2 class="mb-0 fw-bold">{{ valor_total|currency_br }}</h2>
-                                </div>
-                                <i class="fas fa-dollar-sign fa-3x text-danger opacity-25"></i>
-                            </div>
+                            <h6 class="text-muted mb-1 small">
+                                Valor Total (Gasto)
+                                <i class="fas fa-info-circle ms-1" 
+                                   data-bs-toggle="tooltip" 
+                                   data-bs-placement="top" 
+                                   title="Soma dos valores das requisições que geram custo (cd_depo = 1)"></i>
+                            </h6>
+                            <h3 class="mb-1 fw-bold">{{ valor_total|currency_br }}</h3>
+                            <small class="text-muted">
+                                NF: {{ valor_total_nf|currency_br }} | Normal: {{ valor_total_normal|currency_br }}
+                            </small>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-4">
-                    <div class="card stat-card kpi-card kpi-purple shadow-sm border-0">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">
-                                        Valor Médio
-                                        <i class="fas fa-info-circle ms-1" 
-                                           data-bs-toggle="tooltip" 
-                                           data-bs-placement="top" 
-                                           title="Valor médio por requisição (Valor Total dividido pelo número total de requisições)"></i>
-                                    </h6>
-                                    <h2 class="mb-0 fw-bold">{{ valor_medio|currency_br }}</h2>
-                                </div>
-                                <i class="fas fa-chart-line fa-3x text-purple opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-4">
+                <div class="col-md-3 mb-3">
                     <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">
-                                        Centros de Atividade
-                                        <i class="fas fa-info-circle ms-1" 
-                                           data-bs-toggle="tooltip" 
-                                           data-bs-placement="top" 
-                                           title="Número de centros de atividade diferentes que realizaram requisições"></i>
-                                    </h6>
-                                    <h2 class="mb-0 fw-bold">{{ centros_unicos }}</h2>
-                                </div>
-                                <i class="fas fa-building fa-3x text-success opacity-25"></i>
-                            </div>
+                            <h6 class="text-muted mb-1 small">
+                                Itens Únicos
+                                <i class="fas fa-info-circle ms-1" 
+                                   data-bs-toggle="tooltip" 
+                                   data-bs-placement="top" 
+                                   title="Número de itens diferentes que foram requisitados"></i>
+                            </h6>
+                            <h3 class="mb-1 fw-bold">{{ itens_unicos }}</h3>
+                            <small class="text-muted">
+                                NF: {{ itens_unicos_nf }} | Normal: {{ itens_unicos_normal }}
+                            </small>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-4">
+                <div class="col-md-3 mb-3">
                     <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">
-                                        Total de Itens Requisitados
-                                        <i class="fas fa-info-circle ms-1" 
-                                           data-bs-toggle="tooltip" 
-                                           data-bs-placement="top" 
-                                           title="Soma de todas as quantidades de itens retirados do estoque em todas as requisições"></i>
-                                    </h6>
-                                    <h2 class="mb-0 fw-bold">{{ quantidade_total|number_br:2 }}</h2>
-                                </div>
-                                <i class="fas fa-boxes fa-3x text-info opacity-25"></i>
-                            </div>
+                            <h6 class="text-muted mb-1 small">
+                                Valor Médio
+                                <i class="fas fa-info-circle ms-1" 
+                                   data-bs-toggle="tooltip" 
+                                   data-bs-placement="top" 
+                                   title="Valor médio por requisição"></i>
+                            </h6>
+                            <h3 class="mb-1 fw-bold">{{ valor_medio|currency_br }}</h3>
+                            <small class="text-muted">
+                                NF: {{ valor_medio_nf|currency_br }} | Normal: {{ valor_medio_normal|currency_br }}
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -424,7 +339,7 @@
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-chart-bar me-2"></i>Top 10 Itens Mais Requisitados (Quantidade)
+                            <i class="fas fa-chart-bar me-2"></i>Top 10 Itens Mais Requisitados (Quantidade) - Geral
                         </h5>
                     </div>
                     <div class="card-body">
@@ -440,12 +355,76 @@
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-danger text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-chart-bar me-2"></i>Top 10 Itens por Valor Total
+                            <i class="fas fa-chart-bar me-2"></i>Top 10 Itens por Valor Total - Geral
                         </h5>
                     </div>
                     <div class="card-body">
                         <div class="chart-container-large">
                             <canvas id="itensValorChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts Row 2.1: Top Itens NF -->
+        <div class="row mb-5">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Top 10 Itens Mais Requisitados (Quantidade) - NF
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="itensQtdChartNF"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Top 10 Itens por Valor Total - NF
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="itensValorChartNF"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts Row 2.2: Top Itens Normal -->
+        <div class="row mb-5">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Top 10 Itens Mais Requisitados (Quantidade) - Normal
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="itensQtdChartNormal"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Top 10 Itens por Valor Total - Normal
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="itensValorChartNormal"></canvas>
                         </div>
                     </div>
                 </div>
@@ -587,6 +566,25 @@
                     <div class="card-body">
                         <div class="chart-container-large">
                             <canvas id="temporalChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts Row 1.1: Evolution Separated -->
+        <div class="row mb-5">
+            <!-- Gráfico de Linha: Evolução Temporal - NF vs Normal -->
+            <div class="col-md-12 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-warning text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Evolução Temporal: Requisições NF vs Normais (Últimos 12 Meses)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="temporalSeparatedChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -766,19 +764,108 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn('Canvas temporalChart não encontrado');
     }
 
-    // Gráfico de Barras: Top 10 Itens por Quantidade
+    // Gráfico de Linha: Evolução Temporal Separada (NF vs Normal)
+    const temporalSeparatedCtx = document.getElementById('temporalSeparatedChart');
+    if (temporalSeparatedCtx) {
+        try {
+            const mesesLabels = {{ meses_labels|safe }};
+            const mesesDataNF = {{ meses_data_nf|safe }};
+            const mesesValorNF = {{ meses_valor_nf|safe }};
+            const mesesDataNormal = {{ meses_data_normal|safe }};
+            const mesesValorNormal = {{ meses_valor_normal|safe }};
+            
+            if (!mesesLabels || !Array.isArray(mesesLabels) || mesesLabels.length === 0) {
+                temporalSeparatedCtx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis para o período selecionado.</div>';
+            } else {
+                new Chart(temporalSeparatedCtx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: mesesLabels,
+                    datasets: [{
+                        label: 'Quantidade - NF',
+                        data: mesesDataNF,
+                        borderColor: '#0dcaf0',
+                        backgroundColor: 'rgba(13, 202, 240, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Quantidade - Normal',
+                        data: mesesDataNormal,
+                        borderColor: '#198754',
+                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Valor Total - NF (R$)',
+                        data: mesesValorNF,
+                        borderColor: '#0dcaf0',
+                        backgroundColor: 'rgba(13, 202, 240, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y1',
+                        borderDash: [5, 5]
+                    }, {
+                        label: 'Valor Total - Normal (R$)',
+                        data: mesesValorNormal,
+                        borderColor: '#198754',
+                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y1',
+                        borderDash: [5, 5]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Quantidade'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Valor (R$)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
+                }
+            });
+            }
+        } catch (error) {
+            console.error('Erro ao criar gráfico temporal separado:', error);
+        }
+    }
+
+    // Gráfico de Barras: Top 10 Itens por Quantidade - Geral
     const itensQtdCtx = document.getElementById('itensQtdChart');
     if (itensQtdCtx) {
         try {
             const topItensLabels = {{ top_itens_labels|safe }};
             const topItensData = {{ top_itens_data|safe }};
             
-            console.log('Itens Qtd Chart - Labels:', topItensLabels);
-            console.log('Itens Qtd Chart - Data:', topItensData);
-            
-            // Verificar se há dados
             if (!topItensLabels || !Array.isArray(topItensLabels) || topItensLabels.length === 0) {
-                console.warn('Itens Qtd Chart: Sem dados para exibir');
                 itensQtdCtx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis.</div>';
             } else {
                 new Chart(itensQtdCtx.getContext('2d'), {
@@ -811,23 +898,100 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('Erro ao criar gráfico de itens por quantidade:', error);
         }
-    } else {
-        console.warn('Canvas itensQtdChart não encontrado');
     }
 
-    // Gráfico de Barras: Top 10 Itens por Valor
+    // Gráfico de Barras: Top 10 Itens por Quantidade - NF
+    const itensQtdCtxNF = document.getElementById('itensQtdChartNF');
+    if (itensQtdCtxNF) {
+        try {
+            const topItensLabelsNF = {{ top_itens_labels_nf|safe }};
+            const topItensDataNF = {{ top_itens_data_nf|safe }};
+            
+            if (!topItensLabelsNF || !Array.isArray(topItensLabelsNF) || topItensLabelsNF.length === 0) {
+                itensQtdCtxNF.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis.</div>';
+            } else {
+                new Chart(itensQtdCtxNF.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: topItensLabelsNF,
+                    datasets: [{
+                        label: 'Quantidade',
+                        data: topItensDataNF,
+                        backgroundColor: '#0dcaf0'
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+            }
+        } catch (error) {
+            console.error('Erro ao criar gráfico de itens por quantidade NF:', error);
+        }
+    }
+
+    // Gráfico de Barras: Top 10 Itens por Quantidade - Normal
+    const itensQtdCtxNormal = document.getElementById('itensQtdChartNormal');
+    if (itensQtdCtxNormal) {
+        try {
+            const topItensLabelsNormal = {{ top_itens_labels_normal|safe }};
+            const topItensDataNormal = {{ top_itens_data_normal|safe }};
+            
+            if (!topItensLabelsNormal || !Array.isArray(topItensLabelsNormal) || topItensLabelsNormal.length === 0) {
+                itensQtdCtxNormal.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis.</div>';
+            } else {
+                new Chart(itensQtdCtxNormal.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: topItensLabelsNormal,
+                    datasets: [{
+                        label: 'Quantidade',
+                        data: topItensDataNormal,
+                        backgroundColor: '#198754'
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+            }
+        } catch (error) {
+            console.error('Erro ao criar gráfico de itens por quantidade Normal:', error);
+        }
+    }
+
+    // Gráfico de Barras: Top 10 Itens por Valor - Geral
     const itensValorCtx = document.getElementById('itensValorChart');
     if (itensValorCtx) {
         try {
             const topItensValorLabels = {{ top_itens_valor_labels|safe }};
             const topItensValorData = {{ top_itens_valor_data|safe }};
             
-            console.log('Itens Valor Chart - Labels:', topItensValorLabels);
-            console.log('Itens Valor Chart - Data:', topItensValorData);
-            
-            // Verificar se há dados
             if (!topItensValorLabels || !Array.isArray(topItensValorLabels) || topItensValorLabels.length === 0) {
-                console.warn('Itens Valor Chart: Sem dados para exibir');
                 itensValorCtx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis.</div>';
             } else {
                 new Chart(itensValorCtx.getContext('2d'), {
@@ -865,8 +1029,100 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('Erro ao criar gráfico de itens por valor:', error);
         }
-    } else {
-        console.warn('Canvas itensValorChart não encontrado');
+    }
+
+    // Gráfico de Barras: Top 10 Itens por Valor - NF
+    const itensValorCtxNF = document.getElementById('itensValorChartNF');
+    if (itensValorCtxNF) {
+        try {
+            const topItensValorLabelsNF = {{ top_itens_valor_labels_nf|safe }};
+            const topItensValorDataNF = {{ top_itens_valor_data_nf|safe }};
+            
+            if (!topItensValorLabelsNF || !Array.isArray(topItensValorLabelsNF) || topItensValorLabelsNF.length === 0) {
+                itensValorCtxNF.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis.</div>';
+            } else {
+                new Chart(itensValorCtxNF.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: topItensValorLabelsNF,
+                    datasets: [{
+                        label: 'Valor Total (R$)',
+                        data: topItensValorDataNF,
+                        backgroundColor: '#0dcaf0'
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            }
+        } catch (error) {
+            console.error('Erro ao criar gráfico de itens por valor NF:', error);
+        }
+    }
+
+    // Gráfico de Barras: Top 10 Itens por Valor - Normal
+    const itensValorCtxNormal = document.getElementById('itensValorChartNormal');
+    if (itensValorCtxNormal) {
+        try {
+            const topItensValorLabelsNormal = {{ top_itens_valor_labels_normal|safe }};
+            const topItensValorDataNormal = {{ top_itens_valor_data_normal|safe }};
+            
+            if (!topItensValorLabelsNormal || !Array.isArray(topItensValorLabelsNormal) || topItensValorLabelsNormal.length === 0) {
+                itensValorCtxNormal.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis.</div>';
+            } else {
+                new Chart(itensValorCtxNormal.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: topItensValorLabelsNormal,
+                    datasets: [{
+                        label: 'Valor Total (R$)',
+                        data: topItensValorDataNormal,
+                        backgroundColor: '#198754'
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            }
+        } catch (error) {
+            console.error('Erro ao criar gráfico de itens por valor Normal:', error);
+        }
     }
 
     // Gráfico de Barras: Top 10 Centros de Atividade
@@ -1024,27 +1280,44 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 if (dailyCtx) {
+                    // Preparar datasets
+                    const datasets = [{
+                        label: 'Quantidade de Requisições',
+                        data: data.data,
+                        borderColor: '#198754',
+                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Valor Total - Gasto (R$)',
+                        data: data.valor,
+                        borderColor: '#dc3545',
+                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y1'
+                    }];
+                    
+                    // Adicionar linha de itens reutilizados se houver dados
+                    if (data.valor_reused && Array.isArray(data.valor_reused) && data.valor_reused.some(v => v > 0)) {
+                        datasets.push({
+                            label: 'Valor - Itens Reutilizados (R$)',
+                            data: data.valor_reused,
+                            borderColor: '#6f42c1',
+                            backgroundColor: 'rgba(111, 66, 193, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            yAxisID: 'y1',
+                            borderDash: [5, 5]
+                        });
+                    }
+                    
                     dailyChart = new Chart(dailyCtx.getContext('2d'), {
                         type: 'line',
                         data: {
                             labels: data.labels,
-                            datasets: [{
-                                label: 'Quantidade de Requisições',
-                                data: data.data,
-                                borderColor: '#198754',
-                                backgroundColor: 'rgba(25, 135, 84, 0.1)',
-                                tension: 0.4,
-                                fill: true,
-                                yAxisID: 'y'
-                            }, {
-                                label: 'Valor Total (R$)',
-                                data: data.valor,
-                                borderColor: '#dc3545',
-                                backgroundColor: 'rgba(220, 53, 69, 0.1)',
-                                tension: 0.4,
-                                fill: true,
-                                yAxisID: 'y1'
-                            }]
+                            datasets: datasets
                         },
                         options: {
                             responsive: true,
@@ -1097,21 +1370,20 @@ document.addEventListener('DOMContentLoaded', function() {
             const diasLabels = {{ dias_labels|safe }};
             const diasData = {{ dias_data|safe }};
             const diasValor = {{ dias_valor|safe }};
+            const diasValorReused = {{ dias_valor_reused|safe }};
             
             console.log('Daily Chart - Labels:', diasLabels);
             console.log('Daily Chart - Data:', diasData);
             console.log('Daily Chart - Valor:', diasValor);
+            console.log('Daily Chart - Valor Reused:', diasValorReused);
             
             // Verificar se há dados
             if (!diasLabels || !Array.isArray(diasLabels) || diasLabels.length === 0) {
                 console.warn('Daily Chart: Sem dados para exibir');
                 dailyCtx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis para o mês selecionado.</div>';
             } else {
-                dailyChart = new Chart(dailyCtx.getContext('2d'), {
-            type: 'line',
-            data: {
-                labels: diasLabels,
-                datasets: [{
+                // Preparar datasets
+                const datasets = [{
                     label: 'Quantidade de Requisições',
                     data: diasData,
                     borderColor: '#198754',
@@ -1120,14 +1392,69 @@ document.addEventListener('DOMContentLoaded', function() {
                     fill: true,
                     yAxisID: 'y'
                 }, {
-                    label: 'Valor Total (R$)',
+                    label: 'Quantidade - NF',
+                    data: {{ dias_data_nf|safe }},
+                    borderColor: '#0dcaf0',
+                    backgroundColor: 'rgba(13, 202, 240, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    yAxisID: 'y'
+                }, {
+                    label: 'Quantidade - Normal',
+                    data: {{ dias_data_normal|safe }},
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    yAxisID: 'y',
+                    borderDash: [5, 5]
+                }, {
+                    label: 'Valor Total - Gasto (R$)',
                     data: diasValor,
                     borderColor: '#dc3545',
                     backgroundColor: 'rgba(220, 53, 69, 0.1)',
                     tension: 0.4,
                     fill: true,
                     yAxisID: 'y1'
-                }]
+                }, {
+                    label: 'Valor Total - NF (R$)',
+                    data: {{ dias_valor_nf|safe }},
+                    borderColor: '#0dcaf0',
+                    backgroundColor: 'rgba(13, 202, 240, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    yAxisID: 'y1',
+                    borderDash: [5, 5]
+                }, {
+                    label: 'Valor Total - Normal (R$)',
+                    data: {{ dias_valor_normal|safe }},
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    yAxisID: 'y1',
+                    borderDash: [5, 5]
+                }];
+                
+                // Adicionar linha de itens reutilizados se houver dados
+                if (diasValorReused && Array.isArray(diasValorReused) && diasValorReused.some(v => v > 0)) {
+                    datasets.push({
+                        label: 'Valor - Itens Reutilizados (R$)',
+                        data: diasValorReused,
+                        borderColor: '#6f42c1',
+                        backgroundColor: 'rgba(111, 66, 193, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y1',
+                        borderDash: [5, 5]
+                    });
+                }
+                
+                dailyChart = new Chart(dailyCtx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: diasLabels,
+                datasets: datasets
             },
             options: {
                 responsive: true,

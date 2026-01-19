@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Relatório NF ESTF0198{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Ajuste Relatórios SIGA</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Relatório NF ESTF0198</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Relatório NF ESTF0198</h1>
+                <p class="lead">Ajuste de relatórios do SIGA</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Messages - Show at top for better visibility -->
+{% if messages %}
+    <div class="container mt-4" id="messages-container">
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm mb-3" role="alert" style="{% if message.tags == 'error' %}border-left: 4px solid #dc3545; background-color: #f8d7da;{% elif message.tags == 'success' %}border-left: 4px solid #28a745; background-color: #d4edda;{% elif message.tags == 'warning' %}border-left: 4px solid #ffc107; background-color: #fff3cd;{% elif message.tags == 'info' %}border-left: 4px solid #17a2b8; background-color: #d1ecf1;{% endif %}">
+                        <div class="d-flex align-items-start">
+                            <div class="flex-grow-1">
+                                {% if message.tags == 'error' %}
+                                    <h6 class="alert-heading mb-2 fw-bold"><i class="fas fa-exclamation-circle me-2"></i>Erro</h6>
+                                {% elif message.tags == 'success' %}
+                                    <h6 class="alert-heading mb-2 fw-bold"><i class="fas fa-check-circle me-2"></i>Sucesso</h6>
+                                {% elif message.tags == 'warning' %}
+                                    <h6 class="alert-heading mb-2 fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>Atenção</h6>
+                                {% elif message.tags == 'info' %}
+                                    <h6 class="alert-heading mb-2 fw-bold"><i class="fas fa-info-circle me-2"></i>Informação</h6>
+                                {% endif %}
+                                <div class="message-content" style="word-wrap: break-word;">{{ message|safe }}</div>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Upload Section -->
+        <div class="row mb-5">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-upload me-2"></i>Upload e Ajuste de Arquivo CSV
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'relatorio_nf_estf0198' %}" enctype="multipart/form-data" id="uploadForm">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="fileInput" class="form-label">Arquivo CSV para Ajuste</label>
+                                <input type="file" class="form-control" id="fileInput" name="file" accept=".csv" required>
+                                <div class="form-text">Formatos aceitos: CSV (.csv) com delimitador ponto e vírgula (;)</div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                    <i class="fas fa-cog me-2"></i>Processar e Baixar Arquivo Ajustado
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Section (shown only after processing) -->
+        {% if has_processed_file %}
+        <div class="row mb-5">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm border-success">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-check-circle me-2"></i>Arquivo Processado com Sucesso
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-success mb-3">
+                            <h6 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Processamento Concluído</h6>
+                            <p class="mb-2">
+                                <strong>{{ rows_processed }}</strong> linha(s) processada(s)
+                                {% if rows_fixed > 0 %}
+                                    | <strong>{{ rows_fixed }}</strong> linha(s) corrigida(s)
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'download_relatorio_nf_estf0198' %}" class="btn btn-success btn-lg">
+                                <i class="fas fa-download me-2"></i>Baixar Arquivo Ajustado
+                            </a>
+                        </div>
+                        <p class="text-muted mt-3 mb-0">
+                            <i class="fas fa-info-circle me-1"></i>
+                            O arquivo está pronto para download. Clique no botão acima para baixar o arquivo CSV corrigido.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Instructions Section -->
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Instruções
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <h6 class="fw-bold">Como usar:</h6>
+                        <ol>
+                            <li>Faça o upload do arquivo CSV exportado do SIGA</li>
+                            <li>O sistema irá analisar e ajustar o arquivo</li>
+                            <li>Após o processamento, clique no botão "Baixar Arquivo Ajustado" para fazer o download</li>
+                        </ol>
+                        <h6 class="fw-bold mt-3">O que este ajuste faz:</h6>
+                        <ul>
+                            <li>Corrige problemas de formatação no arquivo CSV</li>
+                            <li>Ajusta a coluna "Observações" quando necessário</li>
+                            <li>Garante que todas as linhas tenham o número correto de colunas</li>
+                            <li>Remove ou corrige linhas de resumo que possam causar problemas</li>
+                            <li>Corrige aspas não balanceadas e caracteres especiais</li>
+                        </ul>
+                        <p class="text-muted mt-2">
+                            <i class="fas fa-info-circle me-1"></i>
+                            <strong>Nota:</strong> O sistema suporta arquivos CSV com diferentes encodings (latin-1, iso-8859-1, utf-8, cp1252) e tenta detectar automaticamente o encoding correto.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+window.addEventListener('load', function() {
+    const form = document.getElementById('uploadForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const fileInput = document.getElementById('fileInput');
+    
+    if (form && submitBtn) {
+        form.addEventListener('submit', function(e) {
+            if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                return; // Deixar validação HTML5 funcionar
+            }
+            
+            // Desabilitar botão e mostrar loading
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processando...';
+        });
+    }
+    
+    // Auto-scroll para mensagens se houver erros
+    const messagesContainer = document.getElementById('messages-container');
+    if (messagesContainer) {
+        const errorMessages = messagesContainer.querySelectorAll('.alert-error, .alert-danger');
+        if (errorMessages.length > 0) {
+            setTimeout(function() {
+                errorMessages[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+        }
+    }
+});
+</script>
+{% endblock %}

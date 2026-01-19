@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Importar Paradas de Máquina{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Importar Dados</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Importar Paradas de Máquina</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Importar Paradas de Máquina</h1>
+                <p class="lead">Importe dados de paradas de máquinas através de arquivo CSV</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Upload Section -->
+        <div class="row mb-5">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-upload me-2"></i>Selecionar Arquivo
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'importar_paradas_maquina' %}" enctype="multipart/form-data" id="importarForm">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="fileInput" class="form-label">Arquivo para Importação</label>
+                                <input type="file" class="form-control" id="fileInput" name="file" accept=".csv" required>
+                                <div class="form-text">Formatos aceitos: CSV (.csv) com delimitador ponto e vírgula (;)</div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="onlyNewRecords" name="only_new_records" checked>
+                                    <label class="form-check-label" for="onlyNewRecords">
+                                        <strong>Apenas adicionar novos registros</strong> (registros duplicados serão ignorados)
+                                    </label>
+                                    <div class="form-text">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Quando marcado, apenas registros que ainda não existem na tabela serão importados. Registros duplicados serão ignorados.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="updateExisting" name="update_existing">
+                                    <label class="form-check-label" for="updateExisting">
+                                        Atualizar registros existentes
+                                    </label>
+                                    <div class="form-text">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Quando marcado, registros existentes serão atualizados com os dados do arquivo. <strong>Nota:</strong> Se "Apenas adicionar novos registros" estiver marcado, esta opção será ignorada.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                    <i class="fas fa-upload me-2"></i>Importar Arquivo
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions Section -->
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Instruções
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <h6 class="fw-bold">Formato do Arquivo:</h6>
+                        <p>O arquivo CSV deve usar delimitador ponto e vírgula (;) e conter as seguintes colunas (primeira linha como cabeçalho):</p>
+                        <ul>
+                            <li><strong>UNID</strong> - Código da Unidade</li>
+                            <li><strong>NOME_UNIDADE</strong> - Nome da Unidade</li>
+                            <li><strong>LINHA_PRODUCAO</strong> - Código da Linha de Produção</li>
+                            <li><strong>DESCR_LINHA_PRODUCAO</strong> - Descrição da Linha de Produção</li>
+                            <li><strong>TURNO</strong> - Turno (A, B, C, etc.)</li>
+                            <li><strong>DATA</strong> - Data da parada (formato: DD/MM/YYYY) - obrigatório</li>
+                            <li><strong>CÓD. ITEM</strong> - Código do Item</li>
+                            <li><strong>DESCR. ITEM</strong> - Descrição do Item</li>
+                            <li><strong>CÓD. GRUPO DE RECURSO</strong> - Código do Grupo de Recurso</li>
+                            <li><strong>GRUPO RECURSO</strong> - Descrição do Grupo de Recurso</li>
+                            <li><strong>CÓD. PARADA</strong> - Código da Parada</li>
+                            <li><strong>DESCR. PARADA</strong> - Descrição da Parada</li>
+                            <li><strong>NRO</strong> - Número</li>
+                            <li><strong>CÓD. RECURSO</strong> - Código do Recurso</li>
+                            <li><strong>DESCR. RECURSO</strong> - Descrição do Recurso</li>
+                            <li><strong>HORARIO INICIAL</strong> - Horário inicial (formato: HH:MM)</li>
+                            <li><strong>HORARIO FINAL</strong> - Horário final (formato: HH:MM)</li>
+                            <li><strong>DIF. HORA</strong> - Diferença em horas (decimal)</li>
+                            <li><strong>CAPACIDADE</strong> - Capacidade (decimal)</li>
+                            <li><strong>MOTIVO</strong> - Motivo da parada</li>
+                            <li><strong>AÇÃO</strong> - Ação tomada</li>
+                        </ul>
+                        <h6 class="fw-bold mt-3">Observações:</h6>
+                        <ul>
+                            <li>A primeira linha do arquivo deve conter os cabeçalhos das colunas</li>
+                            <li>O campo <strong>DATA</strong> é obrigatório para cada registro</li>
+                            <li>O sistema identifica registros duplicados pela combinação de Data + Código Recurso + Horário Inicial</li>
+                            <li>O sistema aceita valores decimais no formato brasileiro (ex: 0,06666667) ou formato americano (ex: 0.06666667)</li>
+                            <li>O sistema suporta arquivos CSV com diferentes encodings (latin-1, iso-8859-1, utf-8, cp1252) e tenta detectar automaticamente o encoding correto</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Messages -->
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Executar após o main.js carregar
+window.addEventListener('load', function() {
+    const form = document.getElementById('importarForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const fileInput = document.getElementById('fileInput');
+    
+    if (!form || !submitBtn) {
+        console.error('Form ou botão de submit não encontrado!');
+        return;
+    }
+    
+    // Adicionar listener no formulário
+    form.addEventListener('submit', function(e) {
+        // Verificar se arquivo foi selecionado
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            return; // Deixar validação HTML5 funcionar
+        }
+        
+        // Desabilitar botão e mostrar loading
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Importando...';
+    }, true);
+});
+</script>
+{% endblock %}
