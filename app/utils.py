@@ -3791,6 +3791,45 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                         errors.append(f"Linha {row_num}: ID inválido '{id_excel_raw}'. Linha ignorada.")
                         continue
                     
+                    # Verificar se a linha tem dados além do ID
+                    # Se a linha só tem ID e todos os outros campos estão vazios, pular
+                    # Verificar se pelo menos um campo importante tem valor
+                    # (verificamos apenas alguns campos principais para eficiência)
+                    has_meaningful_data = False
+                    
+                    # Lista de grupos de campos para verificar (cada grupo tem variações possíveis)
+                    field_groups = [
+                        ['SETOR ', 'SETOR', 'setor'],
+                        ['SOLICITANTE', 'solicitante'],
+                        ['FORNECEDOR\nNOME FANTASIA', 'FORNECEDOR NOME FANTASIA', 'FORNECEDOR'],
+                        ['FORNECEDOR\nCNPJ', 'FORNECEDOR CNPJ'],
+                        ['DESCRIÇÃO DO SERVIÇO', 'DESCRI��O DO SERVI�O', 'DESCRICAO DO SERVICO'],
+                        ['VALOR TOTAL', 'valor_total'],
+                        ['PREVISÃO \nP/ EXECUÇÃO', 'PREVISÃO P/ EXECUÇÃO', 'PREVIS�O \nP/ EXECU��O'],
+                        ['USO \nCONTÁBIL', 'USO CONTÁBIL', 'USO \nCONT�BIL'],
+                        ['NÚMERO DA \nNOTA FISCAL', 'NÚMERO DA NOTA FISCAL', 'N�MERO DA \nNOTA FISCAL'],
+                        ['TIPO DE \nSOLICITAÇÃO', 'TIPO DE SOLICITAÇÃO', 'TIPO DE \nSOLICITACAO', 'TIPO DE SOLICITACAO'],
+                        ['ORDEM \nDE SERVIÇO', 'ORDEM DE SERVIÇO', 'ORDEM \nDE SERVI�O'],
+                        ['DATA DE ABERTURA \nDA REQUISIÇÃO', 'DATA DE ABERTURA DA REQUISIÇÃO', 'DATA DE ABERTURA \nDA REQUISI��O'],
+                        ['NÚMERO DA REQUISIÇÃO \nDE COMPRA', 'NÚMERO DA REQUISIÇÃO DE COMPRA', 'N�EMRO DA REQUISI��O \nDE COMPRA'],
+                        ['NÚMERO DO \nPEDIDO DE COMPRA', 'NÚMERO DO PEDIDO DE COMPRA', 'N�MERO DO \nPEDIDO DE COMPRA'],
+                        ['SERVIÇO CONCLUÍDO', 'SERVI�O CONCLU�DO'],
+                        ['NF DE SERVIÇO\n RECEBIDA', 'NF DE SERVIÇO RECEBIDA', 'NF DE SERVI�O\n RECEBIDA'],
+                        ['NF ENVIADA\n PARA LANÇAMENTO ', 'NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA\n PARA LANAMENTO '],
+                        ['OBSERVAÇÕES', 'OBSERVAES', 'OBSERVACOES', 'OBSERVAÇÕES ']
+                    ]
+                    
+                    # Verificar se pelo menos um campo além do ID tem valor
+                    for field_group in field_groups:
+                        value = find_column_value(row_data, field_group)
+                        if value and str(value).strip():
+                            has_meaningful_data = True
+                            break
+                    
+                    # Se não tem dados além do ID, pular esta linha (silenciosamente)
+                    if not has_meaningful_data:
+                        continue
+                    
                     # Mapear colunas do Excel para campos do modelo
                     setor = _safe_str(find_column_value(row_data, ['SETOR ', 'SETOR', 'setor']), max_length=100)
                     solicitante = _safe_str(find_column_value(row_data, ['SOLICITANTE', 'solicitante']), max_length=100)
@@ -3844,14 +3883,19 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                         'tipo': tipo_solicitacao,  # Mapear tipo_solicitacao para campo legado 'tipo'
                     }
                     
-                    # Usar id_excel como chave primária para identificação individual
-                    # Estratégia: usar id_excel para identificar registros únicos
+                    # Usar id_excel + setor como chave composta para identificação única
+                    # Estratégia: mesmo ID pode existir para setores diferentes
+                    # O setor já foi extraído acima na linha 3834
+                    # Se não houver setor, usar um valor padrão para evitar problemas
+                    setor_value = setor if setor else 'SEM SETOR'
+                    
                     projecao_obj = None
                     created = False
                     
                     if update_existing:
                         projecao_obj, created = ProjecaoGasto.objects.update_or_create(
                             id_excel=id_excel,
+                            setor=setor_value,
                             defaults=projecao_data
                         )
                         if created:
@@ -3861,6 +3905,7 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                     else:
                         projecao_obj, created = ProjecaoGasto.objects.get_or_create(
                             id_excel=id_excel,
+                            setor=setor_value,
                             defaults=projecao_data
                         )
                         if created:
@@ -4312,3 +4357,174 @@ def upload_paradas_maquina_from_file(file, update_existing=False) -> Tuple[int, 
         error_detail = f"Erro ao processar arquivo: {str(e)}"
         errors.append(error_detail)
         return 0, 0, errors
+
+
+def normalize_nota_numero(numero_str):
+    """
+    Normaliza o número da nota fiscal para comparação.
+    Remove prefixos como "NF", "Nº", espaços, e sufixos como " - 1", " - 2", etc.
+    
+    Exemplos:
+    - "NF 05777 - 1" -> "05777"
+    - "05777" -> "05777"
+    - "NF 12345" -> "12345"
+    - "Nº 99999 - 2" -> "99999"
+    """
+    if not numero_str:
+        return None
+    
+    import re
+    # Converter para string e remover espaços extras
+    numero_str = str(numero_str).strip().upper()
+    
+    # Remover prefixos comuns (NF, Nº, N, NOTA, etc.)
+    numero_str = re.sub(r'^(NF|Nº|N|NOTA|NOTA\s*FISCAL)\s*', '', numero_str, flags=re.IGNORECASE)
+    
+    # Remover sufixos como " - 1", " - 2", " - A", etc.
+    numero_str = re.sub(r'\s*-\s*\d+$', '', numero_str)
+    numero_str = re.sub(r'\s*-\s*[A-Z]$', '', numero_str)
+    
+    # Remover espaços e caracteres especiais, manter apenas números
+    numero_str = re.sub(r'[^\d]', '', numero_str)
+    
+    return numero_str if numero_str else None
+
+
+def normalize_fornecedor_nome(nome_str):
+    """
+    Normaliza o nome do fornecedor para comparação.
+    Remove espaços extras, converte para maiúsculas, remove caracteres especiais.
+    """
+    if not nome_str:
+        return None
+    
+    import re
+    # Converter para string, remover espaços extras e converter para maiúsculas
+    nome_str = str(nome_str).strip().upper()
+    
+    # Remover espaços múltiplos
+    nome_str = re.sub(r'\s+', ' ', nome_str)
+    
+    # Remover caracteres especiais comuns (mantém letras, números e espaços)
+    nome_str = re.sub(r'[^\w\s]', '', nome_str)
+    
+    return nome_str if nome_str else None
+
+
+def match_projecao_nota_fiscal(projecao, nota_fiscal, tolerance_percent=0.01):
+    """
+    Verifica se uma ProjecaoGasto corresponde a uma NotaFiscal.
+    
+    Args:
+        projecao: Instância de ProjecaoGasto
+        nota_fiscal: Instância de NotaFiscal
+        tolerance_percent: Tolerância percentual para valores (padrão 1%)
+    
+    Returns:
+        Tuple (bool, dict): (True se match, dict com detalhes do match)
+    """
+    from decimal import Decimal
+    
+    match_details = {
+        'numero_match': False,
+        'fornecedor_match': False,
+        'valor_match': False,
+        'score': 0.0
+    }
+    
+    # 1. Comparar número da nota
+    proj_numero = normalize_nota_numero(projecao.numero_nf) if projecao.numero_nf else None
+    nota_numero = normalize_nota_numero(nota_fiscal.nota) if nota_fiscal.nota else None
+    
+    if proj_numero and nota_numero:
+        match_details['numero_match'] = (proj_numero == nota_numero)
+    elif not proj_numero and not nota_numero:
+        # Se ambos são None, não podemos comparar, mas não é um match negativo
+        pass
+    else:
+        match_details['numero_match'] = False
+    
+    # 2. Comparar fornecedor
+    proj_fornecedor = normalize_fornecedor_nome(projecao.fornecedor_nome_fantasia) if projecao.fornecedor_nome_fantasia else None
+    nota_fornecedor = normalize_fornecedor_nome(nota_fiscal.nome_fantasia_emitente) if nota_fiscal.nome_fantasia_emitente else None
+    
+    if proj_fornecedor and nota_fornecedor:
+        # Comparação exata ou parcial (se um contém o outro)
+        match_details['fornecedor_match'] = (
+            proj_fornecedor == nota_fornecedor or
+            proj_fornecedor in nota_fornecedor or
+            nota_fornecedor in proj_fornecedor
+        )
+    elif not proj_fornecedor and not nota_fornecedor:
+        pass
+    else:
+        match_details['fornecedor_match'] = False
+    
+    # 3. Comparar valor (com tolerância)
+    proj_valor = projecao.valor_total if projecao.valor_total else None
+    nota_valor = nota_fiscal.total_nota if nota_fiscal.total_nota else None
+    
+    if proj_valor and nota_valor:
+        # Converter para Decimal se necessário
+        if not isinstance(proj_valor, Decimal):
+            proj_valor = Decimal(str(proj_valor))
+        if not isinstance(nota_valor, Decimal):
+            nota_valor = Decimal(str(nota_valor))
+        
+        # Calcular diferença percentual
+        if proj_valor > 0:
+            diff_percent = abs(proj_valor - nota_valor) / proj_valor
+            match_details['valor_match'] = (diff_percent <= tolerance_percent)
+        else:
+            match_details['valor_match'] = (proj_valor == nota_valor)
+    elif not proj_valor and not nota_valor:
+        pass
+    else:
+        match_details['valor_match'] = False
+    
+    # Calcular score (percentual de match)
+    matches = sum([
+        match_details['numero_match'],
+        match_details['fornecedor_match'],
+        match_details['valor_match']
+    ])
+    match_details['score'] = (matches / 3.0) * 100 if matches > 0 else 0.0
+    
+    # Considerar match se pelo menos 2 dos 3 critérios correspondem
+    # OU se número e valor correspondem (mais importante)
+    is_match = (
+        matches >= 2 or
+        (match_details['numero_match'] and match_details['valor_match'])
+    )
+    
+    return is_match, match_details
+
+
+def find_matching_notas_fiscais(projecao):
+    """
+    Encontra todas as Notas Fiscais que correspondem a uma ProjecaoGasto.
+    
+    Args:
+        projecao: Instância de ProjecaoGasto
+    
+    Returns:
+        List[Tuple]: Lista de tuplas (nota_fiscal, match_details)
+    """
+    from app.models import NotaFiscal
+    
+    if not projecao:
+        return []
+    
+    # Buscar todas as notas fiscais
+    todas_notas = NotaFiscal.objects.all()
+    
+    matches = []
+    for nota in todas_notas:
+        is_match, match_details = match_projecao_nota_fiscal(projecao, nota)
+        if is_match:
+            matches.append((nota, match_details))
+    
+    # Ordenar por score (melhor match primeiro)
+    matches.sort(key=lambda x: x[1]['score'], reverse=True)
+    
+    return matches

@@ -123,7 +123,7 @@
                                 {% endif %}
                             </button>
                         </h2>
-                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro or mostrar_todos %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
                             <div class="accordion-body">
                                 <form method="get" action="{% url 'consultar_projecao_gastos' %}" class="row g-3">
                                     <!-- Preservar busca geral e outros filtros -->
@@ -134,7 +134,17 @@
                                     {% if filtro_valor_min %}<input type="hidden" name="filtro_valor_min" value="{{ filtro_valor_min }}">{% endif %}
                                     {% if filtro_valor_max %}<input type="hidden" name="filtro_valor_max" value="{{ filtro_valor_max }}">{% endif %}
                                     
-                                    <div class="col-md-4">
+                                    <!-- Opção Mostrar Todos -->
+                                    <div class="col-12 mb-3">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="mostrar_todos" name="mostrar_todos" value="true" {% if mostrar_todos %}checked{% endif %} onchange="this.form.submit()">
+                                            <label class="form-check-label" for="mostrar_todos">
+                                                <strong>Mostrar todos os registros (sem filtros de ano/mês)</strong>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-4" {% if mostrar_todos %}style="display: none;"{% endif %}>
                                         <label for="ano" class="form-label">Ano</label>
                                         <select class="form-select" id="ano" name="ano" required>
                                             {% for ano in anos_disponiveis %}
@@ -142,7 +152,7 @@
                                             {% endfor %}
                                         </select>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-6" {% if mostrar_todos %}style="display: none;"{% endif %}>
                                         <label class="form-label">Meses (Selecione múltiplos meses ou deixe todos desmarcados para todos os meses)</label>
                                         <div class="row g-2">
                                             <div class="col-md-3 col-sm-4 col-6">
@@ -280,10 +290,10 @@
                                             <th class="col-descricao">Descrição</th>
                                             <th class="col-fornecedor">Fornecedor</th>
                                             <th class="col-valor">Valor Total</th>
-                                            <th class="col-data">Data Abertura</th>
+                                            <th class="col-data">Uso Contábil</th>
                                             <th class="col-numero">Mês/Ano Ref.</th>
                                             <th class="col-numero">Nº Requisição</th>
-                                            <th class="col-numero">Nº Ordem Serviço</th>
+                                            <th class="col-numero">Nº Nota Fiscal</th>
                                         </tr>
                                     </thead>
                                     <thead class="filter-row">
@@ -328,11 +338,7 @@
                                                 <strong class="format-money" data-value="{{ projecao.valor_total|default:0 }}">R$ {{ projecao.valor_total|floatformat:2|default:"0,00" }}</strong>
                                             </td>
                                             <td class="col-data">
-                                                {% if projecao.data_abertura_requisicao %}
-                                                    {{ projecao.data_abertura_requisicao|date:"d/m/Y" }}
-                                                {% else %}
-                                                    -
-                                                {% endif %}
+                                                {{ projecao.uso_contabil|default:"-" }}
                                             </td>
                                             <td class="col-numero">
                                                 {% if projecao.mes_referencia and projecao.ano_referencia %}
@@ -347,7 +353,7 @@
                                                 {{ projecao.numero_requisicao_compra|default:"-" }}
                                             </td>
                                             <td class="col-numero">
-                                                {{ projecao.numero_ordem_servico|default:"-" }}
+                                                {{ projecao.numero_nf|default:"-" }}
                                             </td>
                                         </tr>
                                         {% empty %}

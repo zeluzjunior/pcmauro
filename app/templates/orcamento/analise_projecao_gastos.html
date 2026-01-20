@@ -49,12 +49,43 @@
         padding: 20px;
         margin-bottom: 30px;
     }
+    .correlacao-table-container {
+        max-height: 600px;
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+    .correlacao-table {
+        width: 100%;
+        table-layout: auto;
+    }
+    .correlacao-table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+        white-space: nowrap;
+        vertical-align: middle;
+        text-align: center;
+        padding: 12px 8px;
+    }
+    .correlacao-table tbody td {
+        vertical-align: middle;
+        padding: 10px 8px;
+    }
+    .col-id { min-width: 100px; }
+    .col-setor-correlacao { min-width: 120px; }
+    .col-descricao-correlacao { min-width: 200px; }
+    .col-fornecedor-correlacao { min-width: 150px; }
+    .col-nf-correlacao { min-width: 120px; }
+    .col-valor-correlacao { min-width: 120px; text-align: right; }
+    .col-status { min-width: 130px; }
+    .col-score { min-width: 150px; }
 </style>
 {% endblock %}
 
 {% block content %}
 <!-- Page Header -->
-<section class="py-5 text-white" style="background-image: linear-gradient(rgba(0, 123, 255, 0.5), rgba(0, 123, 255, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
     <div class="container">
         <div class="row">
             <div class="col-12">
@@ -79,11 +110,11 @@
         <div class="accordion mb-4 filter-section" id="filterAccordion">
             <div class="accordion-item">
                 <h2 class="accordion-header" id="headingFilter">
-                    <button class="accordion-button {% if not ano_selecionado and not meses_selecionados %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if ano_selecionado or meses_selecionados %}true{% else %}false{% endif %}" aria-controls="collapseFilter">
+                    <button class="accordion-button {% if not ano_selecionado and not meses_selecionados and not setor_filtro and not uso_contabil_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if ano_selecionado or meses_selecionados or setor_filtro or uso_contabil_filtro %}true{% else %}false{% endif %}" aria-controls="collapseFilter">
                         <i class="fas fa-filter me-2"></i>Filtros de Análise
                     </button>
                 </h2>
-                <div id="collapseFilter" class="accordion-collapse collapse {% if ano_selecionado or meses_selecionados %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
+                <div id="collapseFilter" class="accordion-collapse collapse {% if ano_selecionado or meses_selecionados or setor_filtro or uso_contabil_filtro %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
                     <div class="accordion-body">
                         <form method="GET" class="row g-3 align-items-end">
                             <div class="col-md-3">
@@ -123,6 +154,24 @@
                             <div class="col-md-3 d-flex justify-content-end">
                                 <button type="submit" class="btn btn-primary me-2"><i class="fas fa-filter me-1"></i>Aplicar Filtros</button>
                                 <a href="{% url 'analise_projecao_gastos' %}" class="btn btn-outline-secondary"><i class="fas fa-sync-alt me-1"></i>Limpar</a>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="setor_filtro" class="form-label">Setor:</label>
+                                <select class="form-select" id="setor_filtro" name="setor">
+                                    <option value="">Todos os Setores</option>
+                                    {% for setor in setores_disponiveis %}
+                                        <option value="{{ setor }}" {% if setor == setor_filtro %}selected{% endif %}>{{ setor }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="uso_contabil_filtro" class="form-label">Uso Contábil:</label>
+                                <select class="form-select" id="uso_contabil_filtro" name="uso_contabil">
+                                    <option value="">Todos os Usos Contábeis</option>
+                                    {% for uso_contabil in uso_contabil_disponiveis %}
+                                        <option value="{{ uso_contabil }}" {% if uso_contabil == uso_contabil_filtro %}selected{% endif %}>{{ uso_contabil }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                         </form>
                     </div>
@@ -216,10 +265,28 @@
                 </div>
             </div>
         </div>
-
+        
+        <!-- Gráfico de Correlação: Valores das Projeções -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Correlação: Valores das Projeções de Gastos e Notas Fiscais
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="correlacaoValoresChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Charts Section -->
         <div class="row mb-5">
-            <div class="col-md-6 mb-4">
+            <div class="col-md-12 mb-4">
                 <div class="card shadow-sm border-0 h-100">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Distribuição por Setor</h5>
@@ -227,18 +294,6 @@
                     <div class="card-body">
                         <div class="chart-container-large">
                             <canvas id="setoresChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm border-0 h-100">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Top 10 Fornecedores por Valor</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="fornecedoresChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -266,21 +321,6 @@
                     <div class="card-body">
                         <div class="chart-container-large">
                             <canvas id="statusChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row mb-5">
-            <div class="col-md-12 mb-4">
-                <div class="card shadow-sm border-0 h-100">
-                    <div class="card-header bg-purple text-white" style="background-color: #6f42c1 !important;">
-                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Distribuição por Uso Contábil</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="usoContabilChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -356,6 +396,194 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Tabela Detalhada de Correlação -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>Tabela Detalhada: Correlação entre Projeções de Gastos e Notas Fiscais
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-4">
+                            Esta tabela mostra o resultado da análise automática de correspondência entre projeções de gastos e notas fiscais. 
+                            A correspondência é feita comparando número da nota (normalizado), fornecedor e valor total.
+                        </p>
+                        <div class="correlacao-table-container">
+                            <table class="table table-hover table-striped correlacao-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="col-id">ID Projeção</th>
+                                        <th class="col-setor-correlacao">Setor</th>
+                                        <th class="col-descricao-correlacao">Descrição</th>
+                                        <th class="col-fornecedor-correlacao">Fornecedor (Projeção)</th>
+                                        <th class="col-nf-correlacao">Nº NF (Projeção)</th>
+                                        <th class="col-valor-correlacao">Valor (Projeção)</th>
+                                        <th class="col-status">Status</th>
+                                        <th class="col-nf-correlacao">Nº NF (Nota Fiscal)</th>
+                                        <th class="col-fornecedor-correlacao">Fornecedor (Nota Fiscal)</th>
+                                        <th class="col-valor-correlacao">Valor (Nota Fiscal)</th>
+                                        <th class="col-score">Score Match</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for correlacao in correlacoes_detalhadas %}
+                                    <tr class="{% if correlacao.tem_match %}table-success{% else %}table-warning{% endif %}">
+                                        <td class="col-id">
+                                            <strong>{{ correlacao.projecao.id_excel|default:"-" }}</strong>
+                                        </td>
+                                        <td class="col-setor-correlacao">{{ correlacao.projecao.setor|default:"-" }}</td>
+                                        <td class="col-descricao-correlacao">{{ correlacao.projecao.descricao|default:"-"|truncatewords:8 }}</td>
+                                        <td class="col-fornecedor-correlacao">{{ correlacao.projecao.fornecedor_nome_fantasia|default:"-"|truncatewords:5 }}</td>
+                                        <td class="col-nf-correlacao">{{ correlacao.projecao.numero_nf|default:"-" }}</td>
+                                        <td class="col-valor-correlacao format-money" data-value="{{ correlacao.projecao.valor_total|default:0 }}">R$ {{ correlacao.projecao.valor_total|floatformat:2|default:"0,00" }}</td>
+                                        <td class="col-status">
+                                            {% if correlacao.tem_match %}
+                                                <span class="badge bg-success">Correspondente</span>
+                                            {% else %}
+                                                <span class="badge bg-warning">Sem Correspondente</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="col-nf-correlacao">
+                                            {% if correlacao.nota_fiscal %}
+                                                {{ correlacao.nota_fiscal.nota|default:"-" }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="col-fornecedor-correlacao">
+                                            {% if correlacao.nota_fiscal %}
+                                                {{ correlacao.nota_fiscal.nome_fantasia_emitente|default:"-"|truncatewords:5 }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="col-valor-correlacao">
+                                            {% if correlacao.nota_fiscal %}
+                                                <span class="format-money" data-value="{{ correlacao.nota_fiscal.total_nota|default:0 }}">R$ {{ correlacao.nota_fiscal.total_nota|floatformat:2|default:"0,00" }}</span>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="col-score text-center">
+                                            {% if correlacao.match_details %}
+                                                <span class="badge {% if correlacao.match_details.score >= 66.67 %}bg-success{% elif correlacao.match_details.score >= 33.33 %}bg-warning{% else %}bg-danger{% endif %}">
+                                                    {{ correlacao.match_details.score|floatformat:1 }}%
+                                                </span>
+                                                <br>
+                                                <small class="text-muted">
+                                                    {% if correlacao.match_details.numero_match %}<i class="fas fa-check text-success"></i>{% else %}<i class="fas fa-times text-danger"></i>{% endif %} Nº
+                                                    {% if correlacao.match_details.fornecedor_match %}<i class="fas fa-check text-success"></i>{% else %}<i class="fas fa-times text-danger"></i>{% endif %} Forn.
+                                                    {% if correlacao.match_details.valor_match %}<i class="fas fa-check text-success"></i>{% else %}<i class="fas fa-times text-danger"></i>{% endif %} Valor
+                                                </small>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="11" class="text-center text-muted py-4">
+                                            <i class="fas fa-inbox fa-2x mb-2"></i>
+                                            <p>Nenhuma correlação encontrada.</p>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Gráficos: Top 10 Fornecedores e Distribuição por Uso Contábil -->
+        <div class="row mb-5">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Top 10 Fornecedores por Valor</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="fornecedoresChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-purple text-white" style="background-color: #6f42c1 !important;">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Distribuição por Uso Contábil</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="usoContabilChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Resumo Correlação Projeções e Notas Fiscais -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-link me-2"></i>Resumo: Correlação entre Projeções de Gastos e Notas Fiscais
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-4">
+                            Esta análise verifica se as projeções de gastos têm notas fiscais correspondentes, 
+                            comparando número da nota (normalizado), fornecedor e valor total. A correspondência é feita automaticamente 
+                            através de análise inteligente dos dados.
+                        </p>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <div class="card border-success">
+                                    <div class="card-body text-center">
+                                        <h6 class="text-muted mb-2">Projeções com Nota Fiscal Correspondente</h6>
+                                        <h3 class="text-success mb-1">{{ projecoes_com_nota_match }}</h3>
+                                        <p class="mb-0">
+                                            <small class="text-muted">{{ percentual_projecoes_com_match|floatformat:1 }}% do total</small><br>
+                                            <strong class="text-success format-money" data-value="{{ valor_projecoes_com_match|default:0 }}">R$ {{ valor_projecoes_com_match|floatformat:2 }}</strong>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card border-warning">
+                                    <div class="card-body text-center">
+                                        <h6 class="text-muted mb-2">Projeções sem Nota Fiscal Correspondente</h6>
+                                        <h3 class="text-warning mb-1">{{ projecoes_sem_nota_match }}</h3>
+                                        <p class="mb-0">
+                                            <small class="text-muted">{% widthratio projecoes_sem_nota_match total_projecoes 100 %}% do total</small><br>
+                                            <strong class="text-warning format-money" data-value="{{ valor_projecoes_sem_match|default:0 }}">R$ {{ valor_projecoes_sem_match|floatformat:2 }}</strong>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card border-primary">
+                                    <div class="card-body text-center">
+                                        <h6 class="text-muted mb-2">Total de Projeções Analisadas</h6>
+                                        <h3 class="text-primary mb-1">{{ total_projecoes }}</h3>
+                                        <p class="mb-0">
+                                            <small class="text-muted">Valor Total</small><br>
+                                            <strong class="text-primary format-money" data-value="{{ valor_total_projetado|default:0 }}">R$ {{ valor_total_projetado|floatformat:2 }}</strong>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </section>
 {% endblock %}
@@ -405,6 +633,122 @@
                 element.textContent = formatarMoedaBR(valor);
             }
         });
+
+        // Gráfico de Correlação: Valores das Projeções (Mensal)
+        const correlacaoValoresCtx = document.getElementById('correlacaoValoresChart');
+        if (correlacaoValoresCtx) {
+            const correlacaoLabels = {{ correlacao_mensal_labels|safe }};
+            const correlacaoValorTotal = {{ correlacao_mensal_valor_total|safe }};
+            const correlacaoValorComMatch = {{ correlacao_mensal_valor_com_match|safe }};
+            const correlacaoValorSemMatch = {{ correlacao_mensal_valor_sem_match|safe }};
+            
+            new Chart(correlacaoValoresCtx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: correlacaoLabels,
+                    datasets: [
+                        {
+                            label: 'Valor Total das Projeções',
+                            data: correlacaoValorTotal,
+                            borderColor: '#0d6efd',
+                            backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                            fill: false,
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointRadius: 6,
+                            pointHoverRadius: 8
+                        },
+                        {
+                            label: 'Valor com Nota Fiscal Associada',
+                            data: correlacaoValorComMatch,
+                            borderColor: '#198754',
+                            backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                            fill: false,
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointRadius: 6,
+                            pointHoverRadius: 8
+                        },
+                        {
+                            label: 'Valor sem Nota Fiscal Associada',
+                            data: correlacaoValorSemMatch,
+                            borderColor: '#ffc107',
+                            backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                            fill: false,
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointRadius: 6,
+                            pointHoverRadius: 8
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                padding: 15,
+                                font: { size: 13 },
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.dataset.label || '';
+                                    const value = context.parsed.y || 0;
+                                    const datasetIndex = context.datasetIndex;
+                                    let total = 0;
+                                    if (datasetIndex === 0) {
+                                        total = value; // Valor total é o próprio valor
+                                    } else {
+                                        // Para os outros datasets, calcular o total do mês
+                                        const dataIndex = context.dataIndex;
+                                        total = correlacaoValorTotal[dataIndex] || value;
+                                    }
+                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(2) : '0.00';
+                                    return label + ': R$ ' + formatarMoedaBR(value).replace('R$ ', '') + ' (' + percentage + '%)';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'R$ ' + formatarMoedaBR(value).replace('R$ ', '');
+                                },
+                                font: { size: 11 }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Valor (R$)',
+                                font: { size: 12, weight: 'bold' }
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                font: { size: 11 },
+                                maxRotation: 45,
+                                minRotation: 45
+                            },
+                            title: {
+                                display: true,
+                                text: 'Mês',
+                                font: { size: 12, weight: 'bold' }
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         // Gráfico de Distribuição por Setor
         const setoresCtx = document.getElementById('setoresChart');

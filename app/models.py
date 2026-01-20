@@ -1172,8 +1172,8 @@ class Visitas(models.Model):
 
 class ProjecaoGasto(models.Model):
     """Modelo para armazenar informações de projeções de gastos e requisições de serviço"""
-    # ID do Excel (identificador único do Excel)
-    id_excel = models.IntegerField('ID Excel', unique=True, db_index=True, null=False)  # ID do Excel - identificador único para identificação individual
+    # ID do Excel (identificador único do Excel combinado com setor)
+    id_excel = models.IntegerField('ID Excel', db_index=True, null=False)  # ID do Excel - usado em combinação com setor para identificação única
     
     # Dados básicos
     setor = models.CharField('Setor', max_length=100, blank=True, null=True, db_index=True)  # SETOR do Excel
@@ -1198,8 +1198,8 @@ class ProjecaoGasto(models.Model):
     uso_contabil = models.CharField('Uso Contábil', max_length=100, blank=True, null=True)  # USO CONTÁBIL
     numero_nf = models.CharField('Número da NF', max_length=100, blank=True, null=True)  # NÚMERO DA NF
     numero_ordem_servico = models.CharField('Número Ordem de Serviço', max_length=100, blank=True, null=True, db_index=True)  # ORDEM DE SERVIÇO
-    numero_requisicao_compra = models.CharField('Número da Requisição de Compra', max_length=100, blank=True, null=True, db_index=True, unique=True)  # NÚMERO DA REQUISIÇÃO DE COMPRA
-    numero_pedido_compra = models.CharField('Número do Pedido de Compra', max_length=100, blank=True, null=True, unique=True)  # NÚMERO DO PEDIDO DE COMPRA
+    numero_requisicao_compra = models.CharField('Número da Requisição de Compra', max_length=100, blank=True, null=True, db_index=True)  # NÚMERO DA REQUISIÇÃO DE COMPRA
+    numero_pedido_compra = models.CharField('Número do Pedido de Compra', max_length=100, blank=True, null=True)  # NÚMERO DO PEDIDO DE COMPRA
     servico_concluido = models.DateField('Serviço Concluído', blank=True, null=True)  # SERVIÇO CONCLUÍDO
     nf_servico_recebida = models.DateField('NF de Serviço Recebida', blank=True, null=True)  # NF DE SERVIÇO RECEBIDA
     nf_enviada_lancamento = models.DateField('NF Enviada para Lançamento', blank=True, null=True)  # NF ENVIADA PARA LANÇAMENTO
@@ -1230,6 +1230,8 @@ class ProjecaoGasto(models.Model):
         verbose_name = 'Projeção de Gasto'
         verbose_name_plural = 'Projeções de Gastos'
         ordering = ['-ano_referencia', '-mes_referencia', '-data_abertura_requisicao', '-created_at']
+        # Constraint única composta: id_excel + setor (mesmo ID pode existir para setores diferentes)
+        unique_together = [['id_excel', 'setor']]
         indexes = [
             models.Index(fields=['tipo']),
             models.Index(fields=['setor']),
@@ -1237,6 +1239,7 @@ class ProjecaoGasto(models.Model):
             models.Index(fields=['mes_referencia', 'ano_referencia']),
             models.Index(fields=['data_abertura_requisicao']),
             models.Index(fields=['numero_requisicao_compra']),
+            models.Index(fields=['id_excel', 'setor']),  # Índice para a chave composta
         ]
     
     def __str__(self):

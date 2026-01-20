@@ -13966,6 +13966,26 @@ def analise_geral_orcamento(request):
         total=Sum('valor_total')
     )['total'] or Decimal('0')
     
+    # ========== CORRELAÇÃO PROJEÇÕES E NOTAS FISCAIS ==========
+    from app.utils import find_matching_notas_fiscais
+    
+    projecoes_com_nota_match = 0
+    projecoes_sem_nota_match = 0
+    valor_projecoes_com_match = Decimal('0')
+    valor_projecoes_sem_match = Decimal('0')
+    
+    # Analisar cada projeção para encontrar matches
+    for projecao in projecoes_filtradas:
+        matches = find_matching_notas_fiscais(projecao)
+        if matches:
+            projecoes_com_nota_match += 1
+            valor_projecoes_com_match += (projecao.valor_total or Decimal('0'))
+        else:
+            projecoes_sem_nota_match += 1
+            valor_projecoes_sem_match += (projecao.valor_total or Decimal('0'))
+    
+    percentual_projecoes_com_match = (projecoes_com_nota_match / total_projecoes * 100) if total_projecoes > 0 else 0
+    
     # Projeções com notas fiscais relacionadas
     projecoes_com_nf = projecoes_filtradas.filter(
         relacoes_notas_fiscais__isnull=False
@@ -14378,6 +14398,9 @@ def consultar_projecao_gastos(request):
     from datetime import datetime
     
     # ========== FILTRO DE ANO E MÊS (igual analise_geral_orcamento) ==========
+    # Verificar se o usuário quer mostrar todos os registros sem filtros
+    mostrar_todos = request.GET.get('mostrar_todos', 'false').lower() == 'true'
+    
     ano_filtro = request.GET.get('ano', None)
     meses_filtro = request.GET.getlist('mes')  # getlist para múltiplos valores
     
@@ -14395,43 +14418,56 @@ def consultar_projecao_gastos(request):
     if not anos_disponiveis:
         anos_disponiveis = [hoje.year]
     
-    # Se não há filtro de ano, usar o ano mais recente dos dados (ou ano atual se não houver dados)
-    if not ano_filtro:
-        if anos_disponiveis:
-            ano_filtro = anos_disponiveis[0]  # Usar o ano mais recente
-        else:
-            ano_filtro = hoje.year
-    
-    # Converter para inteiro
-    try:
-        ano_filtro = int(ano_filtro)
-    except (ValueError, TypeError):
-        if anos_disponiveis:
-            ano_filtro = anos_disponiveis[0]
-        else:
-            ano_filtro = hoje.year
-    
-    # Converter meses para inteiros e validar
-    meses_filtro_int = []
-    if meses_filtro:
-        for mes in meses_filtro:
-            try:
-                mes_int = int(mes)
-                if 1 <= mes_int <= 12:
-                    meses_filtro_int.append(mes_int)
-            except (ValueError, TypeError):
-                continue
-        # Remover duplicatas e ordenar
-        meses_filtro_int = sorted(list(set(meses_filtro_int)))
-    
-    # Se não há meses selecionados, usar todos os meses
-    meses_para_mostrar = meses_filtro_int if meses_filtro_int else list(range(1, 13))
+    # Se mostrar_todos está ativo, não aplicar filtros de ano/mês
+    if mostrar_todos:
+        ano_filtro = None
+        meses_filtro_int = []
+        meses_para_mostrar = []
+    else:
+        # Se não há filtro de ano, usar o ano mais recente dos dados (ou ano atual se não houver dados)
+        if not ano_filtro:
+            if anos_disponiveis:
+                ano_filtro = anos_disponiveis[0]  # Usar o ano mais recente
+            else:
+                ano_filtro = hoje.year
+        
+        # Converter para inteiro
+        try:
+            ano_filtro = int(ano_filtro)
+        except (ValueError, TypeError):
+            if anos_disponiveis:
+                ano_filtro = anos_disponiveis[0]
+            else:
+                ano_filtro = hoje.year
+        
+        # Converter meses para inteiros e validar
+        meses_filtro_int = []
+        if meses_filtro:
+            for mes in meses_filtro:
+                try:
+                    mes_int = int(mes)
+                    if 1 <= mes_int <= 12:
+                        meses_filtro_int.append(mes_int)
+                except (ValueError, TypeError):
+                    continue
+            # Remover duplicatas e ordenar
+            meses_filtro_int = sorted(list(set(meses_filtro_int)))
+        
+        # Se não há meses selecionados, usar todos os meses
+        meses_para_mostrar = meses_filtro_int if meses_filtro_int else list(range(1, 13))
     
     # ========== FILTROS DE PROJEÇÕES ==========
     try:
         # Busca geral
         search_query = request.GET.get('search', '').strip()
-        projecoes_list = ProjecaoGasto.objects.all()
+        # Filtrar apenas registros com dados significativos (não apenas ID)
+        # Incluir apenas registros que têm pelo menos um campo principal preenchido
+        projecoes_list = ProjecaoGasto.objects.filter(
+            Q(setor__isnull=False) & ~Q(setor='') |
+            Q(descricao__isnull=False) & ~Q(descricao='') |
+            Q(valor_total__isnull=False) & ~Q(valor_total=0) |
+            Q(fornecedor_nome_fantasia__isnull=False) & ~Q(fornecedor_nome_fantasia='')
+        )
     except Exception as e:
         import traceback
         print(f"Erro ao acessar ProjecaoGasto: {e}")
@@ -14439,24 +14475,25 @@ def consultar_projecao_gastos(request):
         projecoes_list = ProjecaoGasto.objects.none()
         search_query = ''
     
-    # Aplicar filtro de ano baseado em previsao_execucao
-    # Se o ano filtro foi definido explicitamente pelo usuário, filtrar apenas por esse ano
-    # Caso contrário, mostrar registros do ano mais recente OU registros sem ano_referencia
-    ano_filtro_explicito = request.GET.get('ano', None) is not None
-    if ano_filtro_explicito:
-        # Filtro explícito: filtrar por ano_referencia OU previsao_execucao contém o ano
-        q_ano = Q(ano_referencia=ano_filtro) | Q(previsao_execucao__icontains=str(ano_filtro))
-        projecoes_list = projecoes_list.filter(q_ano)
-    else:
-        # Sem filtro explícito: mostrar registros do ano mais recente OU registros sem ano_referencia
-        # Também incluir registros onde previsao_execucao contém o ano
-        q_ano = Q(ano_referencia=ano_filtro) | Q(ano_referencia__isnull=True) | Q(previsao_execucao__icontains=str(ano_filtro))
-        projecoes_list = projecoes_list.filter(q_ano)
-    
-    # Aplicar filtro de meses baseado em previsao_execucao
-    if meses_filtro_int:
-        # Mapear números de mês para nomes em português (usado em previsao_execucao)
-        meses_nomes = {
+    # Aplicar filtro de ano baseado em previsao_execucao (apenas se mostrar_todos não estiver ativo)
+    if not mostrar_todos:
+        # Se o ano filtro foi definido explicitamente pelo usuário, filtrar apenas por esse ano
+        # Caso contrário, mostrar registros do ano mais recente OU registros sem ano_referencia
+        ano_filtro_explicito = request.GET.get('ano', None) is not None
+        if ano_filtro_explicito:
+            # Filtro explícito: filtrar por ano_referencia OU previsao_execucao contém o ano
+            q_ano = Q(ano_referencia=ano_filtro) | Q(previsao_execucao__icontains=str(ano_filtro))
+            projecoes_list = projecoes_list.filter(q_ano)
+        else:
+            # Sem filtro explícito: mostrar registros do ano mais recente OU registros sem ano_referencia
+            # Também incluir registros onde previsao_execucao contém o ano
+            q_ano = Q(ano_referencia=ano_filtro) | Q(ano_referencia__isnull=True) | Q(previsao_execucao__icontains=str(ano_filtro))
+            projecoes_list = projecoes_list.filter(q_ano)
+        
+        # Aplicar filtro de meses baseado em previsao_execucao
+        if meses_filtro_int:
+            # Mapear números de mês para nomes em português (usado em previsao_execucao)
+            meses_nomes = {
             1: ['JANEIRO', 'JAN'],
             2: ['FEVEREIRO', 'FEV'],
             3: ['MARÇO', 'MARCO', 'MAR'],
@@ -14468,27 +14505,27 @@ def consultar_projecao_gastos(request):
             9: ['SETEMBRO', 'SET'],
             10: ['OUTUBRO', 'OUT'],
             11: ['NOVEMBRO', 'NOV'],
-            12: ['DEZEMBRO', 'DEZ']
-        }
-        
-        # Criar Q object para filtrar por mes_referencia (extraído durante import)
-        meses_selecionados_str = []
-        for m in meses_filtro_int:
-            meses_selecionados_str.append(str(m))  # Formato sem zero: '1', '2', ..., '12'
-            meses_selecionados_str.append(f"{m:02d}")  # Formato com zero: '01', '02', ..., '12'
-        meses_selecionados_str = list(set(meses_selecionados_str))
-        
-        # Criar Q object para filtrar por previsao_execucao diretamente (fallback)
-        q_previsao = Q()
-        for m in meses_filtro_int:
-            nomes_mes = meses_nomes.get(m, [])
-            for nome in nomes_mes:
-                # Buscar por nome do mês em previsao_execucao (case-insensitive)
-                q_previsao |= Q(previsao_execucao__icontains=nome)
-        
-        # Filtrar: mes_referencia OU previsao_execucao contém o mês
-        q_mes = Q(mes_referencia__in=meses_selecionados_str) | q_previsao
-        projecoes_list = projecoes_list.filter(q_mes)
+                12: ['DEZEMBRO', 'DEZ']
+            }
+            
+            # Criar Q object para filtrar por mes_referencia (extraído durante import)
+            meses_selecionados_str = []
+            for m in meses_filtro_int:
+                meses_selecionados_str.append(str(m))  # Formato sem zero: '1', '2', ..., '12'
+                meses_selecionados_str.append(f"{m:02d}")  # Formato com zero: '01', '02', ..., '12'
+            meses_selecionados_str = list(set(meses_selecionados_str))
+            
+            # Criar Q object para filtrar por previsao_execucao diretamente (fallback)
+            q_previsao = Q()
+            for m in meses_filtro_int:
+                nomes_mes = meses_nomes.get(m, [])
+                for nome in nomes_mes:
+                    # Buscar por nome do mês em previsao_execucao (case-insensitive)
+                    q_previsao |= Q(previsao_execucao__icontains=nome)
+            
+            # Filtrar: mes_referencia OU previsao_execucao contém o mês
+            q_mes = Q(mes_referencia__in=meses_selecionados_str) | q_previsao
+            projecoes_list = projecoes_list.filter(q_mes)
     
     # Aplicar busca geral
     if search_query:
@@ -14589,6 +14626,7 @@ def consultar_projecao_gastos(request):
         'ano_filtro': ano_filtro,
         'meses_filtro': meses_filtro_int,
         'anos_disponiveis': anos_disponiveis,
+        'mostrar_todos': mostrar_todos,
     }
     
     return render(request, 'orcamento/consultar_projecao_gastos.html', context)
@@ -14605,6 +14643,8 @@ def analise_projecao_gastos(request):
     # --- Lógica de Filtro ---
     ano_filtro = request.GET.get('ano', None)
     meses_filtro = request.GET.getlist('mes')
+    setor_filtro = request.GET.get('setor', '').strip()
+    uso_contabil_filtro = request.GET.get('uso_contabil', '').strip()
 
     hoje = datetime.now()
     
@@ -14672,35 +14712,67 @@ def analise_projecao_gastos(request):
     }
     meses_selecionados_str = [meses_str_map[m] for m in meses_para_mostrar]
 
+    # Obter valores únicos de setor e uso_contabil para os filtros (de todos os dados, não apenas filtrados)
+    setores_disponiveis = ProjecaoGasto.objects.exclude(
+        setor__isnull=True
+    ).exclude(
+        setor=''
+    ).values_list('setor', flat=True).distinct().order_by('setor')
+    
+    uso_contabil_disponiveis = ProjecaoGasto.objects.exclude(
+        uso_contabil__isnull=True
+    ).exclude(
+        uso_contabil=''
+    ).values_list('uso_contabil', flat=True).distinct().order_by('uso_contabil')
+    
     # --- Queryset Filtrado ---
-    # Começar com todos os dados
-    projecoes_qs = ProjecaoGasto.objects.all()
+    # Começar com todos os dados, mas excluir registros que só têm ID (sem dados significativos)
+    # Incluir apenas registros que têm pelo menos um campo principal preenchido
+    projecoes_qs = ProjecaoGasto.objects.filter(
+        Q(setor__isnull=False) & ~Q(setor='') |
+        Q(descricao__isnull=False) & ~Q(descricao='') |
+        Q(valor_total__isnull=False) & ~Q(valor_total=0) |
+        Q(fornecedor_nome_fantasia__isnull=False) & ~Q(fornecedor_nome_fantasia='')
+    )
     
     # Aplicar filtro de ano (ano_referencia OU created_at)
-    # Incluir também registros sem ano_referencia mas com created_at no ano filtrado
-    # E também incluir registros recentes (últimos 90 dias) mesmo que ano_referencia seja diferente
-    # Isso garante que dados novos importados sejam sempre visíveis
-    data_limite_recente = hoje - timedelta(days=90)
+    # Verificar se o filtro foi explicitamente selecionado pelo usuário
+    ano_filtro_explicito = request.GET.get('ano', None) is not None
     
-    q_ano = (
-        Q(ano_referencia=ano_filtro) |  # Ano de referência coincide
-        Q(created_at__year=ano_filtro) |  # Criado no ano filtrado
-        (Q(ano_referencia__isnull=True) & Q(created_at__year=ano_filtro)) |  # Sem ano_referencia mas criado no ano
-        (Q(created_at__gte=data_limite_recente))  # Dados recentes (últimos 90 dias) sempre incluídos
-    )
-    projecoes_qs = projecoes_qs.filter(q_ano)
+    if ano_filtro_explicito:
+        # Filtro explícito: aplicar filtro restritivo apenas para o ano selecionado
+        q_ano = (
+            Q(ano_referencia=ano_filtro) |  # Ano de referência coincide
+            Q(created_at__year=ano_filtro)  # Criado no ano filtrado
+        )
+        projecoes_qs = projecoes_qs.filter(q_ano)
+    else:
+        # Sem filtro explícito: incluir dados recentes (últimos 90 dias) para dados novos
+        data_limite_recente = hoje - timedelta(days=90)
+        q_ano = (
+            Q(ano_referencia=ano_filtro) |  # Ano de referência coincide
+            Q(created_at__year=ano_filtro) |  # Criado no ano filtrado
+            (Q(ano_referencia__isnull=True) & Q(created_at__year=ano_filtro)) |  # Sem ano_referencia mas criado no ano
+            (Q(created_at__gte=data_limite_recente))  # Dados recentes (últimos 90 dias) sempre incluídos
+        )
+        projecoes_qs = projecoes_qs.filter(q_ano)
     
     # Se há meses selecionados, aplicar filtro de mês
-    # Mas sempre incluir dados recentes (últimos 90 dias) mesmo que não correspondam ao mês
     if meses_filtro_int:
         q_mes = Q()
         for mes_str in meses_selecionados_str:
             q_mes |= Q(mes_referencia__iexact=mes_str)
         for mes_num in meses_filtro_int:
             q_mes |= Q(created_at__month=mes_num)
-        # Incluir dados recentes mesmo que não correspondam ao mês filtrado
-        q_mes |= Q(created_at__gte=data_limite_recente)
         projecoes_qs = projecoes_qs.filter(q_mes)
+    
+    # Aplicar filtro de setor
+    if setor_filtro:
+        projecoes_qs = projecoes_qs.filter(setor=setor_filtro)
+    
+    # Aplicar filtro de uso contábil
+    if uso_contabil_filtro:
+        projecoes_qs = projecoes_qs.filter(uso_contabil=uso_contabil_filtro)
 
     # --- KPIs ---
     total_projecoes = projecoes_qs.count()
@@ -14717,6 +14789,88 @@ def analise_projecao_gastos(request):
     ).values_list('projecao_id', flat=True).distinct()
     projecoes_com_nf = len(projecoes_com_nf_ids)
     percentual_com_nf = (projecoes_com_nf / total_projecoes * 100) if total_projecoes > 0 else 0
+    
+    # ========== CORRELAÇÃO PROJEÇÕES E NOTAS FISCAIS (Análise Automática) ==========
+    from app.utils import find_matching_notas_fiscais
+    
+    projecoes_com_nota_match = 0
+    projecoes_sem_nota_match = 0
+    valor_projecoes_com_match = Decimal('0')
+    valor_projecoes_sem_match = Decimal('0')
+    
+    # Lista detalhada de correlações para a tabela
+    correlacoes_detalhadas = []
+    
+    # Dados mensais para o gráfico de correlação
+    correlacao_mensal_labels = []
+    correlacao_mensal_valor_total = []
+    correlacao_mensal_valor_com_match = []
+    correlacao_mensal_valor_sem_match = []
+    
+    # Analisar cada projeção para encontrar matches
+    for projecao in projecoes_qs:
+        matches = find_matching_notas_fiscais(projecao)
+        if matches:
+            projecoes_com_nota_match += 1
+            valor_projecoes_com_match += (projecao.valor_total or Decimal('0'))
+            # Adicionar à lista detalhada (pegar o melhor match - primeiro da lista ordenada)
+            melhor_match = matches[0] if matches else None
+            if melhor_match:
+                nota_fiscal, match_details = melhor_match
+                correlacoes_detalhadas.append({
+                    'projecao': projecao,
+                    'nota_fiscal': nota_fiscal,
+                    'match_details': match_details,
+                    'tem_match': True
+                })
+        else:
+            projecoes_sem_nota_match += 1
+            valor_projecoes_sem_match += (projecao.valor_total or Decimal('0'))
+            # Adicionar projeções sem match também
+            correlacoes_detalhadas.append({
+                'projecao': projecao,
+                'nota_fiscal': None,
+                'match_details': None,
+                'tem_match': False
+            })
+    
+    percentual_projecoes_com_match = (projecoes_com_nota_match / total_projecoes * 100) if total_projecoes > 0 else 0
+    
+    # Ordenar correlações: primeiro as com match, depois as sem match
+    correlacoes_detalhadas.sort(key=lambda x: (not x['tem_match'], x['projecao'].id_excel or 0))
+    
+    # Calcular valores mensais de correlação
+    meses_nomes_curtos = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    
+    for mes_num, mes_nome in meses_choices:
+        if mes_num in meses_para_mostrar:
+            label = f"{meses_nomes_curtos[mes_num-1]}/{str(ano_filtro)[2:]}"
+            correlacao_mensal_labels.append(label)
+            
+            # Filtrar projeções do mês (usar mes_referencia OU created_at)
+            # Usar o queryset já filtrado por ano (projecoes_qs) e aplicar filtro adicional de mês
+            q_mes_temporal = Q(mes_referencia__iexact=meses_str_map[mes_num]) | Q(created_at__month=mes_num)
+            projecoes_mes = projecoes_qs.filter(q_mes_temporal)
+            
+            # Calcular valores para o mês
+            valor_total_mes = Decimal('0')
+            valor_com_match_mes = Decimal('0')
+            valor_sem_match_mes = Decimal('0')
+            
+            for projecao_mes in projecoes_mes:
+                valor_proj = projecao_mes.valor_total or Decimal('0')
+                valor_total_mes += valor_proj
+                
+                # Verificar se tem match
+                matches_mes = find_matching_notas_fiscais(projecao_mes)
+                if matches_mes:
+                    valor_com_match_mes += valor_proj
+                else:
+                    valor_sem_match_mes += valor_proj
+            
+            correlacao_mensal_valor_total.append(float(valor_total_mes))
+            correlacao_mensal_valor_com_match.append(float(valor_com_match_mes))
+            correlacao_mensal_valor_sem_match.append(float(valor_sem_match_mes))
 
     # Projeções com Ordem de Serviço
     projecoes_com_os = projecoes_qs.exclude(numero_ordem_servico__isnull=True).exclude(numero_ordem_servico='').count()
@@ -14732,6 +14886,19 @@ def analise_projecao_gastos(request):
 
     # Setores únicos
     setores_unicos = projecoes_qs.exclude(setor__isnull=True).exclude(setor='').values('setor').distinct().count()
+    
+    # Obter valores únicos de setor e uso_contabil para os filtros (de todos os dados, não apenas filtrados)
+    setores_disponiveis = ProjecaoGasto.objects.exclude(
+        setor__isnull=True
+    ).exclude(
+        setor=''
+    ).values_list('setor', flat=True).distinct().order_by('setor')
+    
+    uso_contabil_disponiveis = ProjecaoGasto.objects.exclude(
+        uso_contabil__isnull=True
+    ).exclude(
+        uso_contabil=''
+    ).values_list('uso_contabil', flat=True).distinct().order_by('uso_contabil')
 
     # --- Dados para Gráficos ---
     # Gráfico 1: Distribuição por Setor (Top 10) - usando aggregate para eficiência
@@ -14823,6 +14990,10 @@ def analise_projecao_gastos(request):
         'ano_selecionado': ano_filtro,
         'meses_choices': meses_choices,
         'meses_selecionados': meses_filtro_int,
+        'setores_disponiveis': setores_disponiveis,
+        'uso_contabil_disponiveis': uso_contabil_disponiveis,
+        'setor_filtro': setor_filtro,
+        'uso_contabil_filtro': uso_contabil_filtro,
 
         # KPIs
         'total_projecoes': total_projecoes,
@@ -14837,6 +15008,19 @@ def analise_projecao_gastos(request):
         'projecoes_pendentes': projecoes_pendentes,
         'percentual_pendentes': percentual_pendentes,
         'setores_unicos': setores_unicos,
+        # Correlação Projeções e Notas Fiscais
+        'projecoes_com_nota_match': projecoes_com_nota_match,
+        'projecoes_sem_nota_match': projecoes_sem_nota_match,
+        'percentual_projecoes_com_match': percentual_projecoes_com_match,
+        'valor_projecoes_com_match': valor_projecoes_com_match,
+        'valor_projecoes_sem_match': valor_projecoes_sem_match,
+        'correlacoes_detalhadas': correlacoes_detalhadas,
+        
+        # Dados mensais para gráfico de correlação
+        'correlacao_mensal_labels': json.dumps(correlacao_mensal_labels, ensure_ascii=False),
+        'correlacao_mensal_valor_total': json.dumps(correlacao_mensal_valor_total),
+        'correlacao_mensal_valor_com_match': json.dumps(correlacao_mensal_valor_com_match),
+        'correlacao_mensal_valor_sem_match': json.dumps(correlacao_mensal_valor_sem_match),
 
         # Gráficos
         'setores_labels': json.dumps(setores_labels, ensure_ascii=False),
