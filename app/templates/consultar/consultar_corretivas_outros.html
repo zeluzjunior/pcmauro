@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load form_extras %}
 
 {% block title %}Consultar Ordens Corretivas/Outros{% endblock %}
 
@@ -69,7 +70,7 @@
                 <div class="card bg-primary text-white">
                     <div class="card-body">
                         <h5 class="card-title">Total</h5>
-                        <p class="card-text display-6">{{ total_count }}</p>
+                        <p class="card-text display-6">{{ total_count|number_br:0 }}</p>
                     </div>
                 </div>
             </div>
@@ -77,7 +78,7 @@
                 <div class="card bg-info text-white">
                     <div class="card-body">
                         <h5 class="card-title">Mostrando</h5>
-                        <p class="card-text display-6">{{ ordens|length }}</p>
+                        <p class="card-text display-6">{{ ordens|length|number_br:0 }}</p>
                     </div>
                 </div>
             </div>
@@ -85,7 +86,7 @@
                 <div class="card bg-success text-white">
                     <div class="card-body">
                         <h5 class="card-title">Setores</h5>
-                        <p class="card-text display-6">{{ setores_count }}</p>
+                        <p class="card-text display-6">{{ setores_count|number_br:0 }}</p>
                     </div>
                 </div>
             </div>
@@ -93,7 +94,7 @@
                 <div class="card bg-warning text-white">
                     <div class="card-body">
                         <h5 class="card-title">Unidades</h5>
-                        <p class="card-text display-6">{{ unidades_count }}</p>
+                        <p class="card-text display-6">{{ unidades_count|number_br:0 }}</p>
                     </div>
                 </div>
             </div>
@@ -301,10 +302,10 @@
                             {% if ordens %}
                                 {% for ordem in ordens %}
                                 <tr>
-                                    <td><strong>{{ ordem.cd_ordemserv }}</strong></td>
+                                    <td><strong>{{ ordem.cd_ordemserv|number_br:0 }}</strong></td>
                                     <td>
                                         {% if ordem.cd_maquina %}
-                                            <span class="badge bg-secondary">{{ ordem.cd_maquina }}</span>
+                                            <span class="badge bg-secondary">{{ ordem.cd_maquina|number_br:0 }}</span>
                                         {% else %}
                                             -
                                         {% endif %}
@@ -392,7 +393,7 @@
                         
                         <li class="page-item active">
                             <span class="page-link">
-                                Página {{ ordens.number }} de {{ ordens.paginator.num_pages }}
+                                Página {{ ordens.number|number_br:0 }} de {{ ordens.paginator.num_pages|number_br:0 }}
                             </span>
                         </li>
                         
