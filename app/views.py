@@ -13076,16 +13076,23 @@ def limpar_tabela(request):
             total_removido = 0
             detalhes = []
             
-            for key, info in tabelas_map.items():
-                count = info['modelo'].objects.count()
-                if count > 0:
-                    info['modelo'].objects.all().delete()
-                    total_removido += count
-                    detalhes.append(f"{info['nome']} ({count})")
+            from django.db import transaction
+            with transaction.atomic():
+                for key, info in tabelas_map.items():
+                    count = info['modelo'].objects.count()
+                    if count > 0:
+                        info['modelo'].objects.all().delete()
+                        # Verificar se realmente foi deletado
+                        remaining_count = info['modelo'].objects.count()
+                        if remaining_count == 0:
+                            total_removido += count
+                            detalhes.append(f"{info['nome']} ({count})")
+                        else:
+                            detalhes.append(f"{info['nome']} ({count - remaining_count} removidos, {remaining_count} restantes)")
             
             if total_removido > 0:
                 detalhes_str = '<br>'.join([f"- {d}" for d in detalhes])
-                messages.success(request, f'Todas as tabelas foram limpas. Total de {total_removido} registro(s) removidos.<br><br>{detalhes_str}')
+                messages.success(request, f'Todas as tabelas foram limpas. Total de {total_removido} registro(s) removidos permanentemente.<br><br>{detalhes_str}')
             else:
                 messages.info(request, 'Não há registros para limpar.')
         
@@ -13096,8 +13103,16 @@ def limpar_tabela(request):
             
             if count > 0:
                 try:
-                    deleted_count, deleted_details = info['modelo'].objects.all().delete()
-                    messages.success(request, f'{count} registro(s) de {info["nome"]} foram removidos com sucesso.')
+                    # Forçar commit da transação para garantir que a deleção seja permanente
+                    from django.db import transaction
+                    with transaction.atomic():
+                        deleted_count, deleted_details = info['modelo'].objects.all().delete()
+                    # Verificar se realmente foi deletado
+                    remaining_count = info['modelo'].objects.count()
+                    if remaining_count == 0:
+                        messages.success(request, f'{count} registro(s) de {info["nome"]} foram removidos permanentemente do banco de dados.')
+                    else:
+                        messages.warning(request, f'{count - remaining_count} registro(s) de {info["nome"]} foram removidos, mas {remaining_count} registro(s) ainda permanecem no banco de dados.')
                 except Exception as delete_error:
                     import traceback
                     error_details = traceback.format_exc()
@@ -15447,8 +15462,8 @@ def analise_notas_fiscais(request):
 
 
 def relacionar_projecao_nota_fiscal(request):
-    """Relacionar Projeções de Gastos com Notas Fiscais - encontrar matches e confirmar relações"""
-    from app.models import ProjecaoGasto, NotaFiscal, RelacaoProjecaoNotaFiscal
+    """Relacionar Projeções de Gastos com Notas Fiscais e Controle RC e NF - encontrar matches e confirmar relações"""
+    from app.models import ProjecaoGasto, NotaFiscal, ControleRCeNF, RelacaoProjecaoNotaFiscal
     from django.db.models import Q
     from decimal import Decimal
     from django.contrib import messages
@@ -15463,12 +15478,21 @@ def relacionar_projecao_nota_fiscal(request):
             try:
                 projecao = ProjecaoGasto.objects.get(id=projecao_id)
                 nota = NotaFiscal.objects.get(id=nota_id)
+                controle_id = request.POST.get('controle_id', '').strip()
                 score_match = request.POST.get('score_match', '0')
                 observacoes = request.POST.get('observacoes', '').strip()
+                
+                controle_rc_nf = None
+                if controle_id:
+                    try:
+                        controle_rc_nf = ControleRCeNF.objects.get(id_excel=controle_id)
+                    except ControleRCeNF.DoesNotExist:
+                        pass
                 
                 relacao, created = RelacaoProjecaoNotaFiscal.objects.update_or_create(
                     projecao=projecao,
                     nota_fiscal=nota,
+                    controle_rc_nf=controle_rc_nf,
                     defaults={
                         'status': 'confirmado',
                         'score_match': Decimal(score_match) if score_match else None,
@@ -15493,11 +15517,20 @@ def relacionar_projecao_nota_fiscal(request):
             try:
                 projecao = ProjecaoGasto.objects.get(id=projecao_id)
                 nota = NotaFiscal.objects.get(id=nota_id)
+                controle_id = request.POST.get('controle_id', '').strip()
                 observacoes = request.POST.get('observacoes', '').strip()
+                
+                controle_rc_nf = None
+                if controle_id:
+                    try:
+                        controle_rc_nf = ControleRCeNF.objects.get(id_excel=controle_id)
+                    except ControleRCeNF.DoesNotExist:
+                        pass
                 
                 relacao, created = RelacaoProjecaoNotaFiscal.objects.update_or_create(
                     projecao=projecao,
                     nota_fiscal=nota,
+                    controle_rc_nf=controle_rc_nf,
                     defaults={
                         'status': 'rejeitado',
                         'confirmado_por': request.user.username if request.user.is_authenticated else 'Anônimo',
@@ -15518,11 +15551,17 @@ def relacionar_projecao_nota_fiscal(request):
             try:
                 projecao = ProjecaoGasto.objects.get(id=projecao_id)
                 nota = NotaFiscal.objects.get(id=nota_id)
+                controle_id = request.POST.get('controle_id', '').strip()
                 
-                RelacaoProjecaoNotaFiscal.objects.filter(
-                    projecao=projecao,
-                    nota_fiscal=nota
-                ).delete()
+                filtro = Q(projecao=projecao, nota_fiscal=nota)
+                if controle_id:
+                    try:
+                        controle_rc_nf = ControleRCeNF.objects.get(id_excel=controle_id)
+                        filtro &= Q(controle_rc_nf=controle_rc_nf)
+                    except ControleRCeNF.DoesNotExist:
+                        pass
+                
+                RelacaoProjecaoNotaFiscal.objects.filter(filtro).delete()
                 
                 messages.success(request, f'Relação removida com sucesso.')
                     
@@ -15531,7 +15570,7 @@ def relacionar_projecao_nota_fiscal(request):
         
         return redirect('relacionar_projecao_nota_fiscal')
     
-    # Função para calcular score de match
+    # Função para calcular score de match (duas tabelas - original)
     def calcular_match_score(projecao, nota):
         """Calcula score de correspondência entre projeção e nota fiscal (0-100)"""
         score = 0
@@ -15630,6 +15669,266 @@ def relacionar_projecao_nota_fiscal(request):
         percentual = (score / total_peso * 100)
         return round(percentual, 2), detalhes
     
+    # Função para calcular score de match (três tabelas)
+    def calcular_match_score_tres_tabelas(projecao, nota, controle=None):
+        """Calcula score de correspondência entre projeção, nota fiscal e controle RC e NF (0-100)"""
+        if not controle:
+            # Se não há controle, usar função de duas tabelas
+            return calcular_match_score(projecao, nota)
+        
+        score = 0
+        total_peso = 0
+        detalhes = []
+        
+        # Valor - comparar entre as três tabelas (peso 30)
+        valores = []
+        if projecao.valor_total:
+            valores.append(('Projeção', projecao.valor_total))
+        if nota.total_nota:
+            valores.append(('Nota Fiscal', nota.total_nota))
+        if controle:
+            if controle.valor_nf:
+                valores.append(('Controle NF', controle.valor_nf))
+            elif controle.valor_total_pedido:
+                valores.append(('Controle Pedido', controle.valor_total_pedido))
+        
+        if len(valores) >= 2:
+            total_peso += 30
+            # Comparar todos os valores
+            valores_decimais = [float(v[1]) for v in valores]
+            max_valor = max(valores_decimais)
+            min_valor = min(valores_decimais)
+            if max_valor > 0:
+                diff_percent = abs(max_valor - min_valor) / max_valor * 100
+                if diff_percent <= 5:
+                    score += 30
+                    detalhes.append(f"Valor (3 tabelas): Match perfeito (diff: {diff_percent:.1f}%)")
+                elif diff_percent <= 10:
+                    score += 20
+                    detalhes.append(f"Valor (3 tabelas): Match bom (diff: {diff_percent:.1f}%)")
+                elif diff_percent <= 20:
+                    score += 10
+                    detalhes.append(f"Valor (3 tabelas): Match parcial (diff: {diff_percent:.1f}%)")
+                else:
+                    detalhes.append(f"Valor (3 tabelas): Diferença significativa (diff: {diff_percent:.1f}%)")
+        
+        # Fornecedor/Emitente/Empresa - comparar entre as três tabelas (peso 25)
+        fornecedores = []
+        fornecedor_proj = (projecao.fornecedor_nome_fantasia or '').strip().upper()
+        if fornecedor_proj:
+            fornecedores.append(('Projeção', fornecedor_proj))
+        emitente_nota = (nota.nome_fantasia_emitente or nota.emitente or '').strip().upper()
+        if emitente_nota:
+            fornecedores.append(('Nota Fiscal', emitente_nota))
+        if controle and controle.empresa:
+            empresa_controle = (controle.empresa or '').strip().upper()
+            if empresa_controle:
+                fornecedores.append(('Controle RC/NF', empresa_controle))
+        
+        if len(fornecedores) >= 2:
+            total_peso += 25
+            # Verificar se todos são iguais ou similares
+            nomes = [f[1] for f in fornecedores]
+            if len(set(nomes)) == 1:
+                score += 25
+                detalhes.append("Fornecedor/Emitente/Empresa (3 tabelas): Match perfeito")
+            elif any(nomes[0] in n or n in nomes[0] for n in nomes[1:]):
+                score += 15
+                detalhes.append("Fornecedor/Emitente/Empresa (3 tabelas): Match parcial")
+            else:
+                detalhes.append("Fornecedor/Emitente/Empresa (3 tabelas): Não corresponde")
+        
+        # Número NF - comparar entre as três tabelas (peso 20)
+        nfs = []
+        nf_proj = (projecao.numero_nf or '').strip()
+        if nf_proj:
+            nfs.append(('Projeção', nf_proj))
+        nf_nota = (nota.nota or '').strip()
+        if nf_nota:
+            nfs.append(('Nota Fiscal', nf_nota))
+        if controle:
+            if controle.nf_saida:
+                nfs.append(('Controle NF Saída', controle.nf_saida.strip()))
+            if controle.nf_servico:
+                nfs.append(('Controle NF Serviço', controle.nf_servico.strip()))
+        
+        if len(nfs) >= 2:
+            total_peso += 20
+            # Normalizar números de NF para comparação
+            from app.utils import normalize_nota_numero
+            nfs_normalizados = [(f[0], normalize_nota_numero(f[1])) for f in nfs if f[1]]
+            if len(set([n[1] for n in nfs_normalizados])) == 1:
+                score += 20
+                detalhes.append("Número NF (3 tabelas): Match perfeito")
+            else:
+                detalhes.append("Número NF (3 tabelas): Não corresponde")
+        
+        # RC/Pedido - comparar Projeção com Controle (peso 15)
+        if controle:
+            total_peso += 15
+            match_rc_pedido = False
+            # Comparar número de requisição
+            if projecao.numero_requisicao_compra and controle.rc:
+                rc_proj = (projecao.numero_requisicao_compra or '').strip()
+                rc_controle = (controle.rc or '').strip()
+                if rc_proj == rc_controle:
+                    score += 10
+                    detalhes.append("RC: Match perfeito")
+                    match_rc_pedido = True
+            # Comparar número de pedido
+            if projecao.numero_pedido_compra and controle.pedido:
+                pedido_proj = (projecao.numero_pedido_compra or '').strip()
+                pedido_controle = (controle.pedido or '').strip()
+                if pedido_proj == pedido_controle:
+                    score += 5
+                    detalhes.append("Pedido: Match perfeito")
+                    match_rc_pedido = True
+            if not match_rc_pedido:
+                detalhes.append("RC/Pedido: Não corresponde")
+        
+        # Data - comparar entre as três tabelas (peso 10)
+        datas = []
+        if projecao.data_abertura_requisicao:
+            datas.append(('Projeção', projecao.data_abertura_requisicao))
+        if nota.data_emissao:
+            try:
+                from datetime import datetime
+                data_nota_str = nota.data_emissao.strip()
+                for fmt in ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y']:
+                    try:
+                        data_nota = datetime.strptime(data_nota_str, fmt).date()
+                        datas.append(('Nota Fiscal', data_nota))
+                        break
+                    except ValueError:
+                        continue
+            except Exception:
+                pass
+        if controle and controle.data_rc:
+            datas.append(('Controle RC', controle.data_rc.date() if hasattr(controle.data_rc, 'date') else controle.data_rc))
+        if controle and controle.emissao:
+            datas.append(('Controle Emissão', controle.emissao.date() if hasattr(controle.emissao, 'date') else controle.emissao))
+        
+        if len(datas) >= 2:
+            total_peso += 10
+            # Calcular diferença máxima entre datas
+            from datetime import date
+            datas_only = [d[1] for d in datas if isinstance(d[1], date)]
+            if len(datas_only) >= 2:
+                max_data = max(datas_only)
+                min_data = min(datas_only)
+                diff_dias = abs((max_data - min_data).days)
+                if diff_dias <= 7:
+                    score += 10
+                    detalhes.append(f"Data (3 tabelas): Match próximo ({diff_dias} dias)")
+                elif diff_dias <= 30:
+                    score += 5
+                    detalhes.append(f"Data (3 tabelas): Match razoável ({diff_dias} dias)")
+                else:
+                    detalhes.append(f"Data (3 tabelas): Diferença grande ({diff_dias} dias)")
+        
+        if total_peso == 0:
+            return 0, []
+        
+        percentual = (score / total_peso * 100)
+        return round(percentual, 2), detalhes
+    
+    # Função para calcular score de match (duas tabelas - mantida para compatibilidade)
+    def calcular_match_score(projecao, nota):
+        """Calcula score de correspondência entre projeção e nota fiscal (0-100)"""
+        score = 0
+        total_peso = 0
+        detalhes = []
+        
+        # Valor (peso 30)
+        if projecao.valor_total and nota.total_nota:
+            total_peso += 30
+            diff_percent = abs(float(projecao.valor_total - nota.total_nota)) / float(projecao.valor_total) * 100
+            if diff_percent <= 5:
+                score += 30
+                detalhes.append(f"Valor: Match perfeito (diff: {diff_percent:.1f}%)")
+            elif diff_percent <= 10:
+                score += 20
+                detalhes.append(f"Valor: Match bom (diff: {diff_percent:.1f}%)")
+            elif diff_percent <= 20:
+                score += 10
+                detalhes.append(f"Valor: Match parcial (diff: {diff_percent:.1f}%)")
+            else:
+                detalhes.append(f"Valor: Diferença significativa (diff: {diff_percent:.1f}%)")
+        
+        # Fornecedor/Emitente (peso 25)
+        fornecedor_proj = (projecao.fornecedor_nome_fantasia or '').strip().upper()
+        emitente_nota = (nota.nome_fantasia_emitente or nota.emitente or '').strip().upper()
+        if fornecedor_proj and emitente_nota:
+            total_peso += 25
+            if fornecedor_proj == emitente_nota:
+                score += 25
+                detalhes.append("Fornecedor/Emitente: Match perfeito")
+            elif fornecedor_proj in emitente_nota or emitente_nota in fornecedor_proj:
+                score += 15
+                detalhes.append("Fornecedor/Emitente: Match parcial")
+            else:
+                detalhes.append("Fornecedor/Emitente: Não corresponde")
+        
+        # CNPJ (peso 20)
+        cnpj_proj = (projecao.fornecedor_cnpj or '').strip().replace('.', '').replace('/', '').replace('-', '')
+        cnpj_nota = (nota.emitente or '').strip().replace('.', '').replace('/', '').replace('-', '')
+        if cnpj_proj and cnpj_nota:
+            total_peso += 20
+            if cnpj_proj == cnpj_nota:
+                score += 20
+                detalhes.append("CNPJ: Match perfeito")
+            else:
+                detalhes.append("CNPJ: Não corresponde")
+        
+        # Data (peso 15)
+        if projecao.data_abertura_requisicao and nota.data_emissao:
+            total_peso += 15
+            try:
+                from datetime import datetime
+                data_nota_str = nota.data_emissao.strip()
+                data_nota = None
+                for fmt in ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y']:
+                    try:
+                        data_nota = datetime.strptime(data_nota_str, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+                
+                if data_nota:
+                    diff_dias = abs((projecao.data_abertura_requisicao - data_nota).days)
+                    if diff_dias <= 7:
+                        score += 15
+                        detalhes.append(f"Data: Match próximo ({diff_dias} dias)")
+                    elif diff_dias <= 30:
+                        score += 10
+                        detalhes.append(f"Data: Match razoável ({diff_dias} dias)")
+                    elif diff_dias <= 90:
+                        score += 5
+                        detalhes.append(f"Data: Match distante ({diff_dias} dias)")
+                    else:
+                        detalhes.append(f"Data: Diferença grande ({diff_dias} dias)")
+                else:
+                    detalhes.append("Data: Formato não reconhecido")
+            except Exception:
+                detalhes.append("Data: Erro ao comparar")
+        
+        # Número NF (peso 10)
+        nf_proj = (projecao.numero_nf or '').strip()
+        nf_nota = (nota.nota or '').strip()
+        if nf_proj and nf_nota:
+            total_peso += 10
+            if nf_proj == nf_nota:
+                score += 10
+                detalhes.append("Número NF: Match perfeito")
+            else:
+                detalhes.append("Número NF: Não corresponde")
+        
+        if total_peso == 0:
+            return 0, []
+        
+        percentual = (score / total_peso * 100)
+        return round(percentual, 2), detalhes
+    
     # Obter filtros
     filtro_centro_atividade = request.GET.get('filtro_centro_atividade', '').strip()
     filtro_ano = request.GET.get('filtro_ano', '').strip()
@@ -15670,30 +15969,96 @@ def relacionar_projecao_nota_fiscal(request):
     notas_5 = NotaFiscal.objects.filter(uso_contabil='5')
     notas_170 = NotaFiscal.objects.filter(uso_contabil='170')
     
-    # Buscar relações confirmadas
+    # Buscar todos os ControleRCeNF para matching
+    controles_rc_nf = ControleRCeNF.objects.all()
+    
+    # Buscar relações confirmadas (incluindo controle_rc_nf)
     relacoes_confirmadas = RelacaoProjecaoNotaFiscal.objects.filter(
         status='confirmado'
-    ).select_related('projecao', 'nota_fiscal')
+    ).select_related('projecao', 'nota_fiscal', 'controle_rc_nf')
     
     # Criar dicionário de relações confirmadas para lookup rápido
+    # Chave: (projecao_id, nota_id, controle_id_excel ou None)
     relacoes_dict = {}
     for relacao in relacoes_confirmadas:
-        relacoes_dict[(relacao.projecao.id, relacao.nota_fiscal.id)] = relacao
+        controle_key = relacao.controle_rc_nf.id_excel if relacao.controle_rc_nf else None
+        relacoes_dict[(relacao.projecao.id, relacao.nota_fiscal.id, controle_key)] = relacao
     
-    # Função auxiliar para calcular matches
+    # Função auxiliar para encontrar ControleRCeNF que corresponde a ProjecaoGasto e NotaFiscal
+    def encontrar_controle_rc_nf(projecao, nota):
+        """Encontra ControleRCeNF que corresponde à Projeção e Nota Fiscal"""
+        controles_candidatos = []
+        
+        # Buscar por número de NF
+        if projecao.numero_nf or nota.nota:
+            from app.utils import normalize_nota_numero
+            nf_proj = normalize_nota_numero(projecao.numero_nf) if projecao.numero_nf else None
+            nf_nota = normalize_nota_numero(nota.nota) if nota.nota else None
+            
+            # Buscar controles com NF que corresponda
+            if nf_proj or nf_nota:
+                nf_busca = nf_proj or nf_nota
+                controles_nf = controles_rc_nf.filter(
+                    Q(nf_saida__icontains=nf_busca) | Q(nf_servico__icontains=nf_busca)
+                )
+                for controle in controles_nf:
+                    nf_controle_saida = normalize_nota_numero(controle.nf_saida) if controle.nf_saida else None
+                    nf_controle_servico = normalize_nota_numero(controle.nf_servico) if controle.nf_servico else None
+                    if (nf_busca == nf_controle_saida or nf_busca == nf_controle_servico):
+                        controles_candidatos.append(controle)
+        
+        # Buscar por RC (número de requisição)
+        if projecao.numero_requisicao_compra:
+            controles_rc = controles_rc_nf.filter(rc=projecao.numero_requisicao_compra)
+            for controle in controles_rc:
+                if controle not in controles_candidatos:
+                    controles_candidatos.append(controle)
+        
+        # Buscar por Pedido
+        if projecao.numero_pedido_compra:
+            controles_pedido = controles_rc_nf.filter(pedido=projecao.numero_pedido_compra)
+            for controle in controles_pedido:
+                if controle not in controles_candidatos:
+                    controles_candidatos.append(controle)
+        
+        # Se não encontrou por campos específicos, retornar o primeiro que corresponde por valor/fornecedor
+        if not controles_candidatos:
+            # Buscar por empresa/fornecedor
+            if projecao.fornecedor_nome_fantasia or nota.nome_fantasia_emitente:
+                fornecedor_busca = (projecao.fornecedor_nome_fantasia or nota.nome_fantasia_emitente or '').strip().upper()
+                if fornecedor_busca:
+                    controles_empresa = controles_rc_nf.filter(empresa__icontains=fornecedor_busca)
+                    for controle in controles_empresa[:5]:  # Limitar a 5 para performance
+                        controles_candidatos.append(controle)
+        
+        return controles_candidatos[:3]  # Retornar até 3 melhores candidatos
+    
+    # Função auxiliar para calcular matches (incluindo ControleRCeNF)
     def calcular_matches_para_notas(notas_list):
         matches_list = []
         for projecao in projecoes:
             for nota in notas_list:
+                # Encontrar ControleRCeNF que corresponde
+                controles_candidatos = encontrar_controle_rc_nf(projecao, nota)
+                
+                # Se não encontrou controle, criar match sem controle (compatibilidade)
+                if not controles_candidatos:
+                    controle = None
+                    controle_key = None
+                else:
+                    # Usar o primeiro controle candidato (melhor match)
+                    controle = controles_candidatos[0]
+                    controle_key = controle.id_excel
+                
                 # Verificar se já está confirmado
-                relacao_confirmada = relacoes_dict.get((projecao.id, nota.id))
+                relacao_confirmada = relacoes_dict.get((projecao.id, nota.id, controle_key))
                 
                 # Se filtro "apenas não confirmados" está ativo, pular confirmados
                 if mostrar_apenas_nao_confirmados and relacao_confirmada:
                     continue
                 
-                # Calcular score
-                score, detalhes = calcular_match_score(projecao, nota)
+                # Calcular score (com três tabelas se controle existe)
+                score, detalhes = calcular_match_score_tres_tabelas(projecao, nota, controle)
                 
                 # Se filtro "apenas próximos" está ativo, pular scores baixos
                 if mostrar_apenas_proximos and score < 50:
@@ -15702,6 +16067,7 @@ def relacionar_projecao_nota_fiscal(request):
                 matches_list.append({
                     'projecao': projecao,
                     'nota': nota,
+                    'controle': controle,
                     'match_info': {
                         'percentual': score,
                         'detalhes': detalhes,
@@ -15724,10 +16090,11 @@ def relacionar_projecao_nota_fiscal(request):
     total_notas_5 = notas_5.count()
     total_notas_170 = notas_170.count()
     total_notas = total_notas_242 + total_notas_5 + total_notas_170
+    total_controles_rc_nf = controles_rc_nf.count()
     total_relacoes_confirmadas = RelacaoProjecaoNotaFiscal.objects.filter(status='confirmado').count()
     
     context = {
-        'page_title': 'Relacionar Projeção vs Nota Fiscal',
+        'page_title': 'Relacionar Projeção vs Nota Fiscal vs Controle RC/NF',
         'active_page': 'relacionar_projecao_nota_fiscal',
         'matches_242': matches_242,
         'matches_5': matches_5,
@@ -15737,6 +16104,7 @@ def relacionar_projecao_nota_fiscal(request):
         'total_notas_242': total_notas_242,
         'total_notas_5': total_notas_5,
         'total_notas_170': total_notas_170,
+        'total_controles_rc_nf': total_controles_rc_nf,
         'total_relacoes_confirmadas': total_relacoes_confirmadas,
         'filtro_centro_atividade': filtro_centro_atividade,
         'filtro_ano': filtro_ano,
@@ -16114,12 +16482,12 @@ def consultar_planilha_rc(request):
     
     # 1. Duplicatas por RC + NF Saída (mesma RC e mesma NF)
     duplicatas_rc_nf = ControleRCeNF.objects.values('rc', 'nf_saida').annotate(
-        count=Count('id')
+        count=Count('id_excel')
     ).filter(count__gt=1).exclude(rc__isnull=True).exclude(rc='').exclude(nf_saida__isnull=True).exclude(nf_saida='')
     
     for dup in duplicatas_rc_nf:
-        registros = ControleRCeNF.objects.filter(rc=dup['rc'], nf_saida=dup['nf_saida']).order_by('id')
-        ids = list(registros.values_list('id', flat=True))
+        registros = ControleRCeNF.objects.filter(rc=dup['rc'], nf_saida=dup['nf_saida']).order_by('id_excel')
+        ids = list(registros.values_list('id_excel', flat=True))
         duplicatas_analise.append({
             'tipo': 'RC + NF Saída',
             'campos': {'RC': dup['rc'], 'NF Saída': dup['nf_saida']},
@@ -16131,14 +16499,14 @@ def consultar_planilha_rc(request):
     
     # 2. Duplicatas por RC + Pedido (mesma RC e mesmo Pedido)
     duplicatas_rc_pedido = ControleRCeNF.objects.values('rc', 'pedido').annotate(
-        count=Count('id')
+        count=Count('id_excel')
     ).filter(count__gt=1).exclude(rc__isnull=True).exclude(rc='').exclude(pedido__isnull=True).exclude(pedido='')
     
     for dup in duplicatas_rc_pedido:
         # Verificar se já não foi incluído na análise anterior
         if not any(d['tipo'] == 'RC + Pedido' and d['campos']['RC'] == dup['rc'] and d['campos']['Pedido'] == dup['pedido'] for d in duplicatas_analise):
-            registros = ControleRCeNF.objects.filter(rc=dup['rc'], pedido=dup['pedido']).order_by('id')
-            ids = list(registros.values_list('id', flat=True))
+            registros = ControleRCeNF.objects.filter(rc=dup['rc'], pedido=dup['pedido']).order_by('id_excel')
+            ids = list(registros.values_list('id_excel', flat=True))
             duplicatas_analise.append({
                 'tipo': 'RC + Pedido',
                 'campos': {'RC': dup['rc'], 'Pedido': dup['pedido']},
@@ -16150,14 +16518,14 @@ def consultar_planilha_rc(request):
     
     # 3. Duplicatas por NF Saída + Pedido (mesma NF e mesmo Pedido)
     duplicatas_nf_pedido = ControleRCeNF.objects.values('nf_saida', 'pedido').annotate(
-        count=Count('id')
+        count=Count('id_excel')
     ).filter(count__gt=1).exclude(nf_saida__isnull=True).exclude(nf_saida='').exclude(pedido__isnull=True).exclude(pedido='')
     
     for dup in duplicatas_nf_pedido:
         # Verificar se já não foi incluído
         if not any(d['tipo'] == 'NF Saída + Pedido' and d['campos']['NF Saída'] == dup['nf_saida'] and d['campos']['Pedido'] == dup['pedido'] for d in duplicatas_analise):
-            registros = ControleRCeNF.objects.filter(nf_saida=dup['nf_saida'], pedido=dup['pedido']).order_by('id')
-            ids = list(registros.values_list('id', flat=True))
+            registros = ControleRCeNF.objects.filter(nf_saida=dup['nf_saida'], pedido=dup['pedido']).order_by('id_excel')
+            ids = list(registros.values_list('id_excel', flat=True))
             duplicatas_analise.append({
                 'tipo': 'NF Saída + Pedido',
                 'campos': {'NF Saída': dup['nf_saida'], 'Pedido': dup['pedido']},
@@ -16169,14 +16537,14 @@ def consultar_planilha_rc(request):
     
     # 4. Duplicatas por RC apenas (mesma RC, mas pode ter NFs diferentes)
     duplicatas_rc_apenas = ControleRCeNF.objects.values('rc').annotate(
-        count=Count('id')
+        count=Count('id_excel')
     ).filter(count__gt=1).exclude(rc__isnull=True).exclude(rc='')
     
     for dup in duplicatas_rc_apenas:
         # Verificar se já não foi incluído em análises anteriores
         if not any(d['campos'].get('RC') == dup['rc'] for d in duplicatas_analise):
-            registros = ControleRCeNF.objects.filter(rc=dup['rc']).order_by('id')
-            ids = list(registros.values_list('id', flat=True))
+            registros = ControleRCeNF.objects.filter(rc=dup['rc']).order_by('id_excel')
+            ids = list(registros.values_list('id_excel', flat=True))
             nfs_unicas = registros.exclude(nf_saida__isnull=True).exclude(nf_saida='').values_list('nf_saida', flat=True).distinct()
             if len(nfs_unicas) == 1:
                 # Se todas têm a mesma NF, já foi detectado acima
@@ -16253,7 +16621,7 @@ def analise_planilha_rc(request):
     ).exclude(
         status=''
     ).values('status').annotate(
-        total=Count('id'),
+        total=Count('id_excel'),
         valor_total_pedido=Sum('valor_total_pedido'),
         valor_total_nf=Sum('valor_nf')
     ).order_by('-total')
@@ -16281,7 +16649,7 @@ def analise_planilha_rc(request):
     ).exclude(
         empresa=''
     ).values('empresa').annotate(
-        total=Count('id')
+        total=Count('id_excel')
     ).order_by('-total')[:10]
     
     empresa_labels = [item['empresa'][:30] for item in empresa_distribution]
@@ -16293,7 +16661,7 @@ def analise_planilha_rc(request):
     ).exclude(
         solicitante=''
     ).values('solicitante').annotate(
-        total=Count('id')
+        total=Count('id_excel')
     ).order_by('-total')[:10]
     
     solicitante_labels = [item['solicitante'][:30] for item in solicitante_distribution]
@@ -16305,7 +16673,7 @@ def analise_planilha_rc(request):
     ).exclude(
         uso=''
     ).values('uso').annotate(
-        total=Count('id')
+        total=Count('id_excel')
     ).order_by('-total')
     
     uso_labels = [item['uso'] for item in uso_distribution]
@@ -16355,7 +16723,7 @@ def analise_planilha_rc(request):
     ).exclude(
         status=''
     ).values('status').annotate(
-        total_registros=Count('id'),
+        total_registros=Count('id_excel'),
         valor_total_pedido=Sum('valor_total_pedido'),
         valor_total_nf=Sum('valor_nf')
     ).order_by('-valor_total_nf')[:10]

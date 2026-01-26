@@ -14,14 +14,30 @@
     <td>
         <strong>{{ match.projecao.tipo|default:"-" }}</strong><br>
         <small class="text-muted">{{ match.projecao.descricao|truncatewords:5|default:"-" }}</small><br>
-        {% if match.projecao.numero_requisicao %}
-            <small><strong>Req:</strong> {{ match.projecao.numero_requisicao }}</small>
+        {% if match.projecao.numero_requisicao_compra %}
+            <small><strong>Req:</strong> {{ match.projecao.numero_requisicao_compra }}</small>
         {% endif %}
     </td>
     <td>
         <strong>Nota: {{ match.nota.nota|default:"-" }}</strong><br>
         <small class="text-muted">Série: {{ match.nota.serie|default:"-" }}</small><br>
         <small class="text-muted">Modelo: {{ match.nota.modelo|default:"-" }}</small>
+    </td>
+    <td>
+        {% if match.controle %}
+            <strong>ID: {{ match.controle.id_excel|default:"-" }}</strong><br>
+            {% if match.controle.rc %}
+                <small><strong>RC:</strong> {{ match.controle.rc }}</small><br>
+            {% endif %}
+            {% if match.controle.nf_saida %}
+                <small><strong>NF Saída:</strong> {{ match.controle.nf_saida }}</small><br>
+            {% endif %}
+            {% if match.controle.empresa %}
+                <small class="text-muted">{{ match.controle.empresa|truncatewords:2 }}</small>
+            {% endif %}
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
     </td>
     <td>
         {% if match.projecao.centro_atividade %}
@@ -35,36 +51,56 @@
     </td>
     <td>
         <strong>Proj:</strong>
-        {% if match.projecao.valor_planejado %}
-            R$ {{ match.projecao.valor_planejado|floatformat:2 }}<br>
-        {% endif %}
-        {% if match.projecao.valor_realizado %}
-            <small>Real: R$ {{ match.projecao.valor_realizado|floatformat:2 }}</small><br>
+        {% if match.projecao.valor_total %}
+            R$ {{ match.projecao.valor_total|floatformat:2 }}<br>
+        {% else %}
+            <span class="text-muted">-</span><br>
         {% endif %}
         <strong>Nota:</strong>
         {% if match.nota.total_nota %}
-            R$ {{ match.nota.total_nota|floatformat:2 }}
+            R$ {{ match.nota.total_nota|floatformat:2 }}<br>
         {% else %}
-            <span class="text-muted">-</span>
+            <span class="text-muted">-</span><br>
+        {% endif %}
+        {% if match.controle %}
+            <strong>Controle:</strong>
+            {% if match.controle.valor_nf %}
+                R$ {{ match.controle.valor_nf|floatformat:2 }}
+            {% elif match.controle.valor_total_pedido %}
+                R$ {{ match.controle.valor_total_pedido|floatformat:2 }}
+            {% else %}
+                <span class="text-muted">-</span>
+            {% endif %}
         {% endif %}
     </td>
     <td>
-        {% if match.projecao.data_requisicao %}
-            <strong>Proj:</strong> {{ match.projecao.data_requisicao|date:"d/m/Y" }}<br>
+        {% if match.projecao.data_abertura_requisicao %}
+            <strong>Proj:</strong> {{ match.projecao.data_abertura_requisicao|date:"d/m/Y" }}<br>
         {% endif %}
         {% if match.nota.data_emissao %}
-            <strong>Nota:</strong> {{ match.nota.data_emissao|truncatewords:1 }}
-        {% else %}
-            <span class="text-muted">-</span>
+            <strong>Nota:</strong> {{ match.nota.data_emissao|truncatewords:1 }}<br>
+        {% endif %}
+        {% if match.controle %}
+            {% if match.controle.data_rc %}
+                <strong>Controle:</strong> {{ match.controle.data_rc|date:"d/m/Y" }}
+            {% elif match.controle.emissao %}
+                <strong>Controle:</strong> {{ match.controle.emissao|date:"d/m/Y" }}
+            {% else %}
+                <span class="text-muted">-</span>
+            {% endif %}
         {% endif %}
     </td>
     <td>
-        {% if match.projecao.fornecedor %}
-            <strong>Fornec:</strong> {{ match.projecao.fornecedor|truncatewords:2 }}<br>
+        {% if match.projecao.fornecedor_nome_fantasia %}
+            <strong>Fornec:</strong> {{ match.projecao.fornecedor_nome_fantasia|truncatewords:2 }}<br>
         {% endif %}
         {% if match.nota.nome_fantasia_emitente %}
-            <strong>Emit:</strong> {{ match.nota.nome_fantasia_emitente|truncatewords:2 }}
-        {% else %}
+            <strong>Emit:</strong> {{ match.nota.nome_fantasia_emitente|truncatewords:2 }}<br>
+        {% endif %}
+        {% if match.controle and match.controle.empresa %}
+            <strong>Empresa:</strong> {{ match.controle.empresa|truncatewords:2 }}
+        {% endif %}
+        {% if not match.projecao.fornecedor_nome_fantasia and not match.nota.nome_fantasia_emitente and not match.controle.empresa %}
             <span class="text-muted">-</span>
         {% endif %}
     </td>
@@ -93,6 +129,9 @@
                     <input type="hidden" name="acao" value="remover">
                     <input type="hidden" name="projecao_id" value="{{ match.projecao.id }}">
                     <input type="hidden" name="nota_id" value="{{ match.nota.id }}">
+                    {% if match.controle %}
+                    <input type="hidden" name="controle_id" value="{{ match.controle.id_excel }}">
+                    {% endif %}
                     <button type="submit" class="btn btn-sm btn-danger" title="Remover relação" style="width: 100%;">
                         <i class="fas fa-trash"></i> Remover
                     </button>
@@ -118,12 +157,20 @@
                                 <input type="hidden" name="acao" value="confirmar">
                                 <input type="hidden" name="projecao_id" value="{{ match.projecao.id }}">
                                 <input type="hidden" name="nota_id" value="{{ match.nota.id }}">
+                                {% if match.controle %}
+                                <input type="hidden" name="controle_id" value="{{ match.controle.id_excel }}">
+                                {% endif %}
                                 <input type="hidden" name="score_match" value="{{ match.match_info.percentual|floatformat:2 }}">
                                 <div class="modal-body">
                                     <p>Deseja confirmar a relação entre:</p>
                                     <ul>
                                         <li><strong>Projeção:</strong> {{ match.projecao.tipo|default:"-" }} - {{ match.projecao.descricao|truncatewords:10|default:"-" }}</li>
                                         <li><strong>Nota Fiscal:</strong> {{ match.nota.nota|default:"-" }} - {{ match.nota.nome_fantasia_emitente|truncatewords:5|default:"-" }}</li>
+                                        {% if match.controle %}
+                                        <li><strong>Controle RC/NF:</strong> ID: {{ match.controle.id_excel|default:"-" }} - RC: {{ match.controle.rc|default:"-" }} - Empresa: {{ match.controle.empresa|truncatewords:3|default:"-" }}</li>
+                                        {% else %}
+                                        <li><strong>Controle RC/NF:</strong> <span class="text-muted">Não encontrado</span></li>
+                                        {% endif %}
                                     </ul>
                                     <div class="mb-3">
                                         <label for="observacoes_confirm_{{ match.projecao.id }}_{{ match.nota.id }}" class="form-label">Observações (opcional):</label>
@@ -154,11 +201,19 @@
                                 <input type="hidden" name="acao" value="rejeitar">
                                 <input type="hidden" name="projecao_id" value="{{ match.projecao.id }}">
                                 <input type="hidden" name="nota_id" value="{{ match.nota.id }}">
+                                {% if match.controle %}
+                                <input type="hidden" name="controle_id" value="{{ match.controle.id_excel }}">
+                                {% endif %}
                                 <div class="modal-body">
                                     <p>Deseja rejeitar a relação entre:</p>
                                     <ul>
                                         <li><strong>Projeção:</strong> {{ match.projecao.tipo|default:"-" }} - {{ match.projecao.descricao|truncatewords:10|default:"-" }}</li>
                                         <li><strong>Nota Fiscal:</strong> {{ match.nota.nota|default:"-" }} - {{ match.nota.nome_fantasia_emitente|truncatewords:5|default:"-" }}</li>
+                                        {% if match.controle %}
+                                        <li><strong>Controle RC/NF:</strong> ID: {{ match.controle.id_excel|default:"-" }} - RC: {{ match.controle.rc|default:"-" }} - Empresa: {{ match.controle.empresa|truncatewords:3|default:"-" }}</li>
+                                        {% else %}
+                                        <li><strong>Controle RC/NF:</strong> <span class="text-muted">Não encontrado</span></li>
+                                        {% endif %}
                                     </ul>
                                     <div class="mb-3">
                                         <label for="observacoes_reject_{{ match.projecao.id }}_{{ match.nota.id }}" class="form-label">Motivo da rejeição (opcional):</label>

@@ -1,4 +1,4 @@
-﻿"""
+"""
 Utility functions for file uploads and data processing
 """
 import csv
@@ -4047,11 +4047,14 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                     existing = None
                     duplicate_reason = None
                     campos_duplicados = {}
+                    found_by_id_excel = False  # Flag para indicar se encontrou por id_excel
                     
-                    # Prioridade 1: Usar ID do Excel (identificador único)
+                    # Prioridade 1: Usar ID do Excel (chave primária - sempre atualizar se encontrado)
+                    # Se id_excel existe, sempre atualizar (é a chave primária, reutilizável após deleção)
                     if id_excel:
                         existing = ControleRCeNF.objects.filter(id_excel=id_excel).first()
                         if existing:
+                            found_by_id_excel = True
                             duplicate_reason = "ID já existe no banco de dados"
                             campos_duplicados = {'ID': id_excel}
                             # Verificar se outros campos também coincidem
@@ -4064,7 +4067,9 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                                 campos_duplicados['Pedido'] = pedido_excel
                     
                     # Fallback: Se não encontrou por ID, tentar por RC (compatibilidade com dados antigos)
-                    if not existing and rc:
+                    # IMPORTANTE: Só usar fallback se id_excel NÃO foi fornecido no Excel
+                    # Se id_excel foi fornecido, não usar fallback (id_excel é a chave primária)
+                    if not existing and not id_excel and rc:
                         existing = ControleRCeNF.objects.filter(rc=rc).first()
                         if existing:
                             duplicate_reason = "RC já existe no banco de dados (sem ID no Excel)"
@@ -4077,14 +4082,17 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                                 campos_duplicados['Pedido'] = pedido_excel
                     
                     # Fallback: Se não encontrou por ID nem RC, tentar por NF Saída (compatibilidade com dados antigos)
-                    if not existing and nf_saida:
+                    # IMPORTANTE: Só usar fallback se id_excel NÃO foi fornecido no Excel
+                    if not existing and not id_excel and nf_saida:
                         existing = ControleRCeNF.objects.filter(nf_saida=nf_saida).first()
                         if existing:
                             duplicate_reason = "NF Saída já existe no banco de dados (sem ID no Excel)"
                             campos_duplicados = {'NF Saída': nf_saida}
                     
-                    if existing and not update_existing:
-                        # Registrar como duplicata
+                    # Se encontrou por id_excel, sempre atualizar (id_excel é chave primária, reutilizável)
+                    # Se encontrou por fallback (RC/NF), respeitar a flag update_existing
+                    if existing and not found_by_id_excel and not update_existing:
+                        # Registrar como duplicata apenas para fallback matching
                         duplicates.append({
                             'linha_excel': row_num,
                             'id_excel': id_excel or 'N/A',
@@ -4095,7 +4103,7 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                             'pedido': _safe_str(row_data.get('PEDIDO')) or 'N/A',
                             'motivo': duplicate_reason,
                             'campos_duplicados': campos_duplicados,
-                            'registro_existente_id': existing.id,
+                            'registro_existente_id': existing.id_excel,  # id_excel is now the primary key
                             'registro_existente_id_excel': existing.id_excel or 'N/A',
                             'registro_existente_rc': existing.rc or 'N/A',
                             'registro_existente_nf': existing.nf_saida or 'N/A',
@@ -4105,8 +4113,12 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                         continue
                     
                     # Preparar dados
+                    # Se não tem ID do Excel, gerar um baseado na linha (id_excel é obrigatório como chave primária)
+                    if not id_excel:
+                        id_excel = f"IMPORT_{row_num}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                    
                     data_dict = {
-                        'id_excel': id_excel,  # ID é obrigatório, mas pode ser None para compatibilidade
+                        'id_excel': id_excel,  # ID é obrigatório (chave primária)
                         'solicitante': _safe_str(row_data.get('SOLICITANTE')),
                         'empresa': _safe_str(row_data.get('EMPRESA')),
                         'nf_saida': nf_saida,

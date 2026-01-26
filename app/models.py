@@ -1249,7 +1249,7 @@ class ProjecaoGasto(models.Model):
         return f"{id_str} - {tipo_str} - {descricao_str[:50]}"
 
 class RelacaoProjecaoNotaFiscal(models.Model):
-    """Modelo para armazenar relações confirmadas entre Projeções de Gastos e Notas Fiscais"""
+    """Modelo para armazenar relações confirmadas entre Projeções de Gastos, Notas Fiscais e Controle RC e NF"""
     projecao = models.ForeignKey(
         ProjecaoGasto,
         on_delete=models.CASCADE,
@@ -1261,6 +1261,15 @@ class RelacaoProjecaoNotaFiscal(models.Model):
         on_delete=models.CASCADE,
         related_name='relacoes_projecoes',
         verbose_name='Nota Fiscal'
+    )
+    controle_rc_nf = models.ForeignKey(
+        'ControleRCeNF',
+        on_delete=models.CASCADE,
+        related_name='relacoes_projecoes_notas',
+        verbose_name='Controle RC e NF',
+        blank=True,
+        null=True,
+        help_text='Registro do Controle RC e NF relacionado (opcional)'
     )
     
     # Informações sobre a confirmação
@@ -1309,11 +1318,13 @@ class RelacaoProjecaoNotaFiscal(models.Model):
         verbose_name_plural = 'Relações Projeção vs Nota Fiscal'
         ordering = ['-created_at']
         # Evitar duplicatas: uma projeção pode ter apenas uma relação confirmada com uma nota fiscal
-        unique_together = [['projecao', 'nota_fiscal']]
+        # Se controle_rc_nf for fornecido, também deve ser único na combinação
+        unique_together = [['projecao', 'nota_fiscal', 'controle_rc_nf']]
         indexes = [
             models.Index(fields=['status']),
             models.Index(fields=['projecao']),
             models.Index(fields=['nota_fiscal']),
+            models.Index(fields=['controle_rc_nf']),
             models.Index(fields=['created_at']),
         ]
     
@@ -1382,9 +1393,8 @@ class SaldoOrcamentarioSemanal(models.Model):
 
 class ControleRCeNF(models.Model): # Planilha de Controle RC e NF
     """Modelo para armazenar dados do controle de RC e NF"""
-    # ID único do Excel (identificador único do registro na planilha)
-    # Nullable inicialmente para permitir migração de dados existentes
-    id_excel = models.CharField('ID', max_length=100, unique=True, blank=True, null=True, db_index=True, help_text='ID único do registro na planilha Excel')
+    # ID único do Excel (chave primária do registro na planilha)
+    id_excel = models.CharField('ID', max_length=100, primary_key=True, db_index=True, help_text='ID único do registro na planilha Excel (chave primária)')
     
     # Dados básicos
     solicitante = models.CharField('Solicitante', max_length=255, blank=True, null=True)
@@ -1428,7 +1438,6 @@ class ControleRCeNF(models.Model): # Planilha de Controle RC e NF
         verbose_name_plural = 'Controles RC e NF'
         ordering = ['-data_rc', '-created_at']
         indexes = [
-            models.Index(fields=['id_excel']),
             models.Index(fields=['nf_saida']),
             models.Index(fields=['rc']),
             models.Index(fields=['pedido']),

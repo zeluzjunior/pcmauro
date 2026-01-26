@@ -301,9 +301,13 @@
                                                 {% endif %}
                                             </td>
                                             <td>
-                                                <a href="{% url 'visualizar_planilha_rc' controle.id %}" class="btn btn-sm btn-primary" title="Visualizar detalhes completos">
+                                                {% if controle.id_excel %}
+                                                <a href="{% url 'visualizar_planilha_rc' controle.id_excel %}" class="btn btn-sm btn-primary" title="Visualizar detalhes completos">
                                                     <i class="fas fa-eye"></i> Ver
                                                 </a>
+                                                {% else %}
+                                                <span class="text-muted">-</span>
+                                                {% endif %}
                                             </td>
                                         </tr>
                                         {% empty %}
