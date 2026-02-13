@@ -100,7 +100,9 @@
         {% if match.controle and match.controle.empresa %}
             <strong>Empresa:</strong> {{ match.controle.empresa|truncatewords:2 }}
         {% endif %}
-        {% if not match.projecao.fornecedor_nome_fantasia and not match.nota.nome_fantasia_emitente and not match.controle.empresa %}
+        {% if not match.projecao.fornecedor_nome_fantasia and not match.nota.nome_fantasia_emitente and not match.controle %}
+            <span class="text-muted">-</span>
+        {% elif not match.projecao.fornecedor_nome_fantasia and not match.nota.nome_fantasia_emitente and not match.controle.empresa %}
             <span class="text-muted">-</span>
         {% endif %}
     </td>

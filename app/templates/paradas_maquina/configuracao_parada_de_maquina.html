@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load form_extras %}
 
 {% block title %}Configuração de Paradas de Máquina{% endblock %}
 
@@ -26,7 +27,220 @@
 <!-- Main Content -->
 <section class="py-5">
     <div class="container">
-        <!-- Content will be added here -->
+        {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <p class="text-muted mb-4">Configure os parâmetros por mês (ano <strong>{{ ano_atual }}</strong>). O mesmo conjunto de parâmetros é usado em todos os meses; os valores podem ser diferentes para cada mês. <strong>Formato brasileiro:</strong> use vírgula para decimais (ex: 12,5) e ponto para milhares (ex: 1.500).</p>
+
+        <form method="post" action="" id="form-config-parada">
+            {% csrf_token %}
+        <div class="accordion" id="accordionMeses">
+            {% for mes_num, mes_nome, cfg_frig, cfg_ind in config_por_mes %}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading{{ mes_num }}">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ mes_num }}" aria-expanded="false" aria-controls="collapse{{ mes_num }}">
+                        <i class="fas fa-calendar-alt me-2 text-primary"></i>
+                        {{ mes_nome }}
+                    </button>
+                </h2>
+                <div id="collapse{{ mes_num }}" class="accordion-collapse collapse" aria-labelledby="heading{{ mes_num }}" data-bs-parent="#accordionMeses">
+                    <div class="accordion-body">
+                        <!-- Seção Frigorífico -->
+                        <h6 class="text-primary border-bottom pb-2 mb-3"><i class="fas fa-industry me-2"></i>Frigorífico</h6>
+                        <div class="table-responsive mb-4">
+                            <table class="table table-sm table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 45%;">Parâmetro</th>
+                                        <th>Valor ({{ mes_nome }})</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="fw-semibold">Suínos Abatidos por dia</td>
+                                        <td><input type="text" inputmode="decimal" class="form-control form-control-sm input-suinos-dia" placeholder="Ex: 1.500" name="mes_{{ mes_num }}_frigorifico_suinos_abatidos" value="{% if cfg_frig %}{{ cfg_frig.suinos_abatidos|number_br:0 }}{% endif %}" data-mes="{{ mes_num }}"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-semibold">Dias úteis</td>
+                                        <td><input type="text" inputmode="decimal" class="form-control form-control-sm input-dias-uteis" placeholder="Ex: 22" name="mes_{{ mes_num }}_frigorifico_dias_uteis" value="{% if cfg_frig %}{{ cfg_frig.dias_uteis|number_br:0 }}{% endif %}" data-mes="{{ mes_num }}"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-semibold">Total de Abate Planejado <span class="text-muted fw-normal small">(Suínos/dia × Dias úteis)</span></td>
+                                        <td><input type="text" class="form-control form-control-sm total-abate-planejado" placeholder="Calculado automaticamente" name="mes_{{ mes_num }}_frigorifico_total_abate_planejado" value="{% if cfg_frig %}{{ cfg_frig.total_abate_planejado|number_br:0 }}{% endif %}" readonly data-mes="{{ mes_num }}"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-semibold">% de Perda Máximo</td>
+                                        <td><div class="input-group input-group-sm"><input type="text" inputmode="decimal" class="form-control form-control-sm" placeholder="Ex: 1,84 (percentual)" name="mes_{{ mes_num }}_frigorifico_perda_maximo" value="{% if cfg_frig %}{{ cfg_frig.perda_maximo|number_br:2 }}{% endif %}"><span class="input-group-text">%</span></div></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-semibold">Fator de Eficiência %</td>
+                                        <td><div class="input-group input-group-sm"><input type="text" inputmode="decimal" class="form-control form-control-sm" placeholder="Ex: 85,50 (percentual)" name="mes_{{ mes_num }}_frigorifico_fator_eficiencia" value="{% if cfg_frig %}{{ cfg_frig.fator_eficiencia|number_br:2 }}{% endif %}"><span class="input-group-text">%</span></div></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-semibold">Nº Carcaças por Minuto</td>
+                                        <td><input type="text" inputmode="decimal" class="form-control form-control-sm" placeholder="Ex: 12,5 ou 1.234,56" name="mes_{{ mes_num }}_frigorifico_carcacas_por_minuto" value="{% if cfg_frig and cfg_frig.carcacas_por_minuto is not None %}{{ cfg_frig.carcacas_por_minuto|number_br:2 }}{% endif %}"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Seção Indústria -->
+                        <h6 class="text-primary border-bottom pb-2 mb-3"><i class="fas fa-cogs me-2"></i>Indústria</h6>
+                        <div class="table-responsive mb-4">
+                            <table class="table table-sm table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 45%;">Parâmetro</th>
+                                        <th>Valor ({{ mes_nome }})</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="fw-semibold">Dias úteis</td>
+                                        <td><input type="text" inputmode="decimal" class="form-control form-control-sm" placeholder="Ex: 22" name="mes_{{ mes_num }}_industria_dias_uteis" value="{% if cfg_ind %}{{ cfg_ind.dias_uteis_industria|number_br:0 }}{% endif %}"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-semibold">Total de Produção Planejada</td>
+                                        <td><input type="text" inputmode="decimal" class="form-control form-control-sm" placeholder="Ex: 1.500 ou 15.000" name="mes_{{ mes_num }}_industria_total_producao" value="{% if cfg_ind %}{{ cfg_ind.total_producao_planejada_industria|number_br:0 }}{% endif %}"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-semibold">% de Perda Máximo</td>
+                                        <td><div class="input-group input-group-sm"><input type="text" inputmode="decimal" class="form-control form-control-sm" placeholder="Ex: 1,84 (percentual)" name="mes_{{ mes_num }}_industria_perda_maximo" value="{% if cfg_ind %}{{ cfg_ind.perda_maximo_industria|number_br:2 }}{% endif %}"><span class="input-group-text">%</span></div></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-semibold">Fator de Eficiência %</td>
+                                        <td><div class="input-group input-group-sm"><input type="text" inputmode="decimal" class="form-control form-control-sm" placeholder="Ex: 85,50 (percentual)" name="mes_{{ mes_num }}_industria_fator_eficiencia" value="{% if cfg_ind %}{{ cfg_ind.fator_eficiencia_industria|number_br:2 }}{% endif %}"><span class="input-group-text">%</span></div></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="mt-4 d-flex justify-content-end">
+            <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save me-2"></i>Salvar configuração</button>
+        </div>
+        </form>
+
+        <!-- Recursos incluídos na Análise das Paradas de Máquinas -->
+        <hr class="my-5">
+        <h4 class="mb-4"><i class="fas fa-filter me-2 text-primary"></i>Recursos incluídos na Análise das Paradas de Máquinas</h4>
+        <p class="text-muted mb-4">Selecione quais valores de <strong>Linha de Produção</strong> (coluna <code>descr_linha_producao</code> da tabela ParadaMaquina) serão usados no cálculo da análise para cada seção. Apenas os itens marcados serão considerados na página de Análise.</p>
+
+        {% if grupos_recurso %}
+        <form method="post" action="" id="form-recursos-parada">
+            {% csrf_token %}
+            <input type="hidden" name="salvar_recursos" value="1">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h6 class="mb-0"><i class="fas fa-industry me-2"></i>Frigorífico</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="small text-muted mb-3">Marque as linhas de produção (descr_linha_producao) que devem entrar na análise de paradas do Frigorífico.</p>
+                            <div class="row g-2">
+                                {% for gr in grupos_recurso %}
+                                <div class="col-12">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="recurso_frigorifico" value="{{ gr }}" id="frig_{{ forloop.counter0 }}" {% if gr in recursos_frigorifico %}checked{% endif %}>
+                                        <label class="form-check-label" for="frig_{{ forloop.counter0 }}">{{ gr }}</label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-secondary text-white">
+                            <h6 class="mb-0"><i class="fas fa-cogs me-2"></i>Indústria</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="small text-muted mb-3">Marque as linhas de produção (descr_linha_producao) que devem entrar na análise de paradas da Indústria.</p>
+                            <div class="row g-2">
+                                {% for gr in grupos_recurso %}
+                                <div class="col-12">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="recurso_industria" value="{{ gr }}" id="ind_{{ forloop.counter0 }}" {% if gr in recursos_industria %}checked{% endif %}>
+                                        <label class="form-check-label" for="ind_{{ forloop.counter0 }}">{{ gr }}</label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex justify-content-end">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Salvar recursos incluídos</button>
+            </div>
+        </form>
+        {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            Não há valores de <strong>Linha de Produção</strong> (descr_linha_producao) na tabela ParadaMaquina. Importe dados de paradas de máquina para poder configurar as linhas incluídas na análise.
+        </div>
+        {% endif %}
     </div>
 </section>
+
+<script>
+(function() {
+    /** Converte número no padrão BR (1.500 ou 1.500,5) para inteiro. Ponto=milhar, vírgula=decimal. */
+    function parseNumBR(val) {
+        if (val === '' || val === null || val === undefined) return null;
+        var s = String(val).trim().replace(/\s/g, '');
+        if (!s) return null;
+        s = s.replace(/\./g, '').replace(',', '.');
+        var n = parseFloat(s);
+        return isNaN(n) ? null : Math.floor(n);
+    }
+    function updateTotalAbate(mesNum) {
+        var suinos = document.querySelector('input.input-suinos-dia[data-mes="' + mesNum + '"]');
+        var dias = document.querySelector('input.input-dias-uteis[data-mes="' + mesNum + '"]');
+        var total = document.querySelector('input.total-abate-planejado[data-mes="' + mesNum + '"]');
+        if (!suinos || !dias || !total) return;
+        var a = parseNumBR(suinos.value);
+        var b = parseNumBR(dias.value);
+        if (a !== null && b !== null) {
+            total.value = (a * b).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        } else {
+            total.value = '';
+        }
+    }
+    function initTotalAbate() {
+        [1,2,3,4,5,6,7,8,9,10,11,12].forEach(updateTotalAbate);
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        initTotalAbate();
+        document.getElementById('form-config-parada').addEventListener('input', function(e) {
+            var t = e.target;
+            if (t.classList.contains('input-suinos-dia') || t.classList.contains('input-dias-uteis')) {
+                var mes = t.getAttribute('data-mes');
+                if (mes) updateTotalAbate(mes);
+            }
+        });
+        document.getElementById('form-config-parada').addEventListener('change', function(e) {
+            var t = e.target;
+            if (t.classList.contains('input-suinos-dia') || t.classList.contains('input-dias-uteis')) {
+                var mes = t.getAttribute('data-mes');
+                if (mes) updateTotalAbate(mes);
+            }
+        });
+    });
+})();
+</script>
 {% endblock %}

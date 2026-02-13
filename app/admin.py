@@ -17,7 +17,9 @@ from .models import (
     MeuPlanoPreventiva,
     MeuPlanoPreventivaDocumento,
     RoteiroPreventiva,
-    Semana52
+    Semana52,
+    ConfigParadaMaquina,
+    ConfigRecursoParadaMaquina,
 )
 
 
@@ -509,3 +511,22 @@ class Semana52Admin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+@admin.register(ConfigParadaMaquina)
+class ConfigParadaMaquinaAdmin(admin.ModelAdmin):
+    """Admin para configuração mensal de paradas de máquina (Frigorífico/Indústria)."""
+    list_display = ('ano', 'mes', 'secao', 'suinos_abatidos', 'dias_uteis', 'total_abate_planejado', 'perda_maximo', 'fator_eficiencia', 'carcacas_por_minuto', 'updated_at')
+    list_filter = ('ano', 'mes', 'secao')
+    search_fields = ('ano', 'mes', 'secao')
+    ordering = ('ano', 'mes', 'secao')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(ConfigRecursoParadaMaquina)
+class ConfigRecursoParadaMaquinaAdmin(admin.ModelAdmin):
+    """Admin para recursos incluídos na análise de paradas (Frigorífico/Indústria)."""
+    list_display = ('secao', 'descr_recurso')
+    list_filter = ('secao',)
+    search_fields = ('descr_recurso',)
+    ordering = ('secao', 'descr_recurso')

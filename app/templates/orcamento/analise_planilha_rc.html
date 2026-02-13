@@ -22,6 +22,55 @@
         height: 300px;
         margin-bottom: 30px;
     }
+    /* Filter section improvements */
+    .filter-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #fff 100%);
+        border: 1px solid #e9ecef;
+        border-radius: 0.5rem;
+    }
+    .filter-card .card-header {
+        background: transparent;
+        border-bottom: 1px solid #e9ecef;
+        font-weight: 600;
+        font-size: 0.9rem;
+        padding: 0.5rem 1rem;
+        color: #212529;
+    }
+    .filter-month-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.2rem 0.5rem;
+        margin: 0.1rem;
+        border-radius: 0.35rem;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border: 1px solid #dee2e6;
+        background: #fff;
+        color: #212529;
+        transition: all 0.15s;
+    }
+    .filter-month-chip:hover {
+        background: #e9ecef;
+        border-color: #adb5bd;
+        color: #212529;
+    }
+    .filter-month-chip.active {
+        background: #0d6efd;
+        border-color: #0d6efd;
+        color: #fff;
+    }
+    .filter-month-chip input { display: none; }
+    /* Force dark text in filters accordion */
+    #filtrosAccordion .accordion-button,
+    #filtrosAccordion .accordion-button:not(.collapsed),
+    #filtrosAccordion .accordion-body,
+    #filtrosAccordion .form-label,
+    #filtrosAccordion .card-header {
+        color: #212529 !important;
+    }
+    #filtrosAccordion .accordion-button::after {
+        filter: none;
+    }
 </style>
 {% endblock %}
 
@@ -50,6 +99,144 @@
 <!-- Main Content -->
 <section class="py-5">
     <div class="container-fluid px-5">
+        <!-- Filtros -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0 rounded-3 overflow-hidden">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button {% if not meses_filtro and not uso_filtro and not classificacao_filtro and not status_filtro and not previsao_ano_filtro %}collapsed{% endif %} bg-light text-dark border-0 py-3" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro or uso_filtro or classificacao_filtro or status_filtro or previsao_ano_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                                <i class="fas fa-sliders-h me-2 text-primary"></i>
+                                <strong>Filtros</strong>
+                                <span class="badge bg-primary ms-2" id="filtrosBadge">Data RC {{ ano_filtro }}{% if meses_filtro %}{% if meses_filtro|length == 12 %} (12 meses){% else %} ({{ meses_filtro|length }} meses){% endif %}{% else %} (todos){% endif %}{% if uso_filtro or classificacao_filtro or status_filtro or previsao_ano_filtro %} + outros{% endif %}</span>
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro or uso_filtro or classificacao_filtro or status_filtro or previsao_ano_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body bg-light text-dark pt-4 pb-4">
+                                <form method="get" action="{% url 'analise_planilha_rc' %}" id="filtrosForm">
+                                    <div class="row g-4">
+                                        <!-- Card: Data da RC -->
+                                        <div class="col-lg-4">
+                                            <div class="card filter-card h-100 border-0 shadow-sm">
+                                                <div class="card-header d-flex align-items-center">
+                                                    <i class="fas fa-calendar-alt text-primary me-2"></i>
+                                                    Data da RC
+                                                </div>
+                                                <div class="card-body">
+                                                    <label for="ano" class="form-label small fw-semibold">Ano</label>
+                                                    <select class="form-select form-select-sm mb-2" id="ano" name="ano" required>
+                                                        {% for ano in anos_disponiveis %}
+                                                            <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                    <label class="form-label small fw-semibold d-block">Meses</label>
+                                                    <div class="d-flex flex-wrap gap-1">
+                                                        <label class="filter-month-chip {% if 1 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="1" {% if 1 in meses_filtro %}checked{% endif %}>Jan</label>
+                                                        <label class="filter-month-chip {% if 2 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="2" {% if 2 in meses_filtro %}checked{% endif %}>Fev</label>
+                                                        <label class="filter-month-chip {% if 3 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="3" {% if 3 in meses_filtro %}checked{% endif %}>Mar</label>
+                                                        <label class="filter-month-chip {% if 4 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="4" {% if 4 in meses_filtro %}checked{% endif %}>Abr</label>
+                                                        <label class="filter-month-chip {% if 5 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="5" {% if 5 in meses_filtro %}checked{% endif %}>Mai</label>
+                                                        <label class="filter-month-chip {% if 6 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="6" {% if 6 in meses_filtro %}checked{% endif %}>Jun</label>
+                                                        <label class="filter-month-chip {% if 7 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="7" {% if 7 in meses_filtro %}checked{% endif %}>Jul</label>
+                                                        <label class="filter-month-chip {% if 8 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="8" {% if 8 in meses_filtro %}checked{% endif %}>Ago</label>
+                                                        <label class="filter-month-chip {% if 9 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="9" {% if 9 in meses_filtro %}checked{% endif %}>Set</label>
+                                                        <label class="filter-month-chip {% if 10 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="10" {% if 10 in meses_filtro %}checked{% endif %}>Out</label>
+                                                        <label class="filter-month-chip {% if 11 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="11" {% if 11 in meses_filtro %}checked{% endif %}>Nov</label>
+                                                        <label class="filter-month-chip {% if 12 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="12" {% if 12 in meses_filtro %}checked{% endif %}>Dez</label>
+                                                    </div>
+                                                    <div class="mt-2">
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleMeses('mes', true)">Todos</button>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleMeses('mes', false)">Nenhum</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <!-- Card: Previsão para Uso -->
+                                        <div class="col-lg-4">
+                                            <div class="card filter-card h-100 border-0 shadow-sm">
+                                                <div class="card-header d-flex align-items-center">
+                                                    <i class="fas fa-clock text-success me-2"></i>
+                                                    Previsão para Uso
+                                                </div>
+                                                <div class="card-body">
+                                                    <label for="previsao_ano" class="form-label small fw-semibold">Ano</label>
+                                                    <select class="form-select form-select-sm mb-2" id="previsao_ano" name="previsao_ano">
+                                                        <option value="">Qualquer</option>
+                                                        {% for ano in anos_disponiveis %}
+                                                            <option value="{{ ano }}" {% if previsao_ano_filtro == ano %}selected{% endif %}>{{ ano }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                    <label class="form-label small fw-semibold d-block">Meses</label>
+                                                    <div class="d-flex flex-wrap gap-1">
+                                                        <label class="filter-month-chip {% if 1 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="1" {% if 1 in previsao_meses_filtro %}checked{% endif %}>Jan</label>
+                                                        <label class="filter-month-chip {% if 2 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="2" {% if 2 in previsao_meses_filtro %}checked{% endif %}>Fev</label>
+                                                        <label class="filter-month-chip {% if 3 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="3" {% if 3 in previsao_meses_filtro %}checked{% endif %}>Mar</label>
+                                                        <label class="filter-month-chip {% if 4 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="4" {% if 4 in previsao_meses_filtro %}checked{% endif %}>Abr</label>
+                                                        <label class="filter-month-chip {% if 5 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="5" {% if 5 in previsao_meses_filtro %}checked{% endif %}>Mai</label>
+                                                        <label class="filter-month-chip {% if 6 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="6" {% if 6 in previsao_meses_filtro %}checked{% endif %}>Jun</label>
+                                                        <label class="filter-month-chip {% if 7 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="7" {% if 7 in previsao_meses_filtro %}checked{% endif %}>Jul</label>
+                                                        <label class="filter-month-chip {% if 8 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="8" {% if 8 in previsao_meses_filtro %}checked{% endif %}>Ago</label>
+                                                        <label class="filter-month-chip {% if 9 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="9" {% if 9 in previsao_meses_filtro %}checked{% endif %}>Set</label>
+                                                        <label class="filter-month-chip {% if 10 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="10" {% if 10 in previsao_meses_filtro %}checked{% endif %}>Out</label>
+                                                        <label class="filter-month-chip {% if 11 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="11" {% if 11 in previsao_meses_filtro %}checked{% endif %}>Nov</label>
+                                                        <label class="filter-month-chip {% if 12 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="12" {% if 12 in previsao_meses_filtro %}checked{% endif %}>Dez</label>
+                                                    </div>
+                                                    <div class="mt-2">
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleMeses('previsao_mes', true)">Todos</button>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleMeses('previsao_mes', false)">Nenhum</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <!-- Card: Atributos -->
+                                        <div class="col-lg-4">
+                                            <div class="card filter-card h-100 border-0 shadow-sm">
+                                                <div class="card-header d-flex align-items-center">
+                                                    <i class="fas fa-tags text-info me-2"></i>
+                                                    Uso, Classificação e Status
+                                                </div>
+                                                <div class="card-body">
+                                                    <label for="uso" class="form-label small fw-semibold">Uso</label>
+                                                    <select class="form-select form-select-sm mb-2" id="uso" name="uso">
+                                                        <option value="">Todos</option>
+                                                        {% for u in usos_disponiveis %}
+                                                            <option value="{{ u }}" {% if uso_filtro == u %}selected{% endif %}>{{ u }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                    <label for="classificacao" class="form-label small fw-semibold">Classificação</label>
+                                                    <select class="form-select form-select-sm mb-2" id="classificacao" name="classificacao">
+                                                        <option value="">Todas</option>
+                                                        {% for c in classificacoes_disponiveis %}
+                                                            <option value="{{ c }}" {% if classificacao_filtro == c %}selected{% endif %}>{{ c }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                    <label for="status" class="form-label small fw-semibold">Status</label>
+                                                    <select class="form-select form-select-sm" id="status" name="status">
+                                                        <option value="">Todos</option>
+                                                        {% for s in status_disponiveis %}
+                                                            <option value="{{ s }}" {% if status_filtro == s %}selected{% endif %}>{{ s|truncatewords:8 }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-3">
+                                        <div class="col-12 d-flex gap-2 justify-content-end">
+                                            <a href="{% url 'analise_planilha_rc' %}" class="btn btn-outline-secondary">Limpar</a>
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-search me-2"></i>Filtrar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Statistics Cards -->
         <div class="row mb-4">
             <div class="col-md-3">
@@ -694,6 +881,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Filtros: chips clicáveis e toggle meses
+document.querySelectorAll('.filter-month-chip').forEach(function(chip) {
+    chip.addEventListener('click', function(e) {
+        if (e.target.tagName === 'INPUT') return;
+        const input = this.querySelector('input[type="checkbox"]');
+        input.checked = !input.checked;
+        this.classList.toggle('active', input.checked);
+    });
+});
+function toggleMeses(name, checked) {
+    document.querySelectorAll('input[name="' + name + '"]').forEach(function(cb) {
+        cb.checked = checked;
+    });
+    document.querySelectorAll('.filter-month-chip').forEach(function(chip) {
+        const inp = chip.querySelector('input[name="' + name + '"]');
+        if (inp) chip.classList.toggle('active', checked);
+    });
+}
 </script>
 {% endblock %}
 

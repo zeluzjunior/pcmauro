@@ -81,6 +81,7 @@ class Maquina(models.Model):
         help_text='Centro de Atividade relacionado ao setor de manutenção',
         related_name='maquinas'
     )
+    ativo = models.BooleanField('Ativo', default=True, db_index=True, help_text='Máquina ativa (exibir em listagens)')
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
     updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
 
@@ -1448,7 +1449,14 @@ class ControleRCeNF(models.Model): # Planilha de Controle RC e NF
         return f"ID: {self.id_excel or 'N/A'} - RC: {self.rc or 'N/A'} - NF: {self.nf_saida or 'N/A'} - {self.empresa or 'N/A'}"
 
 class ParadaMaquina(models.Model):
-    """Modelo para armazenar paradas de máquinas"""
+    """
+    Modelo para armazenar paradas de máquinas.
+
+    Primary key: id (Django AutoField, único por registro).
+    Identificação de duplicados / chave natural para atualização: (data, cod_recurso, horario_inicial)
+    — uma parada por recurso por data por horário inicial. O import usa essa combinação
+    para update_or_create (atualizar se já existir, criar se não).
+    """
     # Dados da Unidade
     unid = models.IntegerField('Unidade', blank=True, null=True)
     nome_unidade = models.CharField('Nome Unidade', max_length=255, blank=True, null=True)
@@ -1503,6 +1511,108 @@ class ParadaMaquina(models.Model):
             models.Index(fields=['cod_recurso']),
             models.Index(fields=['linha_producao']),
         ]
-    
+        constraints = [
+            models.UniqueConstraint(
+                fields=['data', 'cod_recurso', 'horario_inicial'],
+                name='unique_parada_data_recurso_horario',
+            ),
+        ]
+
     def __str__(self):
         return f"Parada {self.cod_recurso} - {self.data} {self.horario_inicial}"
+
+SECAO_CONFIG_PARADA = (
+    ('frigorifico', 'Frigorífico'),
+    ('industria', 'Indústria'),
+)
+
+class ConfigParadaMaquina(models.Model):
+    """Configuração mensal de paradas de máquina por seção (Frigorífico / Indústria)."""
+    ano = models.IntegerField('Ano', db_index=True)
+    mes = models.IntegerField('Mês', choices=[(i, i) for i in range(1, 13)])
+    secao = models.CharField('Seção', max_length=20, choices=SECAO_CONFIG_PARADA)
+
+    # Parâmetros Frigorífico
+    suinos_abatidos = models.IntegerField('Suínos Abatidos', blank=True, null=True)
+    dias_uteis = models.IntegerField('Dias úteis', blank=True, null=True)
+    total_abate_planejado = models.IntegerField('Total de Abate Planejado', blank=True, null=True)
+    perda_maximo = models.DecimalField('% de Perda Máximo', max_digits=6, decimal_places=2, blank=True, null=True)
+    fator_eficiencia = models.DecimalField('Fator de Eficiência %', max_digits=6, decimal_places=2, blank=True, null=True)
+    carcacas_por_minuto = models.DecimalField('Nº Carcaças por Minuto', max_digits=10, decimal_places=2, blank=True, null=True)
+
+    # Parâmetros Indústria
+    dias_uteis_industria = models.IntegerField('Dias úteis (Indústria)', blank=True, null=True)
+    total_producao_planejada_industria = models.IntegerField('Total de Produção Planejada (Indústria)', blank=True, null=True)
+    perda_maximo_industria = models.DecimalField('% de Perda Máximo (Indústria)', max_digits=6, decimal_places=2, blank=True, null=True)
+    fator_eficiencia_industria = models.DecimalField('Fator de Eficiência % (Indústria)', max_digits=6, decimal_places=2, blank=True, null=True)
+
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Configuração Parada de Máquina'
+        verbose_name_plural = 'Configurações Paradas de Máquina'
+        ordering = ['ano', 'mes', 'secao']
+        constraints = [
+            models.UniqueConstraint(fields=['ano', 'mes', 'secao'], name='unique_config_parada_ano_mes_secao'),
+        ]
+        indexes = [
+            models.Index(fields=['ano', 'mes']),
+        ]
+
+    def __str__(self):
+        return f"Config {self.ano}/{self.mes} - {self.get_secao_display()}"
+
+class ConfigRecursoParadaMaquina(models.Model):
+    """
+    Define quais valores de descr_recurso (da tabela ParadaMaquina) são incluídos
+    na análise de paradas por seção (Frigorífico / Indústria).
+    Se existir registro (secao, descr_recurso), esse recurso é usado no cálculo da análise.
+    Ex.: Frigorífico = apenas registros com descr_recurso em (NORIA ABATE, ...).
+    """
+    secao = models.CharField('Seção', max_length=20, choices=SECAO_CONFIG_PARADA)
+    descr_recurso = models.CharField('Descrição Recurso', max_length=255)
+
+    class Meta:
+        verbose_name = 'Recurso incluído na Análise de Paradas'
+        verbose_name_plural = 'Recursos incluídos na Análise de Paradas'
+        ordering = ['secao', 'descr_recurso']
+        constraints = [
+            models.UniqueConstraint(fields=['secao', 'descr_recurso'], name='unique_config_recurso_parada_secao_descr'),
+        ]
+        indexes = [
+            models.Index(fields=['secao']),
+        ]
+
+    def __str__(self):
+        return f"{self.get_secao_display()} – {self.descr_recurso}"
+
+class ProducaoDiaria(models.Model):
+    """
+    Dados de produção diária por dia do mês: Suínos Abatidos e Produção Indústria.
+    Um registro por (ano, mes, dia).
+    """
+    ano = models.IntegerField('Ano', db_index=True)
+    mes = models.IntegerField('Mês', choices=[(i, i) for i in range(1, 13)])
+    dia = models.IntegerField('Dia', help_text='Dia do mês (1-31)')
+    suinos_abatidos = models.IntegerField('Suínos Abatidos', blank=True, null=True)
+    producao_industria = models.DecimalField(
+        'Produção Indústria', max_digits=15, decimal_places=3, blank=True, null=True
+    )
+
+    class Meta:
+        verbose_name = 'Produção Diária'
+        verbose_name_plural = 'Produções Diárias'
+        ordering = ['ano', 'mes', 'dia']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['ano', 'mes', 'dia'],
+                name='unique_producao_diaria_ano_mes_dia',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['ano', 'mes']),
+        ]
+
+    def __str__(self):
+        return f"{self.ano}/{self.mes:02d}/{self.dia:02d} – Suínos: {self.suinos_abatidos or '-'} | Indústria: {self.producao_industria or '-'}"

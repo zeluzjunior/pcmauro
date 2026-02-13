@@ -1,18 +1,20 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load form_extras %}
 
 {% block title %}Análise de Notas Fiscais{% endblock %}
 
 {% block extra_css %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
     .kpi-card {
         border-left: 4px solid;
-        transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .kpi-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
     }
     .kpi-primary { border-left-color: #0d6efd; }
     .kpi-success { border-left-color: #198754; }
@@ -149,101 +151,62 @@
         </div>
 
         <!-- KPI Cards -->
-        <div class="row mb-5">
-            <div class="col-md-3 mb-4">
-                <div class="card kpi-card kpi-primary shadow-sm border-0 h-100">
-                    <div class="card-body text-center">
-                        <i class="fas fa-file-invoice-dollar fa-3x text-primary opacity-50 mb-3"></i>
-                        <h6 class="text-muted mb-2">Total de Notas Fiscais</h6>
-                        <h2 class="mb-0 fw-bold text-primary format-number">{{ total_notas }}</h2>
-                        <small class="text-muted">Notas cadastradas</small>
+        <div class="mb-5">
+            <!-- Cards Gerais -->
+            <div class="row mb-3">
+                <div class="col-md-3 mb-3">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-1 small">Total de Notas Fiscais</h6>
+                            <h3 class="mb-1 fw-bold format-number">{{ total_notas }}</h3>
+                            <small class="text-muted">Notas cadastradas</small>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-md-3 mb-4">
-                <div class="card kpi-card kpi-success shadow-sm border-0 h-100">
-                    <div class="card-body text-center">
-                        <i class="fas fa-money-bill-wave fa-3x text-success opacity-50 mb-3"></i>
-                        <h6 class="text-muted mb-2">Valor Total</h6>
-                        <h2 class="mb-0 fw-bold text-success format-money" data-value="{{ valor_total_notas|default:0 }}">R$ {{ valor_total_notas|floatformat:2 }}</h2>
-                        <small class="text-muted">Soma de todas as notas</small>
+                <div class="col-md-3 mb-3">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-1 small">Valor Total</h6>
+                            <h3 class="mb-1 fw-bold">{{ valor_total_notas|currency_br }}</h3>
+                            <small class="text-muted">Soma de todas as notas</small>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-md-3 mb-4">
-                <div class="card kpi-card kpi-info shadow-sm border-0 h-100">
-                    <div class="card-body text-center">
-                        <i class="fas fa-calculator fa-3x text-info opacity-50 mb-3"></i>
-                        <h6 class="text-muted mb-2">Valor Médio</h6>
-                        <h2 class="mb-0 fw-bold text-info format-money" data-value="{{ valor_medio|default:0 }}">R$ {{ valor_medio|floatformat:2 }}</h2>
-                        <small class="text-muted">Por nota fiscal</small>
+                <div class="col-md-3 mb-3">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-1 small">Valor Médio</h6>
+                            <h3 class="mb-1 fw-bold">{{ valor_medio|currency_br }}</h3>
+                            <small class="text-muted">Por nota fiscal</small>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-md-3 mb-4">
-                <div class="card kpi-card kpi-warning shadow-sm border-0 h-100">
-                    <div class="card-body text-center">
-                        <i class="fas fa-link fa-3x text-warning opacity-50 mb-3"></i>
-                        <h6 class="text-muted mb-2">Com Projeção</h6>
-                        <h2 class="mb-0 fw-bold text-warning format-number">{{ notas_com_projecao }}</h2>
-                        <small class="text-muted">{{ percentual_com_projecao|floatformat:1 }}% do total</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row mb-5">
-            <div class="col-md-3 mb-4">
-                <div class="card kpi-card kpi-success shadow-sm border-0 h-100">
-                    <div class="card-body text-center">
-                        <i class="fas fa-check-circle fa-3x text-success opacity-50 mb-3"></i>
-                        <h6 class="text-muted mb-2">Autorizada</h6>
-                        <h2 class="mb-0 fw-bold text-success format-number">{{ notas_autorizadas }}</h2>
-                        <small class="text-muted">{{ percentual_autorizadas|floatformat:1 }}% do total</small>
-                        <div class="mt-2">
-                            <small class="text-muted d-block">Valor: <span class="format-money" data-value="{{ valor_autorizadas|default:0 }}">R$ {{ valor_autorizadas|floatformat:2 }}</span></small>
+                <div class="col-md-3 mb-3">
+                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-1 small">Com Projeção</h6>
+                            <h3 class="mb-1 fw-bold format-number">{{ notas_com_projecao }}</h3>
+                            <small class="text-muted">{{ percentual_com_projecao|floatformat:1 }}% do total</small>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
-                <div class="card kpi-card kpi-info shadow-sm border-0 h-100">
-                    <div class="card-body text-center">
-                        <i class="fas fa-file-invoice fa-3x text-info opacity-50 mb-3"></i>
-                        <h6 class="text-muted mb-2">Lançada</h6>
-                        <h2 class="mb-0 fw-bold text-info format-number">{{ notas_lancadas }}</h2>
-                        <small class="text-muted">{{ percentual_lancadas|floatformat:1 }}% do total</small>
-                        <div class="mt-2">
-                            <small class="text-muted d-block">Valor: <span class="format-money" data-value="{{ valor_lancadas|default:0 }}">R$ {{ valor_lancadas|floatformat:2 }}</span></small>
+            <!-- Cards por Situação (6 boxes fixos: LANÇADA, PENDENTE, AUTORIZADA, AGUARDANDO AUTORIZAÇÃO, CANCELADA, Sem situação) -->
+            <div class="row mb-3">
+                {% for item in situacao_stats %}
+                <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+                    <div class="card stat-card kpi-card {% cycle 'kpi-primary' 'kpi-success' 'kpi-info' 'kpi-warning' 'kpi-danger' %} shadow-sm border-0">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-1 small">{{ item.situacao }}</h6>
+                            <h3 class="mb-1 fw-bold">{{ item.valor_total|currency_br }}</h3>
+                            <small class="text-muted">{{ item.percentual|floatformat:1 }}% do total</small>
+                            <div class="mt-2">
+                                <small class="text-muted d-block">{{ item.quantidade }} registro(s)</small>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-md-3 mb-4">
-                <div class="card kpi-card kpi-warning shadow-sm border-0 h-100">
-                    <div class="card-body text-center">
-                        <i class="fas fa-clock fa-3x text-warning opacity-50 mb-3"></i>
-                        <h6 class="text-muted mb-2">Aguardando Autorização</h6>
-                        <h2 class="mb-0 fw-bold text-warning format-number">{{ notas_aguardando }}</h2>
-                        <small class="text-muted">{{ percentual_aguardando|floatformat:1 }}% do total</small>
-                        <div class="mt-2">
-                            <small class="text-muted d-block">Valor: <span class="format-money" data-value="{{ valor_aguardando|default:0 }}">R$ {{ valor_aguardando|floatformat:2 }}</span></small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3 mb-4">
-                <div class="card kpi-card kpi-danger shadow-sm border-0 h-100">
-                    <div class="card-body text-center">
-                        <i class="fas fa-exclamation-triangle fa-3x text-danger opacity-50 mb-3"></i>
-                        <h6 class="text-muted mb-2">Pendente</h6>
-                        <h2 class="mb-0 fw-bold text-danger format-number">{{ notas_pendentes }}</h2>
-                        <small class="text-muted">{{ percentual_pendentes|floatformat:1 }}% do total</small>
-                        <div class="mt-2">
-                            <small class="text-muted d-block">Valor: <span class="format-money" data-value="{{ valor_pendentes|default:0 }}">R$ {{ valor_pendentes|floatformat:2 }}</span></small>
-                        </div>
-                    </div>
-                </div>
+                {% endfor %}
             </div>
         </div>
 

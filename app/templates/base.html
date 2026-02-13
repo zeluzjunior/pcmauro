@@ -382,6 +382,22 @@
                             </div>
                         </li>
 
+
+                        <li class="border-top my-3"></li>
+                        <!-- Dados de Produção Diária -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#producao-diaria-collapse" aria-expanded="false">
+                                <i class="bi bi-calendar-day me-2"></i>
+                                <span class="btn-toggle-text">Dados de Produção Diária</span>
+                            </button>
+                            <div class="collapse" id="producao-diaria-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'dados_producao_diaria' %}" class="link-dark rounded"><i class="fas fa-database me-2"></i>Dados de Produção Diária</a></li>
+                                    <li><a href="{% url 'consultar_producao_diaria' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Produção Diária</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
                         <!-- Paradas de Máquinas -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#paradas-maquina-collapse" aria-expanded="false">

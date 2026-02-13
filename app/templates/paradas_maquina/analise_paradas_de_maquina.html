@@ -157,339 +157,122 @@
                 </div>
             </div>
         </div>
-        
-        <!-- KPI Cards -->
-        <div class="mb-5">
+
+        <div class="alert alert-light border mb-4">
+            <i class="fas fa-cog me-2"></i>
+            <strong>Frigorífico</strong> e <strong>Indústria</strong> são definidos na página <a href="{% url 'configuracao_parada_maquina' %}">Configuração</a> (seção &quot;Recursos incluídos na Análise das Paradas de Máquinas&quot;), com base na coluna <code>descr_linha_producao</code> da tabela ParadaMaquina. Apenas as linhas de produção selecionadas em cada seção entram nas estatísticas abaixo.
+        </div>
+
+        <!-- ========== SEÇÃO FRIGORÍFICO ========== -->
+        <div class="mb-5 pt-5 border-top">
+            <h3 class="mb-4 text-primary"><i class="fas fa-industry me-2"></i>Análise Frigorífico</h3>           
+            <!-- KPIs Frigorífico -->
             <div class="row mb-4">
-                <div class="col-md-3 mb-4">
-                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">
-                                        Total de Paradas
-                                        <i class="fas fa-info-circle ms-1" 
-                                           data-bs-toggle="tooltip" 
-                                           data-bs-placement="top" 
-                                           title="Número total de paradas de máquina registradas no sistema"></i>
-                                    </h6>
-                                    <h2 class="mb-0 fw-bold">{{ total_paradas }}</h2>
-                                </div>
-                                <i class="bi bi-stop-circle fa-3x text-primary opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-4">
-                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">
-                                        Últimos 30 Dias
-                                        <i class="fas fa-info-circle ms-1" 
-                                           data-bs-toggle="tooltip" 
-                                           data-bs-placement="top" 
-                                           title="Número de paradas registradas nos últimos 30 dias"></i>
-                                    </h6>
-                                    <h2 class="mb-0 fw-bold">{{ paradas_recentes }}</h2>
-                                </div>
-                                <i class="fas fa-calendar-day fa-3x text-success opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-4">
-                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">
-                                        Mês Atual
-                                        <i class="fas fa-info-circle ms-1" 
-                                           data-bs-toggle="tooltip" 
-                                           data-bs-placement="top" 
-                                           title="Número de paradas registradas no mês atual"></i>
-                                    </h6>
-                                    <h2 class="mb-0 fw-bold">{{ paradas_mes_atual }}</h2>
-                                </div>
-                                <i class="fas fa-calendar-alt fa-3x text-warning opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-4">
-                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">
-                                        Recursos Únicos
-                                        <i class="fas fa-info-circle ms-1" 
-                                           data-bs-toggle="tooltip" 
-                                           data-bs-placement="top" 
-                                           title="Número de recursos diferentes que tiveram paradas"></i>
-                                    </h6>
-                                    <h2 class="mb-0 fw-bold">{{ recursos_unicos }}</h2>
-                                </div>
-                                <i class="fas fa-cogs fa-3x text-info opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <p class="text-muted mb-4">Dados baseados na projeção de produção e abate:  </p>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Suínos Abatidos por dia (planejados)</h6><h4 class="mb-0 fw-bold">{% if suinos_abatidos_por_dia_medio_frig is not None %}{{ suinos_abatidos_por_dia_medio_frig|number_br:0 }}{% else %}-{% endif %}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Dias úteis planejados:</h6><h4 class="mb-0 fw-bold">{{ dias_uteis_total_frig|default:0|number_br:0 }}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Total Abatido planejados:</h6><h4 class="mb-0 fw-bold">{{ producao_esperada_frig|default:0|number_br:0 }}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">% Perda Máximo:</h6><h4 class="mb-0 fw-bold">{% if perda_maximo_frig is not None %}{{ perda_maximo_frig|number_br:2 }}%{% else %}-{% endif %}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Perda Máxima planejada:</h6><h4 class="mb-0 fw-bold">{{ perda_maxima_calculada_frig|number_br:2 }}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Fator de Eficiência %:</h6><h4 class="mb-0 fw-bold">{% if fator_eficiencia_frig is not None %}{{ fator_eficiencia_frig|number_br:2 }}%{% else %}-{% endif %}</h4></div></div></div>
             </div>
-            <div class="row">
-                <div class="col-md-3 mb-4">
-                    <div class="card stat-card kpi-card kpi-danger shadow-sm border-0">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">
-                                        Total Horas Paradas
-                                        <i class="fas fa-info-circle ms-1" 
-                                           data-bs-toggle="tooltip" 
-                                           data-bs-placement="top" 
-                                           title="Soma total de horas de paradas de máquinas"></i>
-                                    </h6>
-                                    <h2 class="mb-0 fw-bold">{{ total_horas_paradas|number_br:2 }}h</h2>
-                                </div>
-                                <i class="fas fa-clock fa-3x text-danger opacity-25"></i>
-                            </div>
+            
+            
+            <div class="row mb-4">
+                <p class="text-muted mb-4">Dados cálculados usando a produção REAL como base:  </p>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Quantidade de Paradas:</h6><h4 class="mb-0 fw-bold">{{ total_paradas_frig|number_br:0 }}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Total de suínos já abatidos:</h6><h4 class="mb-0 fw-bold">{{ soma_suinos_abatidos_frig|default:0|number_br:0 }}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Total de carcaças Perdidas:</h6><h4 class="mb-0 fw-bold">{{ soma_capacidade_frig|number_br:2 }}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Perda Máxima restante:</h6><h4 class="mb-0 fw-bold">{{ perda_restante_frig|number_br:2 }}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Indicador sem Fator de Correção:</h6><h4 class="mb-0 fw-bold">{% if indicador_sem_fator_frig is not None %}{{ indicador_sem_fator_frig|number_br:2 }}%{% else %}-{% endif %}</h4></div></div></div>
+                <div class="col-md-2 mb-3">{% if indicador_atual_frig is not None and perda_maximo_frig is not None and indicador_atual_frig > perda_maximo_frig %}<div class="card border-0 border-start border-4 border-danger shadow-sm" style="border-left-width: 6px !important; background: linear-gradient(135deg, rgba(220, 53, 69, 0.08) 0%, rgba(220, 53, 69, 0.02) 100%);">{% else %}<div class="card border-0 border-start border-4 border-success shadow-sm" style="border-left-width: 6px !important; background: linear-gradient(135deg, rgba(25, 135, 84, 0.08) 0%, rgba(25, 135, 84, 0.02) 100%);">{% endif %}
+                    <div class="card-body py-3 d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1 small fw-semibold">{% if indicador_atual_frig is not None and perda_maximo_frig is not None and indicador_atual_frig > perda_maximo_frig %}<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Indicador Atual</span>{% else %}<span class="text-success"><i class="fas fa-bullseye me-1"></i>Indicador Atual</span>{% endif %}</h6>
+                            <h4 class="mb-0 fw-bold {% if indicador_atual_frig is not None and perda_maximo_frig is not None and indicador_atual_frig > perda_maximo_frig %}text-danger{% else %}text-success{% endif %}" style="font-size: 1.5rem;">{% if indicador_atual_frig is not None %}{{ indicador_atual_frig|number_br:2 }}%{% else %}-{% endif %}</h4>
                         </div>
+                        <i class="fas fa-chart-line fa-2x opacity-25 ms-2 {% if indicador_atual_frig is not None and perda_maximo_frig is not None and indicador_atual_frig > perda_maximo_frig %}text-danger{% else %}text-success{% endif %}"></i>
                     </div>
                 </div>
-                <div class="col-md-3 mb-4">
-                    <div class="card stat-card kpi-card kpi-purple shadow-sm border-0">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">
-                                        Média Horas/Parada
-                                        <i class="fas fa-info-circle ms-1" 
-                                           data-bs-toggle="tooltip" 
-                                           data-bs-placement="top" 
-                                           title="Média de horas paradas por parada (Total Horas dividido pelo número total de paradas)"></i>
-                                    </h6>
-                                    <h2 class="mb-0 fw-bold">{{ media_horas_paradas|number_br:2 }}h</h2>
-                                </div>
-                                <i class="fas fa-chart-line fa-3x text-purple opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
                 </div>
-                <div class="col-md-3 mb-4">
-                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">
-                                        Linhas de Produção
-                                        <i class="fas fa-info-circle ms-1" 
-                                           data-bs-toggle="tooltip" 
-                                           data-bs-placement="top" 
-                                           title="Número de linhas de produção diferentes que tiveram paradas"></i>
-                                    </h6>
-                                    <h2 class="mb-0 fw-bold">{{ linhas_unicas }}</h2>
-                                </div>
-                                <i class="fas fa-industry fa-3x text-success opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
+
+            <!-- Evolução Temporal Frigorífico -->
+            <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Evolução Temporal (Frigorífico)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="temporalChartFrig"></canvas></div></div></div></div></div>
+            <!-- Evolução Diária Frigorífico -->
+            <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><div class="d-flex justify-content-between align-items-center flex-wrap"><h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Evolução Diária (Frigorífico)</h5><div class="input-group" style="max-width: 220px;"><span class="input-group-text bg-white border-end-0"><i class="fas fa-calendar-alt text-primary"></i></span><input type="month" class="form-control border-start-0" id="mesSelecionadoFrig" value="{{ mes_selecionado }}" style="font-weight: 500;"></div></div></div><div class="card-body"><div class="chart-container-large"><canvas id="dailyChartFrig"></canvas></div></div></div></div></div>
+            <!-- Top Paradas / Turnos Frigorífico -->
+            <div class="row mb-4"><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-info text-white"><h5 class="mb-0">Top 10 Paradas (Frigorífico)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="paradasChartFrig"></canvas></div></div></div></div><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-warning text-white"><h5 class="mb-0">Turnos (Frigorífico)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="turnosChartFrig"></canvas></div></div></div></div></div>
+            <!-- Tabela Paradas Recentes Frigorífico -->
+            <div class="row mb-5"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><h5 class="mb-0"><i class="fas fa-table me-2"></i>Paradas Recentes (Frigorífico)</h5></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0"><thead class="table-light"><tr><th>Data</th><th>Horário Início</th><th>Horário Fim</th><th>Dif. Hora</th><th>Cód. Recurso</th><th>Descrição Recurso</th><th>Cód. Parada</th><th>Descrição Parada</th><th>Turno</th><th>Linha</th></tr></thead><tbody>{% for parada in section_frig.paradas_recentes_list %}<tr><td>{{ parada.data|date:"d/m/Y" }}</td><td>{{ parada.horario_inicial|time:"H:i"|default:"-" }}</td><td>{{ parada.horario_final|time:"H:i"|default:"-" }}</td><td>{{ parada.dif_hora|number_br:2|default:"-" }}h</td><td><span class="badge bg-primary">{{ parada.cod_recurso|default:"-" }}</span></td><td>{{ parada.descr_recurso|default:"-"|truncatewords:10 }}</td><td>{{ parada.cod_parada|default:"-" }}</td><td>{{ parada.descr_parada|default:"-"|truncatewords:5 }}</td><td>{{ parada.turno|default:"-" }}</td><td>{{ parada.linha_producao|default:"-" }}</td></tr>{% empty %}<tr><td colspan="10" class="text-center text-muted">Nenhuma parada encontrada</td></tr>{% endfor %}</tbody></table></div></div></div></div></div>
         </div>
 
-        <!-- Charts Row 1: Evolution by Month -->
-        <div class="row mb-5">
-            <div class="col-md-12 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-line me-2"></i>Evolução Temporal das Paradas (Últimos 12 Meses)
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="temporalChart"></canvas>
-                        </div>
-                    </div>
-                </div>
+        <!-- ========== SEÇÃO INDÚSTRIA ========== -->
+        <div class="mb-5 pt-5 border-top">
+            <h3 class="mb-4 text-secondary"><i class="fas fa-cogs me-2"></i>Análise Indústria</h3>
+            <p class="text-muted mb-4">Estatísticas e gráficos apenas das linhas de produção configuradas como Indústria (descr_linha_producao).</p>
+            <!-- KPIs Indústria -->
+            <div class="row mb-4">
+                <p class="text-muted mb-4">Dados baseados na projeção de produção e abate:  </p>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Produção diária planejada:</h6><h4 class="mb-0 fw-bold">{{ total_paradas_ind|number_br:0 }}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Dias úteis planejados:</h6><h4 class="mb-0 fw-bold">{{ dias_uteis_total_industria|default:0|number_br:0 }}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Total Produção Planejada:</h6><h4 class="mb-0 fw-bold">{{ total_producao_planejada_industria|default:0|number_br:0 }}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">% Perda Máxima:</h6><h4 class="mb-0 fw-bold">{% if perda_maximo_industria is not None %}{{ perda_maximo_industria|number_br:2 }}%{% else %}-{% endif %}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Perda Máxima planejada:</h6><h4 class="mb-0 fw-bold">{{ perda_maxima_planejada_industria|number_br:2 }}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Fator de Eficiência %:</h6><h4 class="mb-0 fw-bold">{% if fator_eficiencia_industria is not None %}{{ fator_eficiencia_industria|number_br:2 }}%{% else %}-{% endif %}</h4></div></div></div>
+                                                                     
+            
             </div>
-        </div>
 
-        <!-- Charts Row 1.5: Daily Chart -->
-        <div class="row mb-5">
-            <div class="col-md-12 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-success text-white">
-                        <div class="d-flex justify-content-between align-items-center flex-wrap">
-                            <h5 class="mb-0">
-                                <i class="fas fa-chart-line me-2"></i>Evolução Diária das Paradas por Mês
-                            </h5>
-                            <div class="d-flex align-items-center mt-2 mt-md-0">
-                                <div class="input-group" style="max-width: 220px;">
-                                    <span class="input-group-text bg-white border-end-0">
-                                        <i class="fas fa-calendar-alt text-success"></i>
-                                    </span>
-                                    <input type="month" 
-                                           class="form-control border-start-0" 
-                                           id="mesSelecionado" 
-                                           value="{{ mes_selecionado }}"
-                                           style="font-weight: 500;">
-                                </div>
-                            </div>
+            <div class="row mb-4">
+                <p class="text-muted mb-4">Dados cálculados usando a produção REAL como base:  </p>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Total de Paradas:</h6><h4 class="mb-0 fw-bold">{{ total_paradas_ind|number_br:0 }}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm">
+                        <div class="card-body py-3"><h6 class="text-muted mb-0 small">Produção realizada:</h6><h4 class="mb-0 fw-bold">{{ soma_producao_industria|number_br:2 }}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Total de Perdas (Kg):</h6><h4 class="mb-0 fw-bold">{{ soma_capacidade_ind|number_br:2 }}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Total de Perdas Restantes</h6><h4 class="mb-0 fw-bold">{{ perda_restante_industria|number_br:2 }}</h4></div></div></div>
+                <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm">
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Indicador sem Fator de Correção:</h6><h4 class="mb-0 fw-bold">{% if indicador_sem_fator_industria is not None %}{{ indicador_sem_fator_industria|number_br:2 }}%{% else %}-{% endif %}</h4></div></div></div>
+                <div class="col-md-2 mb-3">{% if indicador_atual_industria is not None and perda_maximo_industria is not None and indicador_atual_industria > perda_maximo_industria %}<div class="card border-0 border-start border-4 border-danger shadow-sm" style="border-left-width: 6px !important; background: linear-gradient(135deg, rgba(220, 53, 69, 0.08) 0%, rgba(220, 53, 69, 0.02) 100%);">{% else %}<div class="card border-0 border-start border-4 border-success shadow-sm" style="border-left-width: 6px !important; background: linear-gradient(135deg, rgba(25, 135, 84, 0.08) 0%, rgba(25, 135, 84, 0.02) 100%);">{% endif %}
+                    <div class="card-body py-3 d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1 small fw-semibold">{% if indicador_atual_industria is not None and perda_maximo_industria is not None and indicador_atual_industria > perda_maximo_industria %}<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Indicador Atual</span>{% else %}<span class="text-success"><i class="fas fa-bullseye me-1"></i>Indicador Atual</span>{% endif %}</h6>
+                            <h4 class="mb-0 fw-bold {% if indicador_atual_industria is not None and perda_maximo_industria is not None and indicador_atual_industria > perda_maximo_industria %}text-danger{% else %}text-success{% endif %}" style="font-size: 1.5rem;">{% if indicador_atual_industria is not None %}{{ indicador_atual_industria|number_br:2 }}%{% else %}-{% endif %}</h4>
                         </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="dailyChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Charts Row 2 -->
-        <div class="row mb-5">
-            <!-- Top 10 Recursos por Quantidade -->
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-bar me-2"></i>Top 10 Recursos com Mais Paradas
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="recursosQtdChart"></canvas>
-                        </div>
+                        <i class="fas fa-chart-line fa-2x opacity-25 ms-2 {% if indicador_atual_industria is not None and perda_maximo_industria is not None and indicador_atual_industria > perda_maximo_industria %}text-danger{% else %}text-success{% endif %}"></i>
                     </div>
                 </div>
             </div>
 
-            <!-- Top 10 Recursos por Horas -->
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-danger text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-bar me-2"></i>Top 10 Recursos por Horas Paradas
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="recursosHorasChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Charts Row 3 -->
-        <div class="row mb-5">
-            <!-- Top 10 Paradas -->
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-bar me-2"></i>Top 10 Tipos de Parada Mais Frequentes
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="paradasChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Distribuição por Turno -->
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-warning text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-pie me-2"></i>Distribuição por Turno
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="turnosChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Charts Row 4 -->
-        <div class="row mb-5">
-            <!-- Distribuição por Linha de Produção -->
-            <div class="col-md-12 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-secondary text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-bar me-2"></i>Top 10 Linhas de Produção por Paradas
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="linhasChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Data Tables -->
-        <div class="row mb-5">
-            <!-- Tabela: Paradas Recentes -->
-            <div class="col-md-12 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-table me-2"></i>Paradas Recentes
-                        </h5>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Data</th>
-                                        <th>Horário Início</th>
-                                        <th>Horário Fim</th>
-                                        <th>Dif. Hora</th>
-                                        <th>Cód. Recurso</th>
-                                        <th>Descrição Recurso</th>
-                                        <th>Cód. Parada</th>
-                                        <th>Descrição Parada</th>
-                                        <th>Turno</th>
-                                        <th>Linha Produção</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for parada in paradas_recentes_list %}
-                                    <tr>
-                                        <td>{{ parada.data|date:"d/m/Y" }}</td>
-                                        <td>{{ parada.horario_inicial|time:"H:i"|default:"-" }}</td>
-                                        <td>{{ parada.horario_final|time:"H:i"|default:"-" }}</td>
-                                        <td>{{ parada.dif_hora|number_br:2|default:"-" }}h</td>
-                                        <td><span class="badge bg-primary">{{ parada.cod_recurso|default:"-" }}</span></td>
-                                        <td>{{ parada.descr_recurso|default:"-"|truncatewords:10 }}</td>
-                                        <td>{{ parada.cod_parada|default:"-" }}</td>
-                                        <td>{{ parada.descr_parada|default:"-"|truncatewords:5 }}</td>
-                                        <td>{{ parada.turno|default:"-" }}</td>
-                                        <td>{{ parada.linha_producao|default:"-" }}</td>
-                                    </tr>
-                                    {% empty %}
-                                    <tr>
-                                        <td colspan="10" class="text-center text-muted">Nenhuma parada encontrada</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <!-- Evolução Diária Indústria -->
+            <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><div class="d-flex justify-content-between align-items-center flex-wrap"><h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Evolução Diária (Indústria)</h5><div class="input-group" style="max-width: 220px;"><span class="input-group-text bg-white border-end-0"><i class="fas fa-calendar-alt text-secondary"></i></span><input type="month" class="form-control border-start-0" id="mesSelecionadoInd" value="{{ mes_selecionado }}" style="font-weight: 500;"></div></div></div><div class="card-body"><div class="chart-container-large"><canvas id="dailyChartInd"></canvas></div></div></div></div></div>
+            <!-- Top Recursos / Paradas / Turnos / Linhas Indústria -->
+            <div class="row mb-4"><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0">Top 10 Recursos (Indústria)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="recursosQtdChartInd"></canvas></div></div></div></div><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-danger text-white"><h5 class="mb-0">Top 10 Recursos por Horas (Indústria)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="recursosHorasChartInd"></canvas></div></div></div></div></div>
+            <div class="row mb-4"><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-info text-white"><h5 class="mb-0">Top 10 Paradas (Indústria)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="paradasChartInd"></canvas></div></div></div></div><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-warning text-white"><h5 class="mb-0">Turnos (Indústria)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="turnosChartInd"></canvas></div></div></div></div></div>
+            <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0">Linhas de Produção (Indústria)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="linhasChartInd"></canvas></div></div></div></div></div>
+            <!-- Tabela Paradas Recentes Indústria -->
+            <div class="row mb-5"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0"><i class="fas fa-table me-2"></i>Paradas Recentes (Indústria)</h5></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0"><thead class="table-light"><tr><th>Data</th><th>Horário Início</th><th>Horário Fim</th><th>Dif. Hora</th><th>Cód. Recurso</th><th>Descrição Recurso</th><th>Cód. Parada</th><th>Descrição Parada</th><th>Turno</th><th>Linha</th></tr></thead><tbody>{% for parada in section_ind.paradas_recentes_list %}<tr><td>{{ parada.data|date:"d/m/Y" }}</td><td>{{ parada.horario_inicial|time:"H:i"|default:"-" }}</td><td>{{ parada.horario_final|time:"H:i"|default:"-" }}</td><td>{{ parada.dif_hora|number_br:2|default:"-" }}h</td><td><span class="badge bg-secondary">{{ parada.cod_recurso|default:"-" }}</span></td><td>{{ parada.descr_recurso|default:"-"|truncatewords:10 }}</td><td>{{ parada.cod_parada|default:"-" }}</td><td>{{ parada.descr_parada|default:"-"|truncatewords:5 }}</td><td>{{ parada.turno|default:"-" }}</td><td>{{ parada.linha_producao|default:"-" }}</td></tr>{% empty %}<tr><td colspan="10" class="text-center text-muted">Nenhuma parada encontrada</td></tr>{% endfor %}</tbody></table></div></div></div></div></div>
         </div>
     </div>
 </section>
@@ -574,86 +357,128 @@ document.addEventListener('DOMContentLoaded', function() {
             return new bootstrap.Tooltip(tooltipTriggerEl);
         });
     
-    // Gráfico de Linha: Evolução Temporal
-    const temporalCtx = document.getElementById('temporalChart');
-    if (temporalCtx) {
-        try {
-            const mesesLabels = {{ meses_labels|safe }};
-            const mesesData = {{ meses_data|safe }};
-            const mesesHoras = {{ meses_horas|safe }};
-            
-            console.log('Temporal Chart - Labels:', mesesLabels);
-            console.log('Temporal Chart - Data:', mesesData);
-            console.log('Temporal Chart - Horas:', mesesHoras);
-            
-            if (!mesesLabels || !Array.isArray(mesesLabels) || mesesLabels.length === 0) {
-                console.warn('Temporal Chart: Sem dados para exibir');
-                temporalCtx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados disponíveis para o período selecionado.</div>';
-            } else {
-                new Chart(temporalCtx.getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: mesesLabels,
-                    datasets: [{
-                        label: 'Quantidade de Paradas',
-                        data: mesesData,
-                        borderColor: '#198754',
-                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        yAxisID: 'y'
-                    }, {
-                        label: 'Total Horas Paradas',
-                        data: mesesHoras,
-                        borderColor: '#dc3545',
-                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        yAxisID: 'y1'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: true
-                        }
+    // Evolução Temporal Frigorífico: X=dias, linhas=Total Paradas e Total de Perda (capacidade)
+    const temporalFrigCtx = document.getElementById('temporalChartFrig');
+    if (temporalFrigCtx) {
+        const frigLabels = {{ temporal_frig_labels|safe }};
+        const frigParadas = {{ temporal_frig_paradas|safe }};
+        const frigPerda = {{ temporal_frig_perda|safe }};
+        if (frigLabels && Array.isArray(frigLabels) && frigLabels.length > 0) {
+            try {
+                new Chart(temporalFrigCtx.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: frigLabels,
+                        datasets: [
+                            { label: 'Total de Paradas', data: frigParadas, borderColor: '#198754', backgroundColor: 'rgba(25, 135, 84, 0.1)', tension: 0.4, fill: true, yAxisID: 'y' },
+                            { label: 'Total de Perda (capacidade)', data: frigPerda, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.4, fill: true, yAxisID: 'y1' }
+                        ]
                     },
-                    scales: {
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Quantidade'
-                            }
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Horas'
-                            },
-                            grid: {
-                                drawOnChartArea: false
-                            }
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: true } },
+                        scales: {
+                            x: { title: { display: true, text: 'Dias' } },
+                            y: { type: 'linear', display: true, position: 'left', beginAtZero: true, title: { display: true, text: 'Nº de Paradas' } },
+                            y1: { type: 'linear', display: true, position: 'right', beginAtZero: true, title: { display: true, text: 'Perda (capacidade)' }, grid: { drawOnChartArea: false } }
                         }
                     }
-                }
-            });
-            }
-        } catch (error) {
-            console.error('Erro ao criar gráfico temporal:', error);
+                });
+            } catch (e) { console.error('Erro temporal Frigorífico:', e); }
+        } else {
+            temporalFrigCtx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados para o período selecionado.</div>';
         }
     }
 
-    // Gráfico de Barras: Top 10 Recursos por Quantidade
+    // Daily chart por seção (Frig/Ind) - carrega via API com secao=
+    function createDailySectionChart(canvasId, mesInputId, secao) {
+        const dailyCtx = document.getElementById(canvasId);
+        const mesInput = document.getElementById(mesInputId);
+        if (!dailyCtx || !mesInput) return;
+        let chartObj = null;
+        function update(mesAno) {
+            if (chartObj) chartObj.destroy();
+            const [ano, mes] = mesAno.split('-').map(Number);
+            fetch(`/api/dados-diarios-paradas/?ano=${ano}&mes=${mes}&secao=${secao}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.labels || data.labels.length === 0) {
+                        dailyCtx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados para este mês.</div>';
+                        return;
+                    }
+                    chartObj = new Chart(dailyCtx.getContext('2d'), {
+                        type: 'line',
+                        data: {
+                            labels: data.labels,
+                            datasets: [
+                                { label: 'Quantidade', data: data.data, borderColor: '#198754', backgroundColor: 'rgba(25, 135, 84, 0.1)', tension: 0.4, fill: true, yAxisID: 'y' },
+                                { label: 'Total Horas', data: data.horas, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.4, fill: true, yAxisID: 'y1' }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: true } },
+                            scales: {
+                                y: { type: 'linear', display: true, position: 'left', beginAtZero: true, title: { display: true, text: 'Quantidade' } },
+                                y1: { type: 'linear', display: true, position: 'right', beginAtZero: true, title: { display: true, text: 'Horas' }, grid: { drawOnChartArea: false } }
+                            }
+                        }
+                    });
+                })
+                .catch(err => { dailyCtx.parentElement.innerHTML = '<div class="alert alert-danger m-3">Erro ao carregar dados.</div>'; });
+        }
+        mesInput.addEventListener('change', function() { update(this.value); });
+        update(mesInput.value);
+    }
+    createDailySectionChart('dailyChartFrig', 'mesSelecionadoFrig', 'frigorifico');
+    createDailySectionChart('dailyChartInd', 'mesSelecionadoInd', 'industria');
+
+    // Helper: gráfico barras horizontal (seção)
+    function createBarSectionChart(canvasId, labels, data, bgColor) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+        if (!labels || !Array.isArray(labels) || labels.length === 0) { ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
+        try {
+            new Chart(ctx.getContext('2d'), {
+                type: 'bar',
+                data: { labels: labels, datasets: [{ label: '', data: data, backgroundColor: bgColor }] },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
+            });
+        } catch (e) { console.error(e); }
+    }
+    createBarSectionChart('paradasChartFrig', {{ section_frig_top_paradas_labels|safe }}, {{ section_frig_top_paradas_data|safe }}, '#0dcaf0');
+    createBarSectionChart('recursosQtdChartInd', {{ section_ind_top_recursos_labels|safe }}, {{ section_ind_top_recursos_data|safe }}, '#6c757d');
+    createBarSectionChart('recursosHorasChartInd', {{ section_ind_top_recursos_horas_labels|safe }}, {{ section_ind_top_recursos_horas_data|safe }}, '#dc3545');
+    createBarSectionChart('paradasChartInd', {{ section_ind_top_paradas_labels|safe }}, {{ section_ind_top_paradas_data|safe }}, '#0dcaf0');
+
+    // Helper: gráfico pizza/doughnut (turnos/linhas seção)
+    function createDoughnutSectionChart(canvasId, labels, dataCount, dataHoras) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+        if (!labels || !Array.isArray(labels) || labels.length === 0) { ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
+        try {
+            new Chart(ctx.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Quantidade', data: dataCount, backgroundColor: ['#0d6efd','#198754','#ffc107','#dc3545','#0dcaf0','#6f42c1'] },
+                        { label: 'Horas', data: dataHoras, backgroundColor: ['#0d6efd','#198754','#ffc107','#dc3545','#0dcaf0','#6f42c1'] }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } } }
+            });
+        } catch (e) { console.error(e); }
+    }
+    createDoughnutSectionChart('turnosChartFrig', {{ section_frig_turnos_labels|safe }}, {{ section_frig_turnos_data_count|safe }}, {{ section_frig_turnos_data_horas|safe }});
+    createDoughnutSectionChart('turnosChartInd', {{ section_ind_turnos_labels|safe }}, {{ section_ind_turnos_data_count|safe }}, {{ section_ind_turnos_data_horas|safe }});
+
+    // Linhas (bar horizontal) - apenas Indústria
+    createBarSectionChart('linhasChartInd', {{ section_ind_linhas_labels|safe }}, {{ section_ind_linhas_data_count|safe }}, '#6c757d');
+
+    // Gráfico de Barras: Top 10 Recursos por Quantidade (global - mantido se existir canvas)
     const recursosQtdCtx = document.getElementById('recursosQtdChart');
     if (recursosQtdCtx) {
         try {
@@ -908,27 +733,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
+                const datasets = [
+                    { label: 'Quantidade Total', data: data.data, borderColor: '#198754', backgroundColor: 'rgba(25, 135, 84, 0.1)', tension: 0.4, fill: true, yAxisID: 'y' }
+                ];
+                if (data.data_frig) {
+                    datasets.push({ label: 'Quantidade Frigorífico', data: data.data_frig, borderColor: '#0d6efd', backgroundColor: 'rgba(13, 110, 253, 0.1)', tension: 0.4, fill: true, yAxisID: 'y' });
+                }
+                if (data.data_ind) {
+                    datasets.push({ label: 'Quantidade Indústria', data: data.data_ind, borderColor: '#6c757d', backgroundColor: 'rgba(108, 117, 125, 0.1)', tension: 0.4, fill: true, yAxisID: 'y' });
+                }
+                datasets.push({ label: 'Total Horas Paradas', data: data.horas, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.4, fill: true, yAxisID: 'y1' });
+                
                 dailyChart = new Chart(dailyCtx.getContext('2d'), {
                     type: 'line',
                     data: {
                         labels: data.labels,
-                        datasets: [{
-                            label: 'Quantidade de Paradas',
-                            data: data.data,
-                            borderColor: '#198754',
-                            backgroundColor: 'rgba(25, 135, 84, 0.1)',
-                            tension: 0.4,
-                            fill: true,
-                            yAxisID: 'y'
-                        }, {
-                            label: 'Total Horas Paradas',
-                            data: data.horas,
-                            borderColor: '#dc3545',
-                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
-                            tension: 0.4,
-                            fill: true,
-                            yAxisID: 'y1'
-                        }]
+                        datasets: datasets
                     },
                     options: {
                         responsive: true,

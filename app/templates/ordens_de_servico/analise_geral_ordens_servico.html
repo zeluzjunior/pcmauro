@@ -150,8 +150,8 @@
         </div>
         
         <!-- KPI Cards -->
-        <div class="row mb-5">
-            <div class="col-md-3 mb-4">
+        <div class="row mb-2">
+            <div class="col-md-3 mb-3">
                 <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -165,7 +165,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
+            <div class="col-md-3 mb-3">
                 <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -179,7 +179,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
+            <div class="col-md-3 mb-3">
                 <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -193,7 +193,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
+            <div class="col-md-3 mb-3">
                 <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -203,6 +203,66 @@
                                 <small class="text-muted">Média: {{ media_fichas_por_ordem|floatformat:1 }} por ordem</small>
                             </div>
                             <i class="fas fa-file-invoice fa-3x text-warning opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI Cards Row 2: Ordens Abertas, Fechadas, Solicitações, Tempo Total -->
+        <div class="row mb-5">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Ordens Abertas</h6>
+                                <h2 class="mb-0 fw-bold">{{ ordens_abertas }}</h2>
+                                <small class="text-muted">Ordem de Serviço em Execução</small>
+                            </div>
+                            <i class="fas fa-folder-open fa-3x text-warning opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Ordens Fechadas</h6>
+                                <h2 class="mb-0 fw-bold">{{ ordens_fechadas }}</h2>
+                                <small class="text-muted">Ordem de Serviço Fechada</small>
+                            </div>
+                            <i class="fas fa-check-circle fa-3x text-success opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Solicitações</h6>
+                                <h2 class="mb-0 fw-bold">{{ solicitacoes }}</h2>
+                                <small class="text-muted">Solicitação Aberta</small>
+                            </div>
+                            <i class="fas fa-paper-plane fa-3x text-info opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Horas necessárias para zerar OS</h6>
+                                <h2 class="mb-0 fw-bold">{{ tempo_total_necessario_horas|floatformat:1 }} horas</h2>
+                                <small class="text-muted">(Abertas + Solicitações) e supondo 15 min por OS</small>
+                            </div>
+                            <i class="fas fa-clock fa-3x text-primary opacity-25"></i>
                         </div>
                     </div>
                 </div>
@@ -232,7 +292,7 @@
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-success text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-chart-line me-2"></i>Evolução Temporal (Ano Completo)
+                            <i class="fas fa-chart-line me-2"></i>Evolução Temporal (Período Filtrado por Dia)
                         </h5>
                     </div>
                     <div class="card-body">
@@ -663,7 +723,8 @@ if (temporalEl) {
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                return 'Ordens de Serviço: ' + formatarNumeroBR(context.parsed.y);
+                                const data = context.label || '';
+                                return (data ? data + ': ' : '') + formatarNumeroBR(context.parsed.y) + ' ordens';
                             }
                         }
                     }
@@ -680,7 +741,8 @@ if (temporalEl) {
                     x: {
                         ticks: {
                             maxRotation: 45,
-                            minRotation: 45
+                            minRotation: 45,
+                            maxTicksLimit: 30
                         }
                     }
                 }

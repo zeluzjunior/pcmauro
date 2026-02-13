@@ -351,23 +351,20 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Loading state for buttons - ONLY disable AFTER form starts submitting
-    // Don't disable immediately as it can prevent form submission
+    // Skip forms with data-skip-loading (e.g. large producao-diaria form where disable can block submission)
     const submitButtons = document.querySelectorAll('button[type="submit"]');
     submitButtons.forEach(button => {
         const form = button.closest('form');
-        if (form) {
-            // Only disable button AFTER form submit event fires
+        if (form && !form.hasAttribute('data-skip-loading')) {
             form.addEventListener('submit', function() {
                 const originalText = button.innerHTML;
                 button.innerHTML = '<span class="loading me-2"></span>Enviando...';
                 button.disabled = true;
-                
-                // Re-enable after 5 seconds (in case of error)
                 setTimeout(() => {
                     button.innerHTML = originalText;
                     button.disabled = false;
                 }, 5000);
-            }, false); // Use bubble phase, not capture
+            }, false);
         }
     });
 });

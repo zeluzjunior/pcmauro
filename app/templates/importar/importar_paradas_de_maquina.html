@@ -44,6 +44,18 @@
                                 <div class="form-text">Formatos aceitos: CSV (.csv) com delimitador ponto e vírgula (;)</div>
                             </div>
                             <div class="mb-3">
+                                <div class="form-check border rounded p-3 bg-light">
+                                    <input class="form-check-input" type="checkbox" id="excluirAntigos" name="excluir_antigos">
+                                    <label class="form-check-label fw-semibold" for="excluirAntigos">
+                                        Excluir dados antigos e usar apenas os novos dados que serão importados
+                                    </label>
+                                    <div class="form-text mt-1">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Quando marcado, <strong>todos os registros atuais de paradas de máquina serão removidos</strong> e somente os dados do arquivo enviado serão mantidos. Use quando o novo arquivo já contiver o histórico completo (evita duplicados).
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3" id="opcoesIncrementais">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="onlyNewRecords" name="only_new_records" checked>
                                     <label class="form-check-label" for="onlyNewRecords">
@@ -55,7 +67,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-3" id="opcaoAtualizar">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="updateExisting" name="update_existing">
                                     <label class="form-check-label" for="updateExisting">
@@ -141,25 +153,36 @@
 
 {% block extra_js %}
 <script>
-// Executar após o main.js carregar
 window.addEventListener('load', function() {
     const form = document.getElementById('importarForm');
     const submitBtn = document.getElementById('submitBtn');
     const fileInput = document.getElementById('fileInput');
-    
-    if (!form || !submitBtn) {
-        console.error('Form ou botão de submit não encontrado!');
-        return;
+    const excluirAntigos = document.getElementById('excluirAntigos');
+    const onlyNewRecords = document.getElementById('onlyNewRecords');
+    const updateExisting = document.getElementById('updateExisting');
+    const opcoesIncrementais = document.getElementById('opcoesIncrementais');
+    const opcaoAtualizar = document.getElementById('opcaoAtualizar');
+
+    function toggleOpcoesIncrementais() {
+        var excluir = excluirAntigos && excluirAntigos.checked;
+        if (opcoesIncrementais) opcoesIncrementais.style.opacity = excluir ? '0.5' : '1';
+        if (opcaoAtualizar) opcaoAtualizar.style.opacity = excluir ? '0.5' : '1';
+        if (onlyNewRecords) onlyNewRecords.disabled = excluir;
+        if (updateExisting) updateExisting.disabled = excluir;
+        if (excluir && onlyNewRecords) onlyNewRecords.checked = false;
+        if (excluir && updateExisting) updateExisting.checked = false;
     }
-    
-    // Adicionar listener no formulário
+    if (excluirAntigos) excluirAntigos.addEventListener('change', toggleOpcoesIncrementais);
+    toggleOpcoesIncrementais();
+
+    if (!form || !submitBtn) return;
+
     form.addEventListener('submit', function(e) {
-        // Verificar se arquivo foi selecionado
-        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-            return; // Deixar validação HTML5 funcionar
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) return;
+        if (excluirAntigos && excluirAntigos.checked && !confirm('Tem certeza? Todos os dados atuais de paradas de máquina serão excluídos e substituídos pelos dados do arquivo.')) {
+            e.preventDefault();
+            return;
         }
-        
-        // Desabilitar botão e mostrar loading
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Importando...';
     }, true);

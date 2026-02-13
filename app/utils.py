@@ -4195,14 +4195,16 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
         return 0, 0, errors, []
 
 
-def upload_paradas_maquina_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:
+def upload_paradas_maquina_from_file(file, update_existing=False, excluir_antigos=False) -> Tuple[int, int, List[str]]:
     """
-    Faz upload de paradas de máquinas a partir de um arquivo CSV
-    
+    Faz upload de paradas de máquinas a partir de um arquivo CSV.
+
     Args:
         file: Arquivo Django UploadedFile (CSV)
         update_existing: Se True, atualiza registros existentes. Se False, ignora duplicados.
-    
+        excluir_antigos: Se True, remove todos os registros de ParadaMaquina antes de importar;
+            somente os dados do arquivo serão mantidos (evita duplicados ao reimportar arquivo completo).
+
     Returns:
         Tupla (created_count, updated_count, errors)
     """
@@ -4290,6 +4292,9 @@ def upload_paradas_maquina_from_file(file, update_existing=False) -> Tuple[int, 
         
         # Processar dados em transação
         with transaction.atomic():
+            if excluir_antigos:
+                ParadaMaquina.objects.all().delete()
+
             for row_num, row_data in enumerate(data, start=2):
                 try:
                     # Verificar se a linha está vazia
@@ -4310,18 +4315,18 @@ def upload_paradas_maquina_from_file(file, update_existing=False) -> Tuple[int, 
                     cod_recurso = _safe_int(_get_value(row_data, 'CÓD. RECURSO', 'Cód. Recurso', 'cod_recurso'))
                     
                     # Verificar se já existe (usar data + cod_recurso + horario_inicial como chave única)
+                    # Quando excluir_antigos=True, não há registros antigos; sempre criar.
                     existing = None
-                    if cod_recurso:
+                    if not excluir_antigos and cod_recurso:
                         existing = ParadaMaquina.objects.filter(
                             data=data_parada,
                             cod_recurso=cod_recurso,
                             horario_inicial=horario_inicial
                         ).first()
-                    
-                    # Se existe e não deve atualizar, pular
+
                     if existing and not update_existing:
                         continue
-                    
+
                     # Preparar dados
                     parada_data = {
                         'unid': _safe_int(_get_value(row_data, 'UNID', 'Unid', 'unid')),
