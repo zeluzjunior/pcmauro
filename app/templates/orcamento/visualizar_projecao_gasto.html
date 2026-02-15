@@ -1,0 +1,291 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Visualizar Projeção de Gasto #{{ projecao.id }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_projecao_gastos' %}" class="text-white">Consultar Projeção de Gastos</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Projeção #{{ projecao.id }}</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="bi bi-clipboard2-data me-2"></i>Visualizar Projeção de Gasto
+                </h1>
+                <p class="lead">Detalhes completos da Projeção #{{ projecao.id }}</p>
+                <a href="{% url 'consultar_projecao_gastos' %}" class="btn btn-light btn-sm mt-2">
+                    <i class="bi bi-arrow-left me-1"></i>Voltar à consulta
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <div class="row">
+            <div class="col-12">
+                <!-- Dados Básicos -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-info-circle me-2"></i>Dados Básicos
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">ID Excel</label>
+                                <p class="form-control-plaintext">{{ projecao.id_excel|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Setor</label>
+                                <p class="form-control-plaintext">{{ projecao.setor|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Solicitante</label>
+                                <p class="form-control-plaintext">{{ projecao.solicitante|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Tipo de Solicitação</label>
+                                <p class="form-control-plaintext">{{ projecao.tipo_solicitacao|default:"-" }}</p>
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label class="form-label fw-bold">Descrição do Serviço</label>
+                                <p class="form-control-plaintext">{{ projecao.descricao|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dados Financeiros e Referência -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-currency-dollar me-2"></i>Valor e Referência
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Valor Total</label>
+                                <p class="form-control-plaintext fs-5 text-success fw-bold">
+                                    {% if projecao.valor_total %}
+                                        R$ {{ projecao.valor_total|floatformat:2 }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Previsão para Execução</label>
+                                <p class="form-control-plaintext">{{ projecao.previsao_execucao|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Mês Referência</label>
+                                <p class="form-control-plaintext">{{ projecao.mes_referencia|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Ano Referência</label>
+                                <p class="form-control-plaintext">{{ projecao.ano_referencia|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Uso Contábil</label>
+                                <p class="form-control-plaintext">{{ projecao.uso_contabil|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fornecedor -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-building me-2"></i>Fornecedor
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Nome Fantasia</label>
+                                <p class="form-control-plaintext">{{ projecao.fornecedor_nome_fantasia|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">CNPJ</label>
+                                <p class="form-control-plaintext">{{ projecao.fornecedor_cnpj|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Números e Referências -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-hash me-2"></i>Números e Referências
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Nº Requisição de Compra</label>
+                                <p class="form-control-plaintext">{{ projecao.numero_requisicao_compra|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Nº Pedido de Compra</label>
+                                <p class="form-control-plaintext">{{ projecao.numero_pedido_compra|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Nº Ordem de Serviço</label>
+                                <p class="form-control-plaintext">{{ projecao.numero_ordem_servico|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Nº Nota Fiscal</label>
+                                <p class="form-control-plaintext">{{ projecao.numero_nf|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Datas -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="bi bi-calendar3 me-2"></i>Datas
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Data Abertura Requisição</label>
+                                <p class="form-control-plaintext">
+                                    {% if projecao.data_abertura_requisicao %}
+                                        {{ projecao.data_abertura_requisicao|date:"d/m/Y" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Serviço Concluído</label>
+                                <p class="form-control-plaintext">
+                                    {% if projecao.servico_concluido %}
+                                        {{ projecao.servico_concluido|date:"d/m/Y" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">NF Serviço Recebida</label>
+                                <p class="form-control-plaintext">
+                                    {% if projecao.nf_servico_recebida %}
+                                        {{ projecao.nf_servico_recebida|date:"d/m/Y" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">NF Enviada Lançamento</label>
+                                <p class="form-control-plaintext">
+                                    {% if projecao.nf_enviada_lancamento %}
+                                        {{ projecao.nf_enviada_lancamento|date:"d/m/Y" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if projecao.observacoes %}
+                <!-- Observações -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-chat-square-text me-2"></i>Observações
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="form-control-plaintext mb-0">{{ projecao.observacoes }}</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Notas Fiscais Relacionadas -->
+                {% if relacoes_nf %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-file-earmark-text me-2"></i>Notas Fiscais Relacionadas
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Nota</th>
+                                        <th>Total</th>
+                                        <th>Data Emissão</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for rel in relacoes_nf %}
+                                    <tr>
+                                        <td>{{ rel.nota_fiscal.nota|default:"-" }}</td>
+                                        <td>
+                                            {% if rel.nota_fiscal.total_nota %}
+                                                R$ {{ rel.nota_fiscal.total_nota|floatformat:2 }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if rel.nota_fiscal.data_emissao %}
+                                                {{ rel.nota_fiscal.data_emissao|date:"d/m/Y" }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{% url 'visualizar_nota_fiscal' rel.nota_fiscal.id %}" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-eye me-1"></i>Visualizar
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Metadados -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0 text-muted">
+                            <i class="bi bi-clock me-2"></i>Registro criado em {{ projecao.created_at|date:"d/m/Y H:i" }}
+                            {% if projecao.updated_at != projecao.created_at %}
+                                · Atualizado em {{ projecao.updated_at|date:"d/m/Y H:i" }}
+                            {% endif %}
+                        </h6>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

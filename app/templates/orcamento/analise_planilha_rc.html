@@ -60,16 +60,10 @@
         color: #fff;
     }
     .filter-month-chip input { display: none; }
-    /* Force dark text in filters accordion */
-    #filtrosAccordion .accordion-button,
-    #filtrosAccordion .accordion-button:not(.collapsed),
-    #filtrosAccordion .accordion-body,
-    #filtrosAccordion .form-label,
-    #filtrosAccordion .card-header {
+    /* Dark text for form content in filter accordion body */
+    .filter-accordion .accordion-body .form-label,
+    .filter-accordion .accordion-body .card-header {
         color: #212529 !important;
-    }
-    #filtrosAccordion .accordion-button::after {
-        filter: none;
     }
 </style>
 {% endblock %}
@@ -102,17 +96,17 @@
         <!-- Filtros -->
         <div class="row mb-4">
             <div class="col-12">
-                <div class="accordion" id="filtrosAccordion">
+                <div class="accordion filter-accordion" id="filtrosAccordion">
                     <div class="accordion-item shadow-sm border-0 rounded-3 overflow-hidden">
                         <h2 class="accordion-header" id="filtrosHeading">
-                            <button class="accordion-button {% if not meses_filtro and not uso_filtro and not classificacao_filtro and not status_filtro and not previsao_ano_filtro %}collapsed{% endif %} bg-light text-dark border-0 py-3" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro or uso_filtro or classificacao_filtro or status_filtro or previsao_ano_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                            <button class="accordion-button {% if not meses_filtro and not uso_filtro and not classificacao_filtro and not status_filtro and not previsao_ano_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro or uso_filtro or classificacao_filtro or status_filtro or previsao_ano_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
                                 <i class="fas fa-sliders-h me-2 text-primary"></i>
                                 <strong>Filtros</strong>
                                 <span class="badge bg-primary ms-2" id="filtrosBadge">Data RC {{ ano_filtro }}{% if meses_filtro %}{% if meses_filtro|length == 12 %} (12 meses){% else %} ({{ meses_filtro|length }} meses){% endif %}{% else %} (todos){% endif %}{% if uso_filtro or classificacao_filtro or status_filtro or previsao_ano_filtro %} + outros{% endif %}</span>
                             </button>
                         </h2>
                         <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro or uso_filtro or classificacao_filtro or status_filtro or previsao_ano_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
-                            <div class="accordion-body bg-light text-dark pt-4 pb-4">
+                            <div class="accordion-body pt-4 pb-4">
                                 <form method="get" action="{% url 'analise_planilha_rc' %}" id="filtrosForm">
                                     <div class="row g-4">
                                         <!-- Card: Data da RC -->

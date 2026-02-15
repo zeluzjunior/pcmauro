@@ -90,7 +90,7 @@
                 <h1 class="display-4 fw-bold mt-3">
                     <i class="fas fa-link me-2"></i>Relacionar Projeção vs Nota Fiscal vs Controle RC/NF
                 </h1>
-                <p class="lead">Confirme ou rejeite correspondências entre projeções de gastos, notas fiscais e controle RC e NF</p>
+                <p class="lead">Para cada Nota Fiscal, encontre a Projeção de Gasto correspondente. Confirme ou rejeite as correspondências.</p>
             </div>
         </div>
     </div>
@@ -108,6 +108,10 @@
                 </div>
             {% endfor %}
         {% endif %}
+        <div class="alert alert-light border alert-dismissible fade show" role="alert">
+            <i class="fas fa-info-circle me-2"></i><strong>Análise baseada em Nota Fiscal:</strong> para cada NF, busca-se Projeções de Gasto correspondentes. Exibidas até {{ max_matches_por_nota }} candidatos por NF com score ≥ {{ score_minimo }}%.
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
 
         <!-- Statistics -->
         <div class="row mb-4">
@@ -147,7 +151,7 @@
                 <div class="card bg-primary text-white stat-card">
                     <div class="card-body">
                         <h5 class="card-title">UC 242 Matches:</h5>
-                        <p class="card-text display-6">{{ matches_242|length }}</p>
+                        <p class="card-text display-6">{{ matches_242_count }}</p>
                         <small>Notas: {{ total_notas_242 }}</small>
                     </div>
                 </div>
@@ -156,7 +160,7 @@
                 <div class="card bg-info text-white stat-card">
                     <div class="card-body">
                         <h5 class="card-title">UC 5 Matches:</h5>
-                        <p class="card-text display-6">{{ matches_5|length }}</p>
+                        <p class="card-text display-6">{{ matches_5_count }}</p>
                         <small>Notas: {{ total_notas_5 }}</small>
                     </div>
                 </div>
@@ -167,7 +171,7 @@
                 <div class="card bg-warning text-dark stat-card">
                     <div class="card-body">
                         <h5 class="card-title">UC 170 Matches:</h5>
-                        <p class="card-text display-6">{{ matches_170|length }}</p>
+                        <p class="card-text display-6">{{ matches_170_count }}</p>
                         <small>Notas: {{ total_notas_170 }}</small>
                     </div>
                 </div>
@@ -241,13 +245,33 @@
             </div>
         </div>
 
-        <!-- Seção: Uso Contábil 242 -->
-        <div class="row mb-4">
-            <div class="col-12">
+        <!-- Tabs: Uso Contábil 242, 5, 170 -->
+        <ul class="nav nav-tabs mb-3" id="ucTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if active_uc_tab == '242' %}active{% endif %}" id="tab-242" data-bs-toggle="tab" data-bs-target="#panel-242" type="button" role="tab">
+                    <i class="fas fa-link me-2"></i>UC 242 <span class="badge bg-primary ms-1">{{ matches_242_count }}</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if active_uc_tab == '5' %}active{% endif %}" id="tab-5" data-bs-toggle="tab" data-bs-target="#panel-5" type="button" role="tab">
+                    <i class="fas fa-link me-2"></i>UC 5 <span class="badge bg-info ms-1">{{ matches_5_count }}</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if active_uc_tab == '170' %}active{% endif %}" id="tab-170" data-bs-toggle="tab" data-bs-target="#panel-170" type="button" role="tab">
+                    <i class="fas fa-link me-2"></i>UC 170 <span class="badge bg-warning text-dark ms-1">{{ matches_170_count }}</span>
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="ucTabContent">
+            <!-- Panel UC 242 -->
+            <div class="tab-pane fade {% if active_uc_tab == '242' %}show active{% endif %}" id="panel-242" role="tabpanel">
                 <div class="card shadow-sm">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-link me-2"></i>Uso Contábil 242 - Possíveis Correspondências ({{ matches_242|length }})
+                            <i class="fas fa-link me-2"></i>Uso Contábil 242 - Possíveis Correspondências
+                            <small class="ms-2">({{ matches_242_count }} registro{{ matches_242_count|pluralize }})</small>
                         </h5>
                     </div>
                     <div class="card-body">
@@ -276,6 +300,21 @@
                                 </tbody>
                             </table>
                         </div>
+                        {% if matches_242.has_other_pages %}
+                        <nav aria-label="Paginação UC 242" class="mt-3">
+                            <ul class="pagination justify-content-center mb-0">
+                                {% if matches_242.has_previous %}
+                                <li class="page-item"><a class="page-link" href="?{% for k, v in request.GET.items %}{% if k != 'page_242' and k != 'page_5' and k != 'page_170' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page_242=1">Primeira</a></li>
+                                <li class="page-item"><a class="page-link" href="?{% for k, v in request.GET.items %}{% if k != 'page_242' and k != 'page_5' and k != 'page_170' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page_242={{ matches_242.previous_page_number }}">Anterior</a></li>
+                                {% endif %}
+                                <li class="page-item active"><span class="page-link">Página {{ matches_242.number }} de {{ matches_242.paginator.num_pages }}</span></li>
+                                {% if matches_242.has_next %}
+                                <li class="page-item"><a class="page-link" href="?{% for k, v in request.GET.items %}{% if k != 'page_242' and k != 'page_5' and k != 'page_170' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page_242={{ matches_242.next_page_number }}">Próxima</a></li>
+                                <li class="page-item"><a class="page-link" href="?{% for k, v in request.GET.items %}{% if k != 'page_242' and k != 'page_5' and k != 'page_170' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page_242={{ matches_242.paginator.num_pages }}">Última</a></li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
                         {% else %}
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>Nenhuma correspondência encontrada para Uso Contábil 242 com os filtros aplicados.
@@ -284,15 +323,14 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Seção: Uso Contábil 5 -->
-        <div class="row mb-4">
-            <div class="col-12">
+            <!-- Panel UC 5 -->
+            <div class="tab-pane fade {% if active_uc_tab == '5' %}show active{% endif %}" id="panel-5" role="tabpanel">
                 <div class="card shadow-sm">
                     <div class="card-header bg-info text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-link me-2"></i>Uso Contábil 5 - Possíveis Correspondências ({{ matches_5|length }})
+                            <i class="fas fa-link me-2"></i>Uso Contábil 5 - Possíveis Correspondências
+                            <small class="ms-2">({{ matches_5_count }} registro{{ matches_5_count|pluralize }})</small>
                         </h5>
                     </div>
                     <div class="card-body">
@@ -321,6 +359,21 @@
                                 </tbody>
                             </table>
                         </div>
+                        {% if matches_5.has_other_pages %}
+                        <nav aria-label="Paginação UC 5" class="mt-3">
+                            <ul class="pagination justify-content-center mb-0">
+                                {% if matches_5.has_previous %}
+                                <li class="page-item"><a class="page-link" href="?{% for k, v in request.GET.items %}{% if k != 'page_242' and k != 'page_5' and k != 'page_170' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page_5=1">Primeira</a></li>
+                                <li class="page-item"><a class="page-link" href="?{% for k, v in request.GET.items %}{% if k != 'page_242' and k != 'page_5' and k != 'page_170' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page_5={{ matches_5.previous_page_number }}">Anterior</a></li>
+                                {% endif %}
+                                <li class="page-item active"><span class="page-link">Página {{ matches_5.number }} de {{ matches_5.paginator.num_pages }}</span></li>
+                                {% if matches_5.has_next %}
+                                <li class="page-item"><a class="page-link" href="?{% for k, v in request.GET.items %}{% if k != 'page_242' and k != 'page_5' and k != 'page_170' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page_5={{ matches_5.next_page_number }}">Próxima</a></li>
+                                <li class="page-item"><a class="page-link" href="?{% for k, v in request.GET.items %}{% if k != 'page_242' and k != 'page_5' and k != 'page_170' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page_5={{ matches_5.paginator.num_pages }}">Última</a></li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
                         {% else %}
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>Nenhuma correspondência encontrada para Uso Contábil 5 com os filtros aplicados.
@@ -329,15 +382,14 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Seção: Uso Contábil 170 -->
-        <div class="row mb-4">
-            <div class="col-12">
+            <!-- Panel UC 170 -->
+            <div class="tab-pane fade {% if active_uc_tab == '170' %}show active{% endif %}" id="panel-170" role="tabpanel">
                 <div class="card shadow-sm">
                     <div class="card-header bg-warning text-dark">
                         <h5 class="mb-0">
-                            <i class="fas fa-link me-2"></i>Uso Contábil 170 - Possíveis Correspondências ({{ matches_170|length }})
+                            <i class="fas fa-link me-2"></i>Uso Contábil 170 - Possíveis Correspondências
+                            <small class="ms-2">({{ matches_170_count }} registro{{ matches_170_count|pluralize }})</small>
                         </h5>
                     </div>
                     <div class="card-body">
@@ -366,6 +418,21 @@
                                 </tbody>
                             </table>
                         </div>
+                        {% if matches_170.has_other_pages %}
+                        <nav aria-label="Paginação UC 170" class="mt-3">
+                            <ul class="pagination justify-content-center mb-0">
+                                {% if matches_170.has_previous %}
+                                <li class="page-item"><a class="page-link" href="?{% for k, v in request.GET.items %}{% if k != 'page_242' and k != 'page_5' and k != 'page_170' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page_170=1">Primeira</a></li>
+                                <li class="page-item"><a class="page-link" href="?{% for k, v in request.GET.items %}{% if k != 'page_242' and k != 'page_5' and k != 'page_170' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page_170={{ matches_170.previous_page_number }}">Anterior</a></li>
+                                {% endif %}
+                                <li class="page-item active"><span class="page-link">Página {{ matches_170.number }} de {{ matches_170.paginator.num_pages }}</span></li>
+                                {% if matches_170.has_next %}
+                                <li class="page-item"><a class="page-link" href="?{% for k, v in request.GET.items %}{% if k != 'page_242' and k != 'page_5' and k != 'page_170' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page_170={{ matches_170.next_page_number }}">Próxima</a></li>
+                                <li class="page-item"><a class="page-link" href="?{% for k, v in request.GET.items %}{% if k != 'page_242' and k != 'page_5' and k != 'page_170' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page_170={{ matches_170.paginator.num_pages }}">Última</a></li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
                         {% else %}
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>Nenhuma correspondência encontrada para Uso Contábil 170 com os filtros aplicados.

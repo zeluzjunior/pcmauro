@@ -8,11 +8,19 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
     .stat-card {
-        transition: transform 0.2s;
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
     }
     .stat-card:hover {
         transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
     }
+    .stat-card.border-primary { border-left-color: #0d6efd; }
+    .stat-card.border-success { border-left-color: #198754; }
+    .stat-card.border-info { border-left-color: #0dcaf0; }
+    .stat-card.border-warning { border-left-color: #ffc107; }
+    .stat-card.border-danger { border-left-color: #dc3545; }
+    .stat-card.border-secondary { border-left-color: #6c757d; }
     .kpi-card {
         border-left: 4px solid;
     }
@@ -45,11 +53,18 @@
     .accordion-button {
         font-weight: bold;
     }
-    .filter-section {
-        background-color: #f8f9fa;
+    .section-header {
+        border-bottom: 3px solid;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+    .filter-actions {
+        gap: 0.5rem;
+    }
+    .filter-actions .btn {
         border-radius: 8px;
-        padding: 20px;
-        margin-bottom: 30px;
+        font-weight: 500;
+        padding: 0.5rem 1.25rem;
     }
     .correlacao-table-container {
         max-height: 600px;
@@ -109,76 +124,96 @@
 <section class="py-5">
     <div class="container">
         <!-- Filter Section (Accordion) -->
-        <div class="accordion mb-4 filter-section" id="filterAccordion">
-            <div class="accordion-item">
-                <h2 class="accordion-header" id="headingFilter">
-                    <button class="accordion-button {% if not ano_selecionado and not meses_selecionados and not setor_filtro and not uso_contabil_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if ano_selecionado or meses_selecionados or setor_filtro or uso_contabil_filtro %}true{% else %}false{% endif %}" aria-controls="collapseFilter">
-                        <i class="fas fa-filter me-2"></i>Filtros de Análise
-                    </button>
-                </h2>
-                <div id="collapseFilter" class="accordion-collapse collapse {% if ano_selecionado or meses_selecionados or setor_filtro or uso_contabil_filtro %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
-                    <div class="accordion-body">
-                        <form method="GET" class="row g-3 align-items-end">
-                            <div class="col-md-3">
-                                <label for="ano_filtro" class="form-label">Ano:</label>
-                                <select class="form-select" id="ano_filtro" name="ano">
-                                    {% for ano in anos_disponiveis %}
-                                        <option value="{{ ano }}" {% if ano == ano_selecionado %}selected{% endif %}>{{ ano }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="mes_filtro" class="form-label">Mês(es):</label>
-                                <div class="row">
-                                    <div class="col-12">
-                                        <div class="form-check form-check-inline">
-                                            <input class="form-check-input" type="checkbox" id="selecionarTodos" onclick="toggleAllMonths(true)">
-                                            <label class="form-check-label" for="selecionarTodos">Selecionar Todos</label>
-                                        </div>
-                                        <div class="form-check form-check-inline">
-                                            <input class="form-check-input" type="checkbox" id="desmarcarTodos" onclick="toggleAllMonths(false)">
-                                            <label class="form-check-label" for="desmarcarTodos">Desmarcar Todos</label>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row mt-2">
-                                    {% for mes_num, mes_nome in meses_choices %}
-                                        <div class="col-md-3 col-sm-4 col-6">
-                                            <div class="form-check">
-                                                <input class="form-check-input mes-checkbox" type="checkbox" id="mes_{{ mes_num }}" name="mes" value="{{ mes_num }}"
-                                                    {% if mes_num in meses_selecionados %}checked{% endif %}>
-                                                <label class="form-check-label" for="mes_{{ mes_num }}">{{ mes_nome }}</label>
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion filter-accordion" id="filterAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="headingFilter">
+                            <button class="accordion-button {% if not ano_selecionado and not meses_selecionados and not setores_selecionados and not uso_contabil_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if ano_selecionado or meses_selecionados or setores_selecionados or uso_contabil_filtro %}true{% else %}false{% endif %}" aria-controls="collapseFilter">
+                                <i class="fas fa-sliders-h me-2"></i>Filtros de Análise
+                                {% if ano_selecionado or meses_selecionados or setores_selecionados or uso_contabil_filtro %}
+                                    <span class="badge bg-light text-dark ms-2">{% if meses_selecionados %}{{ meses_selecionados|length }}{% else %}12{% endif %} mês(es)</span>
+                                    {% if setores_selecionados %}
+                                    <span class="badge bg-light text-dark ms-1">{{ setores_selecionados|length }} setor(es)</span>
+                                    {% endif %}
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="collapseFilter" class="accordion-collapse collapse {% if ano_selecionado or meses_selecionados or setores_selecionados or uso_contabil_filtro %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
+                            <div class="accordion-body">
+                                <form method="GET" action="{% url 'analise_projecao_gastos' %}">
+                                    <!-- Row 1: Ano+Uso Contábil (juntos) | Setor (maior) | Botões -->
+                                    <div class="row g-3 mb-4">
+                                        <div class="col-md-4">
+                                            <div class="filter-group h-100 d-flex flex-column gap-2">
+                                                <div>
+                                                    <div class="filter-group-label"><i class="fas fa-calendar-alt"></i>Ano</div>
+                                                    <select class="form-select form-select-sm" id="ano_filtro" name="ano">
+                                                        {% for ano in anos_disponiveis %}
+                                                            <option value="{{ ano }}" {% if ano == ano_selecionado %}selected{% endif %}>{{ ano }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <div class="filter-group-label"><i class="fas fa-book"></i>Uso Contábil</div>
+                                                    <select class="form-select form-select-sm" id="uso_contabil_filtro" name="uso_contabil">
+                                                        <option value="">Todos os Usos Contábeis</option>
+                                                        {% for uso_contabil in uso_contabil_disponiveis %}
+                                                            <option value="{{ uso_contabil }}" {% if uso_contabil == uso_contabil_filtro %}selected{% endif %}>{{ uso_contabil }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
                                             </div>
                                         </div>
-                                    {% endfor %}
-                                </div>
+                                        <div class="col-md-7">
+                                            <div class="filter-group h-100">
+                                                <div class="filter-group-label"><i class="fas fa-building"></i>Setor</div>
+                                                <div class="mes-checkbox-group setor-checkbox-group mt-1" style="max-height: 140px; overflow-y: auto; grid-template-columns: repeat(3, 1fr);">
+                                                    {% for setor in setores_disponiveis %}
+                                                        <label class="mes-check-item d-flex align-items-center gap-2 mb-0 cursor-pointer">
+                                                            <input class="form-check-input flex-shrink-0 setor-checkbox" type="checkbox" id="setor_{{ forloop.counter }}" name="setor" value="{{ setor }}" {% if setor in setores_selecionados %}checked{% endif %}>
+                                                            <span>{{ setor }}</span>
+                                                        </label>
+                                                    {% endfor %}
+                                                </div>
+                                                <div class="mt-1">
+                                                    <button type="button" class="btn btn-link btn-sm p-0 me-2 text-decoration-none" onclick="toggleAllSetores(true)">Selecionar todos</button>
+                                                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" onclick="toggleAllSetores(false)">Desmarcar</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-1 d-flex align-items-end">
+                                            <div class="filter-actions d-flex flex-row flex-md-column gap-1 w-100">
+                                                <button type="submit" class="btn btn-primary btn-sm flex-fill flex-md-fill"><i class="fas fa-check me-1"></i>Aplicar</button>
+                                                <a href="{% url 'analise_projecao_gastos' %}" class="btn btn-outline-secondary btn-sm flex-fill flex-md-fill"><i class="fas fa-times me-1"></i>Limpar</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- Row 2: Meses -->
+                                    <div class="filter-group">
+                                        <div class="filter-group-label d-flex justify-content-between align-items-center">
+                                            <span><i class="fas fa-calendar-check"></i>Meses</span>
+                                            <div>
+                                                <button type="button" class="btn btn-link btn-sm p-0 me-2 text-decoration-none" onclick="toggleAllMonths(true)">Selecionar todos</button>
+                                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" onclick="toggleAllMonths(false)">Desmarcar</button>
+                                            </div>
+                                        </div>
+                                        <div class="mes-checkbox-group">
+                                            {% for mes_num, mes_nome in meses_choices %}
+                                                <label class="mes-check-item d-flex align-items-center gap-2 mb-0 cursor-pointer">
+                                                    <input class="form-check-input flex-shrink-0 mes-checkbox" type="checkbox" id="mes_{{ mes_num }}" name="mes" value="{{ mes_num }}" {% if mes_num in meses_selecionados %}checked{% endif %}>
+                                                    <span>{{ mes_nome }}</span>
+                                                </label>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </form>
                             </div>
-                            <div class="col-md-3 d-flex justify-content-end">
-                                <button type="submit" class="btn btn-primary me-2"><i class="fas fa-filter me-1"></i>Aplicar Filtros</button>
-                                <a href="{% url 'analise_projecao_gastos' %}" class="btn btn-outline-secondary"><i class="fas fa-sync-alt me-1"></i>Limpar</a>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="setor_filtro" class="form-label">Setor:</label>
-                                <select class="form-select" id="setor_filtro" name="setor">
-                                    <option value="">Todos os Setores</option>
-                                    {% for setor in setores_disponiveis %}
-                                        <option value="{{ setor }}" {% if setor == setor_filtro %}selected{% endif %}>{{ setor }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="uso_contabil_filtro" class="form-label">Uso Contábil:</label>
-                                <select class="form-select" id="uso_contabil_filtro" name="uso_contabil">
-                                    <option value="">Todos os Usos Contábeis</option>
-                                    {% for uso_contabil in uso_contabil_disponiveis %}
-                                        <option value="{{ uso_contabil }}" {% if uso_contabil == uso_contabil_filtro %}selected{% endif %}>{{ uso_contabil }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </form>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
         </div>
 
         <!-- KPI Cards -->
@@ -188,36 +223,56 @@
                 <div class="col-md-3 mb-3">
                     <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
                         <div class="card-body">
-                            <h6 class="text-muted mb-1 small">Total de Projeções</h6>
-                            <h3 class="mb-1 fw-bold">{{ total_projecoes }}</h3>
-                            <small class="text-muted">Projeções cadastradas</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Total de Projeções</h6>
+                                    <h2 class="mb-0 fw-bold">{{ total_projecoes }}</h2>
+                                    <small class="text-muted">Projeções cadastradas</small>
+                                </div>
+                                <i class="fas fa-clipboard-list fa-3x text-primary opacity-25"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3 mb-3">
                     <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
                         <div class="card-body">
-                            <h6 class="text-muted mb-1 small">Valor Total Projetado</h6>
-                            <h3 class="mb-1 fw-bold">{{ valor_total_projetado|currency_br }}</h3>
-                            <small class="text-muted">Soma de todas as projeções</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Valor Total Projetado</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_total_projetado|currency_br }}</h2>
+                                    <small class="text-muted">Soma de todas as projeções</small>
+                                </div>
+                                <i class="fas fa-dollar-sign fa-3x text-success opacity-25"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3 mb-3">
                     <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
                         <div class="card-body">
-                            <h6 class="text-muted mb-1 small">Valor Médio</h6>
-                            <h3 class="mb-1 fw-bold">{{ valor_medio|currency_br }}</h3>
-                            <small class="text-muted">Por projeção</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Valor Médio</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_medio|currency_br }}</h2>
+                                    <small class="text-muted">Por projeção</small>
+                                </div>
+                                <i class="fas fa-calculator fa-3x text-info opacity-25"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3 mb-3">
                     <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
                         <div class="card-body">
-                            <h6 class="text-muted mb-1 small">Com Nota Fiscal</h6>
-                            <h3 class="mb-1 fw-bold">{{ projecoes_com_nf }}</h3>
-                            <small class="text-muted">{{ percentual_com_nf|floatformat:1 }}% do total</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com Nota Fiscal</h6>
+                                    <h2 class="mb-0 fw-bold">{{ projecoes_com_nf }}</h2>
+                                    <small class="text-muted">{{ percentual_com_nf|floatformat:1 }}% do total</small>
+                                </div>
+                                <i class="fas fa-file-invoice fa-3x text-warning opacity-25"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -227,36 +282,56 @@
                 <div class="col-md-3 mb-3">
                     <div class="card stat-card kpi-card kpi-purple shadow-sm border-0">
                         <div class="card-body">
-                            <h6 class="text-muted mb-1 small">Com Ordem de Serviço</h6>
-                            <h3 class="mb-1 fw-bold">{{ projecoes_com_os }}</h3>
-                            <small class="text-muted">{{ percentual_com_os|floatformat:1 }}% do total</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com Ordem de Serviço</h6>
+                                    <h2 class="mb-0 fw-bold">{{ projecoes_com_os }}</h2>
+                                    <small class="text-muted">{{ percentual_com_os|floatformat:1 }}% do total</small>
+                                </div>
+                                <i class="fas fa-wrench fa-3x opacity-25" style="color: #6f42c1;"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3 mb-3">
                     <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
                         <div class="card-body">
-                            <h6 class="text-muted mb-1 small">Serviços Concluídos</h6>
-                            <h3 class="mb-1 fw-bold">{{ projecoes_concluidas }}</h3>
-                            <small class="text-muted">{{ percentual_concluidas|floatformat:1 }}% do total</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Serviços Concluídos</h6>
+                                    <h2 class="mb-0 fw-bold">{{ projecoes_concluidas }}</h2>
+                                    <small class="text-muted">{{ percentual_concluidas|floatformat:1 }}% do total</small>
+                                </div>
+                                <i class="fas fa-check-circle fa-3x text-success opacity-25"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3 mb-3">
                     <div class="card stat-card kpi-card kpi-danger shadow-sm border-0">
                         <div class="card-body">
-                            <h6 class="text-muted mb-1 small">Pendentes</h6>
-                            <h3 class="mb-1 fw-bold">{{ projecoes_pendentes }}</h3>
-                            <small class="text-muted">{{ percentual_pendentes|floatformat:1 }}% do total</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Pendentes</h6>
+                                    <h2 class="mb-0 fw-bold">{{ projecoes_pendentes }}</h2>
+                                    <small class="text-muted">{{ percentual_pendentes|floatformat:1 }}% do total</small>
+                                </div>
+                                <i class="fas fa-clock fa-3x text-danger opacity-25"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3 mb-3">
                     <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
                         <div class="card-body">
-                            <h6 class="text-muted mb-1 small">Setores Únicos</h6>
-                            <h3 class="mb-1 fw-bold">{{ setores_unicos }}</h3>
-                            <small class="text-muted">Setores diferentes</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Setores Únicos</h6>
+                                    <h2 class="mb-0 fw-bold">{{ setores_unicos }}</h2>
+                                    <small class="text-muted">Setores diferentes</small>
+                                </div>
+                                <i class="fas fa-sitemap fa-3x text-info opacity-25"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -302,7 +377,7 @@
         
         <!-- Charts Section -->
         <div class="row mb-5">
-            <div class="col-md-12 mb-4">
+            <div class="col-md-6 mb-4">
                 <div class="card shadow-sm border-0 h-100">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Distribuição por Setor</h5>
@@ -310,21 +385,6 @@
                     <div class="card-body">
                         <div class="chart-container-large">
                             <canvas id="setoresChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row mb-5">
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm border-0 h-100">
-                    <div class="card-header bg-warning text-white">
-                        <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Evolução Temporal (Mês a Mês)</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="evolucaoTemporalChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -416,7 +476,7 @@
         <!-- Tabela Detalhada de Correlação -->
         <div class="row mb-5">
             <div class="col-12">
-                <div class="card shadow-sm">
+                <div class="card shadow-sm border-0">
                     <div class="card-header bg-info text-white">
                         <h5 class="mb-0">
                             <i class="fas fa-table me-2"></i>Tabela Detalhada: Correlação entre Projeções de Gastos e Notas Fiscais
@@ -546,7 +606,7 @@
         <!-- Resumo Correlação Projeções e Notas Fiscais -->
         <div class="row mb-5">
             <div class="col-12">
-                <div class="card shadow-sm">
+                <div class="card shadow-sm border-0">
                     <div class="card-header bg-info text-white">
                         <h5 class="mb-0">
                             <i class="fas fa-link me-2"></i>Resumo: Correlação entre Projeções de Gastos e Notas Fiscais
@@ -627,6 +687,14 @@
     // Função para selecionar/desmarcar todos os meses
     function toggleAllMonths(select) {
         const checkboxes = document.querySelectorAll('.mes-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = select;
+        });
+    }
+
+    // Função para selecionar/desmarcar todos os setores
+    function toggleAllSetores(select) {
+        const checkboxes = document.querySelectorAll('.setor-checkbox');
         checkboxes.forEach(checkbox => {
             checkbox.checked = select;
         });
@@ -954,90 +1022,6 @@
                                 maxRotation: 45,
                                 minRotation: 45
                             }
-                        }
-                    }
-                }
-            });
-        }
-
-        // Gráfico de Evolução Temporal
-        const evolucaoCtx = document.getElementById('evolucaoTemporalChart');
-        if (evolucaoCtx) {
-            new Chart(evolucaoCtx.getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: {{ evolucao_labels|safe }},
-                    datasets: [
-                        {
-                            label: 'Quantidade de Projeções',
-                            data: {{ evolucao_quantidade_data|safe }},
-                            borderColor: '#ffc107',
-                            backgroundColor: 'rgba(255, 193, 7, 0.1)',
-                            fill: true,
-                            tension: 0.4
-                        },
-                        {
-                            label: 'Valor Total',
-                            data: {{ evolucao_valor_data|safe }},
-                            borderColor: '#198754',
-                            backgroundColor: 'rgba(25, 135, 84, 0.1)',
-                            fill: true,
-                            tension: 0.4,
-                            yAxisID: 'y1'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
-                    plugins: {
-                        legend: { position: 'top' },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) {
-                                        label += ': ';
-                                    }
-                                    if (context.dataset.label.includes('Valor')) {
-                                        label += 'R$ ' + formatarMoedaBR(context.parsed.y).replace('R$ ', '');
-                                    } else {
-                                        label += formatarNumeroBR(context.parsed.y);
-                                    }
-                                    return label;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return formatarNumeroBR(value);
-                                }
-                            }
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return 'R$ ' + formatarMoedaBR(value).replace('R$ ', '');
-                                }
-                            },
-                            grid: {
-                                drawOnChartArea: false,
-                            },
                         }
                     }
                 }

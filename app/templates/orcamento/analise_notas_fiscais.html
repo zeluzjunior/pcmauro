@@ -78,7 +78,7 @@
 <section class="py-5">
     <div class="container">
         <!-- Filter Section (Accordion) -->
-        <div class="accordion mb-4 filter-section" id="filterAccordion">
+        <div class="accordion mb-4 filter-accordion" id="filterAccordion">
             <div class="accordion-item">
                 <h2 class="accordion-header" id="headingFilter">
                     <button class="accordion-button {% if not ano_selecionado and not meses_selecionados and not uso_contabil_filtro and not situacao_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if ano_selecionado or meses_selecionados or uso_contabil_filtro or situacao_filtro %}true{% else %}false{% endif %}" aria-controls="collapseFilter">

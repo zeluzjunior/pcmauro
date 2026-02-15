@@ -15,15 +15,17 @@
         width: 100%;
         table-layout: auto;
     }
-    .table thead th {
+    /* Title row - fixed at top when scrolling */
+    .table .table-header-row th {
         position: sticky;
         top: 0;
         background-color: #f8f9fa;
-        z-index: 10;
+        z-index: 11;
         white-space: nowrap;
         vertical-align: middle;
         text-align: center;
         padding: 12px 8px;
+        box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);
     }
     .table tbody td {
         vertical-align: middle;
@@ -46,19 +48,27 @@
         padding: 8px !important;
         background-color: #e9ecef;
     }
-    .filter-row th {
+    /* Filter row - fixed below title when scrolling */
+    .table .filter-row th {
         background-color: #e9ecef;
         padding: 4px 8px !important;
         position: sticky;
-        top: 48px;
-        z-index: 8;
+        top: 48px;  /* matches title row height */
+        z-index: 10;
+        box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);
     }
-    .col-setor { min-width: 150px; }
-    .col-descricao { min-width: 250px; }
-    .col-fornecedor { min-width: 200px; }
-    .col-data { min-width: 120px; }
-    .col-valor { min-width: 120px; text-align: right; }
-    .col-numero { min-width: 150px; }
+    .col-setor { min-width: 150px; text-align: justify; }
+    .col-descricao { min-width: 320px; text-align: left; }
+    .col-fornecedor { min-width: 200px; text-align: justify; }
+    .col-data { min-width: 120px; text-align: justify; }
+    .col-valor { min-width: 120px; text-align: justify; }
+    .col-numero { min-width: 150px; text-align: justify; }
+    /* Header alignment to match cells */
+    .table thead th.col-setor,
+    .table thead th.col-fornecedor,
+    .table thead th.col-data,
+    .table thead th.col-valor,
+    .table thead th.col-numero { text-align: justify; }
 </style>
 {% endblock %}
 
@@ -90,7 +100,7 @@
         <!-- Filtro de Ano e Mês (Accordion) -->
         <div class="row mb-4">
             <div class="col-12">
-                <div class="accordion" id="filtrosAccordion">
+                <div class="accordion filter-accordion" id="filtrosAccordion">
                     <div class="accordion-item shadow-sm border-0">
                         <h2 class="accordion-header" id="filtrosHeading">
                             <button class="accordion-button {% if not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
@@ -130,6 +140,10 @@
                                     {% if search_query %}<input type="hidden" name="search" value="{{ search_query }}">{% endif %}
                                     {% if filtro_setor %}<input type="hidden" name="filtro_setor" value="{{ filtro_setor }}">{% endif %}
                                     {% if filtro_fornecedor %}<input type="hidden" name="filtro_fornecedor" value="{{ filtro_fornecedor }}">{% endif %}
+                                    {% if filtro_descricao %}<input type="hidden" name="filtro_descricao" value="{{ filtro_descricao }}">{% endif %}
+                                    {% if filtro_uso_contabil %}<input type="hidden" name="filtro_uso_contabil" value="{{ filtro_uso_contabil }}">{% endif %}
+                                    {% if filtro_mes_ano %}<input type="hidden" name="filtro_mes_ano" value="{{ filtro_mes_ano }}">{% endif %}
+                                    {% if filtro_numero_nf %}<input type="hidden" name="filtro_numero_nf" value="{{ filtro_numero_nf }}">{% endif %}
                                     {% if filtro_numero_requisicao %}<input type="hidden" name="filtro_numero_requisicao" value="{{ filtro_numero_requisicao }}">{% endif %}
                                     {% if filtro_valor_min %}<input type="hidden" name="filtro_valor_min" value="{{ filtro_valor_min }}">{% endif %}
                                     {% if filtro_valor_max %}<input type="hidden" name="filtro_valor_max" value="{{ filtro_valor_max }}">{% endif %}
@@ -250,11 +264,19 @@
         <div class="row mb-4">
             <div class="col-12">
                 <form method="get" action="{% url 'consultar_projecao_gastos' %}" class="d-flex">
-                    <!-- Preservar filtros de ano/mês -->
+                    <!-- Preservar filtros de ano/mês e colunas -->
                     <input type="hidden" name="ano" value="{{ ano_filtro }}">
                     {% for mes in meses_filtro %}
                         <input type="hidden" name="mes" value="{{ mes }}">
                     {% endfor %}
+                    {% if filtro_setor %}<input type="hidden" name="filtro_setor" value="{{ filtro_setor }}">{% endif %}
+                    {% if filtro_descricao %}<input type="hidden" name="filtro_descricao" value="{{ filtro_descricao }}">{% endif %}
+                    {% if filtro_fornecedor %}<input type="hidden" name="filtro_fornecedor" value="{{ filtro_fornecedor }}">{% endif %}
+                    {% if filtro_uso_contabil %}<input type="hidden" name="filtro_uso_contabil" value="{{ filtro_uso_contabil }}">{% endif %}
+                    {% if filtro_mes_ano %}<input type="hidden" name="filtro_mes_ano" value="{{ filtro_mes_ano }}">{% endif %}
+                    {% if filtro_numero_nf %}<input type="hidden" name="filtro_numero_nf" value="{{ filtro_numero_nf }}">{% endif %}
+                    {% if filtro_valor_min %}<input type="hidden" name="filtro_valor_min" value="{{ filtro_valor_min }}">{% endif %}
+                    {% if filtro_valor_max %}<input type="hidden" name="filtro_valor_max" value="{{ filtro_valor_max }}">{% endif %}
                     <input type="text" name="search" class="form-control me-2" placeholder="Buscar por setor, descrição, fornecedor, número de requisição..." value="{{ search_query|default:'' }}">
                     <button type="submit" class="btn btn-outline-primary">
                         <i class="fas fa-search"></i> Buscar
@@ -285,23 +307,23 @@
                             <div class="table-container">
                                 <table class="table table-hover table-striped mb-0">
                                     <thead>
-                                        <tr>
+                                        <tr class="table-header-row">
                                             <th class="col-setor">Setor</th>
                                             <th class="col-descricao">Descrição</th>
                                             <th class="col-fornecedor">Fornecedor</th>
                                             <th class="col-valor">Valor Total</th>
                                             <th class="col-data">Uso Contábil</th>
                                             <th class="col-numero">Mês/Ano Ref.</th>
-                                            <th class="col-numero">Nº Requisição</th>
                                             <th class="col-numero">Nº Nota Fiscal</th>
+                                            <th class="text-center" style="min-width: 100px;">Ações</th>
                                         </tr>
-                                    </thead>
-                                    <thead class="filter-row">
-                                        <tr>
+                                        <tr class="filter-row">
                                             <th class="filter-header">
                                                 <input type="text" name="filtro_setor" class="filter-input" placeholder="Filtrar setor..." value="{{ filtro_setor|default:'' }}" onchange="document.getElementById('filterForm').submit();">
                                             </th>
-                                            <th class="filter-header"></th>
+                                            <th class="filter-header">
+                                                <input type="text" name="filtro_descricao" class="filter-input" placeholder="Filtrar descrição..." value="{{ filtro_descricao|default:'' }}" onchange="document.getElementById('filterForm').submit();">
+                                            </th>
                                             <th class="filter-header">
                                                 <input type="text" name="filtro_fornecedor" class="filter-input" placeholder="Filtrar fornecedor..." value="{{ filtro_fornecedor|default:'' }}" onchange="document.getElementById('filterForm').submit();">
                                             </th>
@@ -311,10 +333,14 @@
                                                     <input type="text" name="filtro_valor_max" class="filter-input" placeholder="Max" value="{{ filtro_valor_max|default:'' }}" style="width: 48%;" onchange="document.getElementById('filterForm').submit();">
                                                 </div>
                                             </th>
-                                            <th class="filter-header"></th>
-                                            <th class="filter-header"></th>
                                             <th class="filter-header">
-                                                <input type="text" name="filtro_numero_requisicao" class="filter-input" placeholder="Filtrar nº requisição..." value="{{ filtro_numero_requisicao|default:'' }}" onchange="document.getElementById('filterForm').submit();">
+                                                <input type="text" name="filtro_uso_contabil" class="filter-input" placeholder="Filtrar uso..." value="{{ filtro_uso_contabil|default:'' }}" onchange="document.getElementById('filterForm').submit();">
+                                            </th>
+                                            <th class="filter-header">
+                                                <input type="text" name="filtro_mes_ano" class="filter-input" placeholder="Filtrar mês/ano..." value="{{ filtro_mes_ano|default:'' }}" onchange="document.getElementById('filterForm').submit();">
+                                            </th>
+                                            <th class="filter-header">
+                                                <input type="text" name="filtro_numero_nf" class="filter-input" placeholder="Filtrar NF..." value="{{ filtro_numero_nf|default:'' }}" onchange="document.getElementById('filterForm').submit();">
                                             </th>
                                             <th class="filter-header"></th>
                                         </tr>
@@ -350,10 +376,12 @@
                                                 {% endif %}
                                             </td>
                                             <td class="col-numero">
-                                                {{ projecao.numero_requisicao_compra|default:"-" }}
-                                            </td>
-                                            <td class="col-numero">
                                                 {{ projecao.numero_nf|default:"-" }}
+                                            </td>
+                                            <td class="text-center">
+                                                <a href="{% url 'visualizar_projecao_gasto' projecao.id %}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary" title="Visualizar detalhes">
+                                                    <i class="bi bi-eye me-1"></i>Visualizar
+                                                </a>
                                             </td>
                                         </tr>
                                         {% empty %}
@@ -376,10 +404,10 @@
                             <ul class="pagination justify-content-center mb-0">
                                 {% if projecoes.has_previous %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page=1&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">&laquo; Primeira</a>
+                                        <a class="page-link" href="?page=1&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_descricao %}&filtro_descricao={{ filtro_descricao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_mes_ano %}&filtro_mes_ano={{ filtro_mes_ano }}{% endif %}{% if filtro_numero_nf %}&filtro_numero_nf={{ filtro_numero_nf }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">&laquo; Primeira</a>
                                     </li>
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ projecoes.previous_page_number }}&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Anterior</a>
+                                        <a class="page-link" href="?page={{ projecoes.previous_page_number }}&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_descricao %}&filtro_descricao={{ filtro_descricao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_mes_ano %}&filtro_mes_ano={{ filtro_mes_ano }}{% endif %}{% if filtro_numero_nf %}&filtro_numero_nf={{ filtro_numero_nf }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Anterior</a>
                                     </li>
                                 {% endif %}
                                 
@@ -391,10 +419,10 @@
                                 
                                 {% if projecoes.has_next %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ projecoes.next_page_number }}&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Próxima</a>
+                                        <a class="page-link" href="?page={{ projecoes.next_page_number }}&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_descricao %}&filtro_descricao={{ filtro_descricao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_mes_ano %}&filtro_mes_ano={{ filtro_mes_ano }}{% endif %}{% if filtro_numero_nf %}&filtro_numero_nf={{ filtro_numero_nf }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Próxima</a>
                                     </li>
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ projecoes.paginator.num_pages }}&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Última &raquo;</a>
+                                        <a class="page-link" href="?page={{ projecoes.paginator.num_pages }}&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_descricao %}&filtro_descricao={{ filtro_descricao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_mes_ano %}&filtro_mes_ano={{ filtro_mes_ano }}{% endif %}{% if filtro_numero_nf %}&filtro_numero_nf={{ filtro_numero_nf }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Última &raquo;</a>
                                     </li>
                                 {% endif %}
                             </ul>

@@ -6868,15 +6868,12 @@ def consultar_notas_fiscais(request):
     search_query = request.GET.get('search', '').strip()
     notas_list = NotaFiscal.objects.all()
     
-    # Filtrar por ano e mês (data_emissao ou data_autorizacao)
+    # Filtrar por ano e mês usando somente data_emissao da NotaFiscal
     notas_filtradas_por_data = []
     for nota in notas_list:
         data_emissao = parse_date(nota.data_emissao)
-        data_autorizacao = parse_date(nota.data_autorizacao)
-        data_ref = data_emissao or data_autorizacao
-        
-        if data_ref and data_ref.year == ano_filtro:
-            if not meses_filtro_int or data_ref.month in meses_filtro_int:
+        if data_emissao and data_emissao.year == ano_filtro:
+            if not meses_filtro_int or data_emissao.month in meses_filtro_int:
                 notas_filtradas_por_data.append(nota.id)
     
     if notas_filtradas_por_data:
@@ -15220,12 +15217,22 @@ def consultar_projecao_gastos(request):
     # Valores padrão: usar o ano mais recente dos dados ou ano atual
     hoje = datetime.now()
     
-    # Anos disponíveis para o filtro
+    # Anos disponíveis para o filtro (de ano_referencia E de previsao_execucao)
+    import re
     anos_disponiveis_set = set()
     anos_ref = ProjecaoGasto.objects.exclude(ano_referencia__isnull=True).values_list('ano_referencia', flat=True).distinct()
     for ano in anos_ref:
         if ano:
             anos_disponiveis_set.add(int(ano))
+    # Extrair anos de previsao_execucao (ex: "DEZEMBRO / 2025", "OUTUBRO 2024")
+    prev_exec_values = ProjecaoGasto.objects.exclude(previsao_execucao__isnull=True).exclude(
+        previsao_execucao=''
+    ).values_list('previsao_execucao', flat=True).distinct()
+    for texto in prev_exec_values:
+        if texto:
+            ano_match = re.search(r'\b(20\d{2}|19\d{2})\b', str(texto))
+            if ano_match:
+                anos_disponiveis_set.add(int(ano_match.group(1)))
     anos_disponiveis_set.add(hoje.year)
     anos_disponiveis = sorted(list(anos_disponiveis_set), reverse=True)
     if not anos_disponiveis:
@@ -15340,7 +15347,7 @@ def consultar_projecao_gastos(request):
             q_mes = Q(mes_referencia__in=meses_selecionados_str) | q_previsao
             projecoes_list = projecoes_list.filter(q_mes)
     
-    # Aplicar busca geral
+    # Aplicar busca geral (inclui previsao_execucao para buscar por "DEZEMBRO 2025", etc.)
     if search_query:
         try:
             search_num = Decimal(search_query.replace(',', '.'))
@@ -15350,6 +15357,7 @@ def consultar_projecao_gastos(request):
                 Q(fornecedor_nome_fantasia__icontains=search_query) |
                 Q(numero_requisicao_compra__icontains=search_query) |
                 Q(numero_ordem_servico__icontains=search_query) |
+                Q(previsao_execucao__icontains=search_query) |
                 Q(valor_total=search_num)
             )
         except (ValueError, TypeError):
@@ -15359,6 +15367,7 @@ def consultar_projecao_gastos(request):
                 Q(fornecedor_nome_fantasia__icontains=search_query) |
                 Q(numero_requisicao_compra__icontains=search_query) |
                 Q(numero_ordem_servico__icontains=search_query) |
+                Q(previsao_execucao__icontains=search_query) |
                 Q(solicitante__icontains=search_query)
             )
     
@@ -15373,6 +15382,25 @@ def consultar_projecao_gastos(request):
             Q(fornecedor_nome_fantasia__icontains=filtro_fornecedor) |
             Q(fornecedor_cnpj__icontains=filtro_fornecedor)
         )
+    
+    filtro_descricao = request.GET.get('filtro_descricao', '').strip()
+    if filtro_descricao:
+        projecoes_list = projecoes_list.filter(descricao__icontains=filtro_descricao)
+
+    filtro_uso_contabil = request.GET.get('filtro_uso_contabil', '').strip()
+    if filtro_uso_contabil:
+        projecoes_list = projecoes_list.filter(uso_contabil__icontains=filtro_uso_contabil)
+
+    filtro_mes_ano = request.GET.get('filtro_mes_ano', '').strip()
+    if filtro_mes_ano:
+        projecoes_list = projecoes_list.filter(
+            Q(mes_referencia__icontains=filtro_mes_ano) |
+            Q(previsao_execucao__icontains=filtro_mes_ano)
+        )
+
+    filtro_numero_nf = request.GET.get('filtro_numero_nf', '').strip()
+    if filtro_numero_nf:
+        projecoes_list = projecoes_list.filter(numero_nf__icontains=filtro_numero_nf)
     
     filtro_numero_requisicao = request.GET.get('filtro_numero_requisicao', '').strip()
     if filtro_numero_requisicao:
@@ -15432,6 +15460,10 @@ def consultar_projecao_gastos(request):
         'setores_unicos': setores_unicos or [],
         'filtro_setor': filtro_setor or '',
         'filtro_fornecedor': filtro_fornecedor or '',
+        'filtro_descricao': filtro_descricao or '',
+        'filtro_uso_contabil': filtro_uso_contabil or '',
+        'filtro_mes_ano': filtro_mes_ano or '',
+        'filtro_numero_nf': filtro_numero_nf or '',
         'filtro_numero_requisicao': filtro_numero_requisicao or '',
         'filtro_valor_min': filtro_valor_min or '',
         'filtro_valor_max': filtro_valor_max or '',
@@ -15445,6 +15477,28 @@ def consultar_projecao_gastos(request):
     return render(request, 'orcamento/consultar_projecao_gastos.html', context)
 
 
+def visualizar_projecao_gasto(request, projecao_id):
+    """Visualizar detalhes de uma projeção de gasto específica"""
+    from app.models import ProjecaoGasto, RelacaoProjecaoNotaFiscal
+
+    try:
+        projecao = ProjecaoGasto.objects.get(id=projecao_id)
+    except ProjecaoGasto.DoesNotExist:
+        messages.error(request, 'Projeção de gasto não encontrada.')
+        return redirect('consultar_projecao_gastos')
+
+    # Notas fiscais relacionadas (se houver)
+    relacoes_nf = RelacaoProjecaoNotaFiscal.objects.filter(projecao=projecao).select_related('nota_fiscal')
+
+    context = {
+        'page_title': f'Visualizar Projeção de Gasto #{projecao.id}',
+        'active_page': 'consultar_projecao_gastos',
+        'projecao': projecao,
+        'relacoes_nf': relacoes_nf,
+    }
+    return render(request, 'orcamento/visualizar_projecao_gasto.html', context)
+
+
 def analise_projecao_gastos(request):
     """Página de análise detalhada de projeções de gastos com filtros e gráficos"""
     from app.models import ProjecaoGasto, RelacaoProjecaoNotaFiscal
@@ -15456,7 +15510,8 @@ def analise_projecao_gastos(request):
     # --- Lógica de Filtro ---
     ano_filtro = request.GET.get('ano', None)
     meses_filtro = request.GET.getlist('mes')
-    setor_filtro = request.GET.get('setor', '').strip()
+    setores_filtro = request.GET.getlist('setor')
+    setores_filtro = [s.strip() for s in setores_filtro if s and s.strip()]
     uso_contabil_filtro = request.GET.get('uso_contabil', '').strip()
 
     hoje = datetime.now()
@@ -15567,40 +15622,46 @@ def analise_projecao_gastos(request):
         Q(fornecedor_nome_fantasia__isnull=False) & ~Q(fornecedor_nome_fantasia='')
     )
     
-    # Aplicar filtro de ano (ano_referencia OU created_at)
-    # Verificar se o filtro foi explicitamente selecionado pelo usuário
-    ano_filtro_explicito = request.GET.get('ano', None) is not None
-    
-    if ano_filtro_explicito:
-        # Filtro explícito: aplicar filtro restritivo apenas para o ano selecionado
-        q_ano = (
-            Q(ano_referencia=ano_filtro) |  # Ano de referência coincide
-            Q(created_at__year=ano_filtro)  # Criado no ano filtrado
-        )
-        projecoes_qs = projecoes_qs.filter(q_ano)
-    else:
-        # Sem filtro explícito: incluir dados recentes (últimos 90 dias) para dados novos
-        data_limite_recente = hoje - timedelta(days=90)
-        q_ano = (
-            Q(ano_referencia=ano_filtro) |  # Ano de referência coincide
-            Q(created_at__year=ano_filtro) |  # Criado no ano filtrado
-            (Q(ano_referencia__isnull=True) & Q(created_at__year=ano_filtro)) |  # Sem ano_referencia mas criado no ano
-            (Q(created_at__gte=data_limite_recente))  # Dados recentes (últimos 90 dias) sempre incluídos
-        )
-        projecoes_qs = projecoes_qs.filter(q_ano)
+    # Aplicar filtro de ano (ano_referencia OU created_at quando ano_referencia vazio)
+    q_ano = (
+        Q(ano_referencia=ano_filtro) |  # Ano de referência coincide
+        (Q(ano_referencia__isnull=True) & Q(created_at__year=ano_filtro))  # Fallback: sem ano_ref, criado no ano
+    )
+    projecoes_qs = projecoes_qs.filter(q_ano)
     
     # Se há meses selecionados, aplicar filtro de mês
+    # mes_referencia no DB é armazenado como '01','02',...'12' (extraído do import), não 'JANEIRO','FEVEREIRO'
+    # Também suportar previsao_execucao como fallback (ex: "DEZEMBRO / 2025")
     if meses_filtro_int:
         q_mes = Q()
+        # Formato numérico: mes_referencia in ['01','02',...]
+        for mes_num in meses_filtro_int:
+            q_mes |= Q(mes_referencia__in=[str(mes_num), f'{mes_num:02d}'])
+        # Formato texto (fallback para imports antigos ou diferentes)
         for mes_str in meses_selecionados_str:
             q_mes |= Q(mes_referencia__iexact=mes_str)
+        # previsao_execucao contém nome do mês (ex: "JANEIRO / 2025")
+        meses_nomes_variantes = {
+            1: ['JANEIRO', 'JAN'], 2: ['FEVEREIRO', 'FEV'], 3: ['MARÇO', 'MARCO', 'MAR'],
+            4: ['ABRIL', 'ABR'], 5: ['MAIO', 'MAI'], 6: ['JUNHO', 'JUN'],
+            7: ['JULHO', 'JUL'], 8: ['AGOSTO', 'AGO'], 9: ['SETEMBRO', 'SET'],
+            10: ['OUTUBRO', 'OUT'], 11: ['NOVEMBRO', 'NOV'], 12: ['DEZEMBRO', 'DEZ']
+        }
         for mes_num in meses_filtro_int:
-            q_mes |= Q(created_at__month=mes_num)
+            for nome in meses_nomes_variantes.get(mes_num, []):
+                q_mes |= Q(previsao_execucao__icontains=nome)
+        # Sem mes_referencia nem previsao: usar created_at
+        for mes_num in meses_filtro_int:
+            q_mes |= Q(
+                (Q(mes_referencia__isnull=True) | Q(mes_referencia='')) &
+                (Q(previsao_execucao__isnull=True) | Q(previsao_execucao='')) &
+                Q(created_at__month=mes_num)
+            )
         projecoes_qs = projecoes_qs.filter(q_mes)
     
-    # Aplicar filtro de setor
-    if setor_filtro:
-        projecoes_qs = projecoes_qs.filter(setor=setor_filtro)
+    # Aplicar filtro de setor (múltiplos)
+    if setores_filtro:
+        projecoes_qs = projecoes_qs.filter(setor__in=setores_filtro)
     
     # Aplicar filtro de uso contábil
     if uso_contabil_filtro:
@@ -15749,12 +15810,17 @@ def analise_projecao_gastos(request):
             label = f"{meses_nomes_curtos[mes_num-1]}/{str(ano_filtro)[2:]}"
             evolucao_labels.append(label)
             
-            # Quantidade de projeções no mês (usar mes_referencia OU created_at)
-            q_mes_temporal = Q(mes_referencia__iexact=meses_str_map[mes_num]) | Q(created_at__month=mes_num)
+            # Alocar projeção ao mês: mes_referencia ('01','02'...) OU nome em previsao_execucao OU created_at
+            q_mes_temporal = (
+                Q(mes_referencia__in=[str(mes_num), f'{mes_num:02d}']) |
+                Q(mes_referencia__iexact=meses_str_map[mes_num]) |
+                Q(previsao_execucao__icontains=meses_str_map[mes_num]) |
+                Q(created_at__month=mes_num)
+            )
             qtd_mes = projecoes_qs.filter(q_mes_temporal).count()
             evolucao_quantidade_data.append(qtd_mes)
             
-            # Valor total do mês (usar mes_referencia OU created_at)
+            # Valor total do mês
             valor_mes = projecoes_qs.filter(q_mes_temporal).aggregate(Sum('valor_total'))['valor_total__sum'] or Decimal(0)
             evolucao_valor_data.append(float(valor_mes))
 
@@ -15835,7 +15901,7 @@ def analise_projecao_gastos(request):
         'meses_selecionados': meses_filtro_int,
         'setores_disponiveis': setores_disponiveis,
         'uso_contabil_disponiveis': uso_contabil_disponiveis,
-        'setor_filtro': setor_filtro,
+        'setores_selecionados': setores_filtro,
         'uso_contabil_filtro': uso_contabil_filtro,
 
         # KPIs
@@ -16431,8 +16497,6 @@ def relacionar_projecao_nota_fiscal(request):
                         filtro &= Q(controle_rc_nf=controle_rc_nf)
                     except ControleRCeNF.DoesNotExist:
                         pass
-                else:
-                    filtro &= Q(controle_rc_nf__isnull=True)
                 
                 RelacaoProjecaoNotaFiscal.objects.filter(filtro).delete()
                 
@@ -16811,39 +16875,65 @@ def relacionar_projecao_nota_fiscal(request):
     mostrar_apenas_proximos = request.GET.get('mostrar_apenas_proximos', '') == 'on'
     mostrar_apenas_nao_confirmados = request.GET.get('mostrar_apenas_nao_confirmados', '') == 'on'
     
-    # Buscar projeções com filtros
-    projecoes = ProjecaoGasto.objects.all()
+    # Análise invertida: Nota Fiscal como base → encontrar Projeção de Gasto que corresponde
+    # Score mínimo para mostrar match (evita pares irrelevantes 0%)
+    SCORE_MINIMO = 20
+    MAX_MATCHES_POR_NOTA = 5  # Máximo de projeções candidatas por nota
+    
+    # Buscar projeções com filtros (todas que passam nos filtros - base menor)
+    projecoes_qs = ProjecaoGasto.objects.all()
     if filtro_centro_atividade:
-        projecoes = projecoes.filter(
+        projecoes_qs = projecoes_qs.filter(
             Q(setor__icontains=filtro_centro_atividade) |
             Q(centro_atividade__icontains=filtro_centro_atividade)
         )
     if filtro_ano:
         try:
             ano = int(filtro_ano)
-            projecoes = projecoes.filter(ano_referencia=ano)
+            projecoes_qs = projecoes_qs.filter(ano_referencia=ano)
         except ValueError:
             pass
     if filtro_tipo:
-        projecoes = projecoes.filter(tipo__icontains=filtro_tipo)
+        projecoes_qs = projecoes_qs.filter(tipo__icontains=filtro_tipo)
     if filtro_valor_min:
         try:
-            projecoes = projecoes.filter(valor_total__gte=Decimal(filtro_valor_min))
+            projecoes_qs = projecoes_qs.filter(valor_total__gte=Decimal(filtro_valor_min))
         except (ValueError, TypeError):
             pass
     if filtro_valor_max:
         try:
-            projecoes = projecoes.filter(valor_total__lte=Decimal(filtro_valor_max))
+            projecoes_qs = projecoes_qs.filter(valor_total__lte=Decimal(filtro_valor_max))
         except (ValueError, TypeError):
             pass
     
-    # Buscar notas fiscais separadas por uso_contabil
-    notas_242 = NotaFiscal.objects.filter(uso_contabil='242')
-    notas_5 = NotaFiscal.objects.filter(uso_contabil='5')
-    notas_170 = NotaFiscal.objects.filter(uso_contabil='170')
+    projecoes = list(projecoes_qs)
+    projecoes_total_count = len(projecoes)
+    resultados_limitados = False  # Sem limite artificial com análise por NF
     
-    # Buscar todos os ControleRCeNF para matching
-    controles_rc_nf = ControleRCeNF.objects.all()
+    # Buscar notas fiscais separadas por uso_contabil (NF como base da análise)
+    notas_242 = list(NotaFiscal.objects.filter(uso_contabil='242'))
+    notas_5 = list(NotaFiscal.objects.filter(uso_contabil='5'))
+    notas_170 = list(NotaFiscal.objects.filter(uso_contabil='170'))
+    
+    # Buscar todos os ControleRCeNF para matching (em memória para evitar N+1 no loop)
+    controles_rc_nf_list = list(ControleRCeNF.objects.all())
+    
+    # Índices para lookup O(1) em vez de scan O(n) por par projecao-nota
+    from app.utils import normalize_nota_numero
+    _normalize = normalize_nota_numero
+    controles_by_nf = {}
+    controles_by_rc = {}
+    controles_by_pedido = {}
+    for c in controles_rc_nf_list:
+        for nf_val in (_normalize(c.nf_saida), _normalize(c.nf_servico)):
+            if nf_val:
+                controles_by_nf.setdefault(nf_val, []).append(c)
+        rc_val = (c.rc or '').strip()
+        if rc_val:
+            controles_by_rc.setdefault(rc_val, []).append(c)
+        ped_val = (c.pedido or '').strip()
+        if ped_val:
+            controles_by_pedido.setdefault(ped_val, []).append(c)
     
     # Buscar relações confirmadas (incluindo controle_rc_nf)
     relacoes_confirmadas = RelacaoProjecaoNotaFiscal.objects.filter(
@@ -16857,98 +16947,82 @@ def relacionar_projecao_nota_fiscal(request):
         controle_key = relacao.controle_rc_nf.id_excel if relacao.controle_rc_nf else None
         relacoes_dict[(relacao.projecao.id, relacao.nota_fiscal.id, controle_key)] = relacao
     
-    # Função auxiliar para encontrar ControleRCeNF que corresponde a ProjecaoGasto e NotaFiscal
-    def encontrar_controle_rc_nf(projecao, nota):
+    # Função auxiliar para encontrar ControleRCeNF (usa índices para O(1) lookup)
+    def encontrar_controle_rc_nf(projecao, nota, idx_nf, idx_rc, idx_pedido, controles_list):
         """Encontra ControleRCeNF que corresponde à Projeção e Nota Fiscal"""
         controles_candidatos = []
+        seen_ids = set()
         
-        # Buscar por número de NF
-        if projecao.numero_nf or nota.nota:
-            from app.utils import normalize_nota_numero
-            nf_proj = normalize_nota_numero(projecao.numero_nf) if projecao.numero_nf else None
-            nf_nota = normalize_nota_numero(nota.nota) if nota.nota else None
-            
-            # Buscar controles com NF que corresponda
-            if nf_proj or nf_nota:
-                nf_busca = nf_proj or nf_nota
-                controles_nf = controles_rc_nf.filter(
-                    Q(nf_saida__icontains=nf_busca) | Q(nf_servico__icontains=nf_busca)
-                )
-                for controle in controles_nf:
-                    nf_controle_saida = normalize_nota_numero(controle.nf_saida) if controle.nf_saida else None
-                    nf_controle_servico = normalize_nota_numero(controle.nf_servico) if controle.nf_servico else None
-                    if (nf_busca == nf_controle_saida or nf_busca == nf_controle_servico):
+        def add_candidatos(lst):
+            for c in lst:
+                if id(c) not in seen_ids:
+                    seen_ids.add(id(c))
+                    controles_candidatos.append(c)
+                    if len(controles_candidatos) >= 3:
+                        return
+        
+        # Buscar por número de NF (lookup O(1))
+        nf_busca = _normalize(projecao.numero_nf) or _normalize(nota.nota)
+        if nf_busca and nf_busca in idx_nf:
+            add_candidatos(idx_nf[nf_busca])
+            if len(controles_candidatos) >= 3:
+                return controles_candidatos[:3]
+        
+        # Buscar por RC (lookup O(1))
+        rc_busca = (projecao.numero_requisicao_compra or '').strip()
+        if rc_busca and rc_busca in idx_rc:
+            add_candidatos(idx_rc[rc_busca])
+            if len(controles_candidatos) >= 3:
+                return controles_candidatos[:3]
+        
+        # Buscar por Pedido (lookup O(1))
+        pedido_busca = (projecao.numero_pedido_compra or '').strip()
+        if pedido_busca and pedido_busca in idx_pedido:
+            add_candidatos(idx_pedido[pedido_busca])
+        
+        # Se não encontrou, fallback: buscar por empresa/fornecedor
+        if not controles_candidatos and (projecao.fornecedor_nome_fantasia or nota.nome_fantasia_emitente):
+            fornecedor_busca = (projecao.fornecedor_nome_fantasia or nota.nome_fantasia_emitente or '').strip().upper()
+            if fornecedor_busca:
+                for controle in controles_list:
+                    if (controle.empresa or '').strip().upper().find(fornecedor_busca) >= 0:
                         controles_candidatos.append(controle)
+                        if len(controles_candidatos) >= 3:
+                            break
         
-        # Buscar por RC (número de requisição)
-        if projecao.numero_requisicao_compra:
-            controles_rc = controles_rc_nf.filter(rc=projecao.numero_requisicao_compra)
-            for controle in controles_rc:
-                if controle not in controles_candidatos:
-                    controles_candidatos.append(controle)
-        
-        # Buscar por Pedido
-        if projecao.numero_pedido_compra:
-            controles_pedido = controles_rc_nf.filter(pedido=projecao.numero_pedido_compra)
-            for controle in controles_pedido:
-                if controle not in controles_candidatos:
-                    controles_candidatos.append(controle)
-        
-        # Se não encontrou por campos específicos, retornar o primeiro que corresponde por valor/fornecedor
-        if not controles_candidatos:
-            # Buscar por empresa/fornecedor
-            if projecao.fornecedor_nome_fantasia or nota.nome_fantasia_emitente:
-                fornecedor_busca = (projecao.fornecedor_nome_fantasia or nota.nome_fantasia_emitente or '').strip().upper()
-                if fornecedor_busca:
-                    controles_empresa = controles_rc_nf.filter(empresa__icontains=fornecedor_busca)
-                    for controle in controles_empresa[:5]:  # Limitar a 5 para performance
-                        controles_candidatos.append(controle)
-        
-        return controles_candidatos[:3]  # Retornar até 3 melhores candidatos
+        return controles_candidatos[:3]
     
-    # Função auxiliar para calcular matches (incluindo ControleRCeNF)
+    # Análise por Nota Fiscal: para cada NF, encontrar Projeções que correspondem
+    # Score mínimo: SCORE_MINIMO (ou 50 se "apenas próximos" ativo)
     def calcular_matches_para_notas(notas_list):
+        score_min = 50 if mostrar_apenas_proximos else SCORE_MINIMO
         matches_list = []
-        for projecao in projecoes:
-            for nota in notas_list:
-                # Encontrar ControleRCeNF que corresponde
-                controles_candidatos = encontrar_controle_rc_nf(projecao, nota)
-                
-                # Se não encontrou controle, criar match sem controle (compatibilidade)
-                if not controles_candidatos:
-                    controle = None
-                    controle_key = None
-                else:
-                    # Usar o primeiro controle candidato (melhor match)
-                    controle = controles_candidatos[0]
-                    controle_key = controle.id_excel
-                
-                # Verificar se já está confirmado
+        for nota in notas_list:
+            candidatos_nota = []
+            for projecao in projecoes:
+                controles_candidatos = encontrar_controle_rc_nf(
+                    projecao, nota,
+                    controles_by_nf, controles_by_rc, controles_by_pedido,
+                    controles_rc_nf_list
+                )
+                controle = controles_candidatos[0] if controles_candidatos else None
+                controle_key = controle.id_excel if controle else None
                 relacao_confirmada = relacoes_dict.get((projecao.id, nota.id, controle_key))
-                
-                # Se filtro "apenas não confirmados" está ativo, pular confirmados
                 if mostrar_apenas_nao_confirmados and relacao_confirmada:
                     continue
-                
-                # Calcular score (com três tabelas se controle existe)
                 score, detalhes = calcular_match_score_tres_tabelas(projecao, nota, controle)
-                
-                # Se filtro "apenas próximos" está ativo, pular scores baixos
-                if mostrar_apenas_proximos and score < 50:
+                if score < score_min:
                     continue
-                
-                matches_list.append({
+                candidatos_nota.append({
                     'projecao': projecao,
                     'nota': nota,
                     'controle': controle,
-                    'match_info': {
-                        'percentual': score,
-                        'detalhes': detalhes,
-                    },
+                    'match_info': {'percentual': score, 'detalhes': detalhes},
                     'relacao_confirmada': relacao_confirmada,
                 })
-        
-        # Ordenar por score (maior primeiro)
+            # Ordenar por score e pegar até MAX_MATCHES_POR_NOTA por nota
+            candidatos_nota.sort(key=lambda x: x['match_info']['percentual'], reverse=True)
+            matches_list.extend(candidatos_nota[:MAX_MATCHES_POR_NOTA])
         matches_list.sort(key=lambda x: x['match_info']['percentual'], reverse=True)
         return matches_list
     
@@ -16957,21 +17031,44 @@ def relacionar_projecao_nota_fiscal(request):
     matches_5 = calcular_matches_para_notas(notas_5)
     matches_170 = calcular_matches_para_notas(notas_170)
     
-    # Estatísticas
-    total_projecoes = ProjecaoGasto.objects.count()
-    total_notas_242 = notas_242.count()
-    total_notas_5 = notas_5.count()
-    total_notas_170 = notas_170.count()
+    # Paginação por seção (25 matches por página)
+    from django.core.paginator import Paginator
+    PER_PAGE = 25
+    page_242 = request.GET.get('page_242', 1)
+    page_5 = request.GET.get('page_5', 1)
+    page_170 = request.GET.get('page_170', 1)
+    try:
+        page_242 = max(1, int(page_242))
+        page_5 = max(1, int(page_5))
+        page_170 = max(1, int(page_170))
+    except (ValueError, TypeError):
+        page_242 = page_5 = page_170 = 1
+    
+    paginator_242 = Paginator(matches_242, PER_PAGE)
+    paginator_5 = Paginator(matches_5, PER_PAGE)
+    paginator_170 = Paginator(matches_170, PER_PAGE)
+    matches_242_page = paginator_242.get_page(page_242)
+    matches_5_page = paginator_5.get_page(page_5)
+    matches_170_page = paginator_170.get_page(page_170)
+    
+    # Estatísticas (notas são listas após o limit)
+    total_projecoes = projecoes_total_count
+    total_notas_242 = len(notas_242)
+    total_notas_5 = len(notas_5)
+    total_notas_170 = len(notas_170)
     total_notas = total_notas_242 + total_notas_5 + total_notas_170
-    total_controles_rc_nf = controles_rc_nf.count()
+    total_controles_rc_nf = len(controles_rc_nf_list)
     total_relacoes_confirmadas = RelacaoProjecaoNotaFiscal.objects.filter(status='confirmado').count()
     
     context = {
         'page_title': 'Relacionar Projeção vs Nota Fiscal vs Controle RC/NF',
         'active_page': 'relacionar_projecao_nota_fiscal',
-        'matches_242': matches_242,
-        'matches_5': matches_5,
-        'matches_170': matches_170,
+        'matches_242': matches_242_page,
+        'matches_5': matches_5_page,
+        'matches_170': matches_170_page,
+        'matches_242_count': len(matches_242),
+        'matches_5_count': len(matches_5),
+        'matches_170_count': len(matches_170),
         'total_projecoes': total_projecoes,
         'total_notas': total_notas,
         'total_notas_242': total_notas_242,
@@ -16986,6 +17083,10 @@ def relacionar_projecao_nota_fiscal(request):
         'filtro_valor_max': filtro_valor_max,
         'mostrar_apenas_proximos': mostrar_apenas_proximos,
         'mostrar_apenas_nao_confirmados': mostrar_apenas_nao_confirmados,
+        'resultados_limitados': resultados_limitados,
+        'score_minimo': SCORE_MINIMO,
+        'max_matches_por_nota': MAX_MATCHES_POR_NOTA,
+        'active_uc_tab': '170' if page_170 > 1 else ('5' if page_5 > 1 else '242'),
     }
     
     return render(request, 'orcamento/relacionar_projecao_nota_fiscal.html', context)
