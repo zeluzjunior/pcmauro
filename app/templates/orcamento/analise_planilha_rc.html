@@ -12,6 +12,13 @@
     .stat-card:hover {
         transform: translateY(-5px);
     }
+    .kpi-card {
+        border-left: 4px solid;
+    }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
     .chart-container {
         position: relative;
         height: 400px;
@@ -233,36 +240,60 @@
 
         <!-- Statistics Cards -->
         <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white stat-card">
-                    <div class="card-body">
-                        <h5 class="card-title">Total de Registros</h5>
-                        <p class="card-text display-6">{{ total_registros }}</p>
+            <div class="col-12">
+                <div class="row g-3">
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Total de Registros</h6>
+                                        <h4 class="mb-0 fw-bold">{{ total_registros }}</h4>
+                                    </div>
+                                    <i class="fas fa-database fa-2x text-primary opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-info text-white stat-card">
-                    <div class="card-body">
-                        <h5 class="card-title">Valor Total Pedidos</h5>
-                        <p class="card-text display-6">{{ valor_total_pedido_geral|currency_br }}</p>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Valor Total Pedidos</h6>
+                                        <h4 class="mb-0 fw-bold">{{ valor_total_pedido_geral|currency_br }}</h4>
+                                    </div>
+                                    <i class="fas fa-shopping-cart fa-2x text-info opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-success text-white stat-card">
-                    <div class="card-body">
-                        <h5 class="card-title">Valor Total NF</h5>
-                        <p class="card-text display-6">{{ valor_total_nf_geral|currency_br }}</p>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Valor Total NF</h6>
+                                        <h4 class="mb-0 fw-bold">{{ valor_total_nf_geral|currency_br }}</h4>
+                                    </div>
+                                    <i class="fas fa-file-invoice-dollar fa-2x text-success opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-warning text-white stat-card">
-                    <div class="card-body">
-                        <h5 class="card-title">Registros sem Status</h5>
-                        <p class="card-text display-6">{{ registros_sem_status }}</p>
-                        <small>{% if total_registros > 0 %}{% widthratio registros_sem_status total_registros 100 %}%{% else %}0%{% endif %}</small>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Registros sem Status</h6>
+                                        <h4 class="mb-0 fw-bold">{{ registros_sem_status }}</h4>
+                                        <small class="text-muted">{% if total_registros > 0 %}{% widthratio registros_sem_status total_registros 100 %}%{% else %}0%{% endif %}</small>
+                                    </div>
+                                    <i class="fas fa-exclamation-triangle fa-2x text-warning opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -270,51 +301,79 @@
 
         <!-- Additional Statistics -->
         <div class="row mb-4">
-            <div class="col-md-2">
-                <div class="card bg-light stat-card">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted">Com RC</h6>
-                        <h4 class="text-primary">{{ registros_com_rc }}</h4>
+            <div class="col-12">
+                <div class="row g-3">
+                    <div class="col-md-4 col-lg-2">
+                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-primary">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Com RC</h6>
+                                        <h4 class="mb-0 fw-bold text-primary">{{ registros_com_rc }}</h4>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card bg-light stat-card">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted">Com Pedido</h6>
-                        <h4 class="text-info">{{ registros_com_pedido }}</h4>
+                    <div class="col-md-4 col-lg-2">
+                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-info">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Com Pedido</h6>
+                                        <h4 class="mb-0 fw-bold text-info">{{ registros_com_pedido }}</h4>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card bg-light stat-card">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted">Com NF Saída</h6>
-                        <h4 class="text-success">{{ registros_com_nf_saida }}</h4>
+                    <div class="col-md-4 col-lg-2">
+                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-success">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Com NF Saída</h6>
+                                        <h4 class="mb-0 fw-bold text-success">{{ registros_com_nf_saida }}</h4>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card bg-light stat-card">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted">Com NF Serviço</h6>
-                        <h4 class="text-warning">{{ registros_com_nf_servico }}</h4>
+                    <div class="col-md-4 col-lg-2">
+                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-warning">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Com NF Serviço</h6>
+                                        <h4 class="mb-0 fw-bold text-warning">{{ registros_com_nf_servico }}</h4>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card bg-light stat-card">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted">Valor Médio Pedido</h6>
-                        <h5 class="text-primary">{{ valor_medio_pedido|currency_br }}</h5>
+                    <div class="col-md-4 col-lg-2">
+                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-primary">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Valor Médio Pedido</h6>
+                                        <h5 class="mb-0 fw-bold text-primary">{{ valor_medio_pedido|currency_br }}</h5>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card bg-light stat-card">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted">Valor Médio NF</h6>
-                        <h5 class="text-success">{{ valor_medio_nf|currency_br }}</h5>
+                    <div class="col-md-4 col-lg-2">
+                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-success">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Valor Médio NF</h6>
+                                        <h5 class="mb-0 fw-bold text-success">{{ valor_medio_nf|currency_br }}</h5>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

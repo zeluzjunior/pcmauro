@@ -6,6 +6,13 @@
 
 {% block extra_css %}
 <style>
+    .stat-card { transition: transform 0.2s; }
+    .stat-card:hover { transform: translateY(-5px); }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-warning { border-left-color: #ffc107; }
     .table-container {
         max-height: 70vh;
         overflow-y: auto;
@@ -55,14 +62,11 @@
     }
     .col-empresa { min-width: 120px; }
     .col-solicitante { min-width: 150px; }
-    .col-nf { min-width: 100px; }
     .col-descricao { min-width: 250px; }
-    .col-id { min-width: 100px; }
-    .col-rc { min-width: 120px; }
-    .col-pedido { min-width: 120px; }
     .col-valor { min-width: 120px; text-align: right; }
-    .col-data { min-width: 120px; }
-    .col-status { min-width: 150px; }
+    .table thead th.col-valor { text-align: right; }
+    .col-status { min-width: 220px; white-space: normal; }
+    .col-uso { min-width: 100px; }
 </style>
 {% endblock %}
 
@@ -105,35 +109,59 @@
 
         <!-- Statistics -->
         <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Total de Registros</h5>
-                        <p class="card-text display-6">{{ total_count }}</p>
+            <div class="col-12">
+                <div class="row g-3">
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Total de Registros</h6>
+                                        <h4 class="mb-0 fw-bold">{{ total_count }}</h4>
+                                    </div>
+                                    <i class="fas fa-database fa-2x text-primary opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-success text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Empresas Únicas</h5>
-                        <p class="card-text display-6">{{ empresas_count }}</p>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Empresas Únicas</h6>
+                                        <h4 class="mb-0 fw-bold">{{ empresas_count }}</h4>
+                                    </div>
+                                    <i class="fas fa-building fa-2x text-success opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-info text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Valor Total Pedidos</h5>
-                        <p class="card-text display-6">{{ valor_total_pedido|currency_br }}</p>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Valor Total Pedidos</h6>
+                                        <h4 class="mb-0 fw-bold">{{ valor_total_pedido|currency_br }}</h4>
+                                    </div>
+                                    <i class="fas fa-shopping-cart fa-2x text-info opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-warning text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Valor Total NF</h5>
-                        <p class="card-text display-6">{{ valor_total_nf|currency_br }}</p>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Valor Total NF</h6>
+                                        <h4 class="mb-0 fw-bold">{{ valor_total_nf|currency_br }}</h4>
+                                    </div>
+                                    <i class="fas fa-file-invoice-dollar fa-2x text-warning opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -158,36 +186,17 @@
                                 <table class="table table-hover table-striped mb-0">
                                     <thead>
                                         <tr>
-                                            <th class="col-id">ID</th>
-                                            <th class="col-empresa">Empresa</th>
                                             <th class="col-solicitante">Solicitante</th>
-                                            <th class="col-nf">NF Saída</th>
+                                            <th class="col-empresa">Empresa</th>
                                             <th class="col-descricao">Descrição Serviço</th>
-                                            <th class="col-rc">RC</th>
-                                            <th class="col-data">Data RC</th>
-                                            <th class="col-pedido">Pedido</th>
                                             <th class="col-valor">Valor Pedido</th>
-                                            <th class="col-nf">NF Serviço</th>
-                                            <th class="col-valor">Valor NF</th>
-                                            <th class="col-data">Emissão</th>
                                             <th class="col-status">Status</th>
-                                            <th class="col-nf">Uso</th>
+                                            <th class="col-uso">Uso</th>
                                             <th style="min-width: 100px;">Ações</th>
                                         </tr>
                                     </thead>
                                     <thead class="filter-row">
                                         <tr>
-                                            <th class="filter-header">
-                                                <input type="text" name="filtro_id" class="filter-input" placeholder="Filtrar ID..." value="{{ filtro_id|default:'' }}" onchange="document.getElementById('filterForm').submit();">
-                                            </th>
-                                            <th class="filter-header">
-                                                <select name="filtro_empresa" class="filter-input" onchange="document.getElementById('filterForm').submit();">
-                                                    <option value="">Todas</option>
-                                                    {% for empresa in empresas_unicas %}
-                                                        <option value="{{ empresa }}" {% if filtro_empresa == empresa %}selected{% endif %}>{{ empresa }}</option>
-                                                    {% endfor %}
-                                                </select>
-                                            </th>
                                             <th class="filter-header">
                                                 <select name="filtro_solicitante" class="filter-input" onchange="document.getElementById('filterForm').submit();">
                                                     <option value="">Todos</option>
@@ -196,27 +205,16 @@
                                                     {% endfor %}
                                                 </select>
                                             </th>
-                                            <th class="filter-header"></th>
-                                            <th class="filter-header"></th>
                                             <th class="filter-header">
-                                                <input type="text" name="filtro_rc" class="filter-input" placeholder="Filtrar RC..." value="{{ filtro_rc|default:'' }}" onchange="document.getElementById('filterForm').submit();">
+                                                <input type="text" name="filtro_empresa" class="filter-input" placeholder="Filtrar empresa..." value="{{ filtro_empresa|default:'' }}" onchange="document.getElementById('filterForm').submit();">
                                             </th>
-                                            <th class="filter-header"></th>
-                                            <th class="filter-header"></th>
-                                            <th class="filter-header">
-                                                <div class="d-flex gap-1">
-                                                    <input type="text" name="filtro_valor_min" class="filter-input" placeholder="Min" value="{{ filtro_valor_min|default:'' }}" style="width: 48%;" onchange="document.getElementById('filterForm').submit();">
-                                                    <input type="text" name="filtro_valor_max" class="filter-input" placeholder="Max" value="{{ filtro_valor_max|default:'' }}" style="width: 48%;" onchange="document.getElementById('filterForm').submit();">
-                                                </div>
-                                            </th>
-                                            <th class="filter-header"></th>
                                             <th class="filter-header"></th>
                                             <th class="filter-header"></th>
                                             <th class="filter-header">
                                                 <select name="filtro_status" class="filter-input" onchange="document.getElementById('filterForm').submit();">
                                                     <option value="">Todos</option>
                                                     {% for status in status_unicos %}
-                                                        <option value="{{ status }}" {% if filtro_status == status %}selected{% endif %}>{{ status|truncatewords:3 }}</option>
+                                                        <option value="{{ status }}" {% if filtro_status == status %}selected{% endif %}>{{ status }}</option>
                                                     {% endfor %}
                                                 </select>
                                             </th>
@@ -234,33 +232,14 @@
                                     <tbody>
                                         {% for controle in controles %}
                                         <tr>
-                                            <td class="col-id">
-                                                <strong class="text-primary">{{ controle.id_excel|default:"-" }}</strong>
+                                            <td class="col-solicitante">
+                                                {{ controle.solicitante|default:"-" }}
                                             </td>
                                             <td class="col-empresa">
                                                 <strong>{{ controle.empresa|default:"-" }}</strong>
                                             </td>
-                                            <td class="col-solicitante">
-                                                {{ controle.solicitante|default:"-" }}
-                                            </td>
-                                            <td class="col-nf">
-                                                {{ controle.nf_saida|default:"-" }}
-                                            </td>
                                             <td class="col-descricao">
                                                 {{ controle.descricao_servico|default:"-"|truncatewords:10 }}
-                                            </td>
-                                            <td class="col-rc">
-                                                <strong>{{ controle.rc|default:"-" }}</strong>
-                                            </td>
-                                            <td class="col-data">
-                                                {% if controle.data_rc %}
-                                                    {{ controle.data_rc|date:"d/m/Y" }}
-                                                {% else %}
-                                                    -
-                                                {% endif %}
-                                            </td>
-                                            <td class="col-pedido">
-                                                {{ controle.pedido|default:"-" }}
                                             </td>
                                             <td class="col-valor">
                                                 {% if controle.valor_total_pedido %}
@@ -269,31 +248,14 @@
                                                     -
                                                 {% endif %}
                                             </td>
-                                            <td class="col-nf">
-                                                {{ controle.nf_servico|default:"-" }}
-                                            </td>
-                                            <td class="col-valor">
-                                                {% if controle.valor_nf %}
-                                                    <strong>{{ controle.valor_nf|currency_br }}</strong>
-                                                {% else %}
-                                                    -
-                                                {% endif %}
-                                            </td>
-                                            <td class="col-data">
-                                                {% if controle.emissao %}
-                                                    {{ controle.emissao|date:"d/m/Y" }}
-                                                {% else %}
-                                                    -
-                                                {% endif %}
-                                            </td>
                                             <td class="col-status">
                                                 {% if controle.status %}
-                                                    <span class="badge bg-secondary">{{ controle.status|truncatewords:3 }}</span>
+                                                    <span class="badge bg-secondary">{{ controle.status }}</span>
                                                 {% else %}
                                                     -
                                                 {% endif %}
                                             </td>
-                                            <td class="col-nf">
+                                            <td class="col-uso">
                                                 {% if controle.uso %}
                                                     <span class="badge bg-info">{{ controle.uso }}</span>
                                                 {% else %}
@@ -312,7 +274,7 @@
                                         </tr>
                                         {% empty %}
                                         <tr>
-                                            <td colspan="15" class="text-center text-muted py-4">
+                                            <td colspan="7" class="text-center text-muted py-4">
                                                 <i class="fas fa-inbox fa-2x mb-2"></i>
                                                 <p>Nenhum registro encontrado.</p>
                                             </td>
@@ -330,10 +292,10 @@
                             <ul class="pagination justify-content-center mb-0">
                                 {% if controles.has_previous %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_rc %}&filtro_rc={{ filtro_rc }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">&laquo; Primeira</a>
+                                        <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">&laquo; Primeira</a>
                                     </li>
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ controles.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_rc %}&filtro_rc={{ filtro_rc }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Anterior</a>
+                                        <a class="page-link" href="?page={{ controles.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Anterior</a>
                                     </li>
                                 {% endif %}
                                 
@@ -345,10 +307,10 @@
                                 
                                 {% if controles.has_next %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ controles.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_rc %}&filtro_rc={{ filtro_rc }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Próxima</a>
+                                        <a class="page-link" href="?page={{ controles.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Próxima</a>
                                     </li>
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ controles.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_rc %}&filtro_rc={{ filtro_rc }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Última &raquo;</a>
+                                        <a class="page-link" href="?page={{ controles.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Última &raquo;</a>
                                     </li>
                                 {% endif %}
                             </ul>

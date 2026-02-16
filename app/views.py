@@ -15391,12 +15391,61 @@ def consultar_projecao_gastos(request):
     if filtro_uso_contabil:
         projecoes_list = projecoes_list.filter(uso_contabil__icontains=filtro_uso_contabil)
 
+    # Helpers para normalizar Mês/Ano: 01/2026 = JANEIRO / 2026 (todos os meses)
+    MES_NUM_TO_NOME = {
+        1: 'JANEIRO', 2: 'FEVEREIRO', 3: 'MARÇO', 4: 'ABRIL', 5: 'MAIO', 6: 'JUNHO',
+        7: 'JULHO', 8: 'AGOSTO', 9: 'SETEMBRO', 10: 'OUTUBRO', 11: 'NOVEMBRO', 12: 'DEZEMBRO',
+    }
+    MES_NOME_TO_NUM = {}
+    for _n, _nome in MES_NUM_TO_NOME.items():
+        MES_NOME_TO_NUM[_nome.upper()] = _n
+    MES_NOME_TO_NUM['MARCO'] = 3
+    for _n, _a in [(1,'JAN'),(2,'FEV'),(3,'MAR'),(4,'ABR'),(5,'MAI'),(6,'JUN'),(7,'JUL'),(8,'AGO'),(9,'SET'),(10,'OUT'),(11,'NOV'),(12,'DEZ')]:
+        MES_NOME_TO_NUM[_a] = _n
+
+    def _parse_mes_ano(val):
+        """Converte '01/2026' ou 'JANEIRO / 2026' -> (1, 2026). Retorna None se inválido."""
+        if not val or not str(val).strip():
+            return None
+        val = str(val).strip().upper()
+        ano_match = re.search(r'\b(20\d{2}|19\d{2})\b', val)
+        ano = int(ano_match.group(1)) if ano_match else None
+        if ano is None:
+            return None
+        # Formato "01/2026" ou "1/2026"
+        if '/' in val:
+            parts = val.split('/', 1)
+            mes_part = parts[0].strip()
+            if mes_part.isdigit():
+                mes_int = int(mes_part)
+                if 1 <= mes_int <= 12:
+                    return (mes_int, ano)
+        # Formato "JANEIRO / 2026" ou "JAN 2026" (verificar nomes mais longos primeiro)
+        for nome in sorted(MES_NOME_TO_NUM.keys(), key=lambda x: -len(x)):
+            if len(nome) >= 2 and nome in val:
+                return (MES_NOME_TO_NUM[nome], ano)
+        return None
+
+    def _canonical_mes_ano(mes_int, ano_int):
+        """(1, 2026) -> 'JANEIRO / 2026'."""
+        return f"{MES_NUM_TO_NOME.get(mes_int, str(mes_int))} / {ano_int}"
+
     filtro_mes_ano = request.GET.get('filtro_mes_ano', '').strip()
     if filtro_mes_ano:
-        projecoes_list = projecoes_list.filter(
-            Q(mes_referencia__icontains=filtro_mes_ano) |
-            Q(previsao_execucao__icontains=filtro_mes_ano)
-        )
+        parsed = _parse_mes_ano(filtro_mes_ano)
+        if parsed:
+            mes_int, ano_int = parsed
+            mes_strs = [str(mes_int), f"{mes_int:02d}"]
+            nome_mes = MES_NUM_TO_NOME.get(mes_int, '')
+            abrev_mes = dict((_n, _a) for _n, _a in [(1,'JAN'),(2,'FEV'),(3,'MAR'),(4,'ABR'),(5,'MAI'),(6,'JUN'),(7,'JUL'),(8,'AGO'),(9,'SET'),(10,'OUT'),(11,'NOV'),(12,'DEZ')]).get(mes_int, '')
+            q_numeric = Q(ano_referencia=ano_int) & (Q(mes_referencia__in=mes_strs) if nome_mes else Q(mes_referencia__icontains=filtro_mes_ano))
+            q_previsao = (Q(previsao_execucao__icontains=nome_mes) | Q(previsao_execucao__icontains=abrev_mes)) & Q(previsao_execucao__icontains=str(ano_int)) if nome_mes else Q(previsao_execucao__icontains=filtro_mes_ano)
+            projecoes_list = projecoes_list.filter(q_numeric | q_previsao)
+        else:
+            projecoes_list = projecoes_list.filter(
+                Q(mes_referencia__icontains=filtro_mes_ano) |
+                Q(previsao_execucao__icontains=filtro_mes_ano)
+            )
 
     filtro_numero_nf = request.GET.get('filtro_numero_nf', '').strip()
     if filtro_numero_nf:
@@ -15452,17 +15501,39 @@ def consultar_projecao_gastos(request):
         setor=''
     ).values_list('setor', flat=True).distinct().order_by('setor')
     
+    # Opções para o filtro Mês/Ano Ref.: normalizar para uma opção por (mês, ano), ex: "JANEIRO / 2026"
+    mes_ano_opcoes_set = set()
+    for pe in ProjecaoGasto.objects.exclude(previsao_execucao__isnull=True).exclude(previsao_execucao='').values_list('previsao_execucao', flat=True).distinct():
+        if pe:
+            parsed = _parse_mes_ano(pe)
+            if parsed:
+                mes_ano_opcoes_set.add(_canonical_mes_ano(parsed[0], parsed[1]))
+    for mes_ref, ano_ref in ProjecaoGasto.objects.exclude(mes_referencia__isnull=True).exclude(ano_referencia__isnull=True).exclude(mes_referencia='').values_list('mes_referencia', 'ano_referencia').distinct():
+        if mes_ref is not None and ano_ref is not None:
+            try:
+                mes_int = int(mes_ref) if str(mes_ref).isdigit() else None
+                if mes_int and 1 <= mes_int <= 12:
+                    mes_ano_opcoes_set.add(_canonical_mes_ano(mes_int, int(ano_ref)))
+            except (ValueError, TypeError):
+                pass
+    def _sort_key_mes_ano(s):
+        p = _parse_mes_ano(s)
+        return (p[1], p[0], s) if p else (0, 0, s)
+    mes_ano_opcoes = sorted(mes_ano_opcoes_set, key=_sort_key_mes_ano, reverse=True)
+    
     context = {
         'page_title': 'Consultar Projeção de Gastos',
         'active_page': 'consultar_projecao_gastos',
         'projecoes': projecoes,
         'search_query': search_query or '',
         'setores_unicos': setores_unicos or [],
+        'mes_ano_opcoes': mes_ano_opcoes,
         'filtro_setor': filtro_setor or '',
         'filtro_fornecedor': filtro_fornecedor or '',
         'filtro_descricao': filtro_descricao or '',
         'filtro_uso_contabil': filtro_uso_contabil or '',
         'filtro_mes_ano': filtro_mes_ano or '',
+        'filtro_mes_ano_canonical': _canonical_mes_ano(parsed[0], parsed[1]) if (filtro_mes_ano and (parsed := _parse_mes_ano(filtro_mes_ano))) else (filtro_mes_ano or ''),
         'filtro_numero_nf': filtro_numero_nf or '',
         'filtro_numero_requisicao': filtro_numero_requisicao or '',
         'filtro_valor_min': filtro_valor_min or '',
