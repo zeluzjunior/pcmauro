@@ -3813,7 +3813,7 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                         ['DATA DE ABERTURA \nDA REQUISIÇÃO', 'DATA DE ABERTURA DA REQUISIÇÃO', 'DATA DE ABERTURA \nDA REQUISI��O'],
                         ['NÚMERO DA REQUISIÇÃO \nDE COMPRA', 'NÚMERO DA REQUISIÇÃO DE COMPRA', 'N�EMRO DA REQUISI��O \nDE COMPRA'],
                         ['NÚMERO DO \nPEDIDO DE COMPRA', 'NÚMERO DO PEDIDO DE COMPRA', 'N�MERO DO \nPEDIDO DE COMPRA'],
-                        ['SERVIÇO CONCLUÍDO', 'SERVI�O CONCLU�DO'],
+                        ['SERVIÇO CONCLUÍDO', 'SERVIÇO\nCONCLUÍDO', 'SERVICO CONCLUIDO', 'SERVI�O CONCLU�DO'],
                         ['NF DE SERVIÇO\n RECEBIDA', 'NF DE SERVIÇO RECEBIDA', 'NF DE SERVI�O\n RECEBIDA'],
                         ['NF ENVIADA\n PARA LANÇAMENTO ', 'NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA\n PARA LANAMENTO '],
                         ['OBSERVAÇÕES', 'OBSERVAES', 'OBSERVACOES', 'OBSERVAÇÕES ']
@@ -3845,13 +3845,47 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                     data_abertura = _safe_date(find_column_value(row_data, ['DATA DE ABERTURA \nDA REQUISIÇÃO', 'DATA DE ABERTURA DA REQUISIÇÃO', 'DATA DE ABERTURA \nDA REQUISI��O']))
                     numero_requisicao_compra = _safe_str(find_column_value(row_data, ['NÚMERO DA REQUISIÇÃO \nDE COMPRA', 'NÚMERO DA REQUISIÇÃO DE COMPRA', 'N�EMRO DA REQUISI��O \nDE COMPRA']), max_length=100)
                     numero_pedido_compra = _safe_str(find_column_value(row_data, ['NÚMERO DO \nPEDIDO DE COMPRA', 'NÚMERO DO PEDIDO DE COMPRA', 'N�MERO DO \nPEDIDO DE COMPRA']), max_length=100)
-                    servico_concluido = _safe_date(find_column_value(row_data, ['SERVIÇO CONCLUÍDO', 'SERVI�O CONCLU�DO']))
+                    servico_concluido = _safe_date(find_column_value(row_data, ['SERVIÇO CONCLUÍDO', 'SERVIÇO\nCONCLUÍDO', 'SERVICO CONCLUIDO', 'SERVI�O CONCLU�DO']))
                     nf_servico_recebida = _safe_date(find_column_value(row_data, ['NF DE SERVIÇO\n RECEBIDA', 'NF DE SERVIÇO RECEBIDA', 'NF DE SERVI�O\n RECEBIDA']))
                     nf_enviada_lancamento = _safe_date(find_column_value(row_data, ['NF ENVIADA\n PARA LANÇAMENTO ', 'NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA\n PARA LANAMENTO ']))
                     observacoes = _safe_str(find_column_value(row_data, ['OBSERVAÇÕES', 'OBSERVAES', 'OBSERVACOES', 'OBSERVAÇÕES ']), max_length=None)
                     
                     # Extrair mês e ano da previsão
                     mes_referencia, ano_referencia = extract_mes_ano(previsao_execucao)
+                    
+                    # Colunas mapeadas para campos do modelo (nomes normalizados UPPER para comparação)
+                    mapped_column_names = {
+                        'ID', 'SETOR', 'SETOR ', 'SOLICITANTE',
+                        'FORNECEDOR NOME FANTASIA', 'FORNECEDOR CNPJ', 'FORNECEDOR',
+                        'DESCRIÇÃO DO SERVIÇO', 'DESCRICAO DO SERVICO', 'VALOR TOTAL',
+                        'PREVISÃO P/ EXECUÇÃO', 'PREVISO P/ EXECUO', 'USO CONTÁBIL', 'USO CONTBIL',
+                        'NÚMERO DA NOTA FISCAL', 'NMERO DA NOTA FISCAL',
+                        'TIPO DE SOLICITAÇÃO', 'TIPO DE SOLICITACAO', 'ORDEM DE SERVIÇO',
+                        'DATA DE ABERTURA DA REQUISIÇÃO', 'DATA DE ABERTURA DA REQUISIO',
+                        'NÚMERO DA REQUISIÇÃO DE COMPRA', 'NMERO DA REQUISIO DE COMPRA',
+                        'NÚMERO DO PEDIDO DE COMPRA', 'NMERO DO PEDIDO DE COMPRA',
+                        'SERVIÇO CONCLUÍDO', 'SERVIÇO\nCONCLUÍDO', 'SERVICO CONCLUIDO', 'SERVIO CONCLUDO',
+                        'NF DE SERVIÇO RECEBIDA', 'NF DE SERVIO RECEBIDA',
+                        'NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA PARA LANAMENTO',
+                        'OBSERVAÇÕES', 'OBSERVACOES'
+                    }
+                    
+                    # Coletar colunas do Excel não mapeadas em dados_adicionais
+                    dados_adicionais = {}
+                    for excel_key, val in row_data.items():
+                        if val is None or (isinstance(val, str) and not str(val).strip()):
+                            continue
+                        norm_key = re.sub(r'\s+', ' ', str(excel_key).replace('\n', ' ').strip()).upper()
+                        # Verificar se esta coluna já está mapeada
+                        if norm_key in mapped_column_names:
+                            continue
+                        # Serializar valor para JSON
+                        if hasattr(val, 'isoformat'):
+                            dados_adicionais[excel_key] = val.isoformat()
+                        elif isinstance(val, (int, float)):
+                            dados_adicionais[excel_key] = int(val) if isinstance(val, float) and val == int(val) else val
+                        else:
+                            dados_adicionais[excel_key] = _safe_str(val, max_length=500)
                     
                     # Preparar dados para criação/atualização
                     projecao_data = {
@@ -3881,6 +3915,7 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                         'data_requisicao': data_abertura,  # Mapear para campo legado
                         'numero_requisicao': numero_requisicao_compra,  # Mapear para campo legado
                         'tipo': tipo_solicitacao,  # Mapear tipo_solicitacao para campo legado 'tipo'
+                        'dados_adicionais': dados_adicionais if dados_adicionais else None,
                     }
                     
                     # Usar id_excel + setor como chave composta para identificação única
