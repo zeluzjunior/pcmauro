@@ -3,69 +3,70 @@ Utility functions for file uploads and data processing
 """
 import csv
 import io
+import warnings
 from typing import List, Dict, Tuple
 from django.core.exceptions import ValidationError
 from django.db import transaction
+
+# Suprimir aviso do openpyxl sobre Data Validation (não afeta a leitura)
+warnings.filterwarnings('ignore', message='.*Data Validation.*')
+
 import openpyxl
 
 
-def read_excel_file(file, sheet_name=None):
+def read_excel_file(file, sheet_name=None, header_row=1):
     """
-    LÃª um arquivo Excel (.xlsx, .xls, .xlsm) e retorna os dados
+    Lê um arquivo Excel (.xlsx, .xls, .xlsm) e retorna os dados.
     
     Args:
         file: Arquivo Excel (Django UploadedFile ou path)
         sheet_name: Nome da planilha a ser lida (None para primeira planilha)
+        header_row: Linha do cabeçalho (1-based). Muitos PCMs têm título na linha 1 e cabeçalho na linha 2.
     
     Returns:
-        Lista de dicionÃ¡rios com os dados
+        Lista de dicionários com os dados
     """
     try:
-        # Se for um arquivo Django UploadedFile, garantir que estÃ¡ no inÃ­cio
-        if hasattr(file, 'read'):
-            file.seek(0)  # Resetar para o inÃ­cio do arquivo
-            wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
-        else:
-            wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
+        import re
+        import warnings
+        from datetime import datetime, date
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
+            if hasattr(file, 'read'):
+                file.seek(0)
+                wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
+            else:
+                wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
         
-        # Selecionar a planilha
         if sheet_name:
             ws = wb[sheet_name]
         else:
             ws = wb.active
         
-        # Ler cabeÃ§alhos da primeira linha
+        # Ler cabeçalhos da linha especificada
+        header_row_cells = list(ws[header_row])
         headers = []
-        for cell in ws[1]:
-            header_value = cell.value if cell.value else f'col_{len(headers)}'
-            # Normalizar encoding e espaÃ§os
+        for cell in header_row_cells:
+            header_value = cell.value if cell.value is not None and str(cell.value).strip() else f'col_{len(headers)}'
             if isinstance(header_value, str):
-                # Tentar corrigir problemas de encoding comuns
                 header_value = header_value.strip().replace('\xa0', ' ').replace('\u00a0', ' ')
-                # Normalizar espaÃ§os mÃºltiplos
-                import re
                 header_value = re.sub(r'\s+', ' ', header_value).strip()
-            headers.append(header_value)
+            headers.append(str(header_value) if header_value else f'col_{len(headers)}')
         
-        # Ler dados
+        # Ler dados (a partir da linha seguinte ao cabeçalho)
         data = []
-        from datetime import datetime, date
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            if any(cell is not None for cell in row):  # Ignorar linhas vazias
+        for row in ws.iter_rows(min_row=header_row + 1, values_only=True):
+            if any(cell is not None for cell in row):
                 row_dict = {}
                 for idx, cell_value in enumerate(row):
                     header = headers[idx] if idx < len(headers) else f'col_{idx}'
-                    # Se for um objeto datetime/date do Excel, manter como estÃ¡ para processamento posterior
                     if isinstance(cell_value, (datetime, date)):
                         row_dict[header] = cell_value
-                    # Limpar valores de cÃ©lulas de texto
                     elif isinstance(cell_value, str):
                         cell_value = cell_value.strip().replace('\xa0', ' ').replace('\u00a0', ' ')
-                        import re
                         cell_value = re.sub(r'\s+', ' ', cell_value).strip()
                         row_dict[header] = cell_value
                     else:
-                        # Manter outros tipos (nÃºmeros, etc.) como estÃ£o
                         row_dict[header] = cell_value
                 data.append(row_dict)
         
@@ -2134,6 +2135,12 @@ def _safe_date(value, default=None):
     if value is None or value == '':
         return default
     
+    # Excel usa "-", "---", "N/A" etc. para indicar ausência de data
+    if isinstance(value, str):
+        v = value.strip()
+        if v in ('-', '--', '---', 'N/A', 'n/a', 'N/D', 'n/d', 'NA', 'ND', ''):
+            return default
+    
     # Se já for um objeto date, retornar diretamente
     if isinstance(value, date):
         return value
@@ -2141,6 +2148,28 @@ def _safe_date(value, default=None):
     # Se for datetime, extrair apenas a data
     if isinstance(value, datetime):
         return value.date()
+    
+    # Excel serial number (ex: 45678.0, 45500.0 ou "45678" para datas)
+    if isinstance(value, (int, float)):
+        try:
+            from datetime import timedelta
+            num = int(float(value))
+            if 1 <= num <= 2958465:  # range Excel (1900-9999)
+                return (datetime(1899, 12, 30) + timedelta(days=num)).date()
+        except (ValueError, OverflowError):
+            pass
+    # String que parece número serial do Excel (ex: "45678", "45500.0")
+    if isinstance(value, str):
+        stripped = value.strip()
+        cleaned = stripped.replace('.', '').replace(',', '')
+        if cleaned.isdigit() or (cleaned.replace('-', '').isdigit() and '-' in stripped):
+            try:
+                from datetime import timedelta
+                num = int(float(stripped.replace(',', '.')))
+                if 1 <= num <= 2958465:
+                    return (datetime(1899, 12, 30) + timedelta(days=num)).date()
+            except (ValueError, OverflowError):
+                pass
     
     # Tentar converter string para date
     value_str = str(value).strip()
@@ -3703,13 +3732,14 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
         return 0, 0, errors
 
 
-def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:
+def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -> Tuple[int, int, List[str]]:
     """
     Faz upload de projeções de gastos a partir de um arquivo Excel
     
     Args:
         file: Arquivo Django UploadedFile
         update_existing: Se True, atualiza registros existentes. Se False, ignora duplicados.
+        debug: Se True, adiciona informações de estrutura do arquivo em errors.
     
     Returns:
         Tupla (created_count, updated_count, errors)
@@ -3728,25 +3758,88 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
     try:
         # Ler arquivo baseado na extensão
         if file_name.endswith(('.xlsx', '.xls', '.xlsm')):
-            data = read_excel_file(file, sheet_name='GASTOS')  # Planilha específica
-        else:
-            raise ValidationError("Formato de arquivo não suportado. Use .xlsx, .xls ou .xlsm")
+            # Construir lista de planilhas a tentar: GASTOS exato, depois com "GASTO", depois todas as demais
+            sheets_to_try = ['GASTOS', 'Gastos', 'gastos']
+            try:
+                if hasattr(file, 'seek'):
+                    file.seek(0)
+                wb_temp = openpyxl.load_workbook(file, read_only=True, data_only=True)
+                gasto_sheets = [s for s in wb_temp.sheetnames if 'GASTO' in str(s).upper() and s not in sheets_to_try]
+                other_sheets = [s for s in wb_temp.sheetnames if s not in sheets_to_try and s not in gasto_sheets]
+                sheets_to_try = [s for s in sheets_to_try if s in wb_temp.sheetnames] + gasto_sheets + other_sheets
+                sheets_to_try.append(None)  # planilha ativa (fallback)
+                try:
+                    wb_temp.close()
+                except Exception:
+                    pass
+            except Exception:
+                sheets_to_try = ['GASTOS', 'Gastos', 'gastos', None]
+
+            data = None
+            used_header_row = 1
+            sheet_used = None
+            for sheet_try in sheets_to_try:
+                for header_row_try in [2, 1, 3]:
+                    try:
+                        if hasattr(file, 'seek'):
+                            file.seek(0)
+                        data_try = read_excel_file(file, sheet_name=sheet_try, header_row=header_row_try)
+                        if data_try and len(data_try) > 0:
+                            keys_try = list(data_try[0].keys())
+                            if any(k and ('ID' in str(k).upper() or 'SETOR' in str(k).upper() or 'SERVI' in str(k).upper()) for k in (keys_try or [])):
+                                data = data_try
+                                used_header_row = header_row_try
+                                first_row_keys = keys_try
+                                sheet_used = sheet_try if sheet_try else '(planilha ativa)'
+                                break
+                    except (KeyError, ValueError):
+                        continue
+                if data:
+                    break
+            if debug and sheet_used:
+                errors.append(f"[DEBUG] Planilha usada: {sheet_used}, linha de cabeçalho: {used_header_row}, {len(data)} linha(s) de dados.")
+            if not data:
+                raise ValidationError(
+                    "Nenhuma planilha com dados encontrada. Verifique se existe uma planilha 'GASTOS' ou cujo nome contenha 'GASTO', "
+                    "com colunas ID, SETOR e demais campos esperados."
+                )
+            
+            first_row_keys = list(data[0].keys())
         
-        if not data:
-            raise ValidationError("Arquivo vazio ou sem dados válidos")
-        
+        # Helper para normalizar texto (remove acentos, colapsa espaços) para matching flexível
+        def _normalize_key(s):
+            if not s:
+                return ''
+            s = str(s).replace('\n', ' ').replace('\r', ' ')
+            s = re.sub(r'\s+', ' ', s).strip().upper()
+            # Remover acentos para matching mais flexível
+            import unicodedata
+            s = unicodedata.normalize('NFD', s)
+            s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+            return s
+
         # Função auxiliar para encontrar valor de coluna (case-insensitive e normaliza quebras de linha)
-        def find_column_value(row_data, possible_names):
-            """Encontra valor de coluna considerando variações de nome"""
+        def find_column_value(row_data, possible_names, fallback_keywords=None):
+            """Encontra valor de coluna considerando variações de nome. fallback_keywords: lista de palavras que devem estar no nome da coluna."""
             for name in possible_names:
                 # Tentar nome exato
                 if name in row_data:
                     return row_data[name]
                 # Tentar normalizado (sem quebras de linha, espaços normalizados)
-                normalized_name = re.sub(r'\s+', ' ', name.replace('\n', ' ').strip())
+                normalized_name = re.sub(r'\s+', ' ', name.replace('\n', ' ').replace('\r', ' ').strip())
                 for key in row_data.keys():
-                    normalized_key = re.sub(r'\s+', ' ', key.replace('\n', ' ').strip())
+                    normalized_key = re.sub(r'\s+', ' ', key.replace('\n', ' ').replace('\r', ' ').strip())
                     if normalized_key.upper() == normalized_name.upper():
+                        return row_data[key]
+                # Tentar com acentos removidos
+                for key in row_data.keys():
+                    if _normalize_key(key) == _normalize_key(name):
+                        return row_data[key]
+            # Fallback: buscar por palavras-chave (ex: coluna que contenha "SERVI" e "CONCLU")
+            if fallback_keywords:
+                for key in row_data.keys():
+                    key_norm = _normalize_key(key)
+                    if all(kw in key_norm for kw in fallback_keywords):
                         return row_data[key]
             return None
         
@@ -3773,20 +3866,22 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
             return None, None
         
         # Processar dados em transação
+        excel_servico_imported_count = 0
         with transaction.atomic():
-            for row_num, row_data in enumerate(data, start=2):  # Começar em 2 (linha 1 é cabeçalho)
+            for row_num, row_data in enumerate(data, start=used_header_row + 1):
                 try:
                     # Verificar se a linha está vazia ou tem apenas valores vazios
                     if not any(str(v).strip() if v else '' for v in row_data.values()):
                         continue
                     
-                    # Ler ID do Excel (obrigatório - chave primária)
-                    id_excel_raw = find_column_value(row_data, ['ID', 'id', 'Id'])
-                    if not id_excel_raw:
+                    # Ler ID do Excel (obrigatório - chave primária para update/create)
+                    id_excel_raw = find_column_value(row_data, ['ID', 'id', 'Id', 'Nº', 'Nº ID', 'CÓDIGO', 'CODIGO', 'Código'], fallback_keywords=['ID'])
+                    if id_excel_raw is None or (isinstance(id_excel_raw, str) and not str(id_excel_raw).strip()):
                         errors.append(f"Linha {row_num}: ID não encontrado. Linha ignorada.")
                         continue
                     try:
-                        id_excel = int(float(str(id_excel_raw).strip()))  # Converter para int (trata floats como 1.0 -> 1)
+                        s = str(id_excel_raw).strip()
+                        id_excel = int(float(s))  # Trata 1.0, 2.0, "001", IDs não sequenciais (5, 12, 99...)
                     except (ValueError, TypeError):
                         errors.append(f"Linha {row_num}: ID inválido '{id_excel_raw}'. Linha ignorada.")
                         continue
@@ -3799,7 +3894,7 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                     
                     # Lista de grupos de campos para verificar (cada grupo tem variações possíveis)
                     field_groups = [
-                        ['SETOR ', 'SETOR', 'setor'],
+                        ['SETOR ', 'SETOR', 'setor', 'CENTRO', 'CENTRO DE CUSTO'],
                         ['SOLICITANTE', 'solicitante'],
                         ['FORNECEDOR\nNOME FANTASIA', 'FORNECEDOR NOME FANTASIA', 'FORNECEDOR'],
                         ['FORNECEDOR\nCNPJ', 'FORNECEDOR CNPJ'],
@@ -3814,8 +3909,8 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                         ['NÚMERO DA REQUISIÇÃO \nDE COMPRA', 'NÚMERO DA REQUISIÇÃO DE COMPRA', 'N�EMRO DA REQUISI��O \nDE COMPRA'],
                         ['NÚMERO DO \nPEDIDO DE COMPRA', 'NÚMERO DO PEDIDO DE COMPRA', 'N�MERO DO \nPEDIDO DE COMPRA'],
                         ['SERVIÇO CONCLUÍDO', 'SERVIÇO\nCONCLUÍDO', 'SERVICO CONCLUIDO', 'SERVI�O CONCLU�DO'],
-                        ['NF DE SERVIÇO\n RECEBIDA', 'NF DE SERVIÇO RECEBIDA', 'NF DE SERVI�O\n RECEBIDA'],
-                        ['NF ENVIADA\n PARA LANÇAMENTO ', 'NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA\n PARA LANAMENTO '],
+                        ['NF DE SERVIÇO RECEBIDA', 'NF DE SERVIÇO\n RECEBIDA', 'NF DE SERVICO RECEBIDA', 'NF DE SERVI�O\n RECEBIDA'],
+                        ['NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA\n PARA LANÇAMENTO ', 'NF ENVIADA PARA LANCAMENTO', 'NF ENVIADA\n PARA LANAMENTO '],
                         ['OBSERVAÇÕES', 'OBSERVAES', 'OBSERVACOES', 'OBSERVAÇÕES ']
                     ]
                     
@@ -3825,13 +3920,14 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                         if value and str(value).strip():
                             has_meaningful_data = True
                             break
-                    
-                    # Se não tem dados além do ID, pular esta linha (silenciosamente)
+                    if not has_meaningful_data:
+                        non_id = [v for k, v in row_data.items() if v and str(v).strip() and k and 'ID' not in str(k).upper()]
+                        has_meaningful_data = len(non_id) > 0
                     if not has_meaningful_data:
                         continue
                     
                     # Mapear colunas do Excel para campos do modelo
-                    setor = _safe_str(find_column_value(row_data, ['SETOR ', 'SETOR', 'setor']), max_length=100)
+                    setor = _safe_str(find_column_value(row_data, ['SETOR ', 'SETOR', 'setor', 'CENTRO', 'CENTRO DE CUSTO']), max_length=100)
                     solicitante = _safe_str(find_column_value(row_data, ['SOLICITANTE', 'solicitante']), max_length=100)
                     fornecedor_nome = _safe_str(find_column_value(row_data, ['FORNECEDOR\nNOME FANTASIA', 'FORNECEDOR NOME FANTASIA', 'FORNECEDOR']), max_length=255)
                     fornecedor_cnpj = _safe_str(find_column_value(row_data, ['FORNECEDOR\nCNPJ', 'FORNECEDOR CNPJ']), max_length=20)
@@ -3845,9 +3941,25 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                     data_abertura = _safe_date(find_column_value(row_data, ['DATA DE ABERTURA \nDA REQUISIÇÃO', 'DATA DE ABERTURA DA REQUISIÇÃO', 'DATA DE ABERTURA \nDA REQUISI��O']))
                     numero_requisicao_compra = _safe_str(find_column_value(row_data, ['NÚMERO DA REQUISIÇÃO \nDE COMPRA', 'NÚMERO DA REQUISIÇÃO DE COMPRA', 'N�EMRO DA REQUISI��O \nDE COMPRA']), max_length=100)
                     numero_pedido_compra = _safe_str(find_column_value(row_data, ['NÚMERO DO \nPEDIDO DE COMPRA', 'NÚMERO DO PEDIDO DE COMPRA', 'N�MERO DO \nPEDIDO DE COMPRA']), max_length=100)
-                    servico_concluido = _safe_date(find_column_value(row_data, ['SERVIÇO CONCLUÍDO', 'SERVIÇO\nCONCLUÍDO', 'SERVICO CONCLUIDO', 'SERVI�O CONCLU�DO']))
-                    nf_servico_recebida = _safe_date(find_column_value(row_data, ['NF DE SERVIÇO\n RECEBIDA', 'NF DE SERVIÇO RECEBIDA', 'NF DE SERVI�O\n RECEBIDA']))
-                    nf_enviada_lancamento = _safe_date(find_column_value(row_data, ['NF ENVIADA\n PARA LANÇAMENTO ', 'NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA\n PARA LANAMENTO ']))
+                    # Importar como está (sem análise/tratamento): valores brutos do Excel
+                    def _as_is(val, max_len=255):
+                        if val is None: return None
+                        s = str(val).strip()
+                        return s[:max_len] if s else None
+                    def _get_by_name_or_pos(row, names, fallback_kw, col_idx):
+                        """Tenta por nome, depois por posição (PCM: P=15, Q=16, R=17)."""
+                        v = find_column_value(row, names, fallback_keywords=fallback_kw)
+                        if v is not None and str(v).strip():
+                            return v
+                        keys = list(row.keys())
+                        if col_idx < len(keys):
+                            return row.get(keys[col_idx])
+                        return None
+                    servico_concluido = _as_is(_get_by_name_or_pos(row_data, ['SERVIÇO CONCLUÍDO', 'SERVIÇO\nCONCLUÍDO', 'SERVICO CONCLUIDO', 'SERVI�O CONCLU�DO'], ['SERVICO', 'CONCLU'], 15))
+                    if servico_concluido:
+                        excel_servico_imported_count += 1
+                    nf_servico_recebida = _as_is(_get_by_name_or_pos(row_data, ['NF DE SERVIÇO RECEBIDA', 'NF DE SERVIÇO\n RECEBIDA', 'NF DE SERVICO RECEBIDA', 'NF DE SERVI�O\n RECEBIDA'], ['RECEBIDA', 'SERVI'], 16))
+                    nf_enviada_lancamento = _as_is(_get_by_name_or_pos(row_data, ['NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA\n PARA LANÇAMENTO ', 'NF ENVIADA PARA LANCAMENTO', 'NF ENVIADA\n PARA LANAMENTO '], ['ENVIADA', 'LANCAMENTO'], 17))
                     observacoes = _safe_str(find_column_value(row_data, ['OBSERVAÇÕES', 'OBSERVAES', 'OBSERVACOES', 'OBSERVAÇÕES ']), max_length=None)
                     
                     # Extrair mês e ano da previsão
@@ -3864,7 +3976,7 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                         'DATA DE ABERTURA DA REQUISIÇÃO', 'DATA DE ABERTURA DA REQUISIO',
                         'NÚMERO DA REQUISIÇÃO DE COMPRA', 'NMERO DA REQUISIO DE COMPRA',
                         'NÚMERO DO PEDIDO DE COMPRA', 'NMERO DO PEDIDO DE COMPRA',
-                        'SERVIÇO CONCLUÍDO', 'SERVIÇO\nCONCLUÍDO', 'SERVICO CONCLUIDO', 'SERVIO CONCLUDO',
+                        'SERVIÇO CONCLUÍDO', 'SERVICO CONCLUIDO', 'SERVIO CONCLUDO',
                         'NF DE SERVIÇO RECEBIDA', 'NF DE SERVIO RECEBIDA',
                         'NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA PARA LANAMENTO',
                         'OBSERVAÇÕES', 'OBSERVACOES'
@@ -3887,9 +3999,12 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                         else:
                             dados_adicionais[excel_key] = _safe_str(val, max_length=500)
                     
-                    # Preparar dados para criação/atualização
+                    # setor_value para lookup e armazenamento (consistência: evita registros com setor=None vs 'SEM SETOR')
+                    setor_value = (re.sub(r'\s+', ' ', str(setor).strip()) if setor and str(setor).strip() else 'SEM SETOR')
+                    
+                    # Preparar dados para criação/atualização (usar setor_value para consistência com o lookup)
                     projecao_data = {
-                        'setor': setor,
+                        'setor': setor_value,
                         'solicitante': solicitante,
                         'descricao': descricao,
                         'tipo_solicitacao': tipo_solicitacao,
@@ -3909,33 +4024,59 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                         'nf_servico_recebida': nf_servico_recebida,
                         'nf_enviada_lancamento': nf_enviada_lancamento,
                         'observacoes': observacoes,  # Campo OBSERVAÇÕES do Excel
-                        # Campos legados para compatibilidade
-                        'centro_atividade': setor,  # Mapear SETOR para centro_atividade
-                        'fornecedor': fornecedor_nome,  # Mapear para campo legado
-                        'data_requisicao': data_abertura,  # Mapear para campo legado
-                        'numero_requisicao': numero_requisicao_compra,  # Mapear para campo legado
-                        'tipo': tipo_solicitacao,  # Mapear tipo_solicitacao para campo legado 'tipo'
                         'dados_adicionais': dados_adicionais if dados_adicionais else None,
                     }
                     
                     # Usar id_excel + setor como chave composta para identificação única
-                    # Estratégia: mesmo ID pode existir para setores diferentes
-                    # O setor já foi extraído acima na linha 3834
-                    # Se não houver setor, usar um valor padrão para evitar problemas
-                    setor_value = setor if setor else 'SEM SETOR'
-                    
                     projecao_obj = None
                     created = False
                     
                     if update_existing:
-                        projecao_obj, created = ProjecaoGasto.objects.update_or_create(
-                            id_excel=id_excel,
-                            setor=setor_value,
-                            defaults=projecao_data
-                        )
-                        if created:
-                            created_count += 1
-                        else:
+                        # update_or_create com fallbacks para matching flexível
+                        projecao_obj = ProjecaoGasto.objects.filter(
+                            id_excel=id_excel, setor=setor_value
+                        ).first()
+                        already_updated = False
+                        if projecao_obj is None and setor_value == 'SEM SETOR':
+                            projecao_obj = ProjecaoGasto.objects.filter(
+                                id_excel=id_excel, setor__isnull=True
+                            ).first()
+                            if projecao_obj is not None:
+                                for key, value in projecao_data.items():
+                                    setattr(projecao_obj, key, value)
+                                projecao_obj.save(update_fields=list(projecao_data.keys()))
+                                updated_count += 1
+                                already_updated = True
+                        # Fallback: setor pode variar entre arquivos (ex: "1. TURNO A" vs "1. Manutenção Turno A")
+                        if projecao_obj is None and setor_value != 'SEM SETOR':
+                            prefix_match = re.match(r'^(\d+\.?\s*)', setor_value)
+                            if prefix_match:
+                                prefix = prefix_match.group(1)
+                                candidates = ProjecaoGasto.objects.filter(
+                                    id_excel=id_excel, setor__startswith=prefix
+                                )
+                                projecao_obj = candidates.first() if candidates.count() == 1 else None
+                                if projecao_obj is not None:
+                                    for key, value in projecao_data.items():
+                                        setattr(projecao_obj, key, value)
+                                    projecao_obj.save(update_fields=list(projecao_data.keys()))
+                                    updated_count += 1
+                                    already_updated = True
+                        if projecao_obj is None:
+                            projecao_obj, created = ProjecaoGasto.objects.update_or_create(
+                                id_excel=id_excel,
+                                setor=setor_value,
+                                defaults=projecao_data
+                            )
+                            if created:
+                                created_count += 1
+                            else:
+                                updated_count += 1
+                        elif not already_updated:
+                            # Encontrado pelo primeiro filter (id_excel+setor) - aplicar atualização
+                            for key, value in projecao_data.items():
+                                setattr(projecao_obj, key, value)
+                            projecao_obj.save(update_fields=list(projecao_data.keys()))
                             updated_count += 1
                     else:
                         projecao_obj, created = ProjecaoGasto.objects.get_or_create(
@@ -3945,6 +4086,12 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                         )
                         if created:
                             created_count += 1
+                        else:
+                            # Mesmo sem update_existing, atualizar servico_concluido quando o Excel tem valor
+                            if servico_concluido is not None:
+                                projecao_obj.servico_concluido = servico_concluido
+                                projecao_obj.save(update_fields=['servico_concluido'])
+                                updated_count += 1
                     
                         
                 except Exception as e:
@@ -3952,6 +4099,15 @@ def upload_projecao_gastos_from_file(file, update_existing=False) -> Tuple[int, 
                     errors.append(error_msg)
                     print(f"Erro ao processar linha {row_num}: {error_msg}")
                     continue
+        
+        if excel_servico_imported_count > 0:
+            errors.append(f"Info: {excel_servico_imported_count} linha(s) com SERVIÇO CONCLUÍDO importadas.")
+        elif data and len(data) > 1:
+            errors.append("Aviso: Nenhum valor de SERVIÇO CONCLUÍDO foi encontrado. Verifique se a coluna existe e tem dados.")
+        
+        if created_count == 0 and updated_count == 0 and data and len(data) > 1 and not any('ID não encontrado' in e for e in errors):
+            total_rows = len(data)
+            errors.append(f"[INFO] Nenhum registro criado ou atualizado. Verifique: 1) Opção 'Atualizar registros existentes' está marcada? 2) ID e SETOR no Excel correspondem aos do banco? 3) {total_rows} linha(s) de dados foram lidas.")
         
         return created_count, updated_count, errors
     
@@ -4230,7 +4386,7 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
         return 0, 0, errors, []
 
 
-def upload_paradas_maquina_from_file(file, update_existing=False, excluir_antigos=False) -> Tuple[int, int, List[str]]:
+def upload_paradas_maquina_from_file(file, update_existing=False, excluir_antigos=False, substituir_meses=None) -> Tuple[int, int, List[str]]:
     """
     Faz upload de paradas de máquinas a partir de um arquivo CSV.
 
@@ -4239,6 +4395,9 @@ def upload_paradas_maquina_from_file(file, update_existing=False, excluir_antigo
         update_existing: Se True, atualiza registros existentes. Se False, ignora duplicados.
         excluir_antigos: Se True, remove todos os registros de ParadaMaquina antes de importar;
             somente os dados do arquivo serão mantidos (evita duplicados ao reimportar arquivo completo).
+        substituir_meses: Tupla (ano, [lista_de_meses]) - quando informado, remove APENAS os registros
+            cujo campo data pertence ao ano e meses especificados, depois importa. Ex.: (2026, [2]) para
+            substituir apenas Fevereiro/2026, deixando Janeiro e demais meses intactos.
 
     Returns:
         Tupla (created_count, updated_count, errors)
@@ -4329,6 +4488,15 @@ def upload_paradas_maquina_from_file(file, update_existing=False, excluir_antigo
         with transaction.atomic():
             if excluir_antigos:
                 ParadaMaquina.objects.all().delete()
+            elif substituir_meses:
+                ano_subst, meses_subst = substituir_meses
+                if ano_subst and meses_subst:
+                    from django.db.models import Q
+                    mes_conditions = Q()
+                    for m in meses_subst:
+                        if 1 <= m <= 12:
+                            mes_conditions |= Q(data__month=m)
+                    ParadaMaquina.objects.filter(data__year=ano_subst).filter(mes_conditions).delete()
 
             for row_num, row_data in enumerate(data, start=2):
                 try:

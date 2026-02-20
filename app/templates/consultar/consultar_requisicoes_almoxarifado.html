@@ -6,6 +6,13 @@
 
 {% block extra_css %}
 <style>
+    .stat-card { transition: transform 0.2s; }
+    .stat-card:hover { transform: translateY(-5px); }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-warning { border-left-color: #ffc107; }
     .table-container {
         max-height: 70vh;
         overflow-y: auto;
@@ -56,10 +63,14 @@
     .col-data { min-width: 120px; }
     .col-item { min-width: 100px; }
     .col-descricao { min-width: 250px; }
-    .col-valor { min-width: 120px; text-align: right; }
-    .col-quantidade { min-width: 100px; text-align: right; }
+    .col-valor { min-width: 120px; }
+    .col-quantidade { min-width: 100px; }
     .col-centro { min-width: 100px; }
     .col-usuario { min-width: 150px; }
+    /* Justified alignment: center for all except Descrição Item */
+    #requisicoesTable thead th:not(.col-descricao) { text-align: center; }
+    #requisicoesTable tbody td:not(.col-descricao) { text-align: center; }
+    #requisicoesTable .col-descricao { text-align: left; }
 </style>
 {% endblock %}
 
@@ -164,35 +175,59 @@
 
         <!-- Statistics -->
         <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Total de Requisições</h5>
-                        <p class="card-text display-6">{{ total_count }}</p>
+            <div class="col-12">
+                <div class="row g-3">
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Total de Requisições</h6>
+                                        <h4 class="mb-0 fw-bold">{{ total_count }}</h4>
+                                    </div>
+                                    <i class="fas fa-clipboard-list fa-2x text-primary opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-success text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Itens Únicos</h5>
-                        <p class="card-text display-6">{{ itens_count }}</p>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Itens Únicos</h6>
+                                        <h4 class="mb-0 fw-bold">{{ itens_count }}</h4>
+                                    </div>
+                                    <i class="fas fa-boxes fa-2x text-success opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-info text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Centros de Atividade</h5>
-                        <p class="card-text display-6">{{ centros_count }}</p>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Centros de Atividade</h6>
+                                        <h4 class="mb-0 fw-bold">{{ centros_count }}</h4>
+                                    </div>
+                                    <i class="fas fa-sitemap fa-2x text-info opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-warning text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Valor Total</h5>
-                        <p class="card-text display-6 format-money" data-value="{{ valor_total|default:0 }}">{{ valor_total|currency_br }}</p>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Valor Total</h6>
+                                        <h4 class="mb-0 fw-bold format-money" data-value="{{ valor_total|default:0 }}">{{ valor_total|currency_br }}</h4>
+                                    </div>
+                                    <i class="fas fa-dollar-sign fa-2x text-warning opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -227,7 +262,7 @@
                             {% endfor %}
                             
                             <div class="table-container">
-                                <table class="table table-hover table-striped mb-0">
+                                <table class="table table-hover table-striped mb-0" id="requisicoesTable">
                                     <thead>
                                         <tr>
                                             <th style="width: 40px;">
@@ -237,13 +272,10 @@
                                             <th class="col-item">Código Item</th>
                                             <th class="col-descricao">Descrição Item</th>
                                             <th class="col-quantidade">Quantidade</th>
-                                            <th class="col-valor">Valor Unit.</th>
                                             <th class="col-valor">Valor Total</th>
                                             <th class="col-centro">Centro Atividade</th>
                                             <th class="col-usuario">Usuário Criou</th>
-                                            <th class="col-usuario">Usuário Atendeu</th>
                                             <th class="col-descricao">Operação</th>
-                                            <th class="col-descricao">Local Físico</th>
                                         </tr>
                                         <tr class="filter-row">
                                             <th></th>
@@ -262,7 +294,6 @@
                                             <th>
                                                 <input type="text" name="filter_valor" class="filter-input" value="{{ filter_valor|default:'' }}" placeholder="Valor">
                                             </th>
-                                            <th></th>
                                             <th>
                                                 <input type="text" name="filter_centro" class="filter-input" value="{{ filter_centro|default:'' }}" placeholder="Centro">
                                             </th>
@@ -270,13 +301,7 @@
                                                 <input type="text" name="filter_usuario_criou" class="filter-input" value="{{ filter_usuario_criou|default:'' }}" placeholder="Criou">
                                             </th>
                                             <th>
-                                                <input type="text" name="filter_usuario_atend" class="filter-input" value="{{ filter_usuario_atend|default:'' }}" placeholder="Atendeu">
-                                            </th>
-                                            <th>
                                                 <input type="text" name="filter_operacao" class="filter-input" value="{{ filter_operacao|default:'' }}" placeholder="Operação">
-                                            </th>
-                                            <th>
-                                                <input type="text" name="filter_local" class="filter-input" value="{{ filter_local|default:'' }}" placeholder="Local">
                                             </th>
                                             <th>Ações</th>
                                         </tr>
@@ -289,34 +314,28 @@
                                             </td>
                                             <td>{{ requisicao.data_requisicao|date:"d/m/Y" }}</td>
                                             <td><span class="badge bg-primary">{{ requisicao.cd_item }}</span></td>
-                                            <td>{{ requisicao.descr_item|default:"-" }}</td>
-                                            <td class="text-end">
+                                            <td class="col-descricao">{{ requisicao.descr_item|default:"-" }}</td>
+                                            <td>
                                                 {% if requisicao.qtde_movto_estoq %}
                                                     {{ requisicao.qtde_movto_estoq|floatformat:2 }}
                                                 {% else %}
                                                     -
                                                 {% endif %}
                                             </td>
-                                            <td class="text-end">
+                                            <td>
                                                 {% if requisicao.vlr_movto_estoq %}
                                                     <span class="format-money" data-value="{{ requisicao.vlr_movto_estoq }}">{{ requisicao.vlr_movto_estoq|currency_br }}</span>
                                                 {% else %}
                                                     -
                                                 {% endif %}
                                             </td>
-                                            <td class="text-end">
-                                                {% if requisicao.valor_total %}
-                                                    <span class="format-money" data-value="{{ requisicao.valor_total }}">{{ requisicao.valor_total|currency_br }}</span>
-                                                {% else %}
-                                                    -
-                                                {% endif %}
-                                            </td>
                                             <td>{{ requisicao.cd_centro_ativ|default:"-" }}</td>
                                             <td>{{ requisicao.cd_usu_criou|default:"-" }}</td>
-                                            <td>{{ requisicao.cd_usu_atend|default:"-" }}</td>
                                             <td>{{ requisicao.descr_operacao|default:"-" }}</td>
-                                            <td>{{ requisicao.descr_local_fisic|default:"-" }}</td>
                                             <td>
+                                                <a href="{% url 'visualizar_requisicao_almoxarifado' requisicao.id %}" class="btn btn-sm btn-primary me-1" title="Visualizar">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
                                                 <form method="post" action="{% url 'deletar_requisicoes_almoxarifado' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja deletar esta requisição? Esta ação não pode ser desfeita.');">
                                                     {% csrf_token %}
                                                     <input type="hidden" name="requisicao_id" value="{{ requisicao.id }}">
@@ -328,7 +347,7 @@
                                         </tr>
                                         {% empty %}
                                         <tr>
-                                            <td colspan="13" class="text-center text-muted py-5">
+                                            <td colspan="10" class="text-center text-muted py-5">
                                                 <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
                                                 Nenhuma requisição encontrada.
                                             </td>

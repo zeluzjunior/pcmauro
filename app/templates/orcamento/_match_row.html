@@ -12,7 +12,7 @@
         {% endif %}
     </td>
     <td>
-        <strong>{{ match.projecao.tipo|default:"-" }}</strong><br>
+        <strong>{{ match.projecao.tipo_solicitacao|default:"-" }}</strong><br>
         <small class="text-muted">{{ match.projecao.descricao|truncatewords:5|default:"-" }}</small><br>
         {% if match.projecao.numero_requisicao_compra %}
             <small><strong>Req:</strong> {{ match.projecao.numero_requisicao_compra }}</small>
@@ -40,11 +40,8 @@
         {% endif %}
     </td>
     <td>
-        {% if match.projecao.centro_atividade %}
-            {{ match.projecao.centro_atividade }}
-            {% if match.projecao.nome_centro_atividade %}
-                <br><small class="text-muted">{{ match.projecao.nome_centro_atividade|truncatewords:2 }}</small>
-            {% endif %}
+        {% if match.projecao.setor %}
+            {{ match.projecao.setor }}
         {% else %}
             <span class="text-muted">-</span>
         {% endif %}
@@ -166,7 +163,7 @@
                                 <div class="modal-body">
                                     <p>Deseja confirmar a relação entre:</p>
                                     <ul>
-                                        <li><strong>Projeção:</strong> {{ match.projecao.tipo|default:"-" }} - {{ match.projecao.descricao|truncatewords:10|default:"-" }}</li>
+                                        <li><strong>Projeção:</strong> {{ match.projecao.tipo_solicitacao|default:"-" }} - {{ match.projecao.descricao|truncatewords:10|default:"-" }}</li>
                                         <li><strong>Nota Fiscal:</strong> {{ match.nota.nota|default:"-" }} - {{ match.nota.nome_fantasia_emitente|truncatewords:5|default:"-" }}</li>
                                         {% if match.controle %}
                                         <li><strong>Controle RC/NF:</strong> ID: {{ match.controle.id_excel|default:"-" }} - RC: {{ match.controle.rc|default:"-" }} - Empresa: {{ match.controle.empresa|truncatewords:3|default:"-" }}</li>
@@ -209,7 +206,7 @@
                                 <div class="modal-body">
                                     <p>Deseja rejeitar a relação entre:</p>
                                     <ul>
-                                        <li><strong>Projeção:</strong> {{ match.projecao.tipo|default:"-" }} - {{ match.projecao.descricao|truncatewords:10|default:"-" }}</li>
+                                        <li><strong>Projeção:</strong> {{ match.projecao.tipo_solicitacao|default:"-" }} - {{ match.projecao.descricao|truncatewords:10|default:"-" }}</li>
                                         <li><strong>Nota Fiscal:</strong> {{ match.nota.nota|default:"-" }} - {{ match.nota.nome_fantasia_emitente|truncatewords:5|default:"-" }}</li>
                                         {% if match.controle %}
                                         <li><strong>Controle RC/NF:</strong> ID: {{ match.controle.id_excel|default:"-" }} - RC: {{ match.controle.rc|default:"-" }} - Empresa: {{ match.controle.empresa|truncatewords:3|default:"-" }}</li>

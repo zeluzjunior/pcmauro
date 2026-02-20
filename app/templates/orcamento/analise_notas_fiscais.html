@@ -81,13 +81,13 @@
         <div class="accordion mb-4 filter-accordion" id="filterAccordion">
             <div class="accordion-item">
                 <h2 class="accordion-header" id="headingFilter">
-                    <button class="accordion-button {% if not ano_selecionado and not meses_selecionados and not uso_contabil_filtro and not situacao_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if ano_selecionado or meses_selecionados or uso_contabil_filtro or situacao_filtro %}true{% else %}false{% endif %}" aria-controls="collapseFilter">
+                    <button class="accordion-button {% if not ano_selecionado and not meses_selecionados and not uso_contabil_filtro and not situacao_filtro and not emitente_filtro and not centro_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if ano_selecionado or meses_selecionados or uso_contabil_filtro or situacao_filtro or emitente_filtro or centro_filtro %}true{% else %}false{% endif %}" aria-controls="collapseFilter">
                         <i class="fas fa-filter me-2"></i>Filtros de Análise
                     </button>
                 </h2>
-                <div id="collapseFilter" class="accordion-collapse collapse {% if ano_selecionado or meses_selecionados or uso_contabil_filtro or situacao_filtro %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
+                <div id="collapseFilter" class="accordion-collapse collapse {% if ano_selecionado or meses_selecionados or uso_contabil_filtro or situacao_filtro or emitente_filtro or centro_filtro %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
                     <div class="accordion-body">
-                        <form method="GET" class="row g-3 align-items-end">
+                        <form method="GET" action="{% url 'analise_notas_fiscais' %}" class="row g-3 align-items-end">
                             <div class="col-md-2">
                                 <label for="ano_filtro" class="form-label">Ano:</label>
                                 <select class="form-select" id="ano_filtro" name="ano">
@@ -143,6 +143,25 @@
                             <div class="col-md-2 d-flex justify-content-end">
                                 <button type="submit" class="btn btn-primary me-2"><i class="fas fa-filter me-1"></i>Aplicar Filtros</button>
                                 <a href="{% url 'analise_notas_fiscais' %}" class="btn btn-outline-secondary"><i class="fas fa-sync-alt me-1"></i>Limpar</a>
+                            </div>
+                            <div class="w-100"></div>
+                            <div class="col-md-3">
+                                <label for="emitente_filtro" class="form-label">Emitente:</label>
+                                <select class="form-select" id="emitente_filtro" name="emitente">
+                                    <option value="">Todos</option>
+                                    {% for emit in emitentes_unicos_opcoes %}
+                                        <option value="{{ emit }}" {% if emit == emitente_filtro %}selected{% endif %}>{{ emit|truncatewords:5 }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="centro_filtro" class="form-label">Centro de Atividade:</label>
+                                <select class="form-select" id="centro_filtro" name="centro">
+                                    <option value="">Todos</option>
+                                    {% for centro in centros_unicos_opcoes %}
+                                        <option value="{{ centro }}" {% if centro == centro_filtro %}selected{% endif %}>{{ centro|truncatewords:5 }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                         </form>
                     </div>

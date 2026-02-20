@@ -208,8 +208,6 @@
                 </div>
 
 
-            <!-- Evolução Temporal Frigorífico -->
-            <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Evolução Temporal (Frigorífico)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="temporalChartFrig"></canvas></div></div></div></div></div>
             <!-- Evolução Diária Frigorífico -->
             <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><div class="d-flex justify-content-between align-items-center flex-wrap"><h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Evolução Diária (Frigorífico)</h5><div class="input-group" style="max-width: 220px;"><span class="input-group-text bg-white border-end-0"><i class="fas fa-calendar-alt text-primary"></i></span><input type="month" class="form-control border-start-0" id="mesSelecionadoFrig" value="{{ mes_selecionado }}" style="font-weight: 500;"></div></div></div><div class="card-body"><div class="chart-container-large"><canvas id="dailyChartFrig"></canvas></div></div></div></div></div>
             <!-- Top Paradas / Turnos Frigorífico -->
@@ -226,7 +224,7 @@
             <div class="row mb-4">
                 <p class="text-muted mb-4">Dados baseados na projeção de produção e abate:  </p>
                 <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm">
-                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Produção diária planejada:</h6><h4 class="mb-0 fw-bold">{{ total_paradas_ind|number_br:0 }}</h4></div></div></div>
+                    <div class="card-body py-3"><h6 class="text-muted mb-0 small">Produção diária planejada:</h6><h4 class="mb-0 fw-bold">{% if producao_diaria_planejada_industria is not None %}{{ producao_diaria_planejada_industria|number_br:0 }}{% else %}-{% endif %}</h4></div></div></div>
                 <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm">
                     <div class="card-body py-3"><h6 class="text-muted mb-0 small">Dias úteis planejados:</h6><h4 class="mb-0 fw-bold">{{ dias_uteis_total_industria|default:0|number_br:0 }}</h4></div></div></div>
                 <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm">
@@ -357,40 +355,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return new bootstrap.Tooltip(tooltipTriggerEl);
         });
     
-    // Evolução Temporal Frigorífico: X=dias, linhas=Total Paradas e Total de Perda (capacidade)
-    const temporalFrigCtx = document.getElementById('temporalChartFrig');
-    if (temporalFrigCtx) {
-        const frigLabels = {{ temporal_frig_labels|safe }};
-        const frigParadas = {{ temporal_frig_paradas|safe }};
-        const frigPerda = {{ temporal_frig_perda|safe }};
-        if (frigLabels && Array.isArray(frigLabels) && frigLabels.length > 0) {
-            try {
-                new Chart(temporalFrigCtx.getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: frigLabels,
-                        datasets: [
-                            { label: 'Total de Paradas', data: frigParadas, borderColor: '#198754', backgroundColor: 'rgba(25, 135, 84, 0.1)', tension: 0.4, fill: true, yAxisID: 'y' },
-                            { label: 'Total de Perda (capacidade)', data: frigPerda, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.4, fill: true, yAxisID: 'y1' }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: true } },
-                        scales: {
-                            x: { title: { display: true, text: 'Dias' } },
-                            y: { type: 'linear', display: true, position: 'left', beginAtZero: true, title: { display: true, text: 'Nº de Paradas' } },
-                            y1: { type: 'linear', display: true, position: 'right', beginAtZero: true, title: { display: true, text: 'Perda (capacidade)' }, grid: { drawOnChartArea: false } }
-                        }
-                    }
-                });
-            } catch (e) { console.error('Erro temporal Frigorífico:', e); }
-        } else {
-            temporalFrigCtx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados para o período selecionado.</div>';
-        }
-    }
-
     // Daily chart por seção (Frig/Ind) - carrega via API com secao=
     function createDailySectionChart(canvasId, mesInputId, secao) {
         const dailyCtx = document.getElementById(canvasId);

@@ -157,9 +157,15 @@
                                     </span>
                                 </td>
                                 <td class="text-center">
+                                    {% if tabela.limpar_por_mes %}
+                                    <button type="button" class="btn btn-sm btn-danger" onclick="abrirModalLimparPorMes('{{ tabela.key }}', '{{ tabela.nome }}')" {% if tabela.count == 0 %}disabled title="Tabela vazia"{% endif %}>
+                                        <i class="fas fa-calendar-alt me-1"></i>Limpar por mês
+                                    </button>
+                                    {% else %}
                                     <button type="button" class="btn btn-sm btn-danger" onclick="confirmarLimpeza('{{ tabela.key }}', '{{ tabela.count }}', '{{ tabela.nome }}')" {% if tabela.count == 0 %}disabled title="Tabela vazia"{% endif %}>
                                         <i class="fas fa-trash me-1"></i>Limpar
                                     </button>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -225,6 +231,59 @@
     </div>
 </section>
 
+<!-- Modal Limpar ParadaMaquina por mês -->
+<div class="modal fade" id="modalLimparPorMes" tabindex="-1" aria-labelledby="modalLimparPorMesLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="modalLimparPorMesLabel">
+                    <i class="fas fa-calendar-alt me-2"></i>Limpar por mês — <span id="modalTabelaNome"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'limpar_tabela' %}" id="formLimparPorMes">
+                {% csrf_token %}
+                <input type="hidden" name="tabela" id="tabelaLimparPorMesInput" value="paradas_maquina">
+                <div class="modal-body">
+                    <p class="text-muted">O mês é determinado pelo campo <strong>Data</strong> em cada registro. Selecione o ano e o(s) mês(es) que deseja excluir.</p>
+                    <div class="mb-3">
+                        <label for="anoParadas" class="form-label">Ano</label>
+                        <select class="form-select" id="anoParadas" name="ano_paradas" required>
+                            {% for y in anos_disponiveis_paradas %}
+                            <option value="{{ y }}" {% if y == ano_atual %}selected{% endif %}>{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Mês(es) a excluir</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for num, nome in meses_nomes.items %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="mes_paradas" value="{{ num }}" id="mesParadas{{ num }}">
+                                <label class="form-check-label" for="mesParadas{{ num }}">{{ nome }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" name="deletar_todos_paradas" id="deletarTodosParadas">
+                        <label class="form-check-label text-danger fw-semibold" for="deletarTodosParadas">Deletar TODOS os registros (ignora seleção de meses)</label>
+                    </div>
+                    <div class="alert alert-warning mt-3 mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i><strong>Atenção:</strong> Esta ação é irreversível.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger" id="btnConfirmarLimparPorMes">
+                        <i class="fas fa-trash me-2"></i>Confirmar e Excluir
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Confirmation Modal -->
 <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -288,6 +347,27 @@
             }
         });
     });
+    
+    function abrirModalLimparPorMes(tabelaKey, tabelaNome) {
+        document.getElementById('modalTabelaNome').textContent = tabelaNome;
+        document.getElementById('tabelaLimparPorMesInput').value = tabelaKey;
+        document.getElementById('deletarTodosParadas').checked = false;
+        document.querySelectorAll('input[name="mes_paradas"]').forEach(cb => cb.checked = false);
+        const modal = new bootstrap.Modal(document.getElementById('modalLimparPorMes'));
+        modal.show();
+    }
+    
+    const formLimparPorMes = document.getElementById('formLimparPorMes');
+    if (formLimparPorMes) {
+        formLimparPorMes.addEventListener('submit', function(e) {
+            const deletarTodos = document.getElementById('deletarTodosParadas').checked;
+            const algumMes = document.querySelectorAll('input[name="mes_paradas"]:checked').length > 0;
+            if (!deletarTodos && !algumMes) {
+                e.preventDefault();
+                alert('Selecione pelo menos um mês para excluir ou marque "Deletar TODOS os registros".');
+            }
+        });
+    }
     
     function confirmarLimpeza(tabela, count, tabelaNome) {
         const modal = new bootstrap.Modal(document.getElementById('confirmModal'));

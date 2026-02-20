@@ -32,51 +32,44 @@
                 <div class="card shadow-sm">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-upload me-2"></i>Selecionar Arquivo
+                            <i class="fas fa-upload me-2"></i>Importar Paradas de Máquina
                         </h5>
                     </div>
                     <div class="card-body">
+                        <p class="text-muted mb-4"><i class="fas fa-info-circle me-1"></i>Selecione o ano e o(s) mês(es) que correspondem aos dados do seu arquivo (baseado no campo <strong>Data</strong>). Os dados existentes daquele(s) mês(es) serão removidos e substituídos pelos dados do arquivo. Os demais meses permanecem intactos.</p>
                         <form method="post" action="{% url 'importar_paradas_maquina' %}" enctype="multipart/form-data" id="importarForm">
                             {% csrf_token %}
-                            <div class="mb-3">
-                                <label for="fileInput" class="form-label">Arquivo para Importação</label>
+                            <div class="mb-4 border rounded p-3 bg-primary bg-opacity-10">
+                                <h6 class="fw-semibold mb-2"><i class="fas fa-calendar-alt me-1"></i>1. Selecione o ano e o(s) mês(es) dos dados que serão importados</h6>
+                                <p class="text-muted small mb-3">O mês é determinado pelo campo <strong>Data</strong> em cada registro. Selecione o(s) mês(es) que correspondem aos dados do seu arquivo.</p>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="anoSubstituir" class="form-label">Ano</label>
+                                        <select class="form-select" id="anoSubstituir" name="ano_substituir" required>
+                                            {% for y in anos_disponiveis_paradas %}
+                                                <option value="{{ y }}" {% if y == ano_atual %}selected{% endif %}>{{ y }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="form-label">Mês(es) dos dados do arquivo</label>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            {% for num, nome in meses_nomes.items %}
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="mes_substituir" value="{{ num }}" id="mesSubst{{ num }}">
+                                                <label class="form-check-label" for="mesSubst{{ num }}">{{ nome }}</label>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <label for="fileInput" class="form-label"><i class="fas fa-file-csv me-1"></i>2. Arquivo para Importação</label>
                                 <input type="file" class="form-control" id="fileInput" name="file" accept=".csv" required>
                                 <div class="form-text">Formatos aceitos: CSV (.csv) com delimitador ponto e vírgula (;)</div>
-                            </div>
-                            <div class="mb-3">
-                                <div class="form-check border rounded p-3 bg-light">
-                                    <input class="form-check-input" type="checkbox" id="excluirAntigos" name="excluir_antigos">
-                                    <label class="form-check-label fw-semibold" for="excluirAntigos">
-                                        Excluir dados antigos e usar apenas os novos dados que serão importados
-                                    </label>
-                                    <div class="form-text mt-1">
-                                        <i class="fas fa-info-circle me-1"></i>
-                                        Quando marcado, <strong>todos os registros atuais de paradas de máquina serão removidos</strong> e somente os dados do arquivo enviado serão mantidos. Use quando o novo arquivo já contiver o histórico completo (evita duplicados).
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mb-3" id="opcoesIncrementais">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="onlyNewRecords" name="only_new_records" checked>
-                                    <label class="form-check-label" for="onlyNewRecords">
-                                        <strong>Apenas adicionar novos registros</strong> (registros duplicados serão ignorados)
-                                    </label>
-                                    <div class="form-text">
-                                        <i class="fas fa-info-circle me-1"></i>
-                                        Quando marcado, apenas registros que ainda não existem na tabela serão importados. Registros duplicados serão ignorados.
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mb-3" id="opcaoAtualizar">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="updateExisting" name="update_existing">
-                                    <label class="form-check-label" for="updateExisting">
-                                        Atualizar registros existentes
-                                    </label>
-                                    <div class="form-text">
-                                        <i class="fas fa-info-circle me-1"></i>
-                                        Quando marcado, registros existentes serão atualizados com os dados do arquivo. <strong>Nota:</strong> Se "Apenas adicionar novos registros" estiver marcado, esta opção será ignorada.
-                                    </div>
+                                <div class="alert alert-warning mt-3 mb-0" role="alert">
+                                    <i class="fas fa-exclamation-triangle me-2"></i><strong>Atenção:</strong> Os dados existentes do(s) mês(es) selecionado(s) serão <strong>removidos</strong> e substituídos pelos dados do arquivo. Esta ação não pode ser desfeita.
                                 </div>
                             </div>
                             <div class="d-grid gap-2">
@@ -157,29 +150,24 @@ window.addEventListener('load', function() {
     const form = document.getElementById('importarForm');
     const submitBtn = document.getElementById('submitBtn');
     const fileInput = document.getElementById('fileInput');
-    const excluirAntigos = document.getElementById('excluirAntigos');
-    const onlyNewRecords = document.getElementById('onlyNewRecords');
-    const updateExisting = document.getElementById('updateExisting');
-    const opcoesIncrementais = document.getElementById('opcoesIncrementais');
-    const opcaoAtualizar = document.getElementById('opcaoAtualizar');
-
-    function toggleOpcoesIncrementais() {
-        var excluir = excluirAntigos && excluirAntigos.checked;
-        if (opcoesIncrementais) opcoesIncrementais.style.opacity = excluir ? '0.5' : '1';
-        if (opcaoAtualizar) opcaoAtualizar.style.opacity = excluir ? '0.5' : '1';
-        if (onlyNewRecords) onlyNewRecords.disabled = excluir;
-        if (updateExisting) updateExisting.disabled = excluir;
-        if (excluir && onlyNewRecords) onlyNewRecords.checked = false;
-        if (excluir && updateExisting) updateExisting.checked = false;
-    }
-    if (excluirAntigos) excluirAntigos.addEventListener('change', toggleOpcoesIncrementais);
-    toggleOpcoesIncrementais();
+    const mesCheckboxes = document.querySelectorAll('input[name="mes_substituir"]');
 
     if (!form || !submitBtn) return;
 
     form.addEventListener('submit', function(e) {
-        if (!fileInput || !fileInput.files || fileInput.files.length === 0) return;
-        if (excluirAntigos && excluirAntigos.checked && !confirm('Tem certeza? Todos os dados atuais de paradas de máquina serão excluídos e substituídos pelos dados do arquivo.')) {
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            e.preventDefault();
+            alert('Selecione um arquivo para importar.');
+            return;
+        }
+        var anyChecked = false;
+        mesCheckboxes.forEach(function(cb) { if (cb.checked) anyChecked = true; });
+        if (!anyChecked) {
+            e.preventDefault();
+            alert('Selecione pelo menos um mês que corresponde aos dados do arquivo (campo Data).');
+            return;
+        }
+        if (!confirm('Os dados existentes do(s) mês(es) selecionado(s) serão REMOVIDOS e substituídos pelos dados do arquivo. Os demais meses permanecerão intactos. Deseja continuar?')) {
             e.preventDefault();
             return;
         }

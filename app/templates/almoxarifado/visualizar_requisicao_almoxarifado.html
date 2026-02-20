@@ -1,0 +1,271 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Visualizar Requisição #{{ requisicao.id }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_requisicoes_almoxarifado' %}" class="text-white">Consultar Requisições Almoxarifado</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Requisição #{{ requisicao.id }}</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-box-open me-2"></i>Visualizar Requisição
+                </h1>
+                <p class="lead">Detalhes completos da requisição de almoxarifado #{{ requisicao.id }} - Item {{ requisicao.cd_item|default:"-" }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <div class="row mb-4">
+            <div class="col-12">
+                <a href="{% url 'consultar_requisicoes_almoxarifado' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Voltar para Consultar
+                </a>
+            </div>
+        </div>
+
+        <!-- Informações do Item -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-box me-2"></i>Informações do Item
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Código Item</label>
+                                <p class="form-control-plaintext fs-5">{{ requisicao.cd_item|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Descrição Item</label>
+                                <p class="form-control-plaintext">{{ requisicao.descr_item|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Código Embalagem</label>
+                                <p class="form-control-plaintext">{{ requisicao.cd_embalagem|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Unidade de Medida</label>
+                                <p class="form-control-plaintext">{{ requisicao.cd_unid_medida|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quantidade e Valores -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-calculator me-2"></i>Quantidade e Valores
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Quantidade Movimento Estoque</label>
+                                <p class="form-control-plaintext fs-5">{% if requisicao.qtde_movto_estoq %}{{ requisicao.qtde_movto_estoq|floatformat:2 }}{% else %}-{% endif %}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Valor Total (Movimento Estoque)</label>
+                                <p class="form-control-plaintext fs-5 text-success fw-bold">
+                                    {% if requisicao.vlr_movto_estoq %}
+                                        {{ requisicao.vlr_movto_estoq|currency_br }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Valor Reavaliação</label>
+                                <p class="form-control-plaintext">
+                                    {% if requisicao.vlr_movto_estoq_reav %}
+                                        {{ requisicao.vlr_movto_estoq_reav|currency_br }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Unidade e Uso Contábil -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-building me-2"></i>Unidade e Uso Contábil
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Código Unidade</label>
+                                <p class="form-control-plaintext">{{ requisicao.cd_unid|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Nome Unidade</label>
+                                <p class="form-control-plaintext">{{ requisicao.nome_unid|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Código Uso Contábil</label>
+                                <p class="form-control-plaintext">{{ requisicao.cd_uso_ctb|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Descrição Uso Contábil</label>
+                                <p class="form-control-plaintext">{{ requisicao.descr_uso_ctb|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Depósito e Local Físico -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-warehouse me-2"></i>Depósito e Local Físico
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Código Depósito</label>
+                                <p class="form-control-plaintext">{{ requisicao.cd_depo|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Descrição Depósito</label>
+                                <p class="form-control-plaintext">{{ requisicao.descr_depo|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Código Local Físico</label>
+                                <p class="form-control-plaintext">{{ requisicao.cd_local_fisic|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Descrição Local Físico</label>
+                                <p class="form-control-plaintext">{{ requisicao.descr_local_fisic|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Operação e Centro de Atividade -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-cogs me-2"></i>Operação e Centro de Atividade
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Código Operação</label>
+                                <p class="form-control-plaintext">{{ requisicao.cd_operacao|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Descrição Operação</label>
+                                <p class="form-control-plaintext">{{ requisicao.descr_operacao|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Centro de Atividade</label>
+                                <p class="form-control-plaintext">{{ requisicao.cd_centro_ativ|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Código Unidade Baixa</label>
+                                <p class="form-control-plaintext">{{ requisicao.cd_unid_baixa|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Usuários -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-users me-2"></i>Usuários
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Usuário Criou</label>
+                                <p class="form-control-plaintext">{{ requisicao.cd_usu_criou|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Usuário Atendeu</label>
+                                <p class="form-control-plaintext">{{ requisicao.cd_usu_atend|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Observações -->
+                {% if requisicao.obs_rm or requisicao.obs_item %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-sticky-note me-2"></i>Observações
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% if requisicao.obs_rm %}
+                            <div class="col-12 mb-3">
+                                <label class="form-label fw-bold">Observação RM</label>
+                                <p class="form-control-plaintext">{{ requisicao.obs_rm }}</p>
+                            </div>
+                            {% endif %}
+                            {% if requisicao.obs_item %}
+                            <div class="col-12 mb-3">
+                                <label class="form-label fw-bold">Observação Item</label>
+                                <p class="form-control-plaintext">{{ requisicao.obs_item }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Datas do Sistema -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light text-dark border">
+                        <h5 class="mb-0">
+                            <i class="fas fa-calendar-alt me-2"></i>Datas do Sistema
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Data Requisição</label>
+                                <p class="form-control-plaintext">{{ requisicao.data_requisicao|date:"d/m/Y"|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Data de Criação</label>
+                                <p class="form-control-plaintext">{{ requisicao.created_at|date:"d/m/Y H:i"|default:"-" }}</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Data de Atualização</label>
+                                <p class="form-control-plaintext">{{ requisicao.updated_at|date:"d/m/Y H:i"|default:"-" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

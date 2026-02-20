@@ -251,11 +251,11 @@
                                 <i class="fas fa-info-circle ms-1" 
                                    data-bs-toggle="tooltip" 
                                    data-bs-placement="top" 
-                                   title="Soma dos valores das requisições que geram custo (cd_depo = 1)"></i>
+                                   title="Soma dos valores das requisições que geram custo (cd_depo = 1), excluindo as geradas por NF"></i>
                             </h6>
-                            <h3 class="mb-1 fw-bold">{{ valor_total|currency_br }}</h3>
+                            <h3 class="mb-1 fw-bold">{{ valor_total_normal|currency_br }}</h3>
                             <small class="text-muted">
-                                NF: {{ valor_total_nf|currency_br }} | Normal: {{ valor_total_normal|currency_br }}
+                                Com NF: {{ valor_total_nf|currency_br }}
                             </small>
                         </div>
                     </div>

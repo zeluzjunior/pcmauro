@@ -155,12 +155,12 @@
                                 <div class="row">
                                     <div class="col-md-5">
                                         <strong>Projeção:</strong>
-                                        {% if match_info.comparacoes.valor.tipo %}
-                                            {{ match_info.comparacoes.valor.tipo }}: R$ {{ match_info.comparacoes.valor.projecao|floatformat:2 }}
+                                        {% if match_info.comparacoes.valor.projecao %}
+                                            R$ {{ match_info.comparacoes.valor.projecao|floatformat:2 }}
+                                        {% elif projecao.valor_total %}
+                                            R$ {{ projecao.valor_total|floatformat:2 }}
                                         {% else %}
-                                            {% if projecao.valor_planejado %}Planejado: R$ {{ projecao.valor_planejado|floatformat:2 }}<br>{% endif %}
-                                            {% if projecao.valor_realizado %}Realizado: R$ {{ projecao.valor_realizado|floatformat:2 }}<br>{% endif %}
-                                            {% if projecao.valor_projetado %}Projetado: R$ {{ projecao.valor_projetado|floatformat:2 }}{% endif %}
+                                            -
                                         {% endif %}
                                     </div>
                                     <div class="col-md-5">
@@ -292,7 +292,7 @@
                     <div class="card-body">
                         <div class="mb-3">
                             <label class="form-label fw-bold">Tipo</label>
-                            <p class="form-control-plaintext">{{ projecao.tipo|default:"-" }}</p>
+                            <p class="form-control-plaintext">{{ projecao.tipo_solicitacao|default:"-" }}</p>
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold">Descrição</label>
@@ -307,52 +307,30 @@
                             <p class="form-control-plaintext">{{ projecao.solicitante|default:"-" }}</p>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Centro de Atividade</label>
+                            <label class="form-label fw-bold">Valor Total</label>
                             <p class="form-control-plaintext">
-                                {{ projecao.centro_atividade|default:"-" }}
-                                {% if projecao.nome_centro_atividade %}
-                                    <br><small class="text-muted">{{ projecao.nome_centro_atividade }}</small>
-                                {% endif %}
-                            </p>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Valores</label>
-                            <p class="form-control-plaintext">
-                                {% if projecao.valor_planejado %}
-                                    <strong>Planejado:</strong> R$ {{ projecao.valor_planejado|floatformat:2 }}<br>
-                                {% endif %}
-                                {% if projecao.valor_realizado %}
-                                    <strong>Realizado:</strong> R$ {{ projecao.valor_realizado|floatformat:2 }}<br>
-                                {% endif %}
-                                {% if projecao.valor_projetado %}
-                                    <strong>Projetado:</strong> R$ {{ projecao.valor_projetado|floatformat:2 }}<br>
-                                {% endif %}
                                 {% if projecao.valor_total %}
-                                    <strong>Total:</strong> R$ {{ projecao.valor_total|floatformat:2 }}
+                                    R$ {{ projecao.valor_total|floatformat:2 }}
+                                {% else %}
+                                    -
                                 {% endif %}
                             </p>
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold">Datas</label>
                             <p class="form-control-plaintext">
-                                {% if projecao.data_requisicao %}
-                                    <strong>Requisição:</strong> {{ projecao.data_requisicao|date:"d/m/Y" }}<br>
-                                {% endif %}
                                 {% if projecao.data_abertura_requisicao %}
-                                    <strong>Abertura:</strong> {{ projecao.data_abertura_requisicao|date:"d/m/Y" }}<br>
+                                    <strong>Abertura Requisição:</strong> {{ projecao.data_abertura_requisicao|date:"d/m/Y" }}<br>
                                 {% endif %}
-                                {% if projecao.data_planejada %}
-                                    <strong>Planejada:</strong> {{ projecao.data_planejada|date:"d/m/Y" }}<br>
-                                {% endif %}
-                                {% if projecao.data_realizada %}
-                                    <strong>Realizada:</strong> {{ projecao.data_realizada|date:"d/m/Y" }}
+                                {% if projecao.servico_concluido %}
+                                    <strong>Serviço Concluído:</strong> {{ projecao.servico_concluido }}
                                 {% endif %}
                             </p>
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold">Fornecedor</label>
                             <p class="form-control-plaintext">
-                                {{ projecao.fornecedor|default:projecao.fornecedor_nome_fantasia|default:"-" }}
+                                {{ projecao.fornecedor_nome_fantasia|default:"-" }}
                                 {% if projecao.fornecedor_cnpj %}
                                     <br><small class="text-muted">CNPJ: {{ projecao.fornecedor_cnpj }}</small>
                                 {% endif %}
@@ -361,9 +339,6 @@
                         <div class="mb-3">
                             <label class="form-label fw-bold">Números</label>
                             <p class="form-control-plaintext">
-                                {% if projecao.numero_requisicao %}
-                                    <strong>Requisição:</strong> {{ projecao.numero_requisicao }}<br>
-                                {% endif %}
                                 {% if projecao.numero_requisicao_compra %}
                                     <strong>Req. Compra:</strong> {{ projecao.numero_requisicao_compra }}<br>
                                 {% endif %}

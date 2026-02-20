@@ -1201,24 +1201,10 @@ class ProjecaoGasto(models.Model):
     numero_ordem_servico = models.CharField('Número Ordem de Serviço', max_length=100, blank=True, null=True, db_index=True)  # ORDEM DE SERVIÇO
     numero_requisicao_compra = models.CharField('Número da Requisição de Compra', max_length=100, blank=True, null=True, db_index=True)  # NÚMERO DA REQUISIÇÃO DE COMPRA
     numero_pedido_compra = models.CharField('Número do Pedido de Compra', max_length=100, blank=True, null=True)  # NÚMERO DO PEDIDO DE COMPRA
-    servico_concluido = models.DateField('Serviço Concluído', blank=True, null=True)  # SERVIÇO CONCLUÍDO
-    nf_servico_recebida = models.DateField('NF de Serviço Recebida', blank=True, null=True)  # NF DE SERVIÇO RECEBIDA
-    nf_enviada_lancamento = models.DateField('NF Enviada para Lançamento', blank=True, null=True)  # NF ENVIADA PARA LANÇAMENTO
+    servico_concluido = models.CharField('Serviço Concluído', max_length=255, blank=True, null=True)  # SERVIÇO CONCLUÍDO (texto)
+    nf_servico_recebida = models.CharField('NF de Serviço Recebida', max_length=255, blank=True, null=True)  # NF DE SERVIÇO RECEBIDA (texto)
+    nf_enviada_lancamento = models.CharField('NF Enviada para Lançamento', max_length=255, blank=True, null=True)  # NF ENVIADA PARA LANÇAMENTO (texto)
     observacoes = models.TextField('Observações', blank=True, null=True)  # OBSERVAÇÕES do Excel
-    
-    # Campos legados (mantidos para compatibilidade, mas não mais usados)
-    tipo = models.CharField('Tipo', max_length=100, blank=True, null=True, db_index=True)  # Mantido para compatibilidade
-    centro_atividade = models.CharField('Centro de Atividade', max_length=100, blank=True, null=True, db_index=True)  # Mantido para compatibilidade (mapeado de SETOR)
-    nome_centro_atividade = models.CharField('Nome Centro de Atividade', max_length=255, blank=True, null=True)  # Mantido para compatibilidade
-    valor_planejado = models.DecimalField('Valor Planejado', max_digits=15, decimal_places=2, blank=True, null=True)  # Mantido para compatibilidade
-    valor_realizado = models.DecimalField('Valor Realizado', max_digits=15, decimal_places=2, blank=True, null=True)  # Mantido para compatibilidade
-    valor_projetado = models.DecimalField('Valor Projetado', max_digits=15, decimal_places=2, blank=True, null=True)  # Mantido para compatibilidade
-    data_requisicao = models.DateField('Data Requisição', blank=True, null=True, db_index=True)  # Mantido para compatibilidade (mapeado de data_abertura_requisicao)
-    data_planejada = models.DateField('Data Planejada', blank=True, null=True)  # Mantido para compatibilidade
-    data_realizada = models.DateField('Data Realizada', blank=True, null=True)  # Mantido para compatibilidade
-    fornecedor = models.CharField('Fornecedor', max_length=255, blank=True, null=True)  # Mantido para compatibilidade (mapeado de fornecedor_nome_fantasia)
-    numero_requisicao = models.CharField('Número Requisição', max_length=100, blank=True, null=True, db_index=True)  # Mantido para compatibilidade (mapeado de numero_requisicao_compra)
-    status = models.CharField('Status', max_length=100, blank=True, null=True)  # Mantido para compatibilidade
     
     # Campos flexíveis para armazenar dados adicionais do Excel
     dados_adicionais = models.JSONField('Dados Adicionais', blank=True, null=True, default=dict)
@@ -1234,9 +1220,7 @@ class ProjecaoGasto(models.Model):
         # Constraint única composta: id_excel + setor (mesmo ID pode existir para setores diferentes)
         unique_together = [['id_excel', 'setor']]
         indexes = [
-            models.Index(fields=['tipo']),
             models.Index(fields=['setor']),
-            models.Index(fields=['centro_atividade']),
             models.Index(fields=['mes_referencia', 'ano_referencia']),
             models.Index(fields=['data_abertura_requisicao']),
             models.Index(fields=['numero_requisicao_compra']),
@@ -1245,7 +1229,7 @@ class ProjecaoGasto(models.Model):
     
     def __str__(self):
         id_str = f"ID {self.id_excel}" if self.id_excel else "Sem ID"
-        tipo_str = self.tipo_solicitacao or self.tipo or 'Sem tipo'
+        tipo_str = self.tipo_solicitacao or 'Sem tipo'
         descricao_str = self.descricao or 'Sem descrição'
         return f"{id_str} - {tipo_str} - {descricao_str[:50]}"
 

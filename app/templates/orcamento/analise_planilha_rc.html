@@ -7,10 +7,11 @@
 {% block extra_css %}
 <style>
     .stat-card {
-        transition: transform 0.2s;
+        transition: transform 0.2s, box-shadow 0.2s;
     }
     .stat-card:hover {
         transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
     }
     .kpi-card {
         border-left: 4px solid;
@@ -19,6 +20,9 @@
     .kpi-success { border-left-color: #198754; }
     .kpi-warning { border-left-color: #ffc107; }
     .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .kpi-secondary { border-left-color: #6c757d; }
+    .kpi-purple { border-left-color: #6f42c1; }
     .chart-container {
         position: relative;
         height: 400px;
@@ -67,11 +71,84 @@
         color: #fff;
     }
     .filter-month-chip input { display: none; }
-    /* Dark text for form content in filter accordion body */
+        /* Dark text for form content in filter accordion body */
     .filter-accordion .accordion-body .form-label,
     .filter-accordion .accordion-body .card-header {
         color: #212529 !important;
     }
+    /* Barra de filtros aplicados - fixa ao rolar a página */
+    .filtros-aplicados-bar {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: #fff !important;
+    }
+    /* Tabela Status x Mês: colunas mais largas e scroll horizontal */
+    .tabela-status-mes-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .tabela-status-mes-wrapper table {
+        min-width: 1350px;
+    }
+    .tabela-status-mes-wrapper th,
+    .tabela-status-mes-wrapper td {
+        min-width: 110px;
+        padding: 0.5rem 0.75rem;
+    }
+    .tabela-status-mes-wrapper th:first-child,
+    .tabela-status-mes-wrapper td:first-child {
+        min-width: 200px;
+        text-align: left;
+    }
+    .tabela-status-mes-wrapper th:nth-child(2),
+    .tabela-status-mes-wrapper td:nth-child(2) {
+        text-align: left;
+    }
+    .tabela-status-mes-wrapper th:not(:first-child):not(:nth-child(2)),
+    .tabela-status-mes-wrapper td:not(:first-child):not(:nth-child(2)) {
+        text-align: right;
+    }
+    .tabela-status-mes-wrapper th:last-child,
+    .tabela-status-mes-wrapper td:last-child {
+        min-width: 130px;
+        white-space: nowrap;
+    }
+    .tabela-status-mes-wrapper tfoot tr {
+        background: #6c757d !important;
+        color: white;
+        font-weight: 600;
+    }
+    .tabela-status-mes-wrapper tfoot td {
+        background: #6c757d !important;
+    }
+    .tabela-status-mes-wrapper tbody tr.tr-data-rc {
+        background: rgba(13, 110, 253, 0.05);
+    }
+    .tabela-status-mes-wrapper tbody tr.tr-data-rc:hover {
+        background: rgba(13, 110, 253, 0.1) !important;
+    }
+    .tabela-status-mes-wrapper tbody tr.tr-previsao {
+        background: rgba(255, 193, 7, 0.06);
+    }
+    .tabela-status-mes-wrapper tbody tr.tr-previsao:hover {
+        background: rgba(255, 193, 7, 0.14) !important;
+    }
+    .tabela-status-mes-wrapper tbody tr.tr-status-sep {
+        border-bottom: 2px solid #dee2e6 !important;
+    }
+    .tabela-status-mes-wrapper .cell-status-group {
+        vertical-align: middle;
+        font-weight: 600;
+        background: #f8f9fa !important;
+    }
+    .tabela-status-mes-wrapper .label-base {
+        font-size: 0.75rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 0.25rem;
+    }
+    .tabela-status-mes-wrapper .label-rc { background: #cfe2ff; color: #084298; }
+    .tabela-status-mes-wrapper .label-previsao { background: #fff3cd; color: #664d03; }
 </style>
 {% endblock %}
 
@@ -238,145 +315,165 @@
             </div>
         </div>
 
-        <!-- Statistics Cards -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="row g-3">
-                    <div class="col-md-4 col-lg-3">
-                        <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">Total de Registros</h6>
-                                        <h4 class="mb-0 fw-bold">{{ total_registros }}</h4>
-                                    </div>
-                                    <i class="fas fa-database fa-2x text-primary opacity-25"></i>
-                                </div>
-                            </div>
-                        </div>
+        <!-- Filtros ativos (fixo no topo ao rolar) -->
+        <div class="card border shadow-sm mb-4 filtros-aplicados-bar" id="filtrosAplicadosBar">
+            <div class="card-body py-2 px-4">
+                <div class="d-flex align-items-center flex-wrap gap-2">
+                    <span class="text-muted small fw-semibold me-2 text-nowrap"><i class="fas fa-filter me-1 text-primary"></i>Filtros aplicados:</span>
+                    <div class="d-flex flex-wrap gap-2 align-items-center flex-grow-1">
+                        {% for item in filtros_ativos_resumo %}
+                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3 py-2">{{ item }}</span>
+                        {% endfor %}
                     </div>
-                    <div class="col-md-4 col-lg-3">
-                        <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">Valor Total Pedidos</h6>
-                                        <h4 class="mb-0 fw-bold">{{ valor_total_pedido_geral|currency_br }}</h4>
-                                    </div>
-                                    <i class="fas fa-shopping-cart fa-2x text-info opacity-25"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 col-lg-3">
-                        <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">Valor Total NF</h6>
-                                        <h4 class="mb-0 fw-bold">{{ valor_total_nf_geral|currency_br }}</h4>
-                                    </div>
-                                    <i class="fas fa-file-invoice-dollar fa-2x text-success opacity-25"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 col-lg-3">
-                        <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">Registros sem Status</h6>
-                                        <h4 class="mb-0 fw-bold">{{ registros_sem_status }}</h4>
-                                        <small class="text-muted">{% if total_registros > 0 %}{% widthratio registros_sem_status total_registros 100 %}%{% else %}0%{% endif %}</small>
-                                    </div>
-                                    <i class="fas fa-exclamation-triangle fa-2x text-warning opacity-25"></i>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="d-flex gap-2 ms-auto">
+                        <button type="submit" form="filtrosForm" class="btn btn-sm btn-primary" title="Aplicar filtros"><i class="fas fa-search me-1"></i>Filtrar</button>
+                        <a href="{% url 'analise_planilha_rc' %}" class="btn btn-sm btn-outline-danger" title="Remover todos os filtros"><i class="fas fa-times me-1"></i>Limpar</a>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Additional Statistics -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="row g-3">
-                    <div class="col-md-4 col-lg-2">
-                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-primary">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">Com RC</h6>
-                                        <h4 class="mb-0 fw-bold text-primary">{{ registros_com_rc }}</h4>
-                                    </div>
+        <!-- KPI Cards -->
+        <div class="mb-5">
+
+            <!-- Linha 1: Total de Requisições e Valor em RC abertas -->
+            <div class="row mb-3">
+                <div class="col-md-6 mb-3">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Total de Requisições Abertas</h6>
+                                    <h2 class="mb-0 fw-bold">{{ total_registros }}</h2>
+                                    <small class="text-muted">Data RC no período filtrado</small>
                                 </div>
+                                <i class="fas fa-database fa-3x text-primary opacity-25"></i>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4 col-lg-2">
-                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-info">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">Com Pedido</h6>
-                                        <h4 class="mb-0 fw-bold text-info">{{ registros_com_pedido }}</h4>
-                                    </div>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Valor total em RC abertas</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_total_pedido_geral|currency_br }}</h2>
+                                    <small class="text-muted">Data RC no período filtrado</small>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 col-lg-2">
-                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-success">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">Com NF Saída</h6>
-                                        <h4 class="mb-0 fw-bold text-success">{{ registros_com_nf_saida }}</h4>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 col-lg-2">
-                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-warning">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">Com NF Serviço</h6>
-                                        <h4 class="mb-0 fw-bold text-warning">{{ registros_com_nf_servico }}</h4>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 col-lg-2">
-                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-primary">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">Valor Médio Pedido</h6>
-                                        <h5 class="mb-0 fw-bold text-primary">{{ valor_medio_pedido|currency_br }}</h5>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 col-lg-2">
-                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-success">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">Valor Médio NF</h6>
-                                        <h5 class="mb-0 fw-bold text-success">{{ valor_medio_nf|currency_br }}</h5>
-                                    </div>
-                                </div>
+                                <i class="fas fa-shopping-cart fa-3x text-info opacity-25"></i>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Linha 2: Total com Previsão de uso Atual, Valor Total NF e Possíveis Gastos -->
+            <div class="row mb-3">
+                <div class="col-md-4 mb-3">
+                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Total com Previsão de uso Atual:</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_previsao_uso_atual|currency_br }}</h2>
+                                    <small class="text-muted">{{ total_com_previsao_uso_atual }} registro(s)</small>
+                                </div>
+                                <i class="fas fa-calendar-check fa-3x text-warning opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Valor Total com NF de Serviço:</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_total_nf_geral|currency_br }}</h2>
+                                    <small class="text-muted">Soma das notas fiscais</small>
+                                </div>
+                                <i class="fas fa-file-invoice-dollar fa-3x text-success opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card stat-card kpi-card kpi-secondary shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Possíveis Gastos (Previstos, mas sem NF)</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_possiveis_gastos|currency_br }}</h2>
+                                    <small class="text-muted">Previsão − Valor NF</small>
+                                </div>
+                                <i class="fas fa-exclamation-triangle fa-3x text-secondary opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cards adicionais (6 boxes) -->
+            <div class="row mb-3">
+                <div class="col-md-4 col-lg-2 mb-3">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com RC</h6>
+                                    <h2 class="mb-0 fw-bold">{{ registros_com_rc }}</h2>
+                                    <small class="text-muted">Com requisição de compra</small>
+                                </div>
+                                <i class="fas fa-file-alt fa-3x text-primary opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 col-lg-2 mb-3">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com Pedido</h6>
+                                    <h2 class="mb-0 fw-bold">{{ registros_com_pedido }}</h2>
+                                    <small class="text-muted">Com pedido registrado</small>
+                                </div>
+                                <i class="fas fa-clipboard-list fa-3x text-info opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 col-lg-2 mb-3">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com NF Saída</h6>
+                                    <h2 class="mb-0 fw-bold">{{ registros_com_nf_saida }}</h2>
+                                    <small class="text-muted">NF de saída informada</small>
+                                </div>
+                                <i class="fas fa-file-export fa-3x text-success opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 col-lg-2 mb-3">
+                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com NF Serviço</h6>
+                                    <h2 class="mb-0 fw-bold">{{ registros_com_nf_servico }}</h2>
+                                    <small class="text-muted">NF de serviço informada</small>
+                                </div>
+                                <i class="fas fa-concierge-bell fa-3x text-warning opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
         <!-- Análise por Status (Principal) -->
@@ -568,6 +665,120 @@
                 </div>
             </div>
         </div>
+
+        <!-- Tabela Valor por Status e Mês (dados completos - não segue filtros da página) -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>Valor por Status e Mês ({{ tabela_status_mes_ano }}) — Dados completos
+                        </h5>
+                        <small class="d-block mt-1 opacity-75">Baseado em todos os registros de ControleRCeNF. Duas linhas por status: <strong>Data RC</strong> (agrupa por mês da data da RC) e <strong>Previsão p/ Uso</strong> (agrupa por mês da previsão para uso).</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="tabela-status-mes-wrapper table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th class="text-nowrap">Status</th>
+                                        <th class="text-nowrap" style="min-width: 140px;">Por data</th>
+                                        <th class="text-end text-nowrap">Jan</th>
+                                        <th class="text-end text-nowrap">Fev</th>
+                                        <th class="text-end text-nowrap">Mar</th>
+                                        <th class="text-end text-nowrap">Abr</th>
+                                        <th class="text-end text-nowrap">Mai</th>
+                                        <th class="text-end text-nowrap">Jun</th>
+                                        <th class="text-end text-nowrap">Jul</th>
+                                        <th class="text-end text-nowrap">Ago</th>
+                                        <th class="text-end text-nowrap">Set</th>
+                                        <th class="text-end text-nowrap">Out</th>
+                                        <th class="text-end text-nowrap">Nov</th>
+                                        <th class="text-end text-nowrap">Dez</th>
+                                        <th class="text-end text-nowrap fw-bold">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in tabela_status_grouped %}
+                                    <tr class="tr-data-rc">
+                                        <td rowspan="2" class="text-nowrap cell-status-group">{{ item.status|truncatewords:10 }}</td>
+                                        <td class="text-nowrap"><span class="label-base label-rc"><i class="fas fa-calendar-alt me-1"></i>Data RC</span></td>
+                                        <td class="text-end text-nowrap">{{ item.row_rc.mes_1|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_rc.mes_2|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_rc.mes_3|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_rc.mes_4|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_rc.mes_5|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_rc.mes_6|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_rc.mes_7|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_rc.mes_8|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_rc.mes_9|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_rc.mes_10|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_rc.mes_11|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_rc.mes_12|currency_br }}</td>
+                                        <td class="text-end fw-bold">{{ item.row_rc.total|currency_br }}</td>
+                                    </tr>
+                                    <tr class="tr-previsao {% if not forloop.last %}tr-status-sep{% endif %}">
+                                        <td class="text-nowrap"><span class="label-base label-previsao"><i class="fas fa-clock me-1"></i>Previsão p/ Uso</span></td>
+                                        <td class="text-end text-nowrap">{{ item.row_previsao.mes_1|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_previsao.mes_2|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_previsao.mes_3|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_previsao.mes_4|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_previsao.mes_5|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_previsao.mes_6|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_previsao.mes_7|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_previsao.mes_8|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_previsao.mes_9|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_previsao.mes_10|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_previsao.mes_11|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ item.row_previsao.mes_12|currency_br }}</td>
+                                        <td class="text-end fw-bold">{{ item.row_previsao.total|currency_br }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="15" class="text-center text-muted">Nenhum dado encontrado para {{ tabela_status_mes_ano }}.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                                {% if tabela_status_mes_rows %}
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="2" class="text-nowrap fw-bold"><span class="badge bg-primary badge-base">Data RC</span> Total</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_rc.mes_1|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_rc.mes_2|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_rc.mes_3|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_rc.mes_4|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_rc.mes_5|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_rc.mes_6|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_rc.mes_7|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_rc.mes_8|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_rc.mes_9|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_rc.mes_10|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_rc.mes_11|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_rc.mes_12|currency_br }}</td>
+                                        <td class="text-end fw-bold">{{ tabela_totais_rc.total|currency_br }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2" class="text-nowrap fw-bold"><span class="badge bg-warning text-dark badge-base">Previsão</span> Total</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_previsao.mes_1|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_previsao.mes_2|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_previsao.mes_3|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_previsao.mes_4|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_previsao.mes_5|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_previsao.mes_6|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_previsao.mes_7|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_previsao.mes_8|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_previsao.mes_9|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_previsao.mes_10|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_previsao.mes_11|currency_br }}</td>
+                                        <td class="text-end text-nowrap">{{ tabela_totais_previsao.mes_12|currency_br }}</td>
+                                        <td class="text-end fw-bold">{{ tabela_totais_previsao.total|currency_br }}</td>
+                                    </tr>
+                                </tfoot>
+                                {% endif %}
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </section>
 {% endblock %}
@@ -607,6 +818,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const statusLabels = {{ status_labels|safe }};
         const statusData = {{ status_data|safe }};
         const statusPercentages = {{ status_percentages|safe }};
+        const statusValoresPedido = {{ status_valores_pedido|safe }};
+        const statusValoresNF = {{ status_valores_nf|safe }};
         
         new Chart(statusCtx.getContext('2d'), {
             type: 'pie',
@@ -624,17 +837,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        position: 'right'
+                        position: 'right',
+                        labels: { padding: 12 },
+                        generateLabels: function(chart) {
+                            const data = chart.data;
+                            if (!data.labels.length || !data.datasets.length) return [];
+                            return data.labels.map(function(label, i) {
+                                const qtd = data.datasets[0].data[i];
+                                const pct = statusPercentages[i] || 0;
+                                const valorNF = statusValoresNF[i] || 0;
+                                return {
+                                    text: label + ': ' + formatarNumeroBR(qtd) + ' (' + formatarNumeroBR(pct, 1) + '%) | ' + formatarMoedaBR(valorNF),
+                                    fillStyle: data.datasets[0].backgroundColor[i],
+                                    hidden: false,
+                                    index: i
+                                };
+                            });
+                        }
                     },
                     tooltip: {
                         callbacks: {
                             label: function(context) {
                                 let label = context.label || '';
-                                if (label) {
-                                    label += ': ';
-                                }
-                                const percentage = statusPercentages[context.dataIndex] || 0;
-                                label += formatarNumeroBR(context.parsed) + ' (' + formatarNumeroBR(percentage, 1) + '%)';
+                                if (label) label += ': ';
+                                const i = context.dataIndex;
+                                const qtd = context.parsed || 0;
+                                const pct = statusPercentages[i] || 0;
+                                const valorPedido = statusValoresPedido[i] || 0;
+                                const valorNF = statusValoresNF[i] || 0;
+                                label += formatarNumeroBR(qtd) + ' (' + formatarNumeroBR(pct, 1) + '%)';
+                                label += '\nPedido: ' + formatarMoedaBR(valorPedido);
+                                label += '\nNF: ' + formatarMoedaBR(valorNF);
                                 return label;
                             }
                         }
@@ -753,6 +986,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (empresaCtx) {
         const empresaLabels = {{ empresa_labels|safe }};
         const empresaData = {{ empresa_data|safe }};
+        const empresaValoresPedido = {{ empresa_valores_pedido|safe }};
+        const empresaValoresNF = {{ empresa_valores_nf|safe }};
         
         new Chart(empresaCtx.getContext('2d'), {
             type: 'bar',
@@ -777,7 +1012,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                return 'Registros: ' + formatarNumeroBR(context.parsed.x);
+                                const i = context.dataIndex;
+                                let label = 'Registros: ' + formatarNumeroBR(context.parsed.x);
+                                label += '\nPedido: ' + formatarMoedaBR(empresaValoresPedido[i] || 0);
+                                label += '\nNF: ' + formatarMoedaBR(empresaValoresNF[i] || 0);
+                                return label;
                             }
                         }
                     }
@@ -801,6 +1040,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (solicitanteCtx) {
         const solicitanteLabels = {{ solicitante_labels|safe }};
         const solicitanteData = {{ solicitante_data|safe }};
+        const solicitanteValoresPedido = {{ solicitante_valores_pedido|safe }};
+        const solicitanteValoresNF = {{ solicitante_valores_nf|safe }};
         
         new Chart(solicitanteCtx.getContext('2d'), {
             type: 'bar',
@@ -825,7 +1066,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                return 'Registros: ' + formatarNumeroBR(context.parsed.x);
+                                const i = context.dataIndex;
+                                let label = 'Registros: ' + formatarNumeroBR(context.parsed.x);
+                                label += '\nPedido: ' + formatarMoedaBR(solicitanteValoresPedido[i] || 0);
+                                label += '\nNF: ' + formatarMoedaBR(solicitanteValoresNF[i] || 0);
+                                return label;
                             }
                         }
                     }

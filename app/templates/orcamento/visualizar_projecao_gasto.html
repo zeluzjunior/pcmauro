@@ -178,7 +178,7 @@
                                 <label class="form-label fw-bold">Serviço Concluído</label>
                                 <p class="form-control-plaintext">
                                     {% if projecao.servico_concluido %}
-                                        {{ projecao.servico_concluido|date:"d/m/Y" }}
+                                        {{ projecao.servico_concluido }}
                                     {% else %}
                                         -
                                     {% endif %}
@@ -188,7 +188,7 @@
                                 <label class="form-label fw-bold">NF Serviço Recebida</label>
                                 <p class="form-control-plaintext">
                                     {% if projecao.nf_servico_recebida %}
-                                        {{ projecao.nf_servico_recebida|date:"d/m/Y" }}
+                                        {{ projecao.nf_servico_recebida }}
                                     {% else %}
                                         -
                                     {% endif %}
@@ -198,7 +198,7 @@
                                 <label class="form-label fw-bold">NF Enviada Lançamento</label>
                                 <p class="form-control-plaintext">
                                     {% if projecao.nf_enviada_lancamento %}
-                                        {{ projecao.nf_enviada_lancamento|date:"d/m/Y" }}
+                                        {{ projecao.nf_enviada_lancamento }}
                                     {% else %}
                                         -
                                     {% endif %}

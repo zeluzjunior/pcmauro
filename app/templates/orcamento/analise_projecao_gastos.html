@@ -221,20 +221,6 @@
             <!-- Cards Gerais -->
             <div class="row mb-3">
                 <div class="col-md-3 mb-3">
-                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Total de Projeções</h6>
-                                    <h2 class="mb-0 fw-bold">{{ total_projecoes }}</h2>
-                                    <small class="text-muted">Projeções cadastradas</small>
-                                </div>
-                                <i class="fas fa-clipboard-list fa-3x text-primary opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-3">
                     <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
@@ -253,56 +239,11 @@
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="text-muted mb-2">Valor Médio</h6>
-                                    <h2 class="mb-0 fw-bold">{{ valor_medio|currency_br }}</h2>
-                                    <small class="text-muted">Por projeção</small>
+                                    <h6 class="text-muted mb-2">Serviço Concluído = SIM</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_servico_concluido_sim|currency_br }}</h2>
+                                    <small class="text-muted">{{ projecoes_servico_concluido_sim }} projeções ({{ percentual_servico_concluido_sim|floatformat:1 }}% do total)</small>
                                 </div>
-                                <i class="fas fa-calculator fa-3x text-info opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Com Nota Fiscal</h6>
-                                    <h2 class="mb-0 fw-bold">{{ projecoes_com_nf }}</h2>
-                                    <small class="text-muted">{{ percentual_com_nf|floatformat:1 }}% do total</small>
-                                </div>
-                                <i class="fas fa-file-invoice fa-3x text-warning opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- Cards Adicionais -->
-            <div class="row mb-3">
-                <div class="col-md-3 mb-3">
-                    <div class="card stat-card kpi-card kpi-purple shadow-sm border-0">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Com Ordem de Serviço</h6>
-                                    <h2 class="mb-0 fw-bold">{{ projecoes_com_os }}</h2>
-                                    <small class="text-muted">{{ percentual_com_os|floatformat:1 }}% do total</small>
-                                </div>
-                                <i class="fas fa-wrench fa-3x opacity-25" style="color: #6f42c1;"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Serviços Concluídos</h6>
-                                    <h2 class="mb-0 fw-bold">{{ projecoes_concluidas }}</h2>
-                                    <small class="text-muted">{{ percentual_concluidas|floatformat:1 }}% do total</small>
-                                </div>
-                                <i class="fas fa-check-circle fa-3x text-success opacity-25"></i>
+                                <i class="fas fa-check-circle fa-3x text-info opacity-25"></i>
                             </div>
                         </div>
                     </div>
@@ -312,25 +253,70 @@
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="text-muted mb-2">Pendentes</h6>
-                                    <h2 class="mb-0 fw-bold">{{ projecoes_pendentes }}</h2>
-                                    <small class="text-muted">{{ percentual_pendentes|floatformat:1 }}% do total</small>
+                                    <h6 class="text-muted mb-2">Serviço Concluído = NÃO</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_servico_concluido_nao|currency_br }}</h2>
+                                    <small class="text-muted">{{ projecoes_servico_concluido_nao }} projeções ({{ percentual_servico_concluido_nao|floatformat:1 }}% do total)</small>
                                 </div>
-                                <i class="fas fa-clock fa-3x text-danger opacity-25"></i>
+                                <i class="fas fa-times-circle fa-3x text-danger opacity-25"></i>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3 mb-3">
-                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="text-muted mb-2">Setores Únicos</h6>
-                                    <h2 class="mb-0 fw-bold">{{ setores_unicos }}</h2>
-                                    <small class="text-muted">Setores diferentes</small>
+                                    <h6 class="text-muted mb-2">Serviço Concluído = INDEFINIDO</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_servico_concluido_indefinido|currency_br }}</h2>
+                                    <small class="text-muted">{{ projecoes_servico_concluido_indefinido }} projeções ({{ percentual_servico_concluido_indefinido|floatformat:1 }}% do total)</small>
                                 </div>
-                                <i class="fas fa-sitemap fa-3x text-info opacity-25"></i>
+                                <i class="fas fa-question-circle fa-3x text-warning opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Cards Adicionais (3 boxes) -->
+            <div class="row mb-3">
+                <div class="col-md-4 mb-3">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Total de Projeções</h6>
+                                    <h2 class="mb-0 fw-bold">{{ total_projecoes }}</h2>
+                                    <small class="text-muted">Projeções cadastradas</small>
+                                </div>
+                                <i class="fas fa-clipboard-list fa-3x text-primary opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card stat-card kpi-card kpi-purple shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com Número da NF</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_com_numero_nf|currency_br }}</h2>
+                                    <small class="text-muted">{{ projecoes_com_numero_nf }} projeções ({{ percentual_com_numero_nf|floatformat:1 }}% do total)</small>
+                                </div>
+                                <i class="fas fa-file-invoice fa-3x opacity-25" style="color: #6f42c1;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Impacto no Orçamento</h6>
+                                    <h2 class="mb-0 fw-bold">{% if percentual_impacto_orcamento is not None %}{{ percentual_impacto_orcamento|floatformat:1 }}%{% else %}—{% endif %}</h2>
+                                    <small class="text-muted">Projetado sobre orçamento do período{% if valor_orcamento_periodo %} ({{ valor_orcamento_periodo|currency_br }}){% endif %}</small>
+                                </div>
+                                <i class="fas fa-percentage fa-3x text-success opacity-25"></i>
                             </div>
                         </div>
                     </div>
@@ -369,6 +355,52 @@
                     <div class="card-body">
                         <div class="chart-container-large">
                             <canvas id="gastosPrevisaoChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela Setor x Serviço Concluído (respeita filtros) -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header text-white" style="background-color: #0d6efd;">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>Projeções por Setor e Status (Serviço Concluído)
+                        </h5>
+                        <small class="opacity-90">Valor total (R$) por setor conforme classificação do campo Serviço Concluído</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered table-striped mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Setor</th>
+                                        <th class="text-center">SIM</th>
+                                        <th class="text-center">NÃO</th>
+                                        <th class="text-center">INDEFINIDO</th>
+                                        <th class="text-center">Não informado</th>
+                                        <th class="text-center"><strong>Total</strong></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in tabela_setor_servico %}
+                                    <tr>
+                                        <td><strong>{{ row.setor }}</strong></td>
+                                        <td class="text-center format-money" data-value="{{ row.sim|default:0 }}">{{ row.sim|currency_br }}</td>
+                                        <td class="text-center format-money" data-value="{{ row.nao|default:0 }}">{{ row.nao|currency_br }}</td>
+                                        <td class="text-center format-money" data-value="{{ row.indefinido|default:0 }}">{{ row.indefinido|currency_br }}</td>
+                                        <td class="text-center format-money" data-value="{{ row.nao_informado|default:0 }}">{{ row.nao_informado|currency_br }}</td>
+                                        <td class="text-center format-money" data-value="{{ row.total|default:0 }}"><strong>{{ row.total|currency_br }}</strong></td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">Nenhum dado disponível para os filtros aplicados</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>

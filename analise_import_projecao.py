@@ -39,9 +39,7 @@ MODEL_FIELDS = {
     'fornecedor_nome_fantasia', 'fornecedor_cnpj', 'uso_contabil', 'numero_nf',
     'numero_ordem_servico', 'numero_requisicao_compra', 'numero_pedido_compra',
     'servico_concluido', 'nf_servico_recebida', 'nf_enviada_lancamento', 'observacoes',
-    'tipo', 'centro_atividade', 'nome_centro_atividade', 'valor_planejado', 'valor_realizado',
-    'valor_projetado', 'data_requisicao', 'data_planejada', 'data_realizada', 'fornecedor',
-    'numero_requisicao', 'status', 'dados_adicionais'
+    'dados_adicionais'
 }
 
 
@@ -129,8 +127,7 @@ def analyze_excel(file_path):
             'data_abertura_requisicao', 'previsao_execucao', 'mes_referencia', 'ano_referencia',
             'fornecedor_nome_fantasia', 'fornecedor_cnpj', 'uso_contabil', 'numero_nf',
             'numero_ordem_servico', 'numero_requisicao_compra', 'numero_pedido_compra',
-            'servico_concluido', 'nf_servico_recebida', 'nf_enviada_lancamento', 'observacoes',
-            'centro_atividade', 'fornecedor', 'data_requisicao', 'numero_requisicao', 'tipo'
+            'servico_concluido', 'nf_servico_recebida', 'nf_enviada_lancamento', 'observacoes'
         }
         model_not_fed = MODEL_FIELDS - fields_from_excel - {'id_excel', 'dados_adicionais', 'created_at', 'updated_at'}
         # Remover campos derivados (mes_referencia, ano_referencia vêm de previsao_execucao)
