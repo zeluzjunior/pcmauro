@@ -17,20 +17,30 @@
         max-height: 70vh;
         overflow-y: auto;
         overflow-x: auto;
+        position: relative;
     }
     .table {
         width: 100%;
         table-layout: auto;
+        border-collapse: separate;
+        border-spacing: 0;
     }
     .table thead th {
         position: sticky;
         top: 0;
         background-color: #f8f9fa;
-        z-index: 10;
+        z-index: 12;
         white-space: nowrap;
         vertical-align: middle;
         text-align: center;
         padding: 12px 8px;
+        box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+    }
+    .table thead tr.filter-row th {
+        top: 47px;
+        z-index: 11;
+        background-color: #e9ecef;
+        box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.08);
     }
     .table tbody td {
         vertical-align: middle;
@@ -54,11 +64,7 @@
         background-color: #e9ecef;
     }
     .filter-row th {
-        background-color: #e9ecef;
         padding: 4px 8px !important;
-        position: sticky;
-        top: 48px;
-        z-index: 8;
     }
     .col-data { min-width: 120px; }
     .col-item { min-width: 100px; }
@@ -67,6 +73,7 @@
     .col-quantidade { min-width: 100px; }
     .col-centro { min-width: 100px; }
     .col-usuario { min-width: 150px; }
+    .col-acoes { min-width: 140px; white-space: nowrap; }
     /* Justified alignment: center for all except Descrição Item */
     #requisicoesTable thead th:not(.col-descricao) { text-align: center; }
     #requisicoesTable tbody td:not(.col-descricao) { text-align: center; }
@@ -108,8 +115,9 @@
                 <div id="collapseFilter" class="accordion-collapse collapse {% if ano_filtro or meses_filtro %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
                     <div class="accordion-body">
                         <form method="GET" class="row g-3 align-items-end" action="{% url 'consultar_requisicoes_almoxarifado' %}">
-                            <!-- Preservar busca geral -->
+                            <!-- Preservar busca geral e ordenação -->
                             <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                            {% if sort_valor %}<input type="hidden" name="sort_valor" value="{{ sort_valor }}">{% endif %}
                             
                             <div class="col-md-2">
                                 <label for="ano_filtro" class="form-label">Ano:</label>
@@ -159,12 +167,12 @@
         <div class="row mb-4">
             <div class="col-12">
                 <form method="get" action="{% url 'consultar_requisicoes_almoxarifado' %}" class="d-flex">
-                    <!-- Preservar filtros de data -->
+                    <!-- Preservar filtros de data e ordenação -->
                     <input type="hidden" name="ano" value="{{ ano_filtro }}">
                     {% for mes in meses_filtro %}
                         <input type="hidden" name="mes" value="{{ mes }}">
                     {% endfor %}
-                    
+                    {% if sort_valor %}<input type="hidden" name="sort_valor" value="{{ sort_valor }}">{% endif %}
                     <input type="text" name="search" class="form-control me-2" placeholder="Buscar por item, descrição, centro de atividade..." value="{{ search_query|default:'' }}">
                     <button type="submit" class="btn btn-outline-primary">
                         <i class="fas fa-search"></i> Buscar
@@ -254,12 +262,13 @@
                     </div>
                     <div class="card-body p-0">
                         <form method="get" action="{% url 'consultar_requisicoes_almoxarifado' %}" id="filterForm">
-                            <!-- Preservar busca geral e filtros de data -->
+                            <!-- Preservar busca geral, filtros de data e ordenação -->
                             <input type="hidden" name="search" value="{{ search_query|default:'' }}">
                             <input type="hidden" name="ano" value="{{ ano_filtro }}">
                             {% for mes in meses_filtro %}
                                 <input type="hidden" name="mes" value="{{ mes }}">
                             {% endfor %}
+                            {% if sort_valor %}<input type="hidden" name="sort_valor" value="{{ sort_valor }}">{% endif %}
                             
                             <div class="table-container">
                                 <table class="table table-hover table-striped mb-0" id="requisicoesTable">
@@ -272,7 +281,13 @@
                                             <th class="col-item">Código Item</th>
                                             <th class="col-descricao">Descrição Item</th>
                                             <th class="col-quantidade">Quantidade</th>
-                                            <th class="col-valor">Valor Total</th>
+                                            <th class="col-valor">
+                                                Valor Total
+                                                <div class="btn-group btn-group-sm ms-1 d-inline" role="group">
+                                                    <a href="?{% if query_string_base %}{{ query_string_base }}&{% endif %}sort_valor=asc" class="btn btn-outline-secondary btn-sm py-0 px-1 {% if sort_valor == 'asc' %}active{% endif %}" title="Menor para maior">↑</a>
+                                                    <a href="?{% if query_string_base %}{{ query_string_base }}&{% endif %}sort_valor=desc" class="btn btn-outline-secondary btn-sm py-0 px-1 {% if sort_valor == 'desc' %}active{% endif %}" title="Maior para menor">↓</a>
+                                                </div>
+                                            </th>
                                             <th class="col-centro">Centro Atividade</th>
                                             <th class="col-usuario">Usuário Criou</th>
                                             <th class="col-descricao">Operação</th>
@@ -303,7 +318,7 @@
                                             <th>
                                                 <input type="text" name="filter_operacao" class="filter-input" value="{{ filter_operacao|default:'' }}" placeholder="Operação">
                                             </th>
-                                            <th>Ações</th>
+                                            <th class="col-acoes">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -333,16 +348,18 @@
                                             <td>{{ requisicao.cd_usu_criou|default:"-" }}</td>
                                             <td>{{ requisicao.descr_operacao|default:"-" }}</td>
                                             <td>
-                                                <a href="{% url 'visualizar_requisicao_almoxarifado' requisicao.id %}" class="btn btn-sm btn-primary me-1" title="Visualizar">
-                                                    <i class="fas fa-eye"></i>
-                                                </a>
-                                                <form method="post" action="{% url 'deletar_requisicoes_almoxarifado' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja deletar esta requisição? Esta ação não pode ser desfeita.');">
-                                                    {% csrf_token %}
-                                                    <input type="hidden" name="requisicao_id" value="{{ requisicao.id }}">
-                                                    <button type="submit" class="btn btn-sm btn-danger" title="Deletar">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </form>
+                                                <div class="d-flex gap-2 justify-content-center flex-nowrap">
+                                                    <a href="{% url 'visualizar_requisicao_almoxarifado' requisicao.id %}" class="btn btn-sm btn-outline-primary" title="Visualizar detalhes">
+                                                        <i class="fas fa-eye me-1"></i>Ver
+                                                    </a>
+                                                    <form method="post" action="{% url 'deletar_requisicoes_almoxarifado' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" class="d-inline m-0" onsubmit="return confirm('Tem certeza que deseja deletar esta requisição? Esta ação não pode ser desfeita.');">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="requisicao_id" value="{{ requisicao.id }}">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Deletar">
+                                                            <i class="fas fa-trash me-1"></i>Excluir
+                                                        </button>
+                                                    </form>
+                                                </div>
                                             </td>
                                         </tr>
                                         {% empty %}
@@ -370,10 +387,10 @@
                     <ul class="pagination justify-content-center">
                         {% if requisicoes.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_item %}filter_item={{ filter_item }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_quantidade %}filter_quantidade={{ filter_quantidade }}&{% endif %}{% if filter_valor %}filter_valor={{ filter_valor }}&{% endif %}{% if filter_centro %}filter_centro={{ filter_centro }}&{% endif %}{% if filter_usuario_criou %}filter_usuario_criou={{ filter_usuario_criou }}&{% endif %}{% if filter_usuario_atend %}filter_usuario_atend={{ filter_usuario_atend }}&{% endif %}{% if filter_operacao %}filter_operacao={{ filter_operacao }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page=1">Primeira</a>
+                                <a class="page-link" href="?{% if query_string_base %}{{ query_string_base }}&{% endif %}page=1">Primeira</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_item %}filter_item={{ filter_item }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_quantidade %}filter_quantidade={{ filter_quantidade }}&{% endif %}{% if filter_valor %}filter_valor={{ filter_valor }}&{% endif %}{% if filter_centro %}filter_centro={{ filter_centro }}&{% endif %}{% if filter_usuario_criou %}filter_usuario_criou={{ filter_usuario_criou }}&{% endif %}{% if filter_usuario_atend %}filter_usuario_atend={{ filter_usuario_atend }}&{% endif %}{% if filter_operacao %}filter_operacao={{ filter_operacao }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page={{ requisicoes.previous_page_number }}">Anterior</a>
+                                <a class="page-link" href="?{% if query_string_base %}{{ query_string_base }}&{% endif %}page={{ requisicoes.previous_page_number }}">Anterior</a>
                             </li>
                         {% endif %}
                         
@@ -385,10 +402,10 @@
                         
                         {% if requisicoes.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_item %}filter_item={{ filter_item }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_quantidade %}filter_quantidade={{ filter_quantidade }}&{% endif %}{% if filter_valor %}filter_valor={{ filter_valor }}&{% endif %}{% if filter_centro %}filter_centro={{ filter_centro }}&{% endif %}{% if filter_usuario_criou %}filter_usuario_criou={{ filter_usuario_criou }}&{% endif %}{% if filter_usuario_atend %}filter_usuario_atend={{ filter_usuario_atend }}&{% endif %}{% if filter_operacao %}filter_operacao={{ filter_operacao }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page={{ requisicoes.next_page_number }}">Próxima</a>
+                                <a class="page-link" href="?{% if query_string_base %}{{ query_string_base }}&{% endif %}page={{ requisicoes.next_page_number }}">Próxima</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_data %}filter_data={{ filter_data }}&{% endif %}{% if filter_item %}filter_item={{ filter_item }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_quantidade %}filter_quantidade={{ filter_quantidade }}&{% endif %}{% if filter_valor %}filter_valor={{ filter_valor }}&{% endif %}{% if filter_centro %}filter_centro={{ filter_centro }}&{% endif %}{% if filter_usuario_criou %}filter_usuario_criou={{ filter_usuario_criou }}&{% endif %}{% if filter_usuario_atend %}filter_usuario_atend={{ filter_usuario_atend }}&{% endif %}{% if filter_operacao %}filter_operacao={{ filter_operacao }}&{% endif %}{% if filter_local %}filter_local={{ filter_local }}&{% endif %}page={{ requisicoes.paginator.num_pages }}">Última</a>
+                                <a class="page-link" href="?{% if query_string_base %}{{ query_string_base }}&{% endif %}page={{ requisicoes.paginator.num_pages }}">Última</a>
                             </li>
                         {% endif %}
                     </ul>

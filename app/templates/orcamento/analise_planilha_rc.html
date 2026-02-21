@@ -47,6 +47,7 @@
         padding: 0.5rem 1rem;
         color: #212529;
     }
+    /* Month filter: dropdown with grid of checkboxes */
     .filter-month-chip {
         display: inline-flex;
         align-items: center;
@@ -71,6 +72,42 @@
         color: #fff;
     }
     .filter-month-chip input { display: none; }
+    /* Month filter: calendar-style grid (4x3) */
+    .month-filter-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.4rem;
+    }
+    .month-filter-item {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem 0.25rem;
+        border-radius: 0.4rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 0.8rem;
+        font-weight: 500;
+        border: 2px solid #e9ecef;
+        background: #f8f9fa;
+    }
+    .month-filter-item:hover {
+        background: #e9ecef;
+        border-color: #ced4da;
+        transform: translateY(-1px);
+    }
+    .month-filter-item.checked {
+        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+        border-color: #0d6efd;
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(13, 110, 253, 0.35);
+    }
+    .month-filter-item input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
         /* Dark text for form content in filter accordion body */
     .filter-accordion .accordion-body .form-label,
     .filter-accordion .accordion-body .card-header {
@@ -208,19 +245,19 @@
                                                         {% endfor %}
                                                     </select>
                                                     <label class="form-label small fw-semibold d-block">Meses</label>
-                                                    <div class="d-flex flex-wrap gap-1">
-                                                        <label class="filter-month-chip {% if 1 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="1" {% if 1 in meses_filtro %}checked{% endif %}>Jan</label>
-                                                        <label class="filter-month-chip {% if 2 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="2" {% if 2 in meses_filtro %}checked{% endif %}>Fev</label>
-                                                        <label class="filter-month-chip {% if 3 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="3" {% if 3 in meses_filtro %}checked{% endif %}>Mar</label>
-                                                        <label class="filter-month-chip {% if 4 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="4" {% if 4 in meses_filtro %}checked{% endif %}>Abr</label>
-                                                        <label class="filter-month-chip {% if 5 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="5" {% if 5 in meses_filtro %}checked{% endif %}>Mai</label>
-                                                        <label class="filter-month-chip {% if 6 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="6" {% if 6 in meses_filtro %}checked{% endif %}>Jun</label>
-                                                        <label class="filter-month-chip {% if 7 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="7" {% if 7 in meses_filtro %}checked{% endif %}>Jul</label>
-                                                        <label class="filter-month-chip {% if 8 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="8" {% if 8 in meses_filtro %}checked{% endif %}>Ago</label>
-                                                        <label class="filter-month-chip {% if 9 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="9" {% if 9 in meses_filtro %}checked{% endif %}>Set</label>
-                                                        <label class="filter-month-chip {% if 10 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="10" {% if 10 in meses_filtro %}checked{% endif %}>Out</label>
-                                                        <label class="filter-month-chip {% if 11 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="11" {% if 11 in meses_filtro %}checked{% endif %}>Nov</label>
-                                                        <label class="filter-month-chip {% if 12 in meses_filtro %}active{% endif %}"><input type="checkbox" name="mes" value="12" {% if 12 in meses_filtro %}checked{% endif %}>Dez</label>
+                                                    <div class="month-filter-grid">
+                                                        <label class="month-filter-item {% if 1 in meses_filtro %}checked{% endif %}"><input type="checkbox" name="mes" value="1" {% if 1 in meses_filtro %}checked{% endif %}>Jan</label>
+                                                        <label class="month-filter-item {% if 2 in meses_filtro %}checked{% endif %}"><input type="checkbox" name="mes" value="2" {% if 2 in meses_filtro %}checked{% endif %}>Fev</label>
+                                                        <label class="month-filter-item {% if 3 in meses_filtro %}checked{% endif %}"><input type="checkbox" name="mes" value="3" {% if 3 in meses_filtro %}checked{% endif %}>Mar</label>
+                                                        <label class="month-filter-item {% if 4 in meses_filtro %}checked{% endif %}"><input type="checkbox" name="mes" value="4" {% if 4 in meses_filtro %}checked{% endif %}>Abr</label>
+                                                        <label class="month-filter-item {% if 5 in meses_filtro %}checked{% endif %}"><input type="checkbox" name="mes" value="5" {% if 5 in meses_filtro %}checked{% endif %}>Mai</label>
+                                                        <label class="month-filter-item {% if 6 in meses_filtro %}checked{% endif %}"><input type="checkbox" name="mes" value="6" {% if 6 in meses_filtro %}checked{% endif %}>Jun</label>
+                                                        <label class="month-filter-item {% if 7 in meses_filtro %}checked{% endif %}"><input type="checkbox" name="mes" value="7" {% if 7 in meses_filtro %}checked{% endif %}>Jul</label>
+                                                        <label class="month-filter-item {% if 8 in meses_filtro %}checked{% endif %}"><input type="checkbox" name="mes" value="8" {% if 8 in meses_filtro %}checked{% endif %}>Ago</label>
+                                                        <label class="month-filter-item {% if 9 in meses_filtro %}checked{% endif %}"><input type="checkbox" name="mes" value="9" {% if 9 in meses_filtro %}checked{% endif %}>Set</label>
+                                                        <label class="month-filter-item {% if 10 in meses_filtro %}checked{% endif %}"><input type="checkbox" name="mes" value="10" {% if 10 in meses_filtro %}checked{% endif %}>Out</label>
+                                                        <label class="month-filter-item {% if 11 in meses_filtro %}checked{% endif %}"><input type="checkbox" name="mes" value="11" {% if 11 in meses_filtro %}checked{% endif %}>Nov</label>
+                                                        <label class="month-filter-item {% if 12 in meses_filtro %}checked{% endif %}"><input type="checkbox" name="mes" value="12" {% if 12 in meses_filtro %}checked{% endif %}>Dez</label>
                                                     </div>
                                                     <div class="mt-2">
                                                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleMeses('mes', true)">Todos</button>
@@ -245,19 +282,19 @@
                                                         {% endfor %}
                                                     </select>
                                                     <label class="form-label small fw-semibold d-block">Meses</label>
-                                                    <div class="d-flex flex-wrap gap-1">
-                                                        <label class="filter-month-chip {% if 1 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="1" {% if 1 in previsao_meses_filtro %}checked{% endif %}>Jan</label>
-                                                        <label class="filter-month-chip {% if 2 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="2" {% if 2 in previsao_meses_filtro %}checked{% endif %}>Fev</label>
-                                                        <label class="filter-month-chip {% if 3 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="3" {% if 3 in previsao_meses_filtro %}checked{% endif %}>Mar</label>
-                                                        <label class="filter-month-chip {% if 4 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="4" {% if 4 in previsao_meses_filtro %}checked{% endif %}>Abr</label>
-                                                        <label class="filter-month-chip {% if 5 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="5" {% if 5 in previsao_meses_filtro %}checked{% endif %}>Mai</label>
-                                                        <label class="filter-month-chip {% if 6 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="6" {% if 6 in previsao_meses_filtro %}checked{% endif %}>Jun</label>
-                                                        <label class="filter-month-chip {% if 7 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="7" {% if 7 in previsao_meses_filtro %}checked{% endif %}>Jul</label>
-                                                        <label class="filter-month-chip {% if 8 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="8" {% if 8 in previsao_meses_filtro %}checked{% endif %}>Ago</label>
-                                                        <label class="filter-month-chip {% if 9 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="9" {% if 9 in previsao_meses_filtro %}checked{% endif %}>Set</label>
-                                                        <label class="filter-month-chip {% if 10 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="10" {% if 10 in previsao_meses_filtro %}checked{% endif %}>Out</label>
-                                                        <label class="filter-month-chip {% if 11 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="11" {% if 11 in previsao_meses_filtro %}checked{% endif %}>Nov</label>
-                                                        <label class="filter-month-chip {% if 12 in previsao_meses_filtro %}active{% endif %}"><input type="checkbox" name="previsao_mes" value="12" {% if 12 in previsao_meses_filtro %}checked{% endif %}>Dez</label>
+                                                    <div class="month-filter-grid">
+                                                        <label class="month-filter-item {% if 1 in previsao_meses_filtro %}checked{% endif %}"><input type="checkbox" name="previsao_mes" value="1" {% if 1 in previsao_meses_filtro %}checked{% endif %}>Jan</label>
+                                                        <label class="month-filter-item {% if 2 in previsao_meses_filtro %}checked{% endif %}"><input type="checkbox" name="previsao_mes" value="2" {% if 2 in previsao_meses_filtro %}checked{% endif %}>Fev</label>
+                                                        <label class="month-filter-item {% if 3 in previsao_meses_filtro %}checked{% endif %}"><input type="checkbox" name="previsao_mes" value="3" {% if 3 in previsao_meses_filtro %}checked{% endif %}>Mar</label>
+                                                        <label class="month-filter-item {% if 4 in previsao_meses_filtro %}checked{% endif %}"><input type="checkbox" name="previsao_mes" value="4" {% if 4 in previsao_meses_filtro %}checked{% endif %}>Abr</label>
+                                                        <label class="month-filter-item {% if 5 in previsao_meses_filtro %}checked{% endif %}"><input type="checkbox" name="previsao_mes" value="5" {% if 5 in previsao_meses_filtro %}checked{% endif %}>Mai</label>
+                                                        <label class="month-filter-item {% if 6 in previsao_meses_filtro %}checked{% endif %}"><input type="checkbox" name="previsao_mes" value="6" {% if 6 in previsao_meses_filtro %}checked{% endif %}>Jun</label>
+                                                        <label class="month-filter-item {% if 7 in previsao_meses_filtro %}checked{% endif %}"><input type="checkbox" name="previsao_mes" value="7" {% if 7 in previsao_meses_filtro %}checked{% endif %}>Jul</label>
+                                                        <label class="month-filter-item {% if 8 in previsao_meses_filtro %}checked{% endif %}"><input type="checkbox" name="previsao_mes" value="8" {% if 8 in previsao_meses_filtro %}checked{% endif %}>Ago</label>
+                                                        <label class="month-filter-item {% if 9 in previsao_meses_filtro %}checked{% endif %}"><input type="checkbox" name="previsao_mes" value="9" {% if 9 in previsao_meses_filtro %}checked{% endif %}>Set</label>
+                                                        <label class="month-filter-item {% if 10 in previsao_meses_filtro %}checked{% endif %}"><input type="checkbox" name="previsao_mes" value="10" {% if 10 in previsao_meses_filtro %}checked{% endif %}>Out</label>
+                                                        <label class="month-filter-item {% if 11 in previsao_meses_filtro %}checked{% endif %}"><input type="checkbox" name="previsao_mes" value="11" {% if 11 in previsao_meses_filtro %}checked{% endif %}>Nov</label>
+                                                        <label class="month-filter-item {% if 12 in previsao_meses_filtro %}checked{% endif %}"><input type="checkbox" name="previsao_mes" value="12" {% if 12 in previsao_meses_filtro %}checked{% endif %}>Dez</label>
                                                     </div>
                                                     <div class="mt-2">
                                                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleMeses('previsao_mes', true)">Todos</button>
@@ -1180,22 +1217,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Filtros: chips clicáveis e toggle meses
-document.querySelectorAll('.filter-month-chip').forEach(function(chip) {
-    chip.addEventListener('click', function(e) {
+// Filtros: month grid items clicáveis e toggle meses
+document.querySelectorAll('.month-filter-item').forEach(function(item) {
+    item.addEventListener('click', function(e) {
         if (e.target.tagName === 'INPUT') return;
         const input = this.querySelector('input[type="checkbox"]');
         input.checked = !input.checked;
-        this.classList.toggle('active', input.checked);
+        this.classList.toggle('checked', input.checked);
     });
 });
 function toggleMeses(name, checked) {
     document.querySelectorAll('input[name="' + name + '"]').forEach(function(cb) {
         cb.checked = checked;
     });
-    document.querySelectorAll('.filter-month-chip').forEach(function(chip) {
-        const inp = chip.querySelector('input[name="' + name + '"]');
-        if (inp) chip.classList.toggle('active', checked);
+    document.querySelectorAll('.month-filter-item').forEach(function(item) {
+        const inp = item.querySelector('input[name="' + name + '"]');
+        if (inp) item.classList.toggle('checked', checked);
     });
 }
 </script>

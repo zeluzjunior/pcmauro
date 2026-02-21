@@ -897,26 +897,26 @@ class RoteiroPreventiva(models.Model):
     nome_unid = models.CharField('Nome Unidade', max_length=255, blank=True, null=True)
     
     # Funcionário
-    cd_funciomanu = models.CharField('Código Funcionário Manutenção', max_length=100, blank=True, null=True)
-    nome_funciomanu = models.CharField('Nome Funcionário Manutenção', max_length=255, blank=True, null=True)
-    funciomanu_id = models.IntegerField('ID Funcionário Manutenção', blank=True, null=True)
+    cd_funciomanu = models.CharField('Código Funcionário Manutenção', max_length=100, blank=True, null=True) 
+    nome_funciomanu = models.CharField('Nome Funcionário Manutenção', max_length=255, blank=True, null=True) 
+    funciomanu_id = models.IntegerField('ID Funcionário Manutenção', blank=True, null=True) 
     
     # Setor
-    cd_setormanut = models.CharField('Código Setor Manutenção', max_length=50, blank=True, null=True)
-    descr_setormanut = models.CharField('Descrição Setor Manutenção', max_length=255, blank=True, null=True)
+    cd_setormanut = models.CharField('Código Setor Manutenção', max_length=50, blank=True, null=True) 
+    descr_setormanut = models.CharField('Descrição Setor Manutenção', max_length=255, blank=True, null=True) 
     
     # Tipo Centro de Atividade
-    cd_tpcentativ = models.IntegerField('Código Tipo Centro Atividade', blank=True, null=True)
-    descr_abrev_tpcentativ = models.CharField('Descrição Abreviada Tipo Centro Atividade', max_length=255, blank=True, null=True)
+    cd_tpcentativ = models.IntegerField('Código Tipo Centro Atividade', blank=True, null=True) 
+    descr_abrev_tpcentativ = models.CharField('Descrição Abreviada Tipo Centro Atividade', max_length=255, blank=True, null=True) 
     
     # Ordem de Serviço
-    dt_abertura = models.CharField('Data Abertura', max_length=50, blank=True, null=True, help_text='Data no formato DD/MM/YYYY')
-    cd_ordemserv = models.IntegerField('Código Ordem Serviço', blank=True, null=True)
-    ordemserv_id = models.IntegerField('ID Ordem Serviço', blank=True, null=True)
+    dt_abertura = models.CharField('Data Abertura', max_length=50, blank=True, null=True, help_text='Data no formato DD/MM/YYYY') 
+    cd_ordemserv = models.IntegerField('Código Ordem Serviço', blank=True, null=True) 
+    ordemserv_id = models.IntegerField('ID Ordem Serviço', blank=True, null=True) 
     
     # Máquina
-    cd_maquina = models.BigIntegerField('Código Máquina', blank=True, null=True, db_index=True)
-    descr_maquina = models.CharField('Descrição Máquina', max_length=500, blank=True, null=True)
+    cd_maquina = models.BigIntegerField('Código Máquina', blank=True, null=True, db_index=True) 
+    descr_maquina = models.CharField('Descrição Máquina', max_length=500, blank=True, null=True) 
     
     # Plano de Manutenção
     cd_planmanut = models.IntegerField('Código Plano Manutenção', blank=True, null=True)

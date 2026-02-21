@@ -5383,8 +5383,17 @@ def consultar_requisicoes_almoxarifado(request):
     if filter_local:
         requisicoes_list = requisicoes_list.filter(descr_local_fisic__icontains=filter_local)
     
-    # Ordenar por data de requisição (mais recente primeiro) e código do item
-    requisicoes_list = requisicoes_list.order_by('-data_requisicao', 'cd_item')
+    # Ordenação: Valor Total (asc/desc) ou padrão (data + item)
+    sort_valor = request.GET.get('sort_valor', '').strip().lower()
+    sort_valor = sort_valor if sort_valor in ('asc', 'desc') else ''
+    if sort_valor == 'asc':
+        from django.db.models import F
+        requisicoes_list = requisicoes_list.order_by(F('vlr_movto_estoq').asc(nulls_last=True), '-data_requisicao', 'cd_item')
+    elif sort_valor == 'desc':
+        from django.db.models import F
+        requisicoes_list = requisicoes_list.order_by(F('vlr_movto_estoq').desc(nulls_last=True), '-data_requisicao', 'cd_item')
+    else:
+        requisicoes_list = requisicoes_list.order_by('-data_requisicao', 'cd_item')
     
     # Estatísticas baseadas nos dados FILTRADOS (antes da paginação)
     total_count = requisicoes_list.count()
@@ -5438,8 +5447,38 @@ def consultar_requisicoes_almoxarifado(request):
         'filter_usuario_atend': filter_usuario_atend,
         'filter_operacao': filter_operacao,
         'filter_local': filter_local,
+        'sort_valor': sort_valor,
+        'query_string_base': _build_query_string_base(request, exclude=['sort_valor', 'page']),
     }
     return render(request, 'consultar/consultar_requisicoes_almoxarifado.html', context)
+
+
+def _build_query_string_base(request, exclude=None):
+    """Build query string from request.GET excluding specified params (for pagination/sort links)."""
+    exclude = exclude or []
+    qd = request.GET.copy()
+    for param in exclude:
+        if param in qd:
+            del qd[param]
+    return qd.urlencode()
+
+
+def visualizar_requisicao_almoxarifado(request, requisicao_id):
+    """Visualizar detalhes de uma requisição almoxarifado específica"""
+    from app.models import RequisicaoAlmoxarifado
+    
+    try:
+        requisicao = RequisicaoAlmoxarifado.objects.get(id=requisicao_id)
+    except RequisicaoAlmoxarifado.DoesNotExist:
+        messages.error(request, 'Requisição não encontrada.')
+        return redirect('consultar_requisicoes_almoxarifado')
+    
+    context = {
+        'page_title': f'Visualizar Requisição {requisicao.id}',
+        'active_page': 'consultar_requisicoes_almoxarifado',
+        'requisicao': requisicao,
+    }
+    return render(request, 'almoxarifado/visualizar_requisicao_almoxarifado.html', context)
 
 
 def consultar_paradas_maquina(request):
@@ -6727,21 +6766,6 @@ def deletar_requisicoes_almoxarifado(request):
         redirect_url += '?' + '&'.join(params)
     
     return redirect(redirect_url)
-
-
-def visualizar_requisicao_almoxarifado(request, requisicao_id):
-    """Visualizar detalhes completos de uma requisição de almoxarifado"""
-    from app.models import RequisicaoAlmoxarifado
-    from django.shortcuts import get_object_or_404
-
-    requisicao = get_object_or_404(RequisicaoAlmoxarifado, id=requisicao_id)
-
-    context = {
-        'page_title': f'Visualizar Requisição #{requisicao.id}',
-        'active_page': 'consultar_requisicoes_almoxarifado',
-        'requisicao': requisicao,
-    }
-    return render(request, 'almoxarifado/visualizar_requisicao_almoxarifado.html', context)
 
 
 def analise_requisicoes_data_importada(request):
