@@ -210,10 +210,10 @@
 
             <!-- Evolução Diária Frigorífico -->
             <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><div class="d-flex justify-content-between align-items-center flex-wrap"><h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Evolução Diária (Frigorífico)</h5><div class="input-group" style="max-width: 220px;"><span class="input-group-text bg-white border-end-0"><i class="fas fa-calendar-alt text-primary"></i></span><input type="month" class="form-control border-start-0" id="mesSelecionadoFrig" value="{{ mes_selecionado }}" style="font-weight: 500;"></div></div></div><div class="card-body"><div class="chart-container-large"><canvas id="dailyChartFrig"></canvas></div></div></div></div></div>
+            <!-- Paradas por Máquina (Frigorífico) - baseado em ParadaMaquinaOS -->
+            <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Paradas por Máquina (Frigorífico)</h5></div><div class="card-body"><p class="text-muted small mb-2">Quantidade de paradas associadas a cada máquina via Ordem de Serviço (dados de ParadaMaquinaOS). <strong>Clique na barra</strong> para abrir a página da máquina.</p><div class="chart-container-large"><canvas id="maquinasChartFrig"></canvas></div></div></div></div></div>
             <!-- Top Paradas / Turnos Frigorífico -->
             <div class="row mb-4"><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-info text-white"><h5 class="mb-0">Top 10 Paradas (Frigorífico)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="paradasChartFrig"></canvas></div></div></div></div><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-warning text-white"><h5 class="mb-0">Turnos (Frigorífico)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="turnosChartFrig"></canvas></div></div></div></div></div>
-            <!-- Tabela Paradas Recentes Frigorífico -->
-            <div class="row mb-5"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><h5 class="mb-0"><i class="fas fa-table me-2"></i>Paradas Recentes (Frigorífico)</h5></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0"><thead class="table-light"><tr><th>Data</th><th>Horário Início</th><th>Horário Fim</th><th>Dif. Hora</th><th>Cód. Recurso</th><th>Descrição Recurso</th><th>Cód. Parada</th><th>Descrição Parada</th><th>Turno</th><th>Linha</th></tr></thead><tbody>{% for parada in section_frig.paradas_recentes_list %}<tr><td>{{ parada.data|date:"d/m/Y" }}</td><td>{{ parada.horario_inicial|time:"H:i"|default:"-" }}</td><td>{{ parada.horario_final|time:"H:i"|default:"-" }}</td><td>{{ parada.dif_hora|number_br:2|default:"-" }}h</td><td><span class="badge bg-primary">{{ parada.cod_recurso|default:"-" }}</span></td><td>{{ parada.descr_recurso|default:"-"|truncatewords:10 }}</td><td>{{ parada.cod_parada|default:"-" }}</td><td>{{ parada.descr_parada|default:"-"|truncatewords:5 }}</td><td>{{ parada.turno|default:"-" }}</td><td>{{ parada.linha_producao|default:"-" }}</td></tr>{% empty %}<tr><td colspan="10" class="text-center text-muted">Nenhuma parada encontrada</td></tr>{% endfor %}</tbody></table></div></div></div></div></div>
         </div>
 
         <!-- ========== SEÇÃO INDÚSTRIA ========== -->
@@ -265,12 +265,12 @@
 
             <!-- Evolução Diária Indústria -->
             <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><div class="d-flex justify-content-between align-items-center flex-wrap"><h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Evolução Diária (Indústria)</h5><div class="input-group" style="max-width: 220px;"><span class="input-group-text bg-white border-end-0"><i class="fas fa-calendar-alt text-secondary"></i></span><input type="month" class="form-control border-start-0" id="mesSelecionadoInd" value="{{ mes_selecionado }}" style="font-weight: 500;"></div></div></div><div class="card-body"><div class="chart-container-large"><canvas id="dailyChartInd"></canvas></div></div></div></div></div>
+            <!-- Paradas por Máquina (Indústria) - baseado em ParadaMaquinaOS -->
+            <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Paradas por Máquina (Indústria)</h5></div><div class="card-body"><p class="text-muted small mb-2">Quantidade de paradas associadas a cada máquina via Ordem de Serviço (dados de ParadaMaquinaOS). <strong>Clique na barra</strong> para abrir a página da máquina.</p><div class="chart-container-large"><canvas id="maquinasChartInd"></canvas></div></div></div></div></div>
             <!-- Top Recursos / Paradas / Turnos / Linhas Indústria -->
             <div class="row mb-4"><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0">Top 10 Recursos (Indústria)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="recursosQtdChartInd"></canvas></div></div></div></div><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-danger text-white"><h5 class="mb-0">Top 10 Recursos por Horas (Indústria)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="recursosHorasChartInd"></canvas></div></div></div></div></div>
             <div class="row mb-4"><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-info text-white"><h5 class="mb-0">Top 10 Paradas (Indústria)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="paradasChartInd"></canvas></div></div></div></div><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-warning text-white"><h5 class="mb-0">Turnos (Indústria)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="turnosChartInd"></canvas></div></div></div></div></div>
             <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0">Linhas de Produção (Indústria)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="linhasChartInd"></canvas></div></div></div></div></div>
-            <!-- Tabela Paradas Recentes Indústria -->
-            <div class="row mb-5"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0"><i class="fas fa-table me-2"></i>Paradas Recentes (Indústria)</h5></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0"><thead class="table-light"><tr><th>Data</th><th>Horário Início</th><th>Horário Fim</th><th>Dif. Hora</th><th>Cód. Recurso</th><th>Descrição Recurso</th><th>Cód. Parada</th><th>Descrição Parada</th><th>Turno</th><th>Linha</th></tr></thead><tbody>{% for parada in section_ind.paradas_recentes_list %}<tr><td>{{ parada.data|date:"d/m/Y" }}</td><td>{{ parada.horario_inicial|time:"H:i"|default:"-" }}</td><td>{{ parada.horario_final|time:"H:i"|default:"-" }}</td><td>{{ parada.dif_hora|number_br:2|default:"-" }}h</td><td><span class="badge bg-secondary">{{ parada.cod_recurso|default:"-" }}</span></td><td>{{ parada.descr_recurso|default:"-"|truncatewords:10 }}</td><td>{{ parada.cod_parada|default:"-" }}</td><td>{{ parada.descr_parada|default:"-"|truncatewords:5 }}</td><td>{{ parada.turno|default:"-" }}</td><td>{{ parada.linha_producao|default:"-" }}</td></tr>{% empty %}<tr><td colspan="10" class="text-center text-muted">Nenhuma parada encontrada</td></tr>{% endfor %}</tbody></table></div></div></div></div></div>
         </div>
     </div>
 </section>
@@ -412,7 +412,36 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         } catch (e) { console.error(e); }
     }
+    // Gráfico Paradas por Máquina com link para página da máquina
+    function createMaquinasBarChart(canvasId, labels, data, urls, bgColor) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+        if (!labels || !Array.isArray(labels) || labels.length === 0) { ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
+        try {
+            ctx.style.cursor = 'pointer';
+            new Chart(ctx.getContext('2d'), {
+                type: 'bar',
+                data: { labels: labels, datasets: [{ label: '', data: data, backgroundColor: bgColor }] },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { callbacks: { afterLabel: function() { return 'Clique para abrir a página da máquina'; } } } },
+                    scales: { x: { beginAtZero: true } },
+                    onClick: function(evt, elements) {
+                        if (elements.length > 0 && urls && Array.isArray(urls)) {
+                            const idx = elements[0].index;
+                            const url = urls[idx];
+                            if (url) window.location.href = url;
+                        }
+                    }
+                }
+            });
+        } catch (e) { console.error(e); }
+    }
     createBarSectionChart('paradasChartFrig', {{ section_frig_top_paradas_labels|safe }}, {{ section_frig_top_paradas_data|safe }}, '#0dcaf0');
+    createMaquinasBarChart('maquinasChartFrig', {{ section_frig_maquinas_labels|safe }}, {{ section_frig_maquinas_data|safe }}, {{ section_frig_maquinas_urls|safe }}, '#0d6efd');
+    createMaquinasBarChart('maquinasChartInd', {{ section_ind_maquinas_labels|safe }}, {{ section_ind_maquinas_data|safe }}, {{ section_ind_maquinas_urls|safe }}, '#6c757d');
     createBarSectionChart('recursosQtdChartInd', {{ section_ind_top_recursos_labels|safe }}, {{ section_ind_top_recursos_data|safe }}, '#6c757d');
     createBarSectionChart('recursosHorasChartInd', {{ section_ind_top_recursos_horas_labels|safe }}, {{ section_ind_top_recursos_horas_data|safe }}, '#dc3545');
     createBarSectionChart('paradasChartInd', {{ section_ind_top_paradas_labels|safe }}, {{ section_ind_top_paradas_data|safe }}, '#0dcaf0');

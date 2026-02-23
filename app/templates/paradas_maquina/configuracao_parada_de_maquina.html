@@ -194,6 +194,72 @@
             Não há valores de <strong>Linha de Produção</strong> (descr_linha_producao) na tabela ParadaMaquina. Importe dados de paradas de máquina para poder configurar as linhas incluídas na análise.
         </div>
         {% endif %}
+
+        <!-- Linha de Produção × Centro de Atividade -->
+        <hr class="my-5">
+        <h4 class="mb-4"><i class="fas fa-link me-2 text-primary"></i>Linha de Produção × Centro de Atividade</h4>
+        <p class="text-muted mb-4">Associe cada <strong>Linha de Produção</strong> (descr_linha_producao) aos <strong>Centros de Atividade</strong> relacionados. Exemplo: ABATE pode estar ligado a determinados CAs que compõem essa linha.</p>
+
+        {% if grupos_recurso and centros_atividade %}
+        <form method="post" action="" id="form-linha-ca">
+            {% csrf_token %}
+            <input type="hidden" name="salvar_linha_ca" value="1">
+            <div class="accordion rounded-3" id="accordionLinhaCa">
+                {% for linha in grupos_recurso %}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingLinha{{ forloop.counter0 }}">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#collapseLinha{{ forloop.counter0 }}" aria-expanded="false"
+                                aria-controls="collapseLinha{{ forloop.counter0 }}">
+                            <i class="fas fa-industry me-2 text-primary"></i>
+                            {{ linha }}
+                            {% with ca_ids=linha_ca_map|get_item:linha %}
+                            {% if ca_ids %}<span class="badge bg-success ms-2">{{ ca_ids|length }} CA(s)</span>{% endif %}
+                            {% endwith %}
+                        </button>
+                    </h2>
+                    <div id="collapseLinha{{ forloop.counter0 }}" class="accordion-collapse collapse"
+                         aria-labelledby="headingLinha{{ forloop.counter0 }}" data-bs-parent="#accordionLinhaCa">
+                        <div class="accordion-body">
+                            <div class="row g-2">
+                                {% for ca in centros_atividade %}
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <div class="form-check border rounded px-3 py-2 bg-light bg-opacity-50">
+                                        <input class="form-check-input" type="checkbox"
+                                               name="centro_linha_{{ forloop.parentloop.counter0 }}"
+                                               value="{{ ca.id }}"
+                                               id="ca_{{ forloop.parentloop.counter0 }}_{{ ca.id }}"
+                                               {% with ca_ids=linha_ca_map|get_item:linha %}{% if ca_ids and ca.id in ca_ids %}checked{% endif %}{% endwith %}>
+                                        <label class="form-check-label w-100" for="ca_{{ forloop.parentloop.counter0 }}_{{ ca.id }}">
+                                            <span class="text-primary fw-semibold">CA {{ ca.ca }}</span>
+                                            {% if ca.sigla %}<span class="text-secondary">| {{ ca.sigla }}</span>{% endif %}
+                                            <br>
+                                            <span class="small text-dark">{{ ca.descricao|default:"-" }}</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="d-flex justify-content-end mt-3">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Salvar associações</button>
+            </div>
+        </form>
+        {% elif not grupos_recurso %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            Não há linhas de produção para configurar. Importe dados de paradas de máquina primeiro.
+        </div>
+        {% elif not centros_atividade %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            Não há Centros de Atividade cadastrados. Cadastre Centros de Atividade para poder associá-los às linhas de produção.
+        </div>
+        {% endif %}
     </div>
 </section>
 

@@ -5544,9 +5544,23 @@ def consultar_paradas_maquina(request):
     return render(request, 'paradas_maquina/consultar_paradas_de_maquina.html', context)
 
 
+def visualizar_parada_de_maquina(request, parada_id):
+    """Visualiza todos os dados de um registro ParadaMaquina."""
+    from app.models import ParadaMaquina
+    from django.shortcuts import get_object_or_404
+
+    parada = get_object_or_404(ParadaMaquina, pk=parada_id)
+    context = {
+        'page_title': f'Visualizar Parada {parada.id}',
+        'active_page': 'consultar_paradas_maquina',
+        'parada': parada,
+    }
+    return render(request, 'parada_de_maquina/visualizar_parada_de_maquina.html', context)
+
+
 def configuracao_parada_maquina(request):
-    """Página de configuração de paradas de máquina: carrega e salva ConfigParadaMaquina e ConfigRecursoParadaMaquina."""
-    from app.models import ConfigParadaMaquina, ConfigRecursoParadaMaquina, ParadaMaquina
+    """Página de configuração de paradas de máquina: carrega e salva ConfigParadaMaquina, ConfigRecursoParadaMaquina e ConfigLinhaProducaoCentroAtividade."""
+    from app.models import ConfigParadaMaquina, ConfigRecursoParadaMaquina, ConfigLinhaProducaoCentroAtividade, ParadaMaquina, CentroAtividade
     from datetime import date
     from decimal import Decimal, InvalidOperation
 
@@ -5595,6 +5609,31 @@ def configuracao_parada_maquina(request):
         return _parse_decimal(s)
 
     # POST: identificar qual formulário foi enviado
+    if request.method == 'POST' and 'salvar_linha_ca' in request.POST:
+        # Formulário "Linha de Produção × Centro de Atividade"
+        grupos_recurso = list(
+            ParadaMaquina.objects.exclude(descr_linha_producao__isnull=True)
+            .exclude(descr_linha_producao='')
+            .values_list('descr_linha_producao', flat=True)
+            .distinct()
+            .order_by('descr_linha_producao')
+        )
+        ConfigLinhaProducaoCentroAtividade.objects.all().delete()
+        for i, linha in enumerate(grupos_recurso):
+            ca_ids = request.POST.getlist(f'centro_linha_{i}')
+            for cid in ca_ids:
+                cid = (cid or '').strip()
+                if cid.isdigit():
+                    try:
+                        ConfigLinhaProducaoCentroAtividade.objects.create(
+                            descr_linha_producao=linha,
+                            centro_atividade_id=int(cid)
+                        )
+                    except Exception:
+                        pass
+        messages.success(request, 'Associações Linha de Produção × Centro de Atividade salvas com sucesso.')
+        return redirect('configuracao_parada_maquina')
+
     if request.method == 'POST' and 'salvar_recursos' in request.POST:
         # Formulário "Recursos incluídos na Análise"
         recurso_frigorifico = request.POST.getlist('recurso_frigorifico')
@@ -5667,6 +5706,12 @@ def configuracao_parada_maquina(request):
         ConfigRecursoParadaMaquina.objects.filter(secao='industria').values_list('descr_recurso', flat=True)
     )
 
+    # Linha de Produção × Centro de Atividade
+    centros_atividade = list(CentroAtividade.objects.all().order_by('ca'))
+    linha_ca_map = {}  # { descr_linha_producao: set(of centro_atividade ids) }
+    for rel in ConfigLinhaProducaoCentroAtividade.objects.select_related('centro_atividade'):
+        linha_ca_map.setdefault(rel.descr_linha_producao, set()).add(rel.centro_atividade_id)
+
     context = {
         'page_title': 'Configuração de Paradas de Máquina',
         'active_page': 'configuracao_parada_maquina',
@@ -5678,13 +5723,15 @@ def configuracao_parada_maquina(request):
         'grupos_recurso': grupos_recurso,
         'recursos_frigorifico': recursos_frigorifico,
         'recursos_industria': recursos_industria,
+        'centros_atividade': centros_atividade,
+        'linha_ca_map': linha_ca_map,
     }
     return render(request, 'paradas_maquina/configuracao_parada_de_maquina.html', context)
 
 
 def analise_paradas_maquina(request):
     """Análise de paradas de máquinas com estatísticas e gráficos. Frigorífico/Indústria conforme ConfigRecursoParadaMaquina (descr_recurso)."""
-    from app.models import ParadaMaquina, ConfigRecursoParadaMaquina, ConfigParadaMaquina, ProducaoDiaria
+    from app.models import ParadaMaquina, ParadaMaquinaOS, OrdemServicoCorretiva, Maquina, ConfigRecursoParadaMaquina, ConfigParadaMaquina, ProducaoDiaria
     from datetime import datetime, timedelta
     from django.db.models import Sum, Count, Q, Avg
     from collections import defaultdict
@@ -6313,6 +6360,37 @@ def analise_paradas_maquina(request):
             l_count.append(dados['count'])
             l_horas.append(float(dados['horas']))
         recentes = list(qs.order_by('-data', '-horario_inicial')[:20])
+
+        # Paradas por Máquina (via ParadaMaquinaOS -> OrdemServicoCorretiva)
+        maquina_paradas_d = defaultdict(lambda: {'count': 0, 'descr': ''})
+        parada_ids = list(qs.values_list('id', flat=True))
+        if parada_ids:
+            for pmo in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=parada_ids).select_related('parada_maquina'):
+                try:
+                    os_num = pmo.os_numero.strip()
+                    if not os_num or not os_num.isdigit():
+                        continue
+                    os_int = int(os_num)
+                    os_obj = OrdemServicoCorretiva.objects.filter(cd_ordemserv=os_int).first()
+                    if os_obj and os_obj.cd_maquina is not None:
+                        maquina_paradas_d[os_obj.cd_maquina]['count'] += 1
+                        maquina_paradas_d[os_obj.cd_maquina]['descr'] = os_obj.descr_maquina or ''
+                except (ValueError, TypeError):
+                    continue
+        sorted_maq = sorted(maquina_paradas_d.items(), key=lambda x: x[1]['count'], reverse=True)
+        maq_labels = []
+        maq_data = []
+        maq_urls = []
+        for cd_maq, d in sorted_maq:
+            descr = (d['descr'] or '')[:40]
+            if d['descr'] and len(d['descr']) > 40:
+                descr += "..."
+            maq_labels.append(f"{cd_maq} - {descr}" if descr else str(cd_maq))
+            maq_data.append(d['count'])
+            # Link para página da máquina (visualizar_maquina usa maquina_id)
+            m_obj = Maquina.objects.filter(cd_maquina=cd_maq).first()
+            maq_urls.append(f"/maquinas/visualizar/{m_obj.id}/" if m_obj else "")
+
         return {
             'recursos_unicos': recursos_unicos_s,
             'linhas_unicas': linhas_unicas_s,
@@ -6330,6 +6408,9 @@ def analise_paradas_maquina(request):
             'linhas_data_count': l_count,
             'linhas_data_horas': l_horas,
             'paradas_recentes_list': recentes,
+            'maquinas_labels': maq_labels,
+            'maquinas_data': maq_data,
+            'maquinas_urls': maq_urls,
         }
 
     section_frig = _build_section_charts(qs_frigorifico) if recursos_frigorifico else _build_section_charts(ParadaMaquina.objects.none())
@@ -6512,6 +6593,12 @@ def analise_paradas_maquina(request):
         'section_ind_linhas_labels': json.dumps(section_ind['linhas_labels']),
         'section_ind_linhas_data_count': json.dumps(section_ind['linhas_data_count']),
         'section_ind_linhas_data_horas': json.dumps(section_ind['linhas_data_horas']),
+        'section_frig_maquinas_labels': json.dumps(section_frig['maquinas_labels']),
+        'section_frig_maquinas_data': json.dumps(section_frig['maquinas_data']),
+        'section_frig_maquinas_urls': json.dumps(section_frig['maquinas_urls']),
+        'section_ind_maquinas_labels': json.dumps(section_ind['maquinas_labels']),
+        'section_ind_maquinas_data': json.dumps(section_ind['maquinas_data']),
+        'section_ind_maquinas_urls': json.dumps(section_ind['maquinas_urls']),
         # Filtros
         'anos_disponiveis': anos_disponiveis_list,
         'meses_nomes': meses_nomes,
@@ -6520,6 +6607,254 @@ def analise_paradas_maquina(request):
         'periodo_chart_label': periodo_chart_label,
     }
     return render(request, 'paradas_maquina/analise_paradas_de_maquina.html', context)
+
+
+def analise_maquina_por_parada(request):
+    """
+    Análise de ParadaMaquina focada em extrair Ordens de Serviço (OS) dos campos motivo e acao.
+    OS são identificadas por sequências de 5 ou 6 dígitos. Mesmos filtros (ano/mês) da página analise_paradas_maquina.
+    Permite confirmar associações que são salvas em ParadaMaquinaOS para uso em outras análises.
+    """
+    from app.models import ParadaMaquina, ParadaMaquinaOS
+    from datetime import datetime
+    from django.db.models import Q
+    from django.shortcuts import redirect
+    from django.urls import reverse
+    from django.contrib import messages
+    import re
+    from collections import defaultdict
+
+    # Processar confirmações (POST)
+    if request.method == 'POST':
+        ano_post = request.POST.get('ano')
+        meses_post = request.POST.getlist('mes')
+        # Pares (parada_id, os_numero) confirmados (checkboxes marcados)
+        confirmados_set = set()
+        for key in request.POST:
+            if key.startswith('confirm_'):
+                val = key.replace('confirm_', '')
+                if ':' in val:
+                    try:
+                        pid, os_num = val.split(':', 1)
+                        parada_id = int(pid)
+                        if len(os_num) in (5, 6) and os_num.isdigit():
+                            confirmados_set.add((parada_id, os_num))
+                    except (ValueError, TypeError):
+                        pass
+        # Pares exibidos na tabela (hidden input displayed_pairs: "pid:os,pid:os,...")
+        displayed_pairs = set()
+        raw = request.POST.get('displayed_pairs', '')
+        for part in raw.split(','):
+            part = part.strip()
+            if ':' in part:
+                try:
+                    pid, os_num = part.split(':', 1)
+                    parada_id = int(pid)
+                    if len(os_num) in (5, 6) and os_num.isdigit():
+                        displayed_pairs.add((parada_id, os_num))
+                except (ValueError, TypeError):
+                    pass
+        parada_ids_displayed = {p for p, _ in displayed_pairs}
+        # Remover confirmações que estavam na tabela mas usuário desmarcou
+        for parada_id in parada_ids_displayed:
+            for rec in ParadaMaquinaOS.objects.filter(parada_maquina_id=parada_id):
+                pair = (rec.parada_maquina_id, rec.os_numero)
+                if pair in displayed_pairs and pair not in confirmados_set:
+                    rec.delete()
+        # Criar confirmações marcadas
+        for parada_id, os_num in confirmados_set:
+            ParadaMaquinaOS.objects.get_or_create(
+                parada_maquina_id=parada_id,
+                os_numero=os_num,
+                defaults={}
+            )
+        # Processar OS manuais (Paradas sem OS)
+        for key in request.POST:
+            if key.startswith('manual_os_'):
+                try:
+                    parada_id = int(key.replace('manual_os_', ''))
+                    valor = request.POST.get(key, '').strip()
+                    if valor:
+                        # Extrair apenas dígitos 5-6
+                        import re as re_mod
+                        nums = re_mod.findall(r'\d{5,6}', valor)
+                        for os_num in nums:
+                            if len(os_num) in (5, 6):
+                                ParadaMaquinaOS.objects.get_or_create(
+                                    parada_maquina_id=parada_id,
+                                    os_numero=os_num,
+                                    defaults={}
+                                )
+                except (ValueError, TypeError):
+                    pass
+        # Para paradas sem OS: se campo manual vazio, remover associação existente
+        raw_manual_ids = request.POST.get('displayed_manual_ids', '')
+        for pid_str in raw_manual_ids.split(','):
+            try:
+                parada_id = int(pid_str.strip())
+                valor = request.POST.get(f'manual_os_{parada_id}', '').strip()
+                if not valor:
+                    ParadaMaquinaOS.objects.filter(parada_maquina_id=parada_id).delete()
+            except (ValueError, TypeError):
+                pass
+        messages.success(request, 'Associações salvas com sucesso.')
+        redirect_params = []
+        if ano_post:
+            redirect_params.append(f'ano={ano_post}')
+        for m in (meses_post or []):
+            redirect_params.append(f'mes={m}')
+        url = reverse('analise_maquina_por_parada')
+        if redirect_params:
+            url += '?' + '&'.join(redirect_params)
+        return redirect(url)
+
+    # Anos e meses disponíveis (igual analise_paradas_maquina)
+    anos_disponiveis = ParadaMaquina.objects.exclude(data__isnull=True).values_list('data__year', flat=True).distinct().order_by('-data__year')
+    meses_disponiveis = {}
+    for ano in anos_disponiveis:
+        meses = ParadaMaquina.objects.filter(data__year=ano).exclude(data__isnull=True).values_list('data__month', flat=True).distinct().order_by('data__month')
+        meses_disponiveis[ano] = list(meses)
+
+    # Filtros de ano e meses
+    hoje = datetime.now()
+    has_explicit_filter = 'ano' in request.GET  # usuário submeteu o formulário
+    ano_filtro = request.GET.get('ano', None)
+    meses_filtro = request.GET.getlist('mes')
+    if not ano_filtro:
+        ano_filtro = str(hoje.year)
+    try:
+        ano_filtro = int(ano_filtro)
+    except (ValueError, TypeError):
+        ano_filtro = hoje.year
+
+    meses_filtro_int = []
+    if meses_filtro:
+        for mes in meses_filtro:
+            try:
+                mes_int = int(mes)
+                if 1 <= mes_int <= 12:
+                    meses_filtro_int.append(mes_int)
+            except (ValueError, TypeError):
+                continue
+        meses_filtro_int = sorted(list(set(meses_filtro_int)))
+    elif not has_explicit_filter:
+        # Primeira carga: aplicar filtro do mês atual
+        meses_filtro_int = [hoje.month]
+
+    # Queryset filtrado
+    queryset_base = ParadaMaquina.objects.exclude(data__isnull=True)
+    if ano_filtro:
+        queryset_base = queryset_base.filter(data__year=ano_filtro)
+        if meses_filtro_int:
+            mes_conditions = Q()
+            for mes in meses_filtro_int:
+                mes_conditions |= Q(data__month=mes)
+            queryset_base = queryset_base.filter(mes_conditions)
+
+    # Regex melhorada para Ordem de Serviço: standalone 5-6 dígitos OU após prefixos comuns
+    os_standalone = re.compile(r'\b\d{5,6}\b')
+    # Prefixos: OS, OS12345, OS 12345, Nº 12345, #12345, ordem 12345, ref 12345, etc.
+    os_com_prefixo = re.compile(
+        r'(?:OS|ordem|n[°º]|#|ref|numero|número)(?:\s*:?\s*)?(\d{5,6})\b',
+        re.IGNORECASE
+    )
+
+    def extract_os(text):
+        if not text or not isinstance(text, str):
+            return []
+        found = set()
+        found.update(os_standalone.findall(text))
+        found.update(os_com_prefixo.findall(text))
+        # Sequência 5-6 dígitos após separadores (ex: "ref.12345", "-12345", "(12345)")
+        found.update(re.findall(r'[\s\-_\.\/\(]\s*(\d{5,6})(?=[\s\-_\.\/\)]|$)', text))
+        return list(found)
+
+    # Analisar cada registro
+    registros_com_os = []
+    registros_sem_os = []
+    os_to_registros = defaultdict(list)
+    total_registros = 0
+
+    # Carregar associações já confirmadas
+    parada_ids_com_os = []
+    for parada in queryset_base:
+        total_registros += 1
+        texto = ' '.join(filter(None, [str(parada.motivo or ''), str(parada.acao or '')]))
+        os_encontradas = extract_os(texto)
+        if os_encontradas:
+            parada_ids_com_os.append(parada.id)
+            registros_com_os.append({
+                'parada': parada,
+                'os_list': sorted(os_encontradas),
+                'motivo_preview': (parada.motivo or '')[:200],
+                'acao_preview': (parada.acao or '')[:200],
+            })
+            for os_num in os_encontradas:
+                os_to_registros[os_num].append(parada.id)
+        else:
+            registros_sem_os.append(parada)
+
+    os_confirmadas_set = set()
+    if parada_ids_com_os:
+        for rec in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=parada_ids_com_os):
+            os_confirmadas_set.add((rec.parada_maquina_id, rec.os_numero))
+    # OS manuais para paradas sem detecção (podem ter mais de uma)
+    manual_os_map = defaultdict(list)
+    if registros_sem_os:
+        parada_ids_sem = [p.id for p in registros_sem_os]
+        for rec in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=parada_ids_sem):
+            manual_os_map[rec.parada_maquina_id].append(rec.os_numero)
+    registros_sem_os_with_manual = [
+        {'parada': p, 'manual_os_str': ', '.join(manual_os_map.get(p.id, []))}
+        for p in registros_sem_os
+    ]
+    for item in registros_com_os:
+        item['os_list_with_status'] = [
+            (os_num, (item['parada'].id, os_num) in os_confirmadas_set)
+            for os_num in item['os_list']
+        ]
+
+    # Resumo: OS únicas e contagem de paradas por OS
+    os_resumo = []
+    for os_num in sorted(os_to_registros.keys(), key=lambda x: (len(os_to_registros[x]), x), reverse=True):
+        os_resumo.append({
+            'os_num': os_num,
+            'qtd_paradas': len(os_to_registros[os_num]),
+        })
+
+    meses_nomes = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+    anos_disponiveis_list = list(anos_disponiveis)
+    anos_set = set(anos_disponiveis_list) | {hoje.year}
+    if ano_filtro:
+        anos_set.add(ano_filtro)
+    anos_disponiveis_list = sorted(anos_set, reverse=True)
+    if not anos_disponiveis_list:
+        anos_disponiveis_list = [hoje.year]
+
+    context = {
+        'page_title': 'Análise Máquina por Parada (OS)',
+        'active_page': 'analise_maquina_por_parada',
+        'anos_disponiveis': anos_disponiveis_list,
+        'meses_nomes': meses_nomes,
+        'ano_filtro': ano_filtro,
+        'meses_filtro': meses_filtro_int,
+        'total_registros': total_registros,
+        'registros_com_os': registros_com_os,
+        'registros_sem_os': registros_sem_os,
+        'qtd_com_os': len(registros_com_os),
+        'qtd_sem_os': len(registros_sem_os),
+        'os_resumo': os_resumo,
+        'os_unicas_count': len(os_to_registros),
+        'qtd_confirmadas': len(os_confirmadas_set) + sum(len(v) for v in manual_os_map.values()),
+        'displayed_pairs': ','.join(f"{item['parada'].id}:{os_num}" for item in registros_com_os for os_num in item['os_list']),
+        'registros_sem_os_with_manual': registros_sem_os_with_manual,
+        'displayed_manual_ids': ','.join(str(p.id) for p in registros_sem_os),
+    }
+    return render(request, 'parada_de_maquina/analise_maquina_por_parada.html', context)
 
 
 def api_dados_diarios_paradas(request):
@@ -10373,7 +10708,7 @@ def visualizar_maquina(request, maquina_id):
         'is_maquina_principal': is_maquina_principal,
         'maquinas_secundarias_ids': list(maquinas_secundarias_ids),
     }
-    return render(request, 'visualizar/visualizar_maquina.html', context)
+    return render(request, 'maquinas/visualizar_maquina.html', context)
 
 
 def calendario_planos_maquina(request, maquina_id):

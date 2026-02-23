@@ -19,7 +19,9 @@ from .models import (
     RoteiroPreventiva,
     Semana52,
     ConfigParadaMaquina,
+    ConfigLinhaProducaoCentroAtividade,
     ConfigRecursoParadaMaquina,
+    ParadaMaquinaOS,
 )
 
 
@@ -530,3 +532,22 @@ class ConfigRecursoParadaMaquinaAdmin(admin.ModelAdmin):
     list_filter = ('secao',)
     search_fields = ('descr_recurso',)
     ordering = ('secao', 'descr_recurso')
+
+
+@admin.register(ConfigLinhaProducaoCentroAtividade)
+class ConfigLinhaProducaoCentroAtividadeAdmin(admin.ModelAdmin):
+    """Admin para relacionamento Linha de Produção × Centro de Atividade."""
+    list_display = ('descr_linha_producao', 'centro_atividade')
+    list_filter = ('descr_linha_producao',)
+    search_fields = ('descr_linha_producao', 'centro_atividade__sigla', 'centro_atividade__descricao')
+    raw_id_fields = ('centro_atividade',)
+    ordering = ('descr_linha_producao', 'centro_atividade__ca')
+
+
+@admin.register(ParadaMaquinaOS)
+class ParadaMaquinaOSAdmin(admin.ModelAdmin):
+    """Admin para associações confirmadas ParadaMaquina ↔ Ordem de Serviço."""
+    list_display = ('parada_maquina', 'os_numero', 'created_at')
+    list_filter = ('os_numero', 'created_at')
+    search_fields = ('os_numero',)
+    readonly_fields = ('created_at',)

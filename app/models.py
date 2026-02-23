@@ -1505,10 +1505,37 @@ class ParadaMaquina(models.Model):
     def __str__(self):
         return f"Parada {self.cod_recurso} - {self.data} {self.horario_inicial}"
 
-SECAO_CONFIG_PARADA = (
-    ('frigorifico', 'Frigorífico'),
-    ('industria', 'Indústria'),
-)
+class ParadaMaquinaOS(models.Model):
+    """
+    Associação confirmada entre ParadaMaquina e Ordem de Serviço (OS).
+    Usuário confirma na página Analise Máquina por Parada; dados ficam disponíveis para outras análises.
+    """
+    parada_maquina = models.ForeignKey(
+        ParadaMaquina,
+        on_delete=models.CASCADE,
+        related_name='os_confirmadas'
+    )
+    os_numero = models.CharField('Ordem de Serviço', max_length=10)
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Parada Máquina - OS Confirmada'
+        verbose_name_plural = 'Paradas Máquina - OS Confirmadas'
+        ordering = ['parada_maquina', 'os_numero']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['parada_maquina', 'os_numero'],
+                name='unique_parada_maquina_os',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['os_numero']),
+        ]
+
+    def __str__(self):
+        return f"Parada #{self.parada_maquina_id} ↔ OS {self.os_numero}"
+
+SECAO_CONFIG_PARADA = (('frigorifico', 'Frigorífico'),('industria', 'Indústria'),)
 
 class ConfigParadaMaquina(models.Model):
     """Configuração mensal de paradas de máquina por seção (Frigorífico / Indústria)."""
@@ -1570,6 +1597,37 @@ class ConfigRecursoParadaMaquina(models.Model):
 
     def __str__(self):
         return f"{self.get_secao_display()} – {self.descr_recurso}"
+
+class ConfigLinhaProducaoCentroAtividade(models.Model):
+    """
+    Relaciona descr_linha_producao (da tabela ParadaMaquina) com CentroAtividade.
+    Permite associar linhas de produção (ex: ABATE, EMBALAGEM) aos Centros de Atividade
+    que as compõem. Uma linha pode ter vários CAs; um CA pode estar em várias linhas.
+    """
+    descr_linha_producao = models.CharField('Linha de Produção', max_length=255, db_index=True)
+    centro_atividade = models.ForeignKey(
+        'CentroAtividade',
+        on_delete=models.CASCADE,
+        verbose_name='Centro de Atividade',
+        related_name='linhas_producao_config'
+    )
+
+    class Meta:
+        verbose_name = 'Linha de Produção × Centro de Atividade'
+        verbose_name_plural = 'Linhas de Produção × Centros de Atividade'
+        ordering = ['descr_linha_producao', 'centro_atividade__ca']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['descr_linha_producao', 'centro_atividade'],
+                name='unique_linha_producao_centro_atividade'
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['descr_linha_producao']),
+        ]
+
+    def __str__(self):
+        return f"{self.descr_linha_producao} – {self.centro_atividade}"
 
 class ProducaoDiaria(models.Model):
     """

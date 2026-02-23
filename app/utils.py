@@ -707,15 +707,26 @@ def upload_maquinas_from_file(file, update_existing=False, update_fields=None) -
         if file_name.endswith(('.xlsx', '.xls', '.xlsm')):
             data = read_excel_file(file)
         elif file_name.endswith('.csv'):
-            # Tentar diferentes encodings
-            try:
-                data = read_csv_file(file, encoding='utf-8')
-            except UnicodeDecodeError:
-                try:
-                    file.seek(0)  # Resetar arquivo
-                    data = read_csv_file(file, encoding='latin-1')
-                except Exception as e:
-                    raise ValidationError(f"Erro ao ler arquivo CSV: {str(e)}")
+            # Tentar diferentes encodings e delimitadores (; usado em MAQUINA_TODOS.csv e outros CSVs brasileiros)
+            def _read_maq_csv(enc='utf-8', delim=','):
+                file.seek(0)
+                return read_csv_file(file, encoding=enc, delimiter=delim)
+
+            data = None
+            for encoding in ('utf-8', 'latin-1'):
+                for delimiter in (';', ','):
+                    try:
+                        data = _read_maq_csv(enc=encoding, delim=delimiter)
+                        if data and len(data) > 0 and any('CD_MAQUINA' in str(k).upper() for k in data[0].keys()):
+                            break
+                        data = None
+                    except (UnicodeDecodeError, ValidationError):
+                        data = None
+                        continue
+                if data:
+                    break
+            if not data:
+                raise ValidationError("Erro ao ler CSV. Verifique encoding (UTF-8/Latin-1) e delimitador (; ou ,).")
         else:
             raise ValidationError("Formato de arquivo nÃ£o suportado. Use .xlsx, .xls, .xlsm ou .csv")
         

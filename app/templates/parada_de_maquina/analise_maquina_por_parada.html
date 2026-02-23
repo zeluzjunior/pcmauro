@@ -1,0 +1,422 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Análise Máquina por Parada (Ordem de Serviço){% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .kpi-card {
+        border-left: 4px solid;
+    }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .kpi-secondary { border-left-color: #6c757d; }
+    .kpi-purple { border-left-color: #6f42c1; }
+    .table-scroll-wrapper {
+        max-height: 350px;
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+    .table-scroll-wrapper thead th {
+        position: sticky;
+        top: 0;
+        background: #f8f9fa;
+        z-index: 1;
+        box-shadow: 0 1px 0 #dee2e6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Paradas de Máquina</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise Máquina por Parada (OS)</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-wrench me-2"></i>Análise Máquina por Parada (Ordem de Serviço)
+                </h1>
+                <p class="lead">Extração de Ordens de Serviço dos campos Motivo e Ação (sequências de 5 ou 6 dígitos)</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <!-- Filtro de Ano e Mês (igual analise_paradas_maquina) -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion filter-accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0 rounded-3 overflow-hidden">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button {% if not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                                <i class="fas fa-sliders-h me-2 text-primary"></i>
+                                <strong>Filtros</strong>
+                                {% if meses_filtro or ano_filtro %}
+                                    <span class="badge bg-primary ms-2">
+                                        {% if meses_filtro %}
+                                            {% if meses_filtro|length == 1 %}
+                                                {% for k, v in meses_nomes.items %}{% if k == meses_filtro.0 %}{{ v }}{% endif %}{% endfor %} de {{ ano_filtro }}
+                                            {% else %}
+                                                {{ meses_filtro|length }} meses de {{ ano_filtro }}
+                                            {% endif %}
+                                        {% else %}
+                                            Todos os meses de {{ ano_filtro }}
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'analise_maquina_por_parada' %}" class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="ano" class="form-label">Ano</label>
+                                        <select class="form-select" id="ano" name="ano" required>
+                                            {% for ano in anos_disponiveis %}
+                                                <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Meses (selecione múltiplos ou deixe desmarcados para todos)</label>
+                                        <div class="row g-2">
+                                            {% for mes_num, mes_nome in meses_nomes.items %}
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="{{ mes_num }}" id="mes{{ mes_num }}" {% if mes_num in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes{{ mes_num }}">{{ mes_nome }}</label>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosMeses()">Selecionar Todos</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">Desmarcar Todos</button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="fas fa-search me-2"></i>Filtrar
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-light border mb-4">
+            <i class="fas fa-info-circle me-2"></i>
+            Ordens de Serviço (OS) são detectadas nos campos <strong>motivo</strong> e <strong>ação</strong> da tabela ParadaMaquina como sequências de <strong>5 ou 6 dígitos</strong>. Marque as associações corretas e clique em <strong>Salvar confirmações</strong> para gravar no banco — assim os dados ficam disponíveis para outras análises.
+        </div>
+        {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- KPIs -->
+        <div class="mb-5">
+            <div class="row mb-3">
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Total de Paradas</h6>
+                                    <h2 class="mb-0 fw-bold">{{ total_registros }}</h2>
+                                    <small class="text-muted">período filtrado</small>
+                                </div>
+                                <i class="fas fa-stop-circle fa-3x text-primary opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com OS detectada</h6>
+                                    <h2 class="mb-0 fw-bold">{{ qtd_com_os }}</h2>
+                                    <small class="text-muted">{% if total_registros > 0 %}{{ qtd_com_os }}/{{ total_registros }} ({% widthratio qtd_com_os total_registros 100 %}%){% else %}-{% endif %}</small>
+                                </div>
+                                <i class="fas fa-check-circle fa-3x text-success opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Sem OS detectada</h6>
+                                    <h2 class="mb-0 fw-bold">{{ qtd_sem_os }}</h2>
+                                    <small class="text-muted">sem sequência 5–6 dígitos</small>
+                                </div>
+                                <i class="fas fa-question-circle fa-3x text-warning opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">OS únicas encontradas</h6>
+                                    <h2 class="mb-0 fw-bold">{{ os_unicas_count }}</h2>
+                                    <small class="text-muted">nímeros distintos</small>
+                                </div>
+                                <i class="fas fa-list-ol fa-3x text-info opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-purple shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Associações confirmadas</h6>
+                                    <h2 class="mb-0 fw-bold">{{ qtd_confirmadas|default:0 }}</h2>
+                                    <small class="text-muted">salvas no banco</small>
+                                </div>
+                                <i class="fas fa-save fa-3x opacity-25" style="color: #6f42c1;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form único: confirmações + OS manuais -->
+        {% if registros_com_os or registros_sem_os %}
+        <form method="post" action="{% url 'analise_maquina_por_parada' %}">
+            {% csrf_token %}
+            <input type="hidden" name="ano" value="{{ ano_filtro }}">
+            {% for m in meses_filtro %}
+            <input type="hidden" name="mes" value="{{ m }}">
+            {% endfor %}
+            <input type="hidden" name="displayed_pairs" value="{{ displayed_pairs }}">
+            <input type="hidden" name="displayed_manual_ids" value="{{ displayed_manual_ids }}">
+        {% endif %}
+
+        <!-- Detalhamento: paradas com OS (com confirmação) -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Paradas com Ordem de Serviço detectada</h5>
+                        {% if registros_com_os %}
+                        <span class="badge bg-light text-dark">Marque as associações corretas</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        {% if registros_com_os %}
+                            <div class="table-responsive table-scroll-wrapper">
+                                <table class="table table-hover table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="selectAllConfirm" title="Selecionar todos">
+                                                    <label class="form-check-label small fw-semibold" for="selectAllConfirm">Selecionar todos</label>
+                                                </div>
+                                            </th>
+                                            <th>Data</th>
+                                            <th>Recurso</th>
+                                            <th>OS encontrada(s)</th>
+                                            <th>Motivo (preview)</th>
+                                            <th>Ação (preview)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in registros_com_os %}
+                                        <tr>
+                                            <td>
+                                                {% for os_num, confirmado in item.os_list_with_status %}
+                                                <div class="form-check form-check-inline mb-0">
+                                                    <input class="form-check-input confirm-os-cb" type="checkbox" name="confirm_{{ item.parada.id }}:{{ os_num }}" id="confirm_{{ item.parada.id }}_{{ os_num }}" {% if confirmado %}checked{% endif %}>
+                                                    <label class="form-check-label small" for="confirm_{{ item.parada.id }}_{{ os_num }}">{{ os_num }}</label>
+                                                </div>
+                                                {% endfor %}
+                                            </td>
+                                            <td>{{ item.parada.data|date:"d/m/Y"|default:"-" }}</td>
+                                            <td>{{ item.parada.descr_recurso|default:"-" }}</td>
+                                            <td>
+                                                {% for os_num, confirmado in item.os_list_with_status %}
+                                                <span class="badge {% if confirmado %}bg-success{% else %}bg-primary{% endif %} me-1">{{ os_num }}{% if confirmado %} ✓{% endif %}</span>
+                                                {% endfor %}
+                                            </td>
+                                            <td><small class="text-muted">{{ item.motivo_preview|truncatechars:80 }}</small></td>
+                                            <td><small class="text-muted">{{ item.acao_preview|truncatechars:80 }}</small></td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                        <p class="text-muted mb-0">Nenhum registro com OS detectada no período filtrado.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paradas sem OS detectada (informar manualmente) -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-question-circle me-2"></i>Paradas sem Ordem de Serviço associada</h5>
+                        {% if registros_sem_os %}
+                        <span class="badge bg-dark">Informe a OS manualmente (5 ou 6 dígitos)</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        {% if registros_sem_os %}
+                        <div class="table-responsive table-scroll-wrapper">
+                            <table class="table table-hover table-sm">
+                                <thead>
+                                    <tr>
+                                        <th style="min-width: 140px;">OS manual</th>
+                                        <th>Data</th>
+                                        <th>Recurso</th>
+                                        <th>Linha de Produção</th>
+                                        <th>Motivo (preview)</th>
+                                        <th>Ação (preview)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in registros_sem_os_with_manual %}
+                                    <tr>
+                                        <td>
+                                            <input type="text" 
+                                                   class="form-control form-control-sm" 
+                                                   name="manual_os_{{ item.parada.id }}" 
+                                                   placeholder="Ex: 12345" 
+                                                   value="{{ item.manual_os_str }}"
+                                                   maxlength="50"
+                                                   title="Informe 5 ou 6 dígitos (vários separados por vírgula)">
+                                        </td>
+                                        <td>{{ item.parada.data|date:"d/m/Y"|default:"-" }}</td>
+                                        <td>{{ item.parada.descr_recurso|default:"-" }}</td>
+                                        <td>{{ item.parada.descr_linha_producao|default:"-" }}</td>
+                                        <td><small class="text-muted">{{ item.parada.motivo|truncatechars:80|default:"-" }}</small></td>
+                                        <td><small class="text-muted">{{ item.parada.acao|truncatechars:80|default:"-" }}</small></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted mb-0">Todos os registros do período possuem OS detectada.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if registros_com_os or registros_sem_os %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-save me-2"></i>Salvar confirmações e associações
+                </button>
+            </div>
+        </div>
+        </form>
+        {% endif %}
+
+        <!-- Resumo: OS por quantidade de paradas -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-list-ol me-2"></i>Ordens de Serviço encontradas (por quantidade de paradas)</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if os_resumo %}
+                        <div class="table-responsive table-scroll-wrapper">
+                            <table class="table table-hover table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>OS</th>
+                                        <th class="text-center">Qtd. Paradas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in os_resumo %}
+                                    <tr>
+                                        <td><strong>{{ item.os_num }}</strong></td>
+                                        <td class="text-center">{{ item.qtd_paradas }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted mb-0">Nenhuma OS detectada nos registros filtrados.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+function selecionarTodosMeses() {
+    document.querySelectorAll('input[name="mes"]').forEach(cb => cb.checked = true);
+}
+function desmarcarTodosMeses() {
+    document.querySelectorAll('input[name="mes"]').forEach(cb => cb.checked = false);
+}
+document.addEventListener('DOMContentLoaded', function() {
+    var selectAll = document.getElementById('selectAllConfirm');
+    var confirmCbs = document.querySelectorAll('.confirm-os-cb');
+    if (selectAll && confirmCbs.length) {
+        selectAll.addEventListener('change', function() {
+            confirmCbs.forEach(function(cb) { cb.checked = selectAll.checked; });
+        });
+        confirmCbs.forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                var allChecked = Array.prototype.every.call(confirmCbs, function(c) { return c.checked; });
+                var anyChecked = Array.prototype.some.call(confirmCbs, function(c) { return c.checked; });
+                selectAll.checked = allChecked;
+                selectAll.indeterminate = anyChecked && !allChecked;
+            });
+        });
+        var allChecked = Array.prototype.every.call(confirmCbs, function(c) { return c.checked; });
+        selectAll.checked = allChecked;
+    }
+});
+</script>
+{% endblock %}
