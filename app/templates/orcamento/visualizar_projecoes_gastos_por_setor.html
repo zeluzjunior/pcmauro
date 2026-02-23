@@ -1,0 +1,459 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Projeções de Gastos - {{ setor_nome }}{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .table-container { max-height: 70vh; overflow-y: auto; overflow-x: auto; }
+    .table { width: 100%; table-layout: auto; }
+    .table thead th {
+        position: sticky; top: 0; background-color: #f8f9fa; z-index: 10;
+        white-space: nowrap; vertical-align: middle; text-align: center; padding: 12px 8px;
+    }
+    .table tbody td { vertical-align: middle; padding: 10px 8px; }
+    .col-id { min-width: 70px; text-align: center; }
+    .col-setor { min-width: 150px; }
+    .col-descricao { min-width: 280px; }
+    .col-fornecedor { min-width: 180px; }
+    .col-valor { min-width: 120px; text-align: right; }
+    .table thead th.col-valor { text-align: right; }
+    .col-data { min-width: 120px; }
+    .col-numero { min-width: 120px; }
+    .col-servico-concluido { min-width: 110px; text-align: center; }
+    .stat-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .kpi-purple { border-left-color: #6f42c1; }
+    .chart-container { position: relative; height: 280px; margin-bottom: 1rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'analise_projecao_gastos' %}" class="text-white">Análise de Projeções de Gastos</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Setor: {{ setor_nome }}</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="bi bi-clipboard2-data me-2"></i>Projeções de Gastos
+                </h1>
+                <p class="lead mb-0">Setor: <strong>{{ setor_nome }}</strong></p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <!-- KPIs do setor (visual igual à Análise de Projeções de Gastos) -->
+        <div class="mb-5">
+            <div class="row mb-3">
+                <div class="col-md-4 mb-3">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Total de Gastos Previstos:</h6>
+                                    <h2 class="mb-0 fw-bold">{{ total_registros }}</h2>
+                                    <small class="text-muted">Projeções do setor</small>
+                                </div>
+                                <i class="fas fa-clipboard-list fa-3x text-primary opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Valor Total Previsto:</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_total_setor|currency_br }}</h2>
+                                    <small class="text-muted">Soma das projeções do setor</small>
+                                </div>
+                                <i class="fas fa-dollar-sign fa-3x text-success opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Previsões para o mês atual</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_mes_atual|currency_br }}</h2>
+                                    <small class="text-muted">{{ count_mes_atual }} registro{{ count_mes_atual|pluralize }} no mês atual</small>
+                                </div>
+                                <i class="fas fa-calendar-alt fa-3x text-info opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-4 mb-3">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Serviço Concluído = SIM</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_sim|currency_br }}</h2>
+                                    <small class="text-muted">{{ count_sim }} projeções ({{ pct_sim|floatformat:1 }}% do total)</small>
+                                </div>
+                                <i class="fas fa-check-circle fa-3x text-success opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Serviço Concluído = NÃO</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_nao|currency_br }}</h2>
+                                    <small class="text-muted">{{ count_nao }} projeções ({{ pct_nao|floatformat:1 }}% do total)</small>
+                                </div>
+                                <i class="fas fa-times-circle fa-3x text-danger opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card stat-card kpi-card kpi-purple shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com Número da NF</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_com_nf|currency_br }}</h2>
+                                    <small class="text-muted">{{ count_com_nf }} projeções ({{ pct_com_nf|floatformat:1 }}% do total)</small>
+                                </div>
+                                <i class="fas fa-file-invoice fa-3x opacity-25" style="color: #6f42c1;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resumo por Serviço Concluído + Top Fornecedores + Uso contábil -->
+        <div class="row mb-4">
+            <div class="col-lg-4 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-secondary text-white">
+                        <h6 class="mb-0"><i class="fas fa-tasks me-2"></i>Por Serviço Concluído</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light"><tr><th>Status</th><th class="text-end">Qtd</th><th class="text-end">Valor</th></tr></thead>
+                            <tbody>
+                                <tr><td>SIM</td><td class="text-end">{{ count_sim }}</td><td class="text-end">{{ valor_sim|currency_br }}</td></tr>
+                                <tr><td>NÃO</td><td class="text-end">{{ count_nao }}</td><td class="text-end">{{ valor_nao|currency_br }}</td></tr>
+                                <tr><td>Indefinido / Não informado</td><td class="text-end">{{ count_indef }}</td><td class="text-end">{{ valor_indef|currency_br }}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0"><i class="fas fa-truck me-2"></i>Top 10 Fornecedores</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-container" style="max-height: 260px;">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead class="table-light"><tr><th>Fornecedor</th><th class="text-end">Valor</th></tr></thead>
+                                <tbody>
+                                    {% for f in top_fornecedores %}
+                                    <tr><td>{{ f.fornecedor_nome_fantasia|truncatewords:6 }}</td><td class="text-end">{{ f.valor_total|currency_br }}</td></tr>
+                                    {% empty %}
+                                    <tr><td colspan="2" class="text-center text-muted">Nenhum</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0"><i class="fas fa-tag me-2"></i>Por Uso Contábil</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-container" style="max-height: 260px;">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead class="table-light"><tr><th>Uso</th><th class="text-end">Valor</th></tr></thead>
+                                <tbody>
+                                    {% for u in uso_contabil_agregado %}
+                                    <tr><td>{{ u.uso_contabil|truncatewords:5 }}</td><td class="text-end">{{ u.valor_total|currency_br }}</td></tr>
+                                    {% empty %}
+                                    <tr><td colspan="2" class="text-center text-muted">Nenhum</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfico evolução valor por mês -->
+        {% if evolucao_por_mes %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header text-white d-flex flex-wrap align-items-center justify-content-between gap-2" style="background-color: #0d6efd;">
+                        <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Evolução do valor por mês/ano (setor)</h5>
+                        <label class="d-flex align-items-center gap-2 mb-0">
+                            <span class="text-white">Ano:</span>
+                            <select id="anoGraficoEvolucao" class="form-select form-select-sm" style="width: auto; min-width: 100px;">
+                                {% for a in anos_grafico %}
+                                <option value="{{ a }}" {% if forloop.first %}selected{% endif %}>{{ a }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="evolucaoSetorChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Tabela detalhada -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-table me-2"></i>Projeções do setor {{ setor_nome }}
+                            <small class="ms-2">({{ projecoes.paginator.count }} registro{{ projecoes.paginator.count|pluralize }})</small>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-container">
+                            <table class="table table-hover table-striped mb-0">
+                                <thead>
+                                    <tr>
+                                        <th class="col-id">ID</th>
+                                        <th class="col-setor">Setor</th>
+                                        <th class="col-descricao">Descrição</th>
+                                        <th class="col-fornecedor">Fornecedor</th>
+                                        <th class="col-valor">Valor Total</th>
+                                        <th class="col-data">Uso Contábil</th>
+                                        <th class="col-numero">Mês/Ano Ref.</th>
+                                        <th class="col-numero">Nº Nota Fiscal</th>
+                                        <th class="col-servico-concluido">Serviço Concluído</th>
+                                        <th class="text-center" style="min-width: 100px;">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for projecao in projecoes %}
+                                    <tr>
+                                        <td class="col-id"><strong>{{ projecao.id_excel|default:"-" }}</strong></td>
+                                        <td class="col-setor"><strong>{{ projecao.setor|default:"-" }}</strong></td>
+                                        <td class="col-descricao">{{ projecao.descricao|default:"-"|truncatewords:12 }}</td>
+                                        <td class="col-fornecedor">
+                                            {{ projecao.fornecedor_nome_fantasia|default:"-" }}
+                                            {% if projecao.fornecedor_cnpj %}<br><small class="text-muted">{{ projecao.fornecedor_cnpj }}</small>{% endif %}
+                                        </td>
+                                        <td class="col-valor"><strong>{{ projecao.valor_total|currency_br }}</strong></td>
+                                        <td class="col-data">{{ projecao.uso_contabil|default:"-" }}</td>
+                                        <td class="col-numero">
+                                            {% if projecao.mes_referencia and projecao.ano_referencia %}
+                                                {{ projecao.mes_referencia }}/{{ projecao.ano_referencia }}
+                                            {% elif projecao.previsao_execucao %}
+                                                {{ projecao.previsao_execucao }}
+                                            {% else %}-
+                                            {% endif %}
+                                        </td>
+                                        <td class="col-numero">{{ projecao.numero_nf|default:"-" }}</td>
+                                        <td class="col-servico-concluido text-center align-middle">
+                                            {% if projecao.servico_concluido %}
+                                                <span class="badge bg-success px-2 py-1" title="Concluído em {{ projecao.servico_concluido|date:'d/m/Y' }}">{{ projecao.servico_concluido|date:"d/m/Y" }}</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary bg-opacity-25 text-muted px-2 py-1">Pendente</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <a href="{% url 'visualizar_projecao_gasto' projecao.id %}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary" title="Visualizar detalhes">
+                                                <i class="bi bi-eye me-1"></i>Visualizar
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="10" class="text-center text-muted py-4">
+                                            <i class="fas fa-inbox fa-2x mb-2"></i>
+                                            <p>Nenhuma projeção de gasto para este setor.</p>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% if projecoes.has_other_pages %}
+                    <div class="card-footer">
+                        <nav aria-label="Paginação">
+                            <ul class="pagination justify-content-center mb-0">
+                                {% if projecoes.has_previous %}
+                                    <li class="page-item"><a class="page-link" href="?setor={{ setor_nome|urlencode }}&page=1">&laquo; Primeira</a></li>
+                                    <li class="page-item"><a class="page-link" href="?setor={{ setor_nome|urlencode }}&page={{ projecoes.previous_page_number }}">Anterior</a></li>
+                                {% endif %}
+                                <li class="page-item active"><span class="page-link">Página {{ projecoes.number }} de {{ projecoes.paginator.num_pages }}</span></li>
+                                {% if projecoes.has_next %}
+                                    <li class="page-item"><a class="page-link" href="?setor={{ setor_nome|urlencode }}&page={{ projecoes.next_page_number }}">Próxima</a></li>
+                                    <li class="page-item"><a class="page-link" href="?setor={{ setor_nome|urlencode }}&page={{ projecoes.paginator.num_pages }}">Última &raquo;</a></li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-3">
+            <div class="col-12">
+                <a href="{% url 'analise_projecao_gastos' %}" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar à Análise de Projeções</a>
+            </div>
+        </div>
+
+        <!-- Dados faltantes nos registros do setor (última seção da página) -->
+        <div class="row mb-4 mt-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0 border-warning">
+                    <div class="card-header text-dark" style="background-color: #fff3cd;">
+                        <h5 class="mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Dados faltantes nos registros do setor
+                        </h5>
+                        <small class="opacity-90">Campos vazios ou não preenchidos. Complete as informações para melhorar a análise.</small>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">Total de registros do setor: <strong>{{ total_registros }}</strong>. Abaixo, a quantidade de registros em que cada campo está em branco ou não informado.</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Campo</th>
+                                        <th class="text-center">Registros sem informação</th>
+                                        <th class="text-center">% do total</th>
+                                        <th class="text-center">Registros com informação</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in dados_faltantes %}
+                                    <tr class="{% if item.count_missing > 0 %}table-warning{% endif %}">
+                                        <td>{{ item.label }}</td>
+                                        <td class="text-center">
+                                            {% if item.count_missing > 0 %}
+                                                <strong class="text-danger">{{ item.count_missing }}</strong>
+                                            {% else %}
+                                                <span class="text-success">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">{{ item.pct_missing }}%</td>
+                                        <td class="text-center text-muted">{{ item.count_ok }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="4" class="text-center text-muted">Nenhum dado disponível</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% if evolucao_por_mes %}
+<script>
+(function() {
+    var ctx = document.getElementById('evolucaoSetorChart');
+    var selAno = document.getElementById('anoGraficoEvolucao');
+    if (!ctx || !selAno) return;
+    var evolucaoPorAno = {{ evolucao_por_ano_json|safe }};
+    var anoInicial = selAno.value;
+    var dados = evolucaoPorAno[anoInicial] || { labels: [], valores: [], valores_sim: [], valores_nao: [] };
+    var chartInstance = new Chart(ctx.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: dados.labels,
+            datasets: [
+                {
+                    label: 'Total (R$)',
+                    data: dados.valores || [],
+                    backgroundColor: 'rgba(13, 110, 253, 0.6)',
+                    borderColor: 'rgba(13, 110, 253, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Serviço concluído = SIM',
+                    data: dados.valores_sim || [],
+                    backgroundColor: 'rgba(25, 135, 84, 0.6)',
+                    borderColor: 'rgba(25, 135, 84, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Serviço concluído = NÃO',
+                    data: dados.valores_nao || [],
+                    backgroundColor: 'rgba(220, 53, 69, 0.6)',
+                    borderColor: 'rgba(220, 53, 69, 1)',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: true, position: 'top' } },
+            scales: {
+                y: { beginAtZero: true, ticks: { callback: function(v) { return 'R$ ' + v.toLocaleString('pt-BR'); } } }
+            }
+        }
+    });
+    selAno.addEventListener('change', function() {
+        var y = this.value;
+        var d = evolucaoPorAno[y];
+        if (d) {
+            chartInstance.data.labels = d.labels;
+            chartInstance.data.datasets[0].data = d.valores || [];
+            chartInstance.data.datasets[1].data = d.valores_sim || [];
+            chartInstance.data.datasets[2].data = d.valores_nao || [];
+            chartInstance.update();
+        }
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}

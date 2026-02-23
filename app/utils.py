@@ -14,13 +14,14 @@ warnings.filterwarnings('ignore', message='.*Data Validation.*')
 import openpyxl
 
 
-def read_excel_file(file, sheet_name=None, header_row=1):
+def read_excel_file(file, sheet_name=None, sheet_index=None, header_row=1):
     """
     Lê um arquivo Excel (.xlsx, .xls, .xlsm) e retorna os dados.
     
     Args:
         file: Arquivo Excel (Django UploadedFile ou path)
-        sheet_name: Nome da planilha a ser lida (None para primeira planilha)
+        sheet_name: Nome da planilha a ser lida (None para usar sheet_index ou planilha ativa)
+        sheet_index: Índice 0-based da planilha (usa quando sheet_name é None; evita problemas de encoding no nome)
         header_row: Linha do cabeçalho (1-based). Muitos PCMs têm título na linha 1 e cabeçalho na linha 2.
     
     Returns:
@@ -38,7 +39,9 @@ def read_excel_file(file, sheet_name=None, header_row=1):
             else:
                 wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
         
-        if sheet_name:
+        if sheet_index is not None and 0 <= sheet_index < len(wb.worksheets):
+            ws = wb.worksheets[sheet_index]
+        elif sheet_name:
             ws = wb[sheet_name]
         else:
             ws = wb.active
@@ -3735,12 +3738,12 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
 def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -> Tuple[int, int, List[str]]:
     """
     Faz upload de projeções de gastos a partir de um arquivo Excel
-    
+
     Args:
         file: Arquivo Django UploadedFile
         update_existing: Se True, atualiza registros existentes. Se False, ignora duplicados.
         debug: Se True, adiciona informações de estrutura do arquivo em errors.
-    
+
     Returns:
         Tupla (created_count, updated_count, errors)
     """
@@ -3754,16 +3757,19 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
     
     # Determinar tipo de arquivo
     file_name = file.name.lower()
+    print(f"[ProjecaoGastos] Import: {file.name}")
     
     try:
         # Ler arquivo baseado na extensão
         if file_name.endswith(('.xlsx', '.xls', '.xlsm')):
             # Construir lista de planilhas a tentar: GASTOS exato, depois com "GASTO", depois todas as demais
             sheets_to_try = ['GASTOS', 'Gastos', 'gastos']
+            num_sheets = 0
             try:
                 if hasattr(file, 'seek'):
                     file.seek(0)
                 wb_temp = openpyxl.load_workbook(file, read_only=True, data_only=True)
+                num_sheets = len(wb_temp.sheetnames)
                 gasto_sheets = [s for s in wb_temp.sheetnames if 'GASTO' in str(s).upper() and s not in sheets_to_try]
                 other_sheets = [s for s in wb_temp.sheetnames if s not in sheets_to_try and s not in gasto_sheets]
                 sheets_to_try = [s for s in sheets_to_try if s in wb_temp.sheetnames] + gasto_sheets + other_sheets
@@ -3778,33 +3784,92 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
             data = None
             used_header_row = 1
             sheet_used = None
-            for sheet_try in sheets_to_try:
-                for header_row_try in [2, 1, 3]:
+            # Normalizar nome de coluna para detecção (permite acentos/encoding diferentes entre arquivos)
+            def _header_has_required_keys(keys):
+                """Exige coluna exatamente 'ID' e coluna SETOR (ou CENTRO)."""
+                if not keys:
+                    return False
+                import unicodedata
+                has_id = False
+                has_setor = False
+                for k in keys:
+                    if not k:
+                        continue
+                    n = str(k).replace('\n', ' ').replace('\r', ' ').strip().upper()
+                    n = unicodedata.normalize('NFD', n)
+                    n = ''.join(c for c in n if unicodedata.category(c) != 'Mn')
+                    n = re.sub(r'\s+', ' ', n).strip()
+                    if n == 'ID':
+                        has_id = True
+                    if n and ('SETOR' in n or 'CENTRO' in n):
+                        has_setor = True
+                    if has_id and has_setor:
+                        return True
+                return False
+            def _accept_data(data_try, keys_try):
+                return _header_has_required_keys(keys_try)
+            # Primeiro: tentar por índice de planilha (evita problemas de encoding no nome, ex: "1. Manutenção Turno A")
+            for idx in range(max(num_sheets, 1)):
+                for header_row_try in [2, 1, 3, 4, 5, 6, 7]:
                     try:
                         if hasattr(file, 'seek'):
                             file.seek(0)
-                        data_try = read_excel_file(file, sheet_name=sheet_try, header_row=header_row_try)
+                        data_try = read_excel_file(file, sheet_index=idx, header_row=header_row_try)
                         if data_try and len(data_try) > 0:
                             keys_try = list(data_try[0].keys())
-                            if any(k and ('ID' in str(k).upper() or 'SETOR' in str(k).upper() or 'SERVI' in str(k).upper()) for k in (keys_try or [])):
+                            if _accept_data(data_try, keys_try):
                                 data = data_try
                                 used_header_row = header_row_try
                                 first_row_keys = keys_try
-                                sheet_used = sheet_try if sheet_try else '(planilha ativa)'
+                                sheet_used = f'(planilha {idx + 1})'
                                 break
-                    except (KeyError, ValueError):
+                    except Exception:
                         continue
                 if data:
                     break
+            # Depois: tentar por nome da planilha (para compatibilidade)
+            if not data:
+                for sheet_try in sheets_to_try:
+                    for header_row_try in [2, 1, 3, 4, 5, 6, 7]:
+                        try:
+                            if hasattr(file, 'seek'):
+                                file.seek(0)
+                            data_try = read_excel_file(file, sheet_name=sheet_try, header_row=header_row_try)
+                            if data_try and len(data_try) > 0:
+                                keys_try = list(data_try[0].keys())
+                                if _accept_data(data_try, keys_try):
+                                    data = data_try
+                                    used_header_row = header_row_try
+                                    first_row_keys = keys_try
+                                    sheet_used = sheet_try if sheet_try else '(planilha ativa)'
+                                    break
+                        except Exception:
+                            continue
+                    if data:
+                        break
             if debug and sheet_used:
                 errors.append(f"[DEBUG] Planilha usada: {sheet_used}, linha de cabeçalho: {used_header_row}, {len(data)} linha(s) de dados.")
+            print(f"[ProjecaoGastos] Sheet: {sheet_used}, header_row: {used_header_row}, rows: {len(data) if data else 0}")
             if not data:
                 raise ValidationError(
-                    "Nenhuma planilha com dados encontrada. Verifique se existe uma planilha 'GASTOS' ou cujo nome contenha 'GASTO', "
-                    "com colunas ID, SETOR e demais campos esperados."
+                    "Nenhuma planilha com dados encontrada. A planilha deve ter uma coluna chamada exatamente 'ID' e uma coluna 'SETOR' (ou 'CENTRO')."
                 )
             
             first_row_keys = list(data[0].keys())
+            
+            # Inferir setor do nome do arquivo quando a coluna SETOR estiver vazia (ex: "1. Manutenção Turno A - Previsão....xlsx" -> "1. Manutenção Turno A")
+            setor_from_filename = None
+            base_name = (file.name or '').strip()
+            for ext in ('.xlsx', '.xls', '.xlsm'):
+                if base_name.lower().endswith(ext):
+                    base_name = base_name[:-len(ext)].strip()
+                    break
+            if base_name and ' - ' in base_name:
+                setor_from_filename = base_name.split(' - ')[0].strip()
+                if len(setor_from_filename) > 100:
+                    setor_from_filename = setor_from_filename[:100]
+            elif base_name and re.match(r'^\d+\.\s*.+', base_name):
+                setor_from_filename = base_name[:100].strip()
         
         # Helper para normalizar texto (remove acentos, colapsa espaços) para matching flexível
         def _normalize_key(s):
@@ -3868,25 +3933,26 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
         # Processar dados em transação
         excel_servico_imported_count = 0
         with transaction.atomic():
-            for row_num, row_data in enumerate(data, start=used_header_row + 1):
+            for row_num, row in enumerate(data, start=used_header_row + 1):
+                row_data = row
                 try:
                     # Verificar se a linha está vazia ou tem apenas valores vazios
                     if not any(str(v).strip() if v else '' for v in row_data.values()):
                         continue
                     
-                    # Ler ID do Excel (obrigatório - chave primária para update/create)
-                    id_excel_raw = find_column_value(row_data, ['ID', 'id', 'Id', 'Nº', 'Nº ID', 'CÓDIGO', 'CODIGO', 'Código'], fallback_keywords=['ID'])
+                    # ID: apenas da coluna cujo cabeçalho é exatamente "ID" (case-insensitive, ignora espaços)
+                    id_excel_raw = find_column_value(row_data, ['ID', 'id', 'Id'])
                     if id_excel_raw is None or (isinstance(id_excel_raw, str) and not str(id_excel_raw).strip()):
-                        errors.append(f"Linha {row_num}: ID não encontrado. Linha ignorada.")
+                        errors.append(f"Linha {row_num}: coluna ID não encontrada ou vazia. Linha ignorada.")
                         continue
                     try:
                         s = str(id_excel_raw).strip()
-                        id_excel = int(float(s))  # Trata 1.0, 2.0, "001", IDs não sequenciais (5, 12, 99...)
+                        id_excel = int(float(s))
                     except (ValueError, TypeError):
                         errors.append(f"Linha {row_num}: ID inválido '{id_excel_raw}'. Linha ignorada.")
                         continue
                     
-                    # Verificar se a linha tem dados além do ID
+                    # Processar todas as linhas com ID válido (não pular por falta de outros campos)
                     # Se a linha só tem ID e todos os outros campos estão vazios, pular
                     # Verificar se pelo menos um campo importante tem valor
                     # (verificamos apenas alguns campos principais para eficiência)
@@ -3920,9 +3986,7 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
                         if value and str(value).strip():
                             has_meaningful_data = True
                             break
-                    if not has_meaningful_data:
-                        non_id = [v for k, v in row_data.items() if v and str(v).strip() and k and 'ID' not in str(k).upper()]
-                        has_meaningful_data = len(non_id) > 0
+                    # Se a linha só tem ID e nenhum outro dado, não importar (evita linhas vazias em planilhas com muitas linhas)
                     if not has_meaningful_data:
                         continue
                     
@@ -3999,10 +4063,10 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
                         else:
                             dados_adicionais[excel_key] = _safe_str(val, max_length=500)
                     
-                    # setor_value para lookup e armazenamento (consistência: evita registros com setor=None vs 'SEM SETOR')
-                    setor_value = (re.sub(r'\s+', ' ', str(setor).strip()) if setor and str(setor).strip() else 'SEM SETOR')
+                    # SETOR: apenas da coluna SETOR do Excel; se vazio, usar "SEM SETOR" (não inferir do nome do arquivo)
+                    setor_value = re.sub(r'\s+', ' ', str(setor).strip()) if setor and str(setor).strip() else 'SEM SETOR'
                     
-                    # Preparar dados para criação/atualização (usar setor_value para consistência com o lookup)
+                    # Preparar dados para criação/atualização
                     projecao_data = {
                         'setor': setor_value,
                         'solicitante': solicitante,
@@ -4027,56 +4091,16 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
                         'dados_adicionais': dados_adicionais if dados_adicionais else None,
                     }
                     
-                    # Usar id_excel + setor como chave composta para identificação única
-                    projecao_obj = None
-                    created = False
-                    
+                    # Atualização/criação: apenas por id_excel + setor (exato); sem fallbacks
                     if update_existing:
-                        # update_or_create com fallbacks para matching flexível
-                        projecao_obj = ProjecaoGasto.objects.filter(
-                            id_excel=id_excel, setor=setor_value
-                        ).first()
-                        already_updated = False
-                        if projecao_obj is None and setor_value == 'SEM SETOR':
-                            projecao_obj = ProjecaoGasto.objects.filter(
-                                id_excel=id_excel, setor__isnull=True
-                            ).first()
-                            if projecao_obj is not None:
-                                for key, value in projecao_data.items():
-                                    setattr(projecao_obj, key, value)
-                                projecao_obj.save(update_fields=list(projecao_data.keys()))
-                                updated_count += 1
-                                already_updated = True
-                        # Fallback: setor pode variar entre arquivos (ex: "1. TURNO A" vs "1. Manutenção Turno A")
-                        if projecao_obj is None and setor_value != 'SEM SETOR':
-                            prefix_match = re.match(r'^(\d+\.?\s*)', setor_value)
-                            if prefix_match:
-                                prefix = prefix_match.group(1)
-                                candidates = ProjecaoGasto.objects.filter(
-                                    id_excel=id_excel, setor__startswith=prefix
-                                )
-                                projecao_obj = candidates.first() if candidates.count() == 1 else None
-                                if projecao_obj is not None:
-                                    for key, value in projecao_data.items():
-                                        setattr(projecao_obj, key, value)
-                                    projecao_obj.save(update_fields=list(projecao_data.keys()))
-                                    updated_count += 1
-                                    already_updated = True
-                        if projecao_obj is None:
-                            projecao_obj, created = ProjecaoGasto.objects.update_or_create(
-                                id_excel=id_excel,
-                                setor=setor_value,
-                                defaults=projecao_data
-                            )
-                            if created:
-                                created_count += 1
-                            else:
-                                updated_count += 1
-                        elif not already_updated:
-                            # Encontrado pelo primeiro filter (id_excel+setor) - aplicar atualização
-                            for key, value in projecao_data.items():
-                                setattr(projecao_obj, key, value)
-                            projecao_obj.save(update_fields=list(projecao_data.keys()))
+                        projecao_obj, created = ProjecaoGasto.objects.update_or_create(
+                            id_excel=id_excel,
+                            setor=setor_value,
+                            defaults=projecao_data
+                        )
+                        if created:
+                            created_count += 1
+                        else:
                             updated_count += 1
                     else:
                         projecao_obj, created = ProjecaoGasto.objects.get_or_create(
@@ -4087,7 +4111,6 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
                         if created:
                             created_count += 1
                         else:
-                            # Mesmo sem update_existing, atualizar servico_concluido quando o Excel tem valor
                             if servico_concluido is not None:
                                 projecao_obj.servico_concluido = servico_concluido
                                 projecao_obj.save(update_fields=['servico_concluido'])
@@ -4100,24 +4123,31 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
                     print(f"Erro ao processar linha {row_num}: {error_msg}")
                     continue
         
+        # Transação commitada ao sair do with
+        if debug:
+            total_in_db = ProjecaoGasto.objects.count()
+            errors.append(f"[DEBUG] Após import: {total_in_db} registro(s) na tabela Projeção de Gastos.")
         if excel_servico_imported_count > 0:
             errors.append(f"Info: {excel_servico_imported_count} linha(s) com SERVIÇO CONCLUÍDO importadas.")
         elif data and len(data) > 1:
             errors.append("Aviso: Nenhum valor de SERVIÇO CONCLUÍDO foi encontrado. Verifique se a coluna existe e tem dados.")
-        
         if created_count == 0 and updated_count == 0 and data and len(data) > 1 and not any('ID não encontrado' in e for e in errors):
             total_rows = len(data)
             errors.append(f"[INFO] Nenhum registro criado ou atualizado. Verifique: 1) Opção 'Atualizar registros existentes' está marcada? 2) ID e SETOR no Excel correspondem aos do banco? 3) {total_rows} linha(s) de dados foram lidas.")
-        
+        print(f"[ProjecaoGastos] Result: created={created_count}, updated={updated_count}, errors={len(errors)}")
+        if errors:
+            for e in errors[:5]:
+                print(f"[ProjecaoGastos]   {e[:120]}")
         return created_count, updated_count, errors
     
     except ValidationError as e:
         errors.append(str(e))
+        print(f"[ProjecaoGastos] ValidationError: {e}")
         return 0, 0, errors
     except Exception as e:
         error_detail = f"Erro geral ao processar arquivo: {str(e)}"
         errors.append(error_detail)
-        print(f"Erro geral: {error_detail}")
+        print(f"[ProjecaoGastos] Erro geral: {error_detail}")
         import traceback
         traceback.print_exc()
         return 0, 0, errors
@@ -4336,7 +4366,7 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                         'inclusao_198': _safe_datetime(row_data.get('INCLUSÃO 198')),
                         'status': _safe_str(row_data.get('STATUS'), max_length=255),
                         'obs': _safe_str(row_data.get('OBS'), max_length=1000),
-                        'saldo_residual_pedido': _safe_decimal(row_data.get('SALDO RESIDUAL PEDIDO ')),
+                        'saldo_residual_pedido': _safe_decimal(row_data.get('SALDO RESIDUAL PEDIDO ') or row_data.get('SALDO RESIDUAL PEDIDO')),
                     }
                     
                     if existing:

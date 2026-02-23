@@ -25,6 +25,15 @@
     .kpi-card {
         border-left: 4px solid;
     }
+    .analise-req-kpi-row .card {
+        height: 100%;
+        min-height: 140px;
+    }
+    .analise-req-kpi-row .card-body {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
     .kpi-primary { border-left-color: #0d6efd; }
     .kpi-success { border-left-color: #198754; }
     .kpi-warning { border-left-color: #ffc107; }
@@ -87,7 +96,7 @@
                 <div class="accordion filter-accordion" id="filtrosAccordion">
                     <div class="accordion-item shadow-sm border-0">
                         <h2 class="accordion-header" id="filtrosHeading">
-                            <button class="accordion-button {% if not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="false" aria-controls="filtrosCollapse">
                                 <i class="fas fa-filter me-2"></i>
                                 <strong>Filtros</strong>
                                 {% if meses_filtro or ano_filtro %}
@@ -117,7 +126,7 @@
                                 {% endif %}
                             </button>
                         </h2>
-                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                        <div id="filtrosCollapse" class="accordion-collapse collapse" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
                             <div class="accordion-body">
                                 <form method="get" action="{% url 'analise_requisicoes' %}" class="row g-3">
                                     <div class="col-md-4">
@@ -225,9 +234,9 @@
         <!-- KPI Cards -->
         <div class="mb-5">
             <!-- Cards Gerais -->
-            <div class="row mb-3">
-                <div class="col-md-3 mb-3">
-                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+            <div class="row mb-3 g-3 analise-req-kpi-row">
+                <div class="col-6 col-md-4 col-lg-2 mb-0">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
                         <div class="card-body">
                             <h6 class="text-muted mb-1 small">
                                 Total de Requisições
@@ -243,25 +252,25 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <div class="card stat-card kpi-card kpi-danger shadow-sm border-0">
+                <div class="col-6 col-md-4 col-lg-2 mb-0">
+                    <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
                         <div class="card-body">
                             <h6 class="text-muted mb-1 small">
                                 Valor Total (Gasto)
                                 <i class="fas fa-info-circle ms-1" 
                                    data-bs-toggle="tooltip" 
                                    data-bs-placement="top" 
-                                   title="Soma dos valores das requisições que geram custo (cd_depo = 1), excluindo as geradas por NF"></i>
+                                   title="Soma dos valores das requisições que geram custo (cd_depo = 1)"></i>
                             </h6>
-                            <h3 class="mb-1 fw-bold">{{ valor_total_normal|currency_br }}</h3>
+                            <h3 class="mb-1 fw-bold">{{ valor_total|currency_br }}</h3>
                             <small class="text-muted">
-                                Com NF: {{ valor_total_nf|currency_br }}
+                                Período filtrado
                             </small>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                <div class="col-6 col-md-4 col-lg-2 mb-0">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
                         <div class="card-body">
                             <h6 class="text-muted mb-1 small">
                                 Itens Únicos
@@ -277,8 +286,8 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                <div class="col-6 col-md-4 col-lg-2 mb-0">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
                         <div class="card-body">
                             <h6 class="text-muted mb-1 small">
                                 Valor Médio
@@ -294,10 +303,42 @@
                         </div>
                     </div>
                 </div>
+                <div class="col-6 col-md-4 col-lg-2 mb-0">
+                    <div class="card stat-card kpi-card kpi-purple shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-1 small">
+                                Requisições associadas a NF
+                                <i class="fas fa-info-circle ms-1" 
+                                   data-bs-toggle="tooltip" 
+                                   data-bs-placement="top" 
+                                   title="Valor total das requisições geradas pelo processo de entrada de Nota Fiscal"></i>
+                            </h6>
+                            <h3 class="mb-1 fw-bold">{{ valor_total_nf|currency_br }}</h3>
+                            <small class="text-muted">
+                                {{ total_requisicoes_nf }} requisições
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-4 col-lg-2 mb-0">
+                    <div class="card stat-card kpi-card shadow border border-2 h-100" style="border-left-color: #dc3545 !important; border-left-width: 4px !important; border-color: #dc3545 !important; background: linear-gradient(135deg, #fff5f5 0%, #ffe0e0 100%); box-shadow: 0 0.25rem 0.5rem rgba(220, 53, 69, 0.15);">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-1 small fw-semibold">
+                                Requisições sem associação com NF
+                                <i class="fas fa-info-circle ms-1" 
+                                   data-bs-toggle="tooltip" 
+                                   data-bs-placement="top" 
+                                   title="Valor total das requisições que não foram geradas por Nota Fiscal (impacto direto no orçamento)"></i>
+                            </h6>
+                            <h3 class="mb-1 fw-bold text-danger">{{ valor_total_normal|currency_br }}</h3>
+                            <small class="text-muted">
+                                {{ total_requisicoes_normal }} requisições
+                            </small>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-
-
 
         <!-- Charts Row 1.5: Daily Chart -->
         <div class="row mb-5">
@@ -367,69 +408,86 @@
             </div>
         </div>
         
-        <!-- Charts Row 2.1: Top Itens NF -->
-        <div class="row mb-5">
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-bar me-2"></i>Top 10 Itens Mais Requisitados (Quantidade) - NF
-                        </h5>
+        <!-- Seção: Requisições não associadas a Nota Fiscal -->
+        <div class="mb-5 pb-4 border-bottom">
+            <h4 class="text-success mb-4">
+                <i class="fas fa-box-open me-2"></i>Requisições não associadas a Nota Fiscal:
+            </h4>
+
+            <!-- KPIs: Requisições Normal (sem NF) -->
+            <div class="row mb-3 g-3 analise-req-kpi-row">
+                <div class="col-6 col-md-3 mb-0">
+                    <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-1 small">Total de Requisições (sem NF)</h6>
+                            <h3 class="mb-1 fw-bold">{{ total_requisicoes_normal }}</h3>
+                            <small class="text-muted">registros no período</small>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="itensQtdChartNF"></canvas>
+                </div>
+                <div class="col-6 col-md-3 mb-0">
+                    <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-1 small">Valor Total</h6>
+                            <h3 class="mb-1 fw-bold">{{ valor_total_normal|currency_br }}</h3>
+                            <small class="text-muted">requisições sem NF</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 mb-0">
+                    <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-1 small">Itens Únicos</h6>
+                            <h3 class="mb-1 fw-bold">{{ itens_unicos_normal }}</h3>
+                            <small class="text-muted">itens diferentes</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 mb-0">
+                    <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-1 small">Valor Médio</h6>
+                            <h3 class="mb-1 fw-bold">{{ valor_medio_normal|currency_br }}</h3>
+                            <small class="text-muted">por requisição</small>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-bar me-2"></i>Top 10 Itens por Valor Total - NF
-                        </h5>
+
+            <!-- Gráficos Normal: Top 10 Itens por Quantidade e por Valor -->
+            <div class="row mb-5">
+                <div class="col-md-6 mb-4">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-chart-bar me-2"></i>Top 10 Itens Mais Requisitados (Quantidade) - Normal
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container-large">
+                                <canvas id="itensQtdChartNormal"></canvas>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="itensValorChartNF"></canvas>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-chart-bar me-2"></i>Top 10 Itens por Valor Total - Normal
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container-large">
+                                <canvas id="itensValorChartNormal"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+
         </div>
-        
-        <!-- Charts Row 2.2: Top Itens Normal -->
-        <div class="row mb-5">
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-bar me-2"></i>Top 10 Itens Mais Requisitados (Quantidade) - Normal
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="itensQtdChartNormal"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-bar me-2"></i>Top 10 Itens por Valor Total - Normal
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="itensValorChartNormal"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- Fim da seção: Requisições não associadas a Nota Fiscal -->
 
         <!-- Charts Row 3 -->
         <div class="row mb-5">
@@ -485,73 +543,174 @@
             </div>
         </div>
 
-        <!-- Data Tables -->
+        <!-- Seção: Requisições associadas a entrada de Nota Fiscal -->
+        <div class="mb-5 pb-4 border-bottom">
+            <h4 class="text-info mb-4">
+                <i class="fas fa-file-invoice me-2"></i>Requisições associadas a entrada de Nota Fiscal:
+            </h4>
+
+            <!-- KPIs: Requisições associadas a Nota Fiscal -->
+            <div class="row mb-3 g-3 analise-req-kpi-row">
+                <div class="col-6 col-md-3 mb-0">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-1 small">Total de Requisições (NF)</h6>
+                            <h3 class="mb-1 fw-bold">{{ total_requisicoes_nf }}</h3>
+                            <small class="text-muted">registros no período</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 mb-0">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-1 small">Valor Total</h6>
+                            <h3 class="mb-1 fw-bold">{{ valor_total_nf|currency_br }}</h3>
+                            <small class="text-muted">requisições com NF</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 mb-0">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-1 small">Itens Únicos</h6>
+                            <h3 class="mb-1 fw-bold">{{ itens_unicos_nf }}</h3>
+                            <small class="text-muted">itens diferentes</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 mb-0">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-1 small">Valor Médio</h6>
+                            <h3 class="mb-1 fw-bold">{{ valor_medio_nf|currency_br }}</h3>
+                            <small class="text-muted">por requisição</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráficos NF: Top 10 Itens por Quantidade e por Valor -->
+            <div class="row mb-5">
+                <div class="col-md-6 mb-4">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-chart-bar me-2"></i>Top 10 Itens Mais Requisitados (Quantidade) - NF
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container-large">
+                                <canvas id="itensQtdChartNF"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-chart-bar me-2"></i>Top 10 Itens por Valor Total - NF
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container-large">
+                                <canvas id="itensValorChartNF"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela: Requisições associadas a Nota Fiscal -->
         <div class="row mb-5">
-            <!-- Tabela: Requisições Recentes -->
-            <div class="col-md-12 mb-4">
+            <div class="col-12">
                 <div class="card shadow-sm border-0">
-                    <div class="card-header bg-primary text-white">
+                    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center flex-wrap">
                         <h5 class="mb-0">
-                            <i class="fas fa-table me-2"></i>Requisições Recentes
+                            <i class="fas fa-file-invoice me-2"></i>Requisições associadas a Nota Fiscal
                         </h5>
+                        <span class="badge bg-light text-dark">{{ total_requisicoes_nf }} registro(s) no período</span>
                     </div>
                     <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
+                        <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
+                            <table class="table table-hover table-striped mb-0">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>Data</th>
-                                        <th>Código Item</th>
-                                        <th>Descrição Item</th>
-                                        <th class="text-end">Quantidade</th>
-                                        <th class="text-end">Valor Unit.</th>
-                                        <th class="text-end">Valor Total</th>
-                                        <th>Centro Atividade</th>
-                                        <th>Operação</th>
+                                        <th class="col-data">Data Requisição</th>
+                                        <th class="col-item">Código Item</th>
+                                        <th class="col-descricao">Descrição Item</th>
+                                        <th class="col-quantidade">Quantidade</th>
+                                        <th class="col-valor">Valor Total</th>
+                                        <th class="col-centro">Centro Atividade</th>
+                                        <th class="col-usuario">Usuário Criou</th>
+                                        <th class="col-descricao">Operação</th>
+                                        <th class="col-acoes text-center">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for requisicao in requisicoes_recentes_list %}
+                                    {% for requisicao in requisicoes_nf_page %}
                                     <tr>
                                         <td>{{ requisicao.data_requisicao|date:"d/m/Y" }}</td>
                                         <td><span class="badge bg-primary">{{ requisicao.cd_item }}</span></td>
-                                        <td>{{ requisicao.descr_item|default:"-"|truncatewords:10 }}</td>
-                                        <td class="text-end">
+                                        <td class="col-descricao">{{ requisicao.descr_item|default:"-" }}</td>
+                                        <td>
                                             {% if requisicao.qtde_movto_estoq %}
                                                 {{ requisicao.qtde_movto_estoq|floatformat:2 }}
-                                            {% else %}
-                                                -
-                                            {% endif %}
+                                            {% else %}—{% endif %}
                                         </td>
-                                        <td class="text-end">
+                                        <td>
                                             {% if requisicao.vlr_movto_estoq %}
                                                 {{ requisicao.vlr_movto_estoq|currency_br }}
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                        <td class="text-end">
-                                            {% if requisicao.valor_total %}
-                                                {{ requisicao.valor_total|currency_br }}
-                                            {% else %}
-                                                -
-                                            {% endif %}
+                                            {% else %}—{% endif %}
                                         </td>
                                         <td>{{ requisicao.cd_centro_ativ|default:"-" }}</td>
-                                        <td>{{ requisicao.descr_operacao|default:"-"|truncatewords:5 }}</td>
+                                        <td>{{ requisicao.cd_usu_criou|default:"-" }}</td>
+                                        <td>{{ requisicao.descr_operacao|default:"-" }}</td>
+                                        <td class="text-center">
+                                            <a href="{% url 'visualizar_requisicao_almoxarifado' requisicao.id %}" class="btn btn-sm btn-outline-primary" title="Visualizar detalhes">
+                                                <i class="fas fa-eye me-1"></i>Ver
+                                            </a>
+                                        </td>
                                     </tr>
                                     {% empty %}
                                     <tr>
-                                        <td colspan="8" class="text-center text-muted">Nenhuma requisição encontrada</td>
+                                        <td colspan="9" class="text-center text-muted py-5">
+                                            <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+                                            Nenhuma requisição associada a Nota Fiscal no período.
+                                        </td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
                         </div>
+                        {% if requisicoes_nf_page.has_other_pages %}
+                        <div class="card-footer bg-light">
+                            <nav aria-label="Paginação requisições NF">
+                                <ul class="pagination pagination-sm justify-content-center mb-0">
+                                    {% if requisicoes_nf_page.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}&page_nf={{ requisicoes_nf_page.previous_page_number }}">Anterior</a>
+                                    </li>
+                                    {% endif %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">Página {{ requisicoes_nf_page.number }} de {{ requisicoes_nf_page.paginator.num_pages }}</span>
+                                    </li>
+                                    {% if requisicoes_nf_page.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}&page_nf={{ requisicoes_nf_page.next_page_number }}">Próxima</a>
+                                    </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
         </div>
+
+        </div>
+        <!-- Fim da seção: Requisições associadas a entrada de Nota Fiscal -->
 
         <!-- Charts Row 1 -->
         <div class="row mb-5">

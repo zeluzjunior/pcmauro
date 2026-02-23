@@ -29,209 +29,123 @@ def handle_form_errors(form, request):
 
 
 def home(request):
-    """Home page view - Data filtered by current week from Semana52"""
-    from app.models import OrdemServicoCorretiva, RequisicaoAlmoxarifado, Semana52, Maquina, Manutentor
+    """Home page view - Data filtered by current month"""
+    from app.models import OrdemServicoCorretiva, RequisicaoAlmoxarifado, Maquina, Manutentor
     from datetime import datetime, timedelta, date
     from django.db.models import Sum, Count, Q
     from decimal import Decimal
+    from calendar import monthrange
     
     hoje = date.today()
+    ultimo_dia_mes = monthrange(hoje.year, hoje.month)[1]
+    data_inicio_mes = date(hoje.year, hoje.month, 1)
+    data_fim_mes = date(hoje.year, hoje.month, ultimo_dia_mes)
+    mes_ano_grafico = f"{hoje.year}-{str(hoje.month).zfill(2)}"
+    meses_nomes = ('', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro')
+    mes_ano_label = f"{meses_nomes[hoje.month]} {hoje.year}"
     
-    # Encontrar a semana atual baseada na data de hoje
-    semana_atual = None
-    try:
-        # Buscar semana onde hoje está entre inicio e fim
-        semana_atual = Semana52.objects.filter(
-            inicio__lte=hoje,
-            fim__gte=hoje
-        ).first()
-        
-        # Se não encontrou, buscar a semana mais próxima
-        if not semana_atual:
-            # Tentar encontrar semana onde inicio é mais próximo de hoje (mas não futuro)
-            semana_atual = Semana52.objects.filter(
-                inicio__lte=hoje
-            ).order_by('-inicio').first()
-        
-        # Se ainda não encontrou, buscar qualquer semana futura próxima
-        if not semana_atual:
-            semana_atual = Semana52.objects.filter(
-                inicio__gte=hoje
-            ).order_by('inicio').first()
-    except Exception as e:
-        print(f"Erro ao buscar semana atual: {e}")
-        semana_atual = None
+    # ========== KPIs BASEADOS NO MÊS ATUAL ==========
     
-    # Definir intervalo de datas para filtros
-    data_inicio_semana = None
-    data_fim_semana = None
-    mes_ano_grafico = None
-    
-    if semana_atual and semana_atual.inicio and semana_atual.fim:
-        data_inicio_semana = semana_atual.inicio
-        data_fim_semana = semana_atual.fim
-        # Usar o mês da semana atual para o gráfico
-        mes_ano_grafico = f"{data_inicio_semana.year}-{str(data_inicio_semana.month).zfill(2)}"
-    else:
-        # Fallback: usar mês atual se não houver semana definida
-        mes_ano_grafico = f"{hoje.year}-{str(hoje.month).zfill(2)}"
-        # Usar início e fim do mês atual como fallback
-        from calendar import monthrange
-        ultimo_dia = monthrange(hoje.year, hoje.month)[1]
-        data_inicio_semana = date(hoje.year, hoje.month, 1)
-        data_fim_semana = date(hoje.year, hoje.month, ultimo_dia)
-    
-    # ========== KPIs BASEADOS NA SEMANA ATUAL ==========
-    
-    # 1. Manutenções Corretivas na semana atual
+    # 1. Manutenções Corretivas no mês atual
     manutencoes_corretivas = 0
-    if data_inicio_semana and data_fim_semana:
+    if data_inicio_mes and data_fim_mes:
         try:
-            ordens_semana = OrdemServicoCorretiva.objects.exclude(
+            ordens_mes = OrdemServicoCorretiva.objects.exclude(
                 dt_entrada__isnull=True
             ).exclude(dt_entrada='')
-            
-            # Filtrar por data (precisa parsear dt_entrada que é string)
-            for ordem in ordens_semana:
+            for ordem in ordens_mes:
                 try:
                     dt_str = ordem.dt_entrada.strip()
                     if ' ' in dt_str:
                         date_part = dt_str.split(' ')[0]
                     else:
                         date_part = dt_str
-                    
                     if '/' in date_part:
                         parts = date_part.split('/')
                         if len(parts) == 3:
                             day, month, year = parts
                             ordem_date = date(int(year), int(month), int(day))
-                            if data_inicio_semana <= ordem_date <= data_fim_semana:
+                            if data_inicio_mes <= ordem_date <= data_fim_mes:
                                 manutencoes_corretivas += 1
                 except:
                     continue
         except Exception as e:
             print(f"Erro ao contar manutenções corretivas: {e}")
     
-    # 2. Manutenções Preventivas (usar MeuPlanoPreventiva se disponível)
+    # 2. Manutenções Preventivas no mês atual
     try:
         from app.models import MeuPlanoPreventiva
-        if data_inicio_semana and data_fim_semana:
-            # Contar planos preventivos com ações na semana atual
-            manutencoes_preventivas = MeuPlanoPreventiva.objects.filter(
-                data_planejada__gte=data_inicio_semana,
-                data_planejada__lte=data_fim_semana
-            ).count()
-        else:
-            manutencoes_preventivas = MeuPlanoPreventiva.objects.count()
+        manutencoes_preventivas = MeuPlanoPreventiva.objects.filter(
+            data_planejada__gte=data_inicio_mes,
+            data_planejada__lte=data_fim_mes
+        ).count()
     except:
         manutencoes_preventivas = 0
     
-    # 3. Requisições de Almoxarifado na semana atual
-    if data_inicio_semana and data_fim_semana:
-        requisicoes_semana = RequisicaoAlmoxarifado.objects.filter(
-            data_requisicao__gte=data_inicio_semana,
-            data_requisicao__lte=data_fim_semana
-        )
-        total_requisicoes_semana = requisicoes_semana.count()
-        valor_total_semana = requisicoes_semana.aggregate(
-            total=Sum('vlr_movto_estoq')
-        )['total'] or Decimal('0')
-    else:
-        total_requisicoes_semana = RequisicaoAlmoxarifado.objects.count()
-        valor_total_semana = Decimal('0')
+    # 3. Requisições de Almoxarifado no mês atual
+    requisicoes_mes = RequisicaoAlmoxarifado.objects.filter(
+        data_requisicao__gte=data_inicio_mes,
+        data_requisicao__lte=data_fim_mes
+    )
+    total_requisicoes_semana = requisicoes_mes.count()
+    valor_total_semana = requisicoes_mes.aggregate(
+        total=Sum('vlr_movto_estoq')
+    )['total'] or Decimal('0')
     
-    # 4. Máquinas e Manutentores (total geral, não filtrado por semana)
+    # 4. Máquinas e Manutentores (total geral)
     total_maquinas = Maquina.objects.count()
     total_manutentores = Manutentor.objects.count()
     
-    # 5. Calendário - eventos na semana atual
+    # 5. Calendário - eventos no mês atual (sem ordens de serviço corretiva)
     eventos = []
-    if data_inicio_semana and data_fim_semana:
-        # Buscar ordens de serviço na semana atual
-        ordens = OrdemServicoCorretiva.objects.exclude(
-            dt_entrada__isnull=True
-        ).exclude(dt_entrada='')
-        
-        for ordem in ordens:
-            try:
-                dt_str = ordem.dt_entrada.strip()
-                if ' ' in dt_str:
-                    date_part = dt_str.split(' ')[0]
-                else:
-                    date_part = dt_str
-                
-                if '/' in date_part:
-                    parts = date_part.split('/')
-                    if len(parts) == 3:
-                        day, month, year = parts
-                        ordem_date = date(int(year), int(month), int(day))
-                        
-                        # Incluir apenas eventos dentro da semana atual
-                        if data_inicio_semana <= ordem_date <= data_fim_semana:
-                            start_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
-                            eventos.append({
-                                'title': f'OS {ordem.cd_ordemserv} - {ordem.descr_maquina[:30] if ordem.descr_maquina else "Sem descrição"}',
-                                'start': start_date,
-                                'color': '#3788d8',  # Azul
-                                'url': f'/manutencao-corretiva/consultar/?search={ordem.cd_ordemserv}'
-                            })
-            except:
-                continue
-        
-        # Adicionar eventos de manutenção preventiva na semana atual
-        try:
-            from app.models import MeuPlanoPreventiva
-            preventivas_semana = MeuPlanoPreventiva.objects.filter(
-                data_planejada__gte=data_inicio_semana,
-                data_planejada__lte=data_fim_semana
-            )
-            for preventiva in preventivas_semana:
+    try:
+        from app.models import MeuPlanoPreventiva
+        preventivas_mes = MeuPlanoPreventiva.objects.filter(
+            data_planejada__gte=data_inicio_mes,
+            data_planejada__lte=data_fim_mes
+        )
+        for preventiva in preventivas_mes:
+            eventos.append({
+                'title': f'Preventiva - {preventiva.cd_maquina.cd_maquina if preventiva.cd_maquina else "N/A"}',
+                'start': preventiva.data_planejada.strftime('%Y-%m-%d'),
+                'color': '#28a745',
+                'url': f'/planejamento/meu-plano/?search={preventiva.cd_maquina.cd_maquina if preventiva.cd_maquina else ""}'
+            })
+    except:
+        pass
+    try:
+        from app.models import ManutencaoTerceiro
+        for manutencao in ManutencaoTerceiro.objects.filter(
+            data__date__gte=data_inicio_mes,
+            data__date__lte=data_fim_mes
+        ):
+            if manutencao.data:
                 eventos.append({
-                    'title': f'Preventiva - {preventiva.cd_maquina.cd_maquina if preventiva.cd_maquina else "N/A"}',
-                    'start': preventiva.data_planejada.strftime('%Y-%m-%d'),
-                    'color': '#28a745',  # Verde
-                    'url': f'/planejamento/meu-plano/?search={preventiva.cd_maquina.cd_maquina if preventiva.cd_maquina else ""}'
+                    'title': f'Manutenção Terceiro - {manutencao.titulo[:30]}',
+                    'start': manutencao.data.strftime('%Y-%m-%d'),
+                    'color': '#ff9800',
+                    'url': '/manutencao-terceiro/consultar/'
                 })
-        except:
-            pass
-        
-        # Adicionar eventos de Manutenção Terceiro na semana atual
-        try:
-            from app.models import ManutencaoTerceiro
-            manutencoes_terceiro_semana = ManutencaoTerceiro.objects.filter(
-                data__date__gte=data_inicio_semana,
-                data__date__lte=data_fim_semana
-            )
-            for manutencao in manutencoes_terceiro_semana:
-                if manutencao.data:
-                    eventos.append({
-                        'title': f'Manutenção Terceiro - {manutencao.titulo[:30]}',
-                        'start': manutencao.data.strftime('%Y-%m-%d'),
-                        'color': '#ff9800',  # Laranja
-                        'url': '/manutencao-terceiro/consultar/'
-                    })
-        except Exception as e:
-            print(f"Erro ao adicionar eventos de Manutenção Terceiro: {e}")
-        
-        # Adicionar eventos de Visitas na semana atual
-        try:
-            from app.models import Visitas
-            visitas_semana = Visitas.objects.filter(
-                data__date__gte=data_inicio_semana,
-                data__date__lte=data_fim_semana
-            )
-            for visita in visitas_semana:
-                if visita.data:
-                    eventos.append({
-                        'title': f'Visita - {visita.titulo[:30]}',
-                        'start': visita.data.strftime('%Y-%m-%d'),
-                        'color': '#9c27b0',  # Roxo
-                        'url': '/visitas/consultar/'
-                    })
-        except Exception as e:
-            print(f"Erro ao adicionar eventos de Visitas: {e}")
+    except Exception as e:
+        print(f"Erro ao adicionar eventos de Manutenção Terceiro: {e}")
+    try:
+        from app.models import Visitas
+        for visita in Visitas.objects.filter(
+            data__date__gte=data_inicio_mes,
+            data__date__lte=data_fim_mes
+        ):
+            if visita.data:
+                eventos.append({
+                    'title': f'Visita - {visita.titulo[:30]}',
+                    'start': visita.data.strftime('%Y-%m-%d'),
+                    'color': '#9c27b0',
+                    'url': '/visitas/consultar/'
+                })
+    except Exception as e:
+        print(f"Erro ao adicionar eventos de Visitas: {e}")
     
-    # ========== GRÁFICO: ORDENS FECHADAS NA SEMANA ATUAL ==========
+    # ========== GRÁFICO: ORDENS FECHADAS NO MÊS ATUAL ==========
     ordens_fechadas_labels = []
     ordens_fechadas_data = []
     
@@ -285,117 +199,94 @@ def home(request):
         
         return None
     
-    if data_inicio_semana and data_fim_semana:
-        # Criar dicionário para contar ordens por dia
+    if data_inicio_mes and data_fim_mes:
         from collections import defaultdict
         ordens_por_dia = defaultdict(int)
-        
-        # Buscar todas as ordens com dt_encordmanu preenchida
         ordens_fechadas = OrdemServicoCorretiva.objects.exclude(
             dt_encordmanu__isnull=True
         ).exclude(dt_encordmanu='')
-        
-        # Processar cada ordem e contar por dia
         for ordem in ordens_fechadas:
             try:
-                # Usar função de parse melhorada
                 ordem_date = parse_date_from_string(ordem.dt_encordmanu)
-                
-                if ordem_date:
-                    # Debug: verificar se esta ordem específica está sendo processada
-                    if ordem.cd_ordemserv == 7 or '07/12/2025' in str(ordem.dt_encordmanu):
-                        print(f"DEBUG - Ordem {ordem.cd_ordemserv}:")
-                        print(f"  dt_encordmanu original: {ordem.dt_encordmanu}")
-                        print(f"  Data parseada: {ordem_date}")
-                        print(f"  Semana atual: {data_inicio_semana} a {data_fim_semana}")
-                        print(f"  Está na semana? {data_inicio_semana <= ordem_date <= data_fim_semana}")
-                    
-                    # Verificar se está na semana atual
-                    if data_inicio_semana <= ordem_date <= data_fim_semana:
-                        # Formatar data como chave (YYYY-MM-DD)
-                        data_key = ordem_date.strftime('%Y-%m-%d')
-                        ordens_por_dia[data_key] += 1
-                    elif ordem.cd_ordemserv == 7 or '07/12/2025' in str(ordem.dt_encordmanu):
-                        print(f"  Ordem {ordem.cd_ordemserv} NÃO está na semana atual!")
-                        print(f"  Comparação: {data_inicio_semana} <= {ordem_date} <= {data_fim_semana}")
-                else:
-                    # Debug: se não conseguiu fazer parse
-                    if ordem.cd_ordemserv == 7 or '07/12/2025' in str(ordem.dt_encordmanu):
-                        print(f"DEBUG - Ordem {ordem.cd_ordemserv}: Não conseguiu fazer parse de '{ordem.dt_encordmanu}'")
-            except Exception as e:
-                # Log erro para debug, mas continuar processando outras ordens
-                if ordem.cd_ordemserv == 7 or '07/12/2025' in str(ordem.dt_encordmanu):
-                    print(f"Erro ao processar dt_encordmanu da ordem {ordem.cd_ordemserv}: {e}")
-                    import traceback
-                    traceback.print_exc()
+                if ordem_date and data_inicio_mes <= ordem_date <= data_fim_mes:
+                    data_key = ordem_date.strftime('%Y-%m-%d')
+                    ordens_por_dia[data_key] += 1
+            except Exception:
                 continue
-        
-        # Criar lista de todos os dias da semana
-        from datetime import timedelta
-        current_date = data_inicio_semana
-        while current_date <= data_fim_semana:
+        current_date = data_inicio_mes
+        while current_date <= data_fim_mes:
             data_key = current_date.strftime('%Y-%m-%d')
-            data_label = current_date.strftime('%d/%m')
-            ordens_fechadas_labels.append(data_label)
+            ordens_fechadas_labels.append(current_date.strftime('%d/%m'))
             ordens_fechadas_data.append(ordens_por_dia.get(data_key, 0))
             current_date += timedelta(days=1)
     
-    # Converter para JSON para o template
     import json
-    # Garantir que sempre temos arrays válidos (mesmo que vazios)
-    if not ordens_fechadas_labels:
-        ordens_fechadas_labels = []
-    if not ordens_fechadas_data:
-        ordens_fechadas_data = []
-    
-    # Debug: imprimir dados calculados
-    print(f"DEBUG - Gráfico Ordens Fechadas (usando dt_encordmanu):")
-    print(f"  Data de hoje: {hoje}")
-    print(f"  Semana: {semana_atual.semana if semana_atual else 'N/A'}")
-    print(f"  Data início semana: {data_inicio_semana}, Data fim semana: {data_fim_semana}")
-    print(f"  Total de ordens processadas: {ordens_fechadas.count()}")
-    print(f"  Labels: {ordens_fechadas_labels}")
-    print(f"  Data: {ordens_fechadas_data}")
-    print(f"  Total de ordens fechadas na semana: {sum(ordens_fechadas_data)}")
-    
-    # Debug adicional: verificar se há ordens com dt_encordmanu = 07/12/2025
-    # Tentar encontrar ordem com ID 7 ou com data 07/12/2025
-    ordem_teste = OrdemServicoCorretiva.objects.filter(cd_ordemserv=7).first()
-    if not ordem_teste:
-        # Tentar encontrar qualquer ordem com essa data
-        ordens_com_data = OrdemServicoCorretiva.objects.exclude(dt_encordmanu__isnull=True).exclude(dt_encordmanu='')
-        for ordem in ordens_com_data:
-            if '07/12/2025' in str(ordem.dt_encordmanu):
-                ordem_teste = ordem
-                break
-    
-    if ordem_teste:
-        print(f"DEBUG - Ordem encontrada (ID: {ordem_teste.cd_ordemserv}):")
-        print(f"  dt_encordmanu: {ordem_teste.dt_encordmanu}")
-        ordem_date_teste = parse_date_from_string(ordem_teste.dt_encordmanu)
-        print(f"  Data parseada: {ordem_date_teste}")
-        if ordem_date_teste:
-            print(f"  Está na semana atual ({data_inicio_semana} a {data_fim_semana})? {data_inicio_semana <= ordem_date_teste <= data_fim_semana if data_inicio_semana and data_fim_semana else 'N/A'}")
-            # Verificar qual semana contém essa data
-            semana_com_data = Semana52.objects.filter(
-                inicio__lte=ordem_date_teste,
-                fim__gte=ordem_date_teste
-            ).first()
-            if semana_com_data:
-                print(f"  Esta data pertence à semana: {semana_com_data.semana} ({semana_com_data.inicio} a {semana_com_data.fim})")
-            else:
-                print(f"  Nenhuma semana encontrada que contenha esta data!")
-    
     ordens_fechadas_labels_json = json.dumps(ordens_fechadas_labels)
     ordens_fechadas_data_json = json.dumps(ordens_fechadas_data)
+    
+    # ========== ORÇAMENTO, GASTOS E REQUISIÇÕES (ano atual, todos os meses) ==========
+    from app.models import DadosOrcamento, ProjecaoGasto, NotaFiscal, RequisicaoAlmoxarifado
+    from django.db.models import Sum, Q
+    ano_orcamento = hoje.year
+    total_orcamento_disponivel = DadosOrcamento.objects.filter(
+        ano=ano_orcamento
+    ).aggregate(total=Sum('valor_orcamento'))['total'] or Decimal('0')
+    q_ano_proj = (
+        Q(ano_referencia=ano_orcamento) |
+        (Q(ano_referencia__isnull=True) & Q(created_at__year=ano_orcamento))
+    )
+    projecoes_ano = ProjecaoGasto.objects.filter(q_ano_proj)
+    valor_servico_concluido_nao = projecoes_ano.filter(
+        servico_concluido__iexact='NÃO'
+    ).aggregate(Sum('valor_total'))['valor_total__sum'] or Decimal('0')
+    requisicoes_ano = RequisicaoAlmoxarifado.objects.filter(
+        data_requisicao__year=ano_orcamento
+    )
+    mensagem_nf_requisicao = "REQUISIÇÃO GERADA PELO PROCESSO DE ENTRADA DE NOTA FISCAL"
+    requisicoes_sem_nf = requisicoes_ano.exclude(obs_rm__icontains=mensagem_nf_requisicao)
+    valor_total_requisicoes_sem_nf = Decimal('0.00')
+    for req in requisicoes_sem_nf.filter(cd_depo=1):
+        if req.vlr_movto_estoq:
+            valor_total_requisicoes_sem_nf += abs(req.vlr_movto_estoq)
+    todas_notas_lancadas = NotaFiscal.objects.filter(
+        Q(situacao__icontains='LANÇADA') | Q(situacao__icontains='LANCADA')
+    ).filter(uso_contabil='242')
+    def _parse_date_emissao(date_str):
+        if not date_str:
+            return None
+        date_str = str(date_str).strip()
+        if ' ' in date_str:
+            date_str = date_str.split(' ')[0]
+        for fmt in ('%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', '%Y/%m/%d'):
+            try:
+                return datetime.strptime(date_str, fmt)
+            except (ValueError, TypeError):
+                continue
+        if '/' in date_str:
+            parts = date_str.split('/')
+            if len(parts) == 3:
+                try:
+                    d, m, y = parts
+                    if len(y) == 2:
+                        y = '20' + y
+                    return datetime(int(y), int(m), int(d))
+                except (ValueError, TypeError):
+                    pass
+        return None
+    valor_total_notas_lancadas = Decimal('0')
+    for nota in todas_notas_lancadas:
+        de = _parse_date_emissao(nota.data_emissao)
+        if de and de.year == ano_orcamento:
+            valor_total_notas_lancadas += (nota.total_nota or Decimal('0'))
+    saldo_parcial = total_orcamento_disponivel - valor_total_requisicoes_sem_nf - valor_servico_concluido_nao - valor_total_notas_lancadas
     
     context = {
         'page_title': 'Home',
         'active_page': 'home',
         'eventos': eventos,
-        'semana_atual': semana_atual,
-        'data_inicio_semana': data_inicio_semana,
-        'data_fim_semana': data_fim_semana,
+        'data_inicio_mes': data_inicio_mes,
+        'data_fim_mes': data_fim_mes,
+        'mes_ano_label': mes_ano_label,
         'mes_ano_grafico': mes_ano_grafico,
         # KPIs
         'manutencoes_corretivas': manutencoes_corretivas,
@@ -407,6 +298,12 @@ def home(request):
         # Dados do gráfico de ordens fechadas
         'ordens_fechadas_labels': ordens_fechadas_labels_json,
         'ordens_fechadas_data': ordens_fechadas_data_json,
+        # Orçamento, Gastos e Requisições (ano atual)
+        'total_orcamento_disponivel': total_orcamento_disponivel,
+        'valor_total_requisicoes_sem_nf': valor_total_requisicoes_sem_nf,
+        'valor_servico_concluido_nao': valor_servico_concluido_nao,
+        'valor_total_notas_lancadas': valor_total_notas_lancadas,
+        'saldo_parcial': saldo_parcial,
     }
     return render(request, 'home.html', context)
 
@@ -652,7 +549,8 @@ def analise_requisicoes(request):
     from app.models import RequisicaoAlmoxarifado
     from decimal import Decimal
     from datetime import datetime, timedelta
-    from django.db.models import Sum, Count, Q, Avg
+    from django.db.models import Sum, Count, Q, Avg, Max, Case, When, F, Value
+    from django.db.models.fields import DecimalField
     from collections import defaultdict
     import json
     from calendar import monthrange
@@ -668,7 +566,7 @@ def analise_requisicoes(request):
     ano_filtro = request.GET.get('ano', None)
     meses_filtro = request.GET.getlist('mes')  # getlist para múltiplos valores
     
-    # Valores padrão: ano atual e todos os meses
+    # Valores padrão: ano atual e mês atual (carregar com filtro aplicado ao mês atual)
     hoje = datetime.now()
     if not ano_filtro:
         ano_filtro = str(hoje.year)
@@ -679,7 +577,7 @@ def analise_requisicoes(request):
     except (ValueError, TypeError):
         ano_filtro = hoje.year
     
-    # Converter meses para inteiros e validar
+    # Converter meses para inteiros e validar; se não informado, usar mês atual
     meses_filtro_int = []
     if meses_filtro:
         for mes in meses_filtro:
@@ -691,6 +589,9 @@ def analise_requisicoes(request):
                 continue
         # Remover duplicatas e ordenar
         meses_filtro_int = sorted(list(set(meses_filtro_int)))
+    else:
+        # Sem mês na URL: aplicar filtro ao mês atual
+        meses_filtro_int = [hoje.month]
     
     # Construir queryset base com filtros
     queryset_base = RequisicaoAlmoxarifado.objects.all()
@@ -907,53 +808,66 @@ def analise_requisicoes(request):
         else:
             data_atual = data_atual.replace(month=data_atual.month + 1, day=1)
     
-    # Top 10 itens mais requisitados (por quantidade) - Geral
+    # Quantidade "requisitada" = saídas do estoque: no sistema de origem valor negativo = saída.
+    # Interpretamos como quantidade retirada: somamos (-qtde_movto_estoq) quando qtde_movto_estoq < 0.
+    qtd_saida_expr = Sum(
+        Case(
+            When(qtde_movto_estoq__lt=0, then=-F('qtde_movto_estoq')),
+            default=Value(0),
+            output_field=DecimalField(max_digits=15, decimal_places=2)
+        )
+    )
+    
+    # Top 10 itens mais requisitados (por quantidade) - Geral (agrupar só por cd_item para não fragmentar)
     top_itens_qtd = queryset_base.exclude(
         qtde_movto_estoq__isnull=True
-    ).values('cd_item', 'descr_item').annotate(
-        total_qtd=Sum('qtde_movto_estoq')
+    ).values('cd_item').annotate(
+        total_qtd=qtd_saida_expr,
+        descr_item=Max('descr_item')
     ).order_by('-total_qtd')[:10]
     
     top_itens_labels = []
     top_itens_data = []
     for item in top_itens_qtd:
-        descr = item['descr_item'] or f"Item {item['cd_item']}"
+        descr = (item.get('descr_item') or '').strip() or f"Item {item['cd_item']}"
         if len(descr) > 40:
             descr = descr[:37] + "..."
         top_itens_labels.append(f"{item['cd_item']} - {descr}")
-        top_itens_data.append(abs(float(item['total_qtd'])))
+        top_itens_data.append(float(item['total_qtd'] or 0))
     
-    # Top 10 itens mais requisitados (por quantidade) - NF
+    # Top 10 itens mais requisitados (por quantidade) - NF (agrupar só por cd_item)
     top_itens_qtd_nf = queryset_nf.exclude(
         qtde_movto_estoq__isnull=True
-    ).values('cd_item', 'descr_item').annotate(
-        total_qtd=Sum('qtde_movto_estoq')
+    ).values('cd_item').annotate(
+        total_qtd=qtd_saida_expr,
+        descr_item=Max('descr_item')
     ).order_by('-total_qtd')[:10]
     
     top_itens_labels_nf = []
     top_itens_data_nf = []
     for item in top_itens_qtd_nf:
-        descr = item['descr_item'] or f"Item {item['cd_item']}"
+        descr = (item.get('descr_item') or '').strip() or f"Item {item['cd_item']}"
         if len(descr) > 40:
             descr = descr[:37] + "..."
         top_itens_labels_nf.append(f"{item['cd_item']} - {descr}")
-        top_itens_data_nf.append(abs(float(item['total_qtd'])))
+        top_itens_data_nf.append(float(item['total_qtd'] or 0))
     
-    # Top 10 itens mais requisitados (por quantidade) - Normal
+    # Top 10 itens mais requisitados (por quantidade) - Normal (agrupar só por cd_item)
     top_itens_qtd_normal = queryset_normal.exclude(
         qtde_movto_estoq__isnull=True
-    ).values('cd_item', 'descr_item').annotate(
-        total_qtd=Sum('qtde_movto_estoq')
+    ).values('cd_item').annotate(
+        total_qtd=qtd_saida_expr,
+        descr_item=Max('descr_item')
     ).order_by('-total_qtd')[:10]
     
     top_itens_labels_normal = []
     top_itens_data_normal = []
     for item in top_itens_qtd_normal:
-        descr = item['descr_item'] or f"Item {item['cd_item']}"
+        descr = (item.get('descr_item') or '').strip() or f"Item {item['cd_item']}"
         if len(descr) > 40:
             descr = descr[:37] + "..."
         top_itens_labels_normal.append(f"{item['cd_item']} - {descr}")
-        top_itens_data_normal.append(abs(float(item['total_qtd'])))
+        top_itens_data_normal.append(float(item['total_qtd'] or 0))
     
     # Top 10 itens por valor - Geral
     top_itens_valor = []
@@ -1052,6 +966,15 @@ def analise_requisicoes(request):
     
     # Requisições recentes (últimas 20)
     requisicoes_recentes_list = queryset_base.order_by('-data_requisicao', '-created_at')[:20]
+    
+    # Requisições associadas a NF — lista paginada para a tabela na análise
+    requisicoes_nf_ordered = queryset_nf.order_by('-data_requisicao', 'cd_item')
+    paginator_nf = Paginator(requisicoes_nf_ordered, 50)
+    page_nf = request.GET.get('page_nf', 1)
+    try:
+        requisicoes_nf_page = paginator_nf.page(int(page_nf))
+    except (ValueError, TypeError):
+        requisicoes_nf_page = paginator_nf.page(1)
     
     # Top 10 usuários que criaram requisições
     usuarios_dict = defaultdict(lambda: {'count': 0, 'valor': Decimal('0.00')})
@@ -1227,6 +1150,7 @@ def analise_requisicoes(request):
         'usuarios_data_count': json.dumps(usuarios_data_count),
         'usuarios_data_valor': json.dumps(usuarios_data_valor),
         'requisicoes_recentes_list': requisicoes_recentes_list,
+        'requisicoes_nf_page': requisicoes_nf_page,
         # Filtros
         'anos_disponiveis': anos_disponiveis_list,
         'meses_nomes': meses_nomes,
@@ -3477,9 +3401,9 @@ def importar_projecao_gastos(request):
                     messages.warning(request, f'... e mais {len(errors) - limit} mensagens.')
             
             if created_count > 0:
-                messages.success(request, f'{created_count} projeção(ões) de gasto(s) criada(s) com sucesso!')
+                messages.success(request, f'{created_count} projeção(ões) de gasto(s) criada(s) com sucesso! Os dados foram gravados no banco. Recarregue a página de consulta e verifique os filtros (ano, mês, setor) se não aparecerem.')
             if updated_count > 0:
-                messages.info(request, f'{updated_count} projeção(ões) de gasto(s) atualizada(s)!')
+                messages.info(request, f'{updated_count} projeção(ões) de gasto(s) atualizada(s)! Os dados foram gravados no banco. Recarregue a página de consulta e verifique os filtros (ano, mês, setor) se não aparecerem.')
             if created_count == 0 and updated_count == 0 and not errors:
                 messages.info(request, 'Nenhum registro criado ou atualizado. Verifique se a opção "Atualizar registros existentes" está marcada e se o arquivo tem a estrutura esperada (colunas ID, SETOR, etc.).')
             
@@ -5375,9 +5299,18 @@ def consultar_requisicoes_almoxarifado(request):
     if filter_usuario_atend:
         requisicoes_list = requisicoes_list.filter(cd_usu_atend__icontains=filter_usuario_atend)
     
+    # Opções para filtro de Operação (distintos no dataset já filtrado por ano/mês e outros)
+    operacoes_disponiveis = list(
+        requisicoes_list.exclude(descr_operacao__isnull=True).exclude(descr_operacao='')
+        .values_list('descr_operacao', flat=True).distinct().order_by('descr_operacao')
+    )
+    has_operacao_vazio = requisicoes_list.filter(Q(descr_operacao__isnull=True) | Q(descr_operacao='')).exists()
     filter_operacao = request.GET.get('filter_operacao', '').strip()
     if filter_operacao:
-        requisicoes_list = requisicoes_list.filter(descr_operacao__icontains=filter_operacao)
+        if filter_operacao == '__VAZIO__':
+            requisicoes_list = requisicoes_list.filter(Q(descr_operacao__isnull=True) | Q(descr_operacao=''))
+        else:
+            requisicoes_list = requisicoes_list.filter(descr_operacao=filter_operacao)
     
     filter_local = request.GET.get('filter_local', '').strip()
     if filter_local:
@@ -5448,6 +5381,8 @@ def consultar_requisicoes_almoxarifado(request):
         'filter_operacao': filter_operacao,
         'filter_local': filter_local,
         'sort_valor': sort_valor,
+        'operacoes_disponiveis': operacoes_disponiveis,
+        'has_operacao_vazio': has_operacao_vazio,
         'query_string_base': _build_query_string_base(request, exclude=['sort_valor', 'page']),
     }
     return render(request, 'consultar/consultar_requisicoes_almoxarifado.html', context)
@@ -13812,7 +13747,8 @@ def gerenciar_projeto(request):
             'key': 'requisicao_almoxarifado',
             'icone': 'fas fa-shopping-cart',
             'cor': 'warning',
-            'descricao': 'Requisições de itens retirados do almoxarifado'
+            'descricao': 'Requisições de itens retirados do almoxarifado (campo Data da Requisição define o mês)',
+            'limpar_por_mes': True,
         },
         {
             'nome': 'Notas Fiscais',
@@ -13820,7 +13756,8 @@ def gerenciar_projeto(request):
             'key': 'nota_fiscal',
             'icone': 'fas fa-file-invoice-dollar',
             'cor': 'primary',
-            'descricao': 'Notas fiscais cadastradas no sistema'
+            'descricao': 'Notas fiscais cadastradas no sistema (mês definido pelo campo Data Emissão)',
+            'limpar_por_mes': True,
         },
         {
             'nome': 'Visitas',
@@ -13898,11 +13835,61 @@ def gerenciar_projeto(request):
     if ano_atual not in anos_paradas:
         anos_paradas = [ano_atual] + anos_paradas
     anos_disponiveis_paradas = sorted(set(anos_paradas), reverse=True) if anos_paradas else [ano_atual]
+    # Anos disponíveis para "Limpar por mês" (RequisicaoAlmoxarifado)
+    anos_requisicoes = list(RequisicaoAlmoxarifado.objects.exclude(data_requisicao__isnull=True).values_list('data_requisicao__year', flat=True).distinct().order_by('-data_requisicao__year'))
+    if ano_atual not in anos_requisicoes:
+        anos_requisicoes = [ano_atual] + anos_requisicoes
+    anos_disponiveis_requisicoes = sorted(set(anos_requisicoes), reverse=True) if anos_requisicoes else [ano_atual]
+    # Anos disponíveis para "Limpar por mês" (NotaFiscal — data_emissao é CharField, parse em Python)
+    from datetime import datetime as dt
+    def _parse_data_emissao(s):
+        if not s or not str(s).strip():
+            return None
+        s = str(s).strip()
+        if ' ' in s:
+            s = s.split(' ')[0]
+        for fmt in ('%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', '%d/%m/%y'):
+            try:
+                return dt.strptime(s, fmt)
+            except (ValueError, TypeError):
+                continue
+        if '/' in s:
+            parts = s.split('/')
+            if len(parts) == 3:
+                try:
+                    d, m, y = int(parts[0]), int(parts[1]), int(parts[2])
+                    if y < 100:
+                        y += 2000
+                    return dt(y, m, d)
+                except (ValueError, TypeError):
+                    pass
+        return None
+    anos_notas_set = set()
+    for nota in NotaFiscal.objects.exclude(data_emissao__isnull=True).exclude(data_emissao='').only('data_emissao'):
+        d = _parse_data_emissao(nota.data_emissao)
+        if d:
+            anos_notas_set.add(d.year)
+    if ano_atual not in anos_notas_set:
+        anos_notas_set.add(ano_atual)
+    anos_disponiveis_notas = sorted(anos_notas_set, reverse=True) if anos_notas_set else [ano_atual]
     meses_nomes = {
         1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
         5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
         9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
     }
+    
+    # Setores distintos para Projeções de Gastos (excluir por setor)
+    from django.db.models import Count
+    setores_projecao_gasto = list(
+        ProjecaoGasto.objects.values('setor').annotate(count=Count('id')).order_by('setor')
+    )
+    for item in setores_projecao_gasto:
+        if item['setor'] is None or (isinstance(item['setor'], str) and not item['setor'].strip()):
+            item['setor_display'] = '(vazio / SEM SETOR)'
+            item['setor_value'] = ''
+        else:
+            item['setor_display'] = item['setor']
+            item['setor_value'] = item['setor']
     
     context = {
         'page_title': 'Gerenciar Projeto',
@@ -13914,8 +13901,11 @@ def gerenciar_projeto(request):
         'tabelas_info': tabelas_info,
         'total_geral': total_geral,
         'anos_disponiveis_paradas': anos_disponiveis_paradas,
+        'anos_disponiveis_requisicoes': anos_disponiveis_requisicoes,
+        'anos_disponiveis_notas': anos_disponiveis_notas,
         'meses_nomes': meses_nomes,
         'ano_atual': ano_atual,
+        'setores_projecao_gasto': setores_projecao_gasto,
     }
     return render(request, 'administrador/gerenciar_projeto.html', context)
 
@@ -14009,6 +13999,105 @@ def limpar_tabela(request):
                 messages.error(request, f'Ano ou mês(es) inválidos: {str(e)}')
         return redirect('gerenciar_projeto')
     
+    # Tratamento especial: RequisicaoAlmoxarifado — limpar por mês (campo data_requisicao)
+    if tabela == 'requisicao_almoxarifado':
+        from django.db import transaction
+        deletar_todos = request.POST.get('deletar_todos_requisicoes') == 'on'
+        if deletar_todos:
+            count = RequisicaoAlmoxarifado.objects.count()
+            if count > 0:
+                with transaction.atomic():
+                    RequisicaoAlmoxarifado.objects.all().delete()
+                messages.success(request, f'{count} registro(s) de Requisições Almoxarifado foram removidos permanentemente.')
+            else:
+                messages.info(request, 'Não há registros para limpar em Requisições Almoxarifado.')
+        else:
+            try:
+                ano = int(request.POST.get('ano_requisicoes', 0))
+                meses_raw = request.POST.getlist('mes_requisicoes')
+                meses = [int(m) for m in meses_raw if m and 1 <= int(m) <= 12]
+                meses = sorted(set(meses))
+                if not ano or not meses:
+                    messages.error(request, 'Selecione pelo menos um ano e um mês para excluir, ou marque "Deletar TODOS os registros".')
+                    return redirect('gerenciar_projeto')
+                mes_conditions = Q()
+                for m in meses:
+                    mes_conditions |= Q(data_requisicao__month=m)
+                qs = RequisicaoAlmoxarifado.objects.filter(data_requisicao__year=ano).filter(mes_conditions)
+                count = qs.count()
+                if count > 0:
+                    with transaction.atomic():
+                        qs.delete()
+                    nomes_meses = {1:'Janeiro',2:'Fevereiro',3:'Março',4:'Abril',5:'Maio',6:'Junho',7:'Julho',8:'Agosto',9:'Setembro',10:'Outubro',11:'Novembro',12:'Dezembro'}
+                    nomes = [nomes_meses.get(m, str(m)) for m in meses]
+                    messages.success(request, f'{count} registro(s) de Requisições Almoxarifado ({", ".join(nomes)}/{ano}) foram removidos permanentemente.')
+                else:
+                    messages.info(request, 'Não há registros para os meses selecionados em Requisições Almoxarifado.')
+            except (ValueError, TypeError) as e:
+                messages.error(request, f'Ano ou mês(es) inválidos: {str(e)}')
+        return redirect('gerenciar_projeto')
+    
+    # Tratamento especial: NotaFiscal — limpar por mês (campo data_emissao é CharField, parse em Python)
+    if tabela == 'nota_fiscal':
+        from django.db import transaction
+        from datetime import datetime as _dt
+        def _parse_nf_date(s):
+            if not s or not str(s).strip():
+                return None
+            s = str(s).strip()
+            if ' ' in s:
+                s = s.split(' ')[0]
+            for fmt in ('%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', '%d/%m/%y'):
+                try:
+                    return _dt.strptime(s, fmt)
+                except (ValueError, TypeError):
+                    continue
+            if '/' in s:
+                parts = s.split('/')
+                if len(parts) == 3:
+                    try:
+                        d, m, y = int(parts[0]), int(parts[1]), int(parts[2])
+                        if y < 100:
+                            y += 2000
+                        return _dt(y, m, d)
+                    except (ValueError, TypeError):
+                        pass
+            return None
+        deletar_todos = request.POST.get('deletar_todos_notas') == 'on'
+        if deletar_todos:
+            count = NotaFiscal.objects.count()
+            if count > 0:
+                with transaction.atomic():
+                    NotaFiscal.objects.all().delete()
+                messages.success(request, f'{count} registro(s) de Notas Fiscais foram removidos permanentemente.')
+            else:
+                messages.info(request, 'Não há registros para limpar em Notas Fiscais.')
+        else:
+            try:
+                ano = int(request.POST.get('ano_notas', 0))
+                meses_raw = request.POST.getlist('mes_notas')
+                meses = [int(m) for m in meses_raw if m and 1 <= int(m) <= 12]
+                meses = sorted(set(meses))
+                if not ano or not meses:
+                    messages.error(request, 'Selecione pelo menos um ano e um mês para excluir, ou marque "Deletar TODOS os registros".')
+                    return redirect('gerenciar_projeto')
+                ids_to_delete = []
+                for nota in NotaFiscal.objects.only('id', 'data_emissao'):
+                    d = _parse_nf_date(nota.data_emissao)
+                    if d and d.year == ano and d.month in meses:
+                        ids_to_delete.append(nota.id)
+                if ids_to_delete:
+                    with transaction.atomic():
+                        NotaFiscal.objects.filter(id__in=ids_to_delete).delete()
+                    nomes_meses = {1:'Janeiro',2:'Fevereiro',3:'Março',4:'Abril',5:'Maio',6:'Junho',7:'Julho',8:'Agosto',9:'Setembro',10:'Outubro',11:'Novembro',12:'Dezembro'}
+                    nomes = [nomes_meses.get(m, str(m)) for m in meses]
+                    messages.success(request, f'{len(ids_to_delete)} registro(s) de Notas Fiscais ({", ".join(nomes)}/{ano}) foram removidos permanentemente.')
+                else:
+                    messages.info(request, 'Não há registros para os meses selecionados em Notas Fiscais.')
+            except (ValueError, TypeError) as e:
+                messages.error(request, f'Ano ou mês(es) inválidos: {str(e)}')
+        return redirect('gerenciar_projeto')
+    
     try:
         if tabela == 'todos':
             # Limpar todas as tabelas
@@ -14067,6 +14156,44 @@ def limpar_tabela(request):
         error_details = traceback.format_exc()
         messages.error(request, f'Erro ao limpar tabela: {str(e)}<br><br>Detalhes: <pre>{error_details}</pre>')
     
+    return redirect('gerenciar_projeto')
+
+
+def deletar_projecao_gasto_por_setor(request):
+    """Excluir registros de ProjecaoGasto pelos setores selecionados."""
+    if request.method != 'POST':
+        messages.error(request, 'Método não permitido.')
+        return redirect('gerenciar_projeto')
+    
+    from app.models import ProjecaoGasto
+    from django.db.models import Q
+    
+    setores = request.POST.getlist('setores')
+    if not setores:
+        messages.error(request, 'Selecione pelo menos um setor para excluir.')
+        return redirect('gerenciar_projeto')
+    
+    # __EMPTY__ = setor vazio (null ou string vazia)
+    q = Q()
+    if '__EMPTY__' in setores:
+        q |= Q(setor__isnull=True) | Q(setor='')
+    setores_val = [s for s in setores if s != '__EMPTY__']
+    if setores_val:
+        q |= Q(setor__in=setores_val)
+    
+    qs = ProjecaoGasto.objects.filter(q)
+    count = qs.count()
+    if count == 0:
+        messages.info(request, 'Nenhum registro encontrado para os setores selecionados.')
+        return redirect('gerenciar_projeto')
+    
+    try:
+        from django.db import transaction
+        with transaction.atomic():
+            qs.delete()
+        messages.success(request, f'{count} registro(s) de Projeções de Gastos do(s) setor(es) selecionado(s) foram excluídos permanentemente.')
+    except Exception as e:
+        messages.error(request, f'Erro ao excluir: {str(e)}')
     return redirect('gerenciar_projeto')
 
 
@@ -14836,7 +14963,7 @@ def analise_geral_orcamento(request):
     ano_filtro = request.GET.get('ano', None)
     meses_filtro = request.GET.getlist('mes')  # getlist para múltiplos valores
     
-    # Valores padrão: ano atual e todos os meses (None)
+    # Valores padrão: ano atual e mês atual (quando não há filtros na URL)
     hoje = datetime.now()
     if not ano_filtro:
         ano_filtro = str(hoje.year)
@@ -14860,8 +14987,10 @@ def analise_geral_orcamento(request):
         # Remover duplicatas e ordenar
         meses_filtro_int = sorted(list(set(meses_filtro_int)))
     
-    # Se não há meses selecionados, usar todos os meses
-    meses_para_mostrar = meses_filtro_int if meses_filtro_int else list(range(1, 13))
+    # Se não há meses selecionados, usar o mês atual
+    if not meses_filtro_int:
+        meses_filtro_int = [hoje.month]
+    meses_para_mostrar = meses_filtro_int
     
     # Função auxiliar para parse de datas
     def parse_date(date_str):
@@ -14906,20 +15035,71 @@ def analise_geral_orcamento(request):
     )['total'] or Decimal('0')
     
     # ========== PROJEÇÕES DE GASTOS ==========
-    projecoes_filtradas = ProjecaoGasto.objects.filter(
-        ano_referencia=ano_filtro
+    # Ano: ano_referencia OU created_at quando ano_referencia vazio (igual analise_projecao_gastos)
+    q_ano_proj = (
+        Q(ano_referencia=ano_filtro) |
+        (Q(ano_referencia__isnull=True) & Q(created_at__year=ano_filtro))
     )
+    projecoes_filtradas = ProjecaoGasto.objects.filter(q_ano_proj)
     if meses_filtro_int:
+        # mes_referencia no DB pode ser '01','02',...'12' (import) ou nome; também previsao_execucao e created_at
         meses_str = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
                      'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO']
         meses_selecionados_str = [meses_str[m-1] for m in meses_filtro_int]
-        projecoes_filtradas = projecoes_filtradas.filter(mes_referencia__in=meses_selecionados_str)
+        q_mes_proj = Q()
+        for mes_num in meses_filtro_int:
+            q_mes_proj |= Q(mes_referencia__in=[str(mes_num), f'{mes_num:02d}'])
+        for mes_str in meses_selecionados_str:
+            q_mes_proj |= Q(mes_referencia__iexact=mes_str)
+        meses_nomes_variantes = {
+            1: ['JANEIRO', 'JAN'], 2: ['FEVEREIRO', 'FEV'], 3: ['MARÇO', 'MARCO', 'MAR'],
+            4: ['ABRIL', 'ABR'], 5: ['MAIO', 'MAI'], 6: ['JUNHO', 'JUN'],
+            7: ['JULHO', 'JUL'], 8: ['AGOSTO', 'AGO'], 9: ['SETEMBRO', 'SET'],
+            10: ['OUTUBRO', 'OUT'], 11: ['NOVEMBRO', 'NOV'], 12: ['DEZEMBRO', 'DEZ']
+        }
+        for mes_num in meses_filtro_int:
+            for nome in meses_nomes_variantes.get(mes_num, []):
+                q_mes_proj |= Q(previsao_execucao__icontains=nome)
+        for mes_num in meses_filtro_int:
+            q_mes_proj |= Q(
+                (Q(mes_referencia__isnull=True) | Q(mes_referencia='')) &
+                (Q(previsao_execucao__isnull=True) | Q(previsao_execucao='')) &
+                Q(created_at__month=mes_num)
+            )
+        projecoes_filtradas = projecoes_filtradas.filter(q_mes_proj)
     
     total_projecoes = projecoes_filtradas.count()
     valor_total_projecoes = projecoes_filtradas.aggregate(
         total=Sum('valor_total')
     )['total'] or Decimal('0')
-    
+    valor_total_projetado = valor_total_projecoes
+
+    # KPIs Previsões de Gastos (para accordion na análise geral, mesmo da página analise-projecao-gastos)
+    qs_servico_sim = projecoes_filtradas.filter(servico_concluido__iexact='SIM')
+    projecoes_servico_concluido_sim = qs_servico_sim.count()
+    valor_servico_concluido_sim = qs_servico_sim.aggregate(Sum('valor_total'))['valor_total__sum'] or Decimal('0')
+    percentual_servico_concluido_sim = (projecoes_servico_concluido_sim / total_projecoes * 100) if total_projecoes > 0 else 0
+
+    qs_servico_nao = projecoes_filtradas.filter(servico_concluido__iexact='NÃO')
+    projecoes_servico_concluido_nao = qs_servico_nao.count()
+    valor_servico_concluido_nao = qs_servico_nao.aggregate(Sum('valor_total'))['valor_total__sum'] or Decimal('0')
+    percentual_servico_concluido_nao = (projecoes_servico_concluido_nao / total_projecoes * 100) if total_projecoes > 0 else 0
+
+    qs_servico_indefinido = projecoes_filtradas.exclude(servico_concluido__iexact='SIM').exclude(servico_concluido__iexact='NÃO')
+    projecoes_servico_concluido_indefinido = qs_servico_indefinido.count()
+    valor_servico_concluido_indefinido = qs_servico_indefinido.aggregate(Sum('valor_total'))['valor_total__sum'] or Decimal('0')
+    percentual_servico_concluido_indefinido = (projecoes_servico_concluido_indefinido / total_projecoes * 100) if total_projecoes > 0 else 0
+
+    qs_com_numero_nf = projecoes_filtradas.exclude(numero_nf__isnull=True).exclude(numero_nf='')
+    projecoes_com_numero_nf = qs_com_numero_nf.count()
+    valor_com_numero_nf = qs_com_numero_nf.aggregate(Sum('valor_total'))['valor_total__sum'] or Decimal('0')
+    percentual_com_numero_nf = (projecoes_com_numero_nf / total_projecoes * 100) if total_projecoes > 0 else 0
+
+    valor_orcamento_periodo = total_orcamento_disponivel  # já calculado abaixo em DadosOrcamento
+    percentual_impacto_orcamento = None
+    if total_orcamento_disponivel and total_orcamento_disponivel > 0:
+        percentual_impacto_orcamento = float((valor_total_projetado / total_orcamento_disponivel) * 100)
+
     # ========== CORRELAÇÃO PROJEÇÕES E NOTAS FISCAIS ==========
     from app.utils import find_matching_notas_fiscais
     
@@ -15024,7 +15204,38 @@ def analise_geral_orcamento(request):
     
     # Valor total de requisições para o card (já filtrado por ano/mês)
     valor_total_requisicoes_filtrado = valor_total_requisicoes
-    
+
+    # Requisições associadas a Notas Fiscais (mesmo critério da página analise-requisicoes)
+    mensagem_nf_requisicao = "REQUISIÇÃO GERADA PELO PROCESSO DE ENTRADA DE NOTA FISCAL"
+    requisicoes_com_nf = requisicoes_filtradas.filter(obs_rm__icontains=mensagem_nf_requisicao)
+    total_requisicoes_com_nf = requisicoes_com_nf.count()
+    valor_total_requisicoes_com_nf = Decimal('0.00')
+    for req in requisicoes_com_nf.filter(cd_depo=1):
+        if req.vlr_movto_estoq:
+            valor_total_requisicoes_com_nf += abs(req.vlr_movto_estoq)
+
+    # Requisições sem associação a Nota Fiscal (excluir as que têm a mensagem NF)
+    requisicoes_sem_nf = requisicoes_filtradas.exclude(obs_rm__icontains=mensagem_nf_requisicao)
+    total_requisicoes_sem_nf = requisicoes_sem_nf.count()
+    valor_total_requisicoes_sem_nf = Decimal('0.00')
+    for req in requisicoes_sem_nf.filter(cd_depo=1):
+        if req.vlr_movto_estoq:
+            valor_total_requisicoes_sem_nf += abs(req.vlr_movto_estoq)
+
+    # Percentual que Requisições sem NF representam sobre o orçamento total (para o último box)
+    percentual_requisicoes_sem_nf_sobre_orcamento = 0
+    if total_orcamento_disponivel and total_orcamento_disponivel > 0:
+        percentual_requisicoes_sem_nf_sobre_orcamento = float(
+            (valor_total_requisicoes_sem_nf / total_orcamento_disponivel) * 100
+        )
+
+    # Percentual que Valor NF Lançadas representa sobre o orçamento total (último box da linha Notas Fiscais)
+    percentual_notas_lancadas_sobre_orcamento = 0
+    if total_orcamento_disponivel and total_orcamento_disponivel > 0:
+        percentual_notas_lancadas_sobre_orcamento = float(
+            (valor_total_notas_lancadas / total_orcamento_disponivel) * 100
+        )
+
     # ========== KPIs ==========
     # Total de gastos (projeções + notas + requisições)
     total_gastos = valor_total_projecoes + valor_total_notas + valor_total_requisicoes
@@ -15037,8 +15248,8 @@ def analise_geral_orcamento(request):
     # Saldo disponível
     saldo_disponivel = total_orcamento_disponivel - total_gastos
     
-    # Saldo Parcial = Orçamento Disponível - Requisições - Notas Fiscais LANÇADA
-    saldo_parcial = total_orcamento_disponivel - valor_total_requisicoes_filtrado - valor_total_notas_lancadas
+    # Saldo Parcial = Orçamento Disponível − Requisições sem NF − Gastos Previstos (Serv. Concluído NÃO) − Valor NF Lançadas
+    saldo_parcial = total_orcamento_disponivel - valor_total_requisicoes_sem_nf - valor_servico_concluido_nao - valor_total_notas_lancadas
     
     # Percentual de projeções com NF relacionada
     percentual_projecoes_com_nf = 0
@@ -15304,6 +15515,11 @@ def analise_geral_orcamento(request):
     context = {
         'page_title': 'Análise Geral de Orçamento',
         'active_page': 'analise_geral_orcamento',
+        'total_requisicoes_com_nf': total_requisicoes_com_nf,
+        'valor_total_requisicoes_com_nf': valor_total_requisicoes_com_nf,
+        'total_requisicoes_sem_nf': total_requisicoes_sem_nf,
+        'valor_total_requisicoes_sem_nf': valor_total_requisicoes_sem_nf,
+        'percentual_requisicoes_sem_nf_sobre_orcamento': percentual_requisicoes_sem_nf_sobre_orcamento,
         'ano_filtro': ano_filtro,
         'meses_filtro': meses_filtro_int,
         'anos_disponiveis': anos_disponiveis,
@@ -15314,6 +15530,21 @@ def analise_geral_orcamento(request):
         'percentual_utilizado': percentual_utilizado,
         'total_projecoes': total_projecoes,
         'valor_total_projecoes': valor_total_projecoes,
+        'valor_total_projetado': valor_total_projetado,
+        'valor_servico_concluido_sim': valor_servico_concluido_sim,
+        'projecoes_servico_concluido_sim': projecoes_servico_concluido_sim,
+        'percentual_servico_concluido_sim': percentual_servico_concluido_sim,
+        'valor_servico_concluido_nao': valor_servico_concluido_nao,
+        'projecoes_servico_concluido_nao': projecoes_servico_concluido_nao,
+        'percentual_servico_concluido_nao': percentual_servico_concluido_nao,
+        'valor_servico_concluido_indefinido': valor_servico_concluido_indefinido,
+        'projecoes_servico_concluido_indefinido': projecoes_servico_concluido_indefinido,
+        'percentual_servico_concluido_indefinido': percentual_servico_concluido_indefinido,
+        'valor_com_numero_nf': valor_com_numero_nf,
+        'projecoes_com_numero_nf': projecoes_com_numero_nf,
+        'percentual_com_numero_nf': percentual_com_numero_nf,
+        'percentual_impacto_orcamento': percentual_impacto_orcamento,
+        'valor_orcamento_periodo': valor_orcamento_periodo,
         'projecoes_com_nf': projecoes_com_nf,
         'percentual_projecoes_com_nf': percentual_projecoes_com_nf,
         'total_notas': total_notas,
@@ -15324,6 +15555,7 @@ def analise_geral_orcamento(request):
         'valor_total_requisicoes': valor_total_requisicoes,
         'valor_total_requisicoes_filtrado': valor_total_requisicoes_filtrado,
         'valor_total_notas_lancadas': valor_total_notas_lancadas,
+        'percentual_notas_lancadas_sobre_orcamento': percentual_notas_lancadas_sobre_orcamento,
         'saldo_parcial': saldo_parcial,
         # Gráficos
         'meses_labels': json.dumps(meses_labels, ensure_ascii=False),
@@ -15383,12 +15615,14 @@ def consultar_projecao_gastos(request):
         anos_disponiveis = [hoje.year]
     
     # Se mostrar_todos está ativo, não aplicar filtros de ano/mês
+    # Aplicar ano/mês só quando o usuário enviou 'ano' na requisição (ex.: pelo accordion); assim, ao usar só o filtro de Setor na tabela, não aplicamos ano/mês
+    ano_mes_explicito = 'ano' in request.GET
     if mostrar_todos:
         ano_filtro = None
         meses_filtro_int = []
         meses_para_mostrar = []
     else:
-        # Se não há filtro de ano, usar o ano mais recente dos dados (ou ano atual se não houver dados)
+        # Se não há filtro de ano, usar o ano mais recente dos dados (ou ano atual se não houver dados) apenas para exibição
         if not ano_filtro:
             if anos_disponiveis:
                 ano_filtro = anos_disponiveis[0]  # Usar o ano mais recente
@@ -15417,7 +15651,7 @@ def consultar_projecao_gastos(request):
             # Remover duplicatas e ordenar
             meses_filtro_int = sorted(list(set(meses_filtro_int)))
         
-        # Se não há meses selecionados, usar todos os meses
+        # Se não há meses selecionados, usar todos os meses (só quando ano foi enviado)
         meses_para_mostrar = meses_filtro_int if meses_filtro_int else list(range(1, 13))
     
     # ========== FILTROS DE PROJEÇÕES ==========
@@ -15439,20 +15673,10 @@ def consultar_projecao_gastos(request):
         projecoes_list = ProjecaoGasto.objects.none()
         search_query = ''
     
-    # Aplicar filtro de ano baseado em previsao_execucao (apenas se mostrar_todos não estiver ativo)
-    if not mostrar_todos:
-        # Se o ano filtro foi definido explicitamente pelo usuário, filtrar apenas por esse ano
-        # Caso contrário, mostrar registros do ano mais recente OU registros sem ano_referencia
-        ano_filtro_explicito = request.GET.get('ano', None) is not None
-        if ano_filtro_explicito:
-            # Filtro explícito: filtrar por ano_referencia OU previsao_execucao contém o ano
-            q_ano = Q(ano_referencia=ano_filtro) | Q(previsao_execucao__icontains=str(ano_filtro))
-            projecoes_list = projecoes_list.filter(q_ano)
-        else:
-            # Sem filtro explícito: mostrar registros do ano mais recente OU registros sem ano_referencia
-            # Também incluir registros onde previsao_execucao contém o ano
-            q_ano = Q(ano_referencia=ano_filtro) | Q(ano_referencia__isnull=True) | Q(previsao_execucao__icontains=str(ano_filtro))
-            projecoes_list = projecoes_list.filter(q_ano)
+    # Aplicar filtro de ano/mês apenas quando o usuário enviou 'ano' na URL (ex.: filtro do accordion); não aplicar quando só usa filtros da tabela (ex.: Setor)
+    if not mostrar_todos and ano_mes_explicito:
+        q_ano = Q(ano_referencia=ano_filtro) | Q(previsao_execucao__icontains=str(ano_filtro))
+        projecoes_list = projecoes_list.filter(q_ano)
         
         # Aplicar filtro de meses baseado em previsao_execucao
         if meses_filtro_int:
@@ -15548,6 +15772,10 @@ def consultar_projecao_gastos(request):
     if filtro_uso_contabil:
         projecoes_list = projecoes_list.filter(uso_contabil__icontains=filtro_uso_contabil)
 
+    filtro_servico_concluido = request.GET.get('filtro_servico_concluido', '').strip()
+    if filtro_servico_concluido:
+        projecoes_list = projecoes_list.filter(servico_concluido__iexact=filtro_servico_concluido)
+
     # Helpers para normalizar Mês/Ano: 01/2026 = JANEIRO / 2026 (todos os meses)
     MES_NUM_TO_NOME = {
         1: 'JANEIRO', 2: 'FEVEREIRO', 3: 'MARÇO', 4: 'ABRIL', 5: 'MAIO', 6: 'JUNHO',
@@ -15636,9 +15864,16 @@ def consultar_projecao_gastos(request):
         except (ValueError, TypeError):
             pass
     
-    # Ordenar por ano/mês/data (mais recente primeiro)
+    # Ordenação: permitir ordenar por ID (crescente ou decrescente)
+    order_id = (request.GET.get('order_id') or '').strip().lower()
+    default_order = ['-ano_referencia', '-mes_referencia', '-data_abertura_requisicao', '-created_at']
     try:
-        projecoes_list = projecoes_list.order_by('-ano_referencia', '-mes_referencia', '-data_abertura_requisicao', '-created_at')
+        if order_id == 'asc':
+            projecoes_list = projecoes_list.order_by('id_excel', *default_order)
+        elif order_id == 'desc':
+            projecoes_list = projecoes_list.order_by('-id_excel', *default_order)
+        else:
+            projecoes_list = projecoes_list.order_by(*default_order)
     except Exception:
         try:
             projecoes_list = projecoes_list.order_by('-created_at', '-id')
@@ -15686,6 +15921,15 @@ def consultar_projecao_gastos(request):
         return (p[1], p[0], s) if p else (0, 0, s)
     mes_ano_opcoes = sorted(mes_ano_opcoes_set, key=_sort_key_mes_ano, reverse=True)
     
+    # URLs para ordenar coluna ID (preservando todos os filtros)
+    from urllib.parse import urlencode
+    get_copy_asc = request.GET.copy()
+    get_copy_asc['order_id'] = 'asc'
+    get_copy_desc = request.GET.copy()
+    get_copy_desc['order_id'] = 'desc'
+    url_ordenar_id_asc = request.path + '?' + urlencode(get_copy_asc)
+    url_ordenar_id_desc = request.path + '?' + urlencode(get_copy_desc)
+    
     context = {
         'page_title': 'Consultar Projeção de Gastos',
         'active_page': 'consultar_projecao_gastos',
@@ -15704,11 +15948,16 @@ def consultar_projecao_gastos(request):
         'filtro_numero_requisicao': filtro_numero_requisicao or '',
         'filtro_valor_min': filtro_valor_min or '',
         'filtro_valor_max': filtro_valor_max or '',
+        'filtro_servico_concluido': filtro_servico_concluido or '',
         # Filtros de ano/mês (igual analise_geral_orcamento)
         'ano_filtro': ano_filtro,
         'meses_filtro': meses_filtro_int,
         'anos_disponiveis': anos_disponiveis,
         'mostrar_todos': mostrar_todos,
+        # Ordenação ID
+        'order_id': order_id,
+        'url_ordenar_id_asc': url_ordenar_id_asc,
+        'url_ordenar_id_desc': url_ordenar_id_desc,
     }
     
     return render(request, 'orcamento/consultar_projecao_gastos.html', context)
@@ -15734,6 +15983,201 @@ def visualizar_projecao_gasto(request, projecao_id):
         'relacoes_nf': relacoes_nf,
     }
     return render(request, 'orcamento/visualizar_projecao_gasto.html', context)
+
+
+def visualizar_projecoes_gastos_por_setor(request):
+    """Lista e analisa projeções de gastos de um único setor. setor via GET (permite nomes com /)."""
+    from app.models import ProjecaoGasto
+    from django.core.paginator import Paginator
+    from django.db.models import Sum, Count, Q
+    from decimal import Decimal
+    from django.shortcuts import redirect
+    import json
+
+    setor_nome = request.GET.get('setor', '').strip()
+    if not setor_nome:
+        return redirect('analise_projecao_gastos')
+    projecoes_list = ProjecaoGasto.objects.filter(setor=setor_nome).order_by(
+        '-ano_referencia', '-mes_referencia', '-data_abertura_requisicao', '-created_at'
+    )
+    total_registros = projecoes_list.count()
+    valor_total_setor = projecoes_list.aggregate(total=Sum('valor_total'))['total'] or Decimal('0.00')
+
+    # Previsões para o mês atual (mes_referencia + ano_referencia = mês/ano corrente)
+    from datetime import datetime
+    hoje = datetime.now()
+    q_mes_atual = Q(ano_referencia=hoje.year) & (Q(mes_referencia=str(hoje.month)) | Q(mes_referencia=f'{hoje.month:02d}'))
+    projecoes_mes_atual = projecoes_list.filter(q_mes_atual)
+    valor_mes_atual = projecoes_mes_atual.aggregate(total=Sum('valor_total'))['total'] or Decimal('0.00')
+    count_mes_atual = projecoes_mes_atual.count()
+
+    # Serviço concluído: SIM / NÃO / INDEFINIDO (resto)
+    qs_sim = projecoes_list.filter(servico_concluido__iexact='SIM')
+    qs_nao = projecoes_list.filter(servico_concluido__iexact='NÃO')
+    qs_indef = projecoes_list.exclude(servico_concluido__iexact='SIM').exclude(servico_concluido__iexact='NÃO')
+    count_sim = qs_sim.count()
+    count_nao = qs_nao.count()
+    count_indef = qs_indef.count()
+    valor_sim = qs_sim.aggregate(Sum('valor_total'))['valor_total__sum'] or Decimal('0.00')
+    valor_nao = qs_nao.aggregate(Sum('valor_total'))['valor_total__sum'] or Decimal('0.00')
+    valor_indef = qs_indef.aggregate(Sum('valor_total'))['valor_total__sum'] or Decimal('0.00')
+    pct_sim = (count_sim / total_registros * 100) if total_registros > 0 else 0
+    pct_nao = (count_nao / total_registros * 100) if total_registros > 0 else 0
+    pct_indef = (count_indef / total_registros * 100) if total_registros > 0 else 0
+
+    # Com número de NF preenchido
+    qs_com_nf = projecoes_list.exclude(numero_nf__isnull=True).exclude(numero_nf='')
+    count_com_nf = qs_com_nf.count()
+    valor_com_nf = qs_com_nf.aggregate(Sum('valor_total'))['valor_total__sum'] or Decimal('0.00')
+    pct_com_nf = (count_com_nf / total_registros * 100) if total_registros > 0 else 0
+
+    # Top fornecedores do setor (valor total)
+    top_fornecedores = list(
+        projecoes_list.exclude(fornecedor_nome_fantasia__isnull=True).exclude(fornecedor_nome_fantasia='')
+        .values('fornecedor_nome_fantasia')
+        .annotate(valor_total=Sum('valor_total'), qtd=Count('id'))
+        .order_by('-valor_total')[:10]
+    )
+    # Valor por uso contábil
+    uso_contabil_agregado = list(
+        projecoes_list.exclude(uso_contabil__isnull=True).exclude(uso_contabil='')
+        .values('uso_contabil')
+        .annotate(valor_total=Sum('valor_total'), qtd=Count('id'))
+        .order_by('-valor_total')
+    )
+    # Evolução por mês/ano (mes_referencia + ano_referencia) — por ano para filtro no gráfico
+    _meses_nome = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    anos_grafico = list(
+        projecoes_list.exclude(ano_referencia__isnull=True)
+        .values_list('ano_referencia', flat=True).distinct().order_by('-ano_referencia')
+    )
+    if not anos_grafico:
+        from datetime import datetime
+        anos_grafico = [datetime.now().year]
+    evolucao_por_ano = {}
+    for ano in anos_grafico:
+        labels_ano = []
+        valores_ano = []
+        valores_sim = []
+        valores_nao = []
+        for mes in range(1, 13):
+            q_mes = Q(ano_referencia=ano) & (Q(mes_referencia=str(mes)) | Q(mes_referencia=f'{mes:02d}'))
+            base_qs = projecoes_list.filter(q_mes)
+            agg = base_qs.aggregate(v=Sum('valor_total'), c=Count('id'))
+            v = agg['v'] or Decimal('0')
+            agg_sim = base_qs.filter(servico_concluido__iexact='SIM').aggregate(v=Sum('valor_total'))
+            agg_nao = base_qs.filter(servico_concluido__iexact='NÃO').aggregate(v=Sum('valor_total'))
+            v_sim = agg_sim['v'] or Decimal('0')
+            v_nao = agg_nao['v'] or Decimal('0')
+            labels_ano.append(f"{_meses_nome[mes - 1]}/{str(ano)[2:]}")
+            valores_ano.append(float(v))
+            valores_sim.append(float(v_sim))
+            valores_nao.append(float(v_nao))
+        evolucao_por_ano[str(ano)] = {
+            'labels': labels_ano,
+            'valores': valores_ano,
+            'valores_sim': valores_sim,
+            'valores_nao': valores_nao,
+        }
+    # Manter compatibilidade: primeiro ano = dados default do gráfico
+    ano_default = str(anos_grafico[0])
+    evolucao_por_mes = [{'label': evolucao_por_ano[ano_default]['labels'][i], 'valor': evolucao_por_ano[ano_default]['valores'][i]} for i in range(12)]
+    evolucao_labels = json.dumps(evolucao_por_ano[ano_default]['labels'], ensure_ascii=False)
+    evolucao_valores = json.dumps(evolucao_por_ano[ano_default]['valores'])
+    evolucao_por_ano_json = json.dumps(evolucao_por_ano, ensure_ascii=False)
+    anos_grafico_json = json.dumps([str(a) for a in anos_grafico], ensure_ascii=False)
+
+    # Análise de dados faltantes (por campo) para orientar o preenchimento
+    def _missing_char(qs, field):
+        return qs.filter(Q(**{f'{field}__isnull': True}) | Q(**{field: ''})).count()
+    def _missing_date(qs, field):
+        return qs.filter(**{f'{field}__isnull': True}).count()
+    def _missing_valor(qs):
+        return qs.filter(Q(valor_total__isnull=True) | Q(valor_total=0)).count()
+    def _missing_ano(qs):
+        return qs.filter(ano_referencia__isnull=True).count()
+
+    campos_analise = [
+        ('descricao', 'Descrição do Serviço'),
+        ('valor_total', 'Valor Total'),
+        ('fornecedor_nome_fantasia', 'Fornecedor (Nome Fantasia)'),
+        ('fornecedor_cnpj', 'Fornecedor (CNPJ)'),
+        ('data_abertura_requisicao', 'Data de Abertura da Requisição'),
+        ('previsao_execucao', 'Previsão para Execução'),
+        ('mes_referencia', 'Mês Referência'),
+        ('ano_referencia', 'Ano Referência'),
+        ('uso_contabil', 'Uso Contábil'),
+        ('numero_nf', 'Número da NF'),
+        ('numero_ordem_servico', 'Número Ordem de Serviço'),
+        ('numero_requisicao_compra', 'Número da Requisição de Compra'),
+        ('numero_pedido_compra', 'Número do Pedido de Compra'),
+        ('servico_concluido', 'Serviço Concluído'),
+        ('solicitante', 'Solicitante'),
+        ('tipo_solicitacao', 'Tipo de Solicitação'),
+        ('nf_servico_recebida', 'NF de Serviço Recebida'),
+        ('nf_enviada_lancamento', 'NF Enviada para Lançamento'),
+        ('observacoes', 'Observações'),
+    ]
+    dados_faltantes = []
+    for campo, label in campos_analise:
+        if campo == 'valor_total':
+            n = _missing_valor(projecoes_list)
+        elif campo == 'ano_referencia':
+            n = _missing_ano(projecoes_list)
+        elif campo == 'data_abertura_requisicao':
+            n = _missing_date(projecoes_list, campo)
+        else:
+            n = _missing_char(projecoes_list, campo)
+        pct = (n / total_registros * 100) if total_registros > 0 else 0
+        dados_faltantes.append({
+            'campo': campo,
+            'label': label,
+            'count_missing': n,
+            'pct_missing': round(pct, 1),
+            'count_ok': total_registros - n,
+        })
+    dados_faltantes.sort(key=lambda x: (-x['count_missing'], x['label']))
+
+    paginator = Paginator(projecoes_list, 50)
+    page_number = request.GET.get('page', 1)
+    try:
+        page_number = int(page_number)
+    except (ValueError, TypeError):
+        page_number = 1
+    projecoes = paginator.get_page(page_number)
+
+    context = {
+        'page_title': f'Projeções de Gastos - Setor: {setor_nome}',
+        'active_page': 'analise_projecao_gastos',
+        'setor_nome': setor_nome,
+        'projecoes': projecoes,
+        'valor_total_setor': valor_total_setor,
+        'valor_mes_atual': valor_mes_atual,
+        'count_mes_atual': count_mes_atual,
+        'total_registros': total_registros,
+        'count_sim': count_sim,
+        'count_nao': count_nao,
+        'count_indef': count_indef,
+        'valor_sim': valor_sim,
+        'valor_nao': valor_nao,
+        'valor_indef': valor_indef,
+        'pct_sim': pct_sim,
+        'pct_nao': pct_nao,
+        'pct_indef': pct_indef,
+        'count_com_nf': count_com_nf,
+        'valor_com_nf': valor_com_nf,
+        'pct_com_nf': pct_com_nf,
+        'top_fornecedores': top_fornecedores,
+        'uso_contabil_agregado': uso_contabil_agregado,
+        'evolucao_labels': evolucao_labels,
+        'evolucao_valores': evolucao_valores,
+        'evolucao_por_mes': evolucao_por_mes,
+        'evolucao_por_ano_json': evolucao_por_ano_json,
+        'anos_grafico': anos_grafico,
+        'anos_grafico_json': anos_grafico_json,
+        'dados_faltantes': dados_faltantes,
+    }
+    return render(request, 'orcamento/visualizar_projecoes_gastos_por_setor.html', context)
 
 
 def analise_projecao_gastos(request):
@@ -15797,11 +16241,10 @@ def analise_projecao_gastos(request):
                 continue
         meses_filtro_int = sorted(list(set(meses_filtro_int)))
 
-    # Se nenhum mês for selecionado, considerar todos os meses
+    # Se nenhum mês for selecionado, usar o mês atual
     if not meses_filtro_int:
-        meses_para_mostrar = list(range(1, 13))
-    else:
-        meses_para_mostrar = meses_filtro_int
+        meses_filtro_int = [hoje.month]
+    meses_para_mostrar = meses_filtro_int
 
     meses_choices = [
         (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
@@ -15858,6 +16301,8 @@ def analise_projecao_gastos(request):
         Q(valor_total__isnull=False) & ~Q(valor_total=0) |
         Q(fornecedor_nome_fantasia__isnull=False) & ~Q(fornecedor_nome_fantasia='')
     )
+    # Queryset sem filtro de ano (para o gráfico Gastos por Previsão, que tem seletor de ano próprio)
+    projecoes_grafico_previsao = projecoes_qs
     
     # Aplicar filtro de ano (ano_referencia OU created_at quando ano_referencia vazio)
     q_ano = (
@@ -15895,14 +16340,17 @@ def analise_projecao_gastos(request):
                 Q(created_at__month=mes_num)
             )
         projecoes_qs = projecoes_qs.filter(q_mes)
+        projecoes_grafico_previsao = projecoes_grafico_previsao.filter(q_mes)
     
     # Aplicar filtro de setor (múltiplos)
     if setores_filtro:
         projecoes_qs = projecoes_qs.filter(setor__in=setores_filtro)
+        projecoes_grafico_previsao = projecoes_grafico_previsao.filter(setor__in=setores_filtro)
     
     # Aplicar filtro de uso contábil
     if uso_contabil_filtro:
         projecoes_qs = projecoes_qs.filter(uso_contabil=uso_contabil_filtro)
+        projecoes_grafico_previsao = projecoes_grafico_previsao.filter(uso_contabil=uso_contabil_filtro)
 
     # --- KPIs ---
     total_projecoes = projecoes_qs.count()
@@ -16123,28 +16571,76 @@ def analise_projecao_gastos(request):
     uso_contabil_labels = [u['uso_contabil'][:40] + '...' if len(u['uso_contabil']) > 40 else u['uso_contabil'] for u in uso_contabil_agregados]
     uso_contabil_data = [float(u['valor_total'] or 0) for u in uso_contabil_agregados]
 
-    # Gráfico 6: Gastos por Previsão de Execução (previsao_execucao -> mês/ano por centro_atividade)
+    # Gráfico 6: Gastos por Previsão de Execução — mesmo processo do gráfico Evolução (setor): por ano, 3 barras (Total, SIM, NÃO)
     from collections import defaultdict
-    # Agregar por (ano, mês, centro_atividade); usar centro_atividade ou setor como fallback
-    gastos_por_previsao = defaultdict(lambda: Decimal('0'))
-    centros_set = set()
-    for proj in projecoes_qs.exclude(previsao_execucao__isnull=True).exclude(previsao_execucao=''):
+    meses_nomes_curtos_previsao = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    total_previsao = defaultdict(lambda: Decimal('0'))
+    sim_previsao = defaultdict(lambda: Decimal('0'))
+    nao_previsao = defaultdict(lambda: Decimal('0'))
+    for proj in projecoes_grafico_previsao.exclude(previsao_execucao__isnull=True).exclude(previsao_execucao=''):
         ano, mes = _parse_previsao_execucao(proj.previsao_execucao)
         if ano is not None and mes is not None:
-            centro = (proj.setor or '').strip() or 'Não informado'
-            centros_set.add(centro)
-            key = (ano, mes, centro)
-            gastos_por_previsao[key] += (proj.valor_total or Decimal('0'))
-    # Ordenar meses e centros; montar labels (eixo X = mês) e um dataset por centro_atividade
-    meses_nomes_curtos_previsao = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-    keys_meses = sorted(set((k[0], k[1]) for k in gastos_por_previsao.keys()), key=lambda x: (x[0], x[1]))
-    gastos_previsao_labels = [f"{meses_nomes_curtos_previsao[k[1]-1]}/{k[0]}" for k in keys_meses]
-    centros_ordenados = sorted(centros_set)
-    gastos_previsao_centros = centros_ordenados
-    gastos_previsao_datasets = []
-    for centro in centros_ordenados:
-        valores = [float(gastos_por_previsao.get((ano, mes, centro), Decimal('0'))) for ano, mes in keys_meses]
-        gastos_previsao_datasets.append(valores)
+            v = proj.valor_total or Decimal('0')
+            key = (ano, mes)
+            total_previsao[key] += v
+            if (proj.servico_concluido or '').strip().upper() == 'SIM':
+                sim_previsao[key] += v
+            elif (proj.servico_concluido or '').strip().upper() == 'NÃO':
+                nao_previsao[key] += v
+    anos_previsao_set = set(k[0] for k in total_previsao.keys())
+    anos_grafico_previsao = sorted(anos_previsao_set, reverse=True) if anos_previsao_set else [datetime.now().year]
+    gastos_previsao_por_ano = {}
+    for ano in anos_grafico_previsao:
+        labels_ano = [f"{meses_nomes_curtos_previsao[mes - 1]}/{str(ano)[2:]}" for mes in range(1, 13)]
+        valores_ano = [float(total_previsao.get((ano, mes), Decimal('0'))) for mes in range(1, 13)]
+        valores_sim = [float(sim_previsao.get((ano, mes), Decimal('0'))) for mes in range(1, 13)]
+        valores_nao = [float(nao_previsao.get((ano, mes), Decimal('0'))) for mes in range(1, 13)]
+        gastos_previsao_por_ano[str(ano)] = {
+            'labels': labels_ano,
+            'valores': valores_ano,
+            'valores_sim': valores_sim,
+            'valores_nao': valores_nao,
+        }
+    gastos_previsao_por_ano_json = json.dumps(gastos_previsao_por_ano, ensure_ascii=False)
+    anos_grafico_previsao_json = json.dumps([str(a) for a in anos_grafico_previsao], ensure_ascii=False)
+
+    # Gráfico Valor por Setor: X = data (mês/ano), Y = valor (R$); uma série por setor
+    meses_nomes_curtos = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    # Pares (ano, mes) presentes nos dados (mes_referencia + ano_referencia)
+    valor_por_setor_mes = defaultdict(lambda: defaultdict(lambda: Decimal('0')))  # setor -> (ano, mes) -> valor
+    keys_meses_setor = set()  # (ano, mes)
+    for proj in projecoes_qs.exclude(ano_referencia__isnull=True):
+        ano = proj.ano_referencia
+        mes_str = (proj.mes_referencia or '').strip()
+        mes = None
+        if mes_str.isdigit():
+            mes = int(mes_str) if len(mes_str) <= 2 else int(mes_str[:2])
+        if mes is None or not (1 <= mes <= 12):
+            continue
+        setor_nome = (proj.setor or '').strip() or 'Não informado'
+        key = (ano, mes)
+        keys_meses_setor.add(key)
+        valor_por_setor_mes[setor_nome][key] += (proj.valor_total or Decimal('0'))
+    keys_meses_ordenados = sorted(keys_meses_setor, key=lambda x: (x[0], x[1]))
+    valor_por_setor_labels = [f"{meses_nomes_curtos[k[1] - 1]}/{str(k[0])[2:]}" for k in keys_meses_ordenados]
+    setores_ordenados = sorted(set(valor_por_setor_mes.keys()), key=lambda s: (s == 'Não informado', s))
+    cores_setores = [
+        '#0d6efd', '#198754', '#ffc107', '#dc3545', '#0dcaf0', '#6f42c1',
+        '#fd7e14', '#20c997', '#e83e8c', '#6c757d', '#17a2b8', '#28a745',
+        '#ff6b6b', '#4ecdc4', '#95e1d3', '#a0522d', '#9370db', '#2f4f4f'
+    ]
+    valor_por_setor_datasets = []
+    for i, setor in enumerate(setores_ordenados):
+        valores = [float(valor_por_setor_mes[setor].get(k, Decimal('0'))) for k in keys_meses_ordenados]
+        valor_por_setor_datasets.append({
+            'label': setor,
+            'data': valores,
+            'backgroundColor': cores_setores[i % len(cores_setores)],
+            'borderColor': cores_setores[i % len(cores_setores)],
+            'borderWidth': 1
+        })
+    valor_por_setor_labels_json = json.dumps(valor_por_setor_labels, ensure_ascii=False)
+    valor_por_setor_datasets_json = json.dumps(valor_por_setor_datasets, ensure_ascii=False)
 
     # --- Tabela por Setor e servico_concluido (abaixo do gráfico Gastos por Previsão) ---
     setores_raw = list(projecoes_qs.values_list('setor', flat=True).distinct())
@@ -16198,9 +16694,12 @@ def analise_projecao_gastos(request):
         valor_total=Sum('valor_total')
     ).order_by('-valor_total')[:10]
 
+    setores_para_links = list(setores_disponiveis)[:9]
+
     context = {
         'page_title': 'Análise de Projeções de Gastos',
         'active_page': 'analise_projecao_gastos',
+        'setores_para_links': setores_para_links,
         'anos_disponiveis': anos_disponiveis,
         'ano_selecionado': ano_filtro,
         'meses_choices': meses_choices,
@@ -16268,10 +16767,14 @@ def analise_projecao_gastos(request):
         'uso_contabil_labels': json.dumps(uso_contabil_labels, ensure_ascii=False),
         'uso_contabil_data': json.dumps(uso_contabil_data),
 
-        # Gastos por Previsão de Execução (previsao_execucao) por centro_atividade
-        'gastos_previsao_labels': json.dumps(gastos_previsao_labels, ensure_ascii=False),
-        'gastos_previsao_centros': json.dumps(gastos_previsao_centros, ensure_ascii=False),
-        'gastos_previsao_datasets': json.dumps(gastos_previsao_datasets),
+        # Gastos por Previsão de Execução (por ano, 3 barras: Total, SIM, NÃO — mesmo processo do gráfico Evolução setor)
+        'gastos_previsao_por_ano_json': gastos_previsao_por_ano_json,
+        'anos_grafico_previsao': anos_grafico_previsao,
+        'anos_grafico_previsao_json': anos_grafico_previsao_json,
+
+        # Gráfico Valor por Setor
+        'valor_por_setor_labels_json': valor_por_setor_labels_json,
+        'valor_por_setor_datasets_json': valor_por_setor_datasets_json,
 
         # Tabelas
         'top_setores': top_setores,
@@ -18194,6 +18697,10 @@ def analise_planilha_rc(request):
         Q(nf_servico__isnull=True) | Q(nf_servico='')
     ).count()
     
+    registros_com_saldo_residual_pedido = queryset_base.exclude(
+        saldo_residual_pedido__isnull=True
+    ).count()
+    
     # Resumo dos filtros ativos para exibição
     MESES_NOMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
     filtros_ativos_resumo = []
@@ -18303,6 +18810,7 @@ def analise_planilha_rc(request):
         'registros_com_pedido': registros_com_pedido,
         'registros_com_nf_saida': registros_com_nf_saida,
         'registros_com_nf_servico': registros_com_nf_servico,
+        'registros_com_saldo_residual_pedido': registros_com_saldo_residual_pedido,
         'valor_total_pedido_geral': valor_total_pedido_geral,
         'valor_total_nf_geral': valor_total_nf_geral,
         'valor_possiveis_gastos': (valor_previsao_uso_atual or Decimal(0)) - (valor_total_nf_geral or Decimal(0)),

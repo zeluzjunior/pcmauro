@@ -92,34 +92,21 @@
                     <div class="card-body">
                         <h6>Formato do Arquivo:</h6>
                         <ul>
-                            <li>O arquivo deve ser um arquivo Excel (.xlsx, .xls ou .xlsm)</li>
-                            <li>Deve conter uma planilha chamada <strong>"GASTOS"</strong></li>
-                            <li>A primeira linha deve conter os cabeçalhos das colunas</li>
+                            <li>Arquivo Excel (.xlsx, .xls ou .xlsm)</li>
+                            <li>Planilha <strong>"GASTOS"</strong> ou a primeira planilha do arquivo</li>
+                            <li>Cabeçalhos na linha 2 (ou 1 ou 3)</li>
                         </ul>
                         
-                        <h6 class="mt-4">Colunas Esperadas:</h6>
+                        <h6 class="mt-4">Colunas obrigatórias:</h6>
                         <ul>
-                            <li><strong>SETOR</strong> - Setor responsável</li>
-                            <li><strong>SOLICITANTE</strong> - Solicitante (CNPJ)</li>
-                            <li><strong>FORNECEDOR NOME FANTASIA</strong> - Nome fantasia do fornecedor</li>
-                            <li><strong>FORNECEDOR CNPJ</strong> - CNPJ do fornecedor</li>
-                            <li><strong>DESCRIÇÃO DO SERVIÇO</strong> - Descrição do serviço</li>
-                            <li><strong>VALOR TOTAL</strong> - Valor total do serviço</li>
-                            <li><strong>PREVISÃO P/ EXECUÇÃO</strong> - Previsão de execução (ex: "OUTUBRO / 2025")</li>
-                            <li><strong>USO CONTÁBIL</strong> - Uso contábil</li>
-                            <li><strong>NÚMERO DA NOTA FISCAL</strong> - Número da nota fiscal</li>
-                            <li><strong>ORDEM DE SERVIÇO</strong> - Número da ordem de serviço</li>
-                            <li><strong>DATA DE ABERTURA DA REQUISIÇÃO</strong> - Data de abertura</li>
-                            <li><strong>NÚMERO DA REQUISIÇÃO DE COMPRA</strong> - Número da requisição (usado como identificador único)</li>
-                            <li><strong>NÚMERO DO PEDIDO DE COMPRA</strong> - Número do pedido</li>
-                            <li><strong>SERVIÇO CONCLUÍDO</strong> - Data de conclusão do serviço</li>
-                            <li><strong>NF DE SERVIÇO RECEBIDA</strong> - Data de recebimento da NF</li>
-                            <li><strong>NF ENVIADA PARA LANÇAMENTO</strong> - Data de envio para lançamento</li>
+                            <li><strong>ID</strong> (ou Nº, CÓDIGO) – número do item</li>
+                            <li><strong>SETOR</strong> (ou CENTRO) – setor responsável. Se vazio, será usado "SEM SETOR"</li>
                         </ul>
+                        <p class="mb-0">Outras colunas reconhecidas: SOLICITANTE, DESCRIÇÃO DO SERVIÇO, TIPO DE SOLICITAÇÃO, VALOR TOTAL, DATA DE ABERTURA DA REQUISIÇÃO, PREVISÃO P/ EXECUÇÃO, FORNECEDOR, CNPJ, USO CONTÁBIL, NÚMERO DA NOTA FISCAL, ORDEM DE SERVIÇO, NÚMERO DA REQUISIÇÃO DE COMPRA, NÚMERO DO PEDIDO DE COMPRA, SERVIÇO CONCLUÍDO, NF DE SERVIÇO RECEBIDA, NF ENVIADA PARA LANÇAMENTO, OBSERVAÇÕES.</p>
                         
                         <div class="alert alert-warning mt-4">
                             <i class="fas fa-exclamation-triangle me-2"></i>
-                            <strong>Importante:</strong> O campo <strong>ID</strong> do Excel (junto com <strong>SETOR</strong>) é usado como identificador único. Se uma projeção com o mesmo ID e SETOR já existir no banco e a opção "Atualizar registros existentes" estiver marcada, os dados serão atualizados. Caso contrário, a linha será ignorada. O ID pode ser qualquer número (não precisa ser sequencial 1, 2, 3...).
+                            <strong>Chave única:</strong> cada linha é identificada por <strong>ID + SETOR</strong>. Com "Atualizar registros existentes" marcado, registros com o mesmo ID e SETOR são atualizados; caso contrário, duplicatas são ignoradas.
                         </div>
                     </div>
                 </div>

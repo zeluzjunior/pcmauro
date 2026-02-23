@@ -352,31 +352,22 @@
             </div>
         </div>
 
-        <!-- Filtros ativos (fixo no topo ao rolar) -->
-        <div class="card border shadow-sm mb-4 filtros-aplicados-bar" id="filtrosAplicadosBar">
-            <div class="card-body py-2 px-4">
-                <div class="d-flex align-items-center flex-wrap gap-2">
-                    <span class="text-muted small fw-semibold me-2 text-nowrap"><i class="fas fa-filter me-1 text-primary"></i>Filtros aplicados:</span>
-                    <div class="d-flex flex-wrap gap-2 align-items-center flex-grow-1">
-                        {% for item in filtros_ativos_resumo %}
-                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3 py-2">{{ item }}</span>
-                        {% endfor %}
-                    </div>
-                    <div class="d-flex gap-2 ms-auto">
-                        <button type="submit" form="filtrosForm" class="btn btn-sm btn-primary" title="Aplicar filtros"><i class="fas fa-search me-1"></i>Filtrar</button>
-                        <a href="{% url 'analise_planilha_rc' %}" class="btn btn-sm btn-outline-danger" title="Remover todos os filtros"><i class="fas fa-times me-1"></i>Limpar</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- KPI Cards -->
         <div class="mb-5">
 
-            <!-- Linha 1: Total de Requisições e Valor em RC abertas -->
             <div class="row mb-3">
-                <div class="col-md-6 mb-3">
-                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+                <div class="col-12">
+                    <div class="alert alert-light border border-2 border-info border-opacity-75 d-flex align-items-center gap-3 py-3 mb-0" role="note">
+                        <i class="fas fa-info-circle fa-2x text-info flex-shrink-0"></i>
+                        <p class="mb-0 text-dark fw-semibold text-justify">Os dados exibidos abaixo referem-se ao período definido nos filtros acima.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Uma linha: Total Requisições, Valor RC abertas, Previsão uso, Valor NF Serviço, Possíveis Gastos -->
+            <div class="row mb-3">
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
@@ -389,8 +380,8 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-6 mb-3">
-                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
@@ -403,16 +394,12 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Linha 2: Total com Previsão de uso Atual, Valor Total NF e Possíveis Gastos -->
-            <div class="row mb-3">
-                <div class="col-md-4 mb-3">
-                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="text-muted mb-2">Total com Previsão de uso Atual:</h6>
+                                    <h6 class="text-muted mb-2">Total com Previsão de uso para o período filtrado:</h6>
                                     <h2 class="mb-0 fw-bold">{{ valor_previsao_uso_atual|currency_br }}</h2>
                                     <small class="text-muted">{{ total_com_previsao_uso_atual }} registro(s)</small>
                                 </div>
@@ -421,8 +408,8 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4 mb-3">
-                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
@@ -435,26 +422,26 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4 mb-3">
-                    <div class="card stat-card kpi-card kpi-secondary shadow-sm border-0">
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card shadow h-100 border-2 border-warning" style="background: linear-gradient(135deg, #fffbf0 0%, #fff8e6 100%);">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="text-muted mb-2">Possíveis Gastos (Previstos, mas sem NF)</h6>
-                                    <h2 class="mb-0 fw-bold">{{ valor_possiveis_gastos|currency_br }}</h2>
+                                    <h6 class="text-warning-emphasis fw-bold mb-2">Possíveis Gastos (Previstos, mas sem NF)</h6>
+                                    <h2 class="mb-0 fw-bold text-dark">{{ valor_possiveis_gastos|currency_br }}</h2>
                                     <small class="text-muted">Previsão − Valor NF</small>
                                 </div>
-                                <i class="fas fa-exclamation-triangle fa-3x text-secondary opacity-25"></i>
+                                <i class="fas fa-exclamation-triangle fa-3x text-warning opacity-75"></i>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Cards adicionais (6 boxes) -->
-            <div class="row mb-3">
-                <div class="col-md-4 col-lg-2 mb-3">
-                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+            <!-- Cards adicionais (5 boxes) -->
+            <div class="row mb-3 g-2">
+                <div class="col mb-0">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
@@ -467,8 +454,8 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4 col-lg-2 mb-3">
-                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                <div class="col mb-0">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
@@ -481,8 +468,8 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4 col-lg-2 mb-3">
-                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                <div class="col mb-0">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
@@ -495,8 +482,8 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4 col-lg-2 mb-3">
-                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+                <div class="col mb-0">
+                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
@@ -505,6 +492,20 @@
                                     <small class="text-muted">NF de serviço informada</small>
                                 </div>
                                 <i class="fas fa-concierge-bell fa-3x text-warning opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col mb-0">
+                    <div class="card stat-card kpi-card shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com Saldo Residual Pedido</h6>
+                                    <h2 class="mb-0 fw-bold">{{ registros_com_saldo_residual_pedido }}</h2>
+                                    <small class="text-muted">Registros com saldo residual preenchido</small>
+                                </div>
+                                <i class="fas fa-coins fa-3x text-secondary opacity-25"></i>
                             </div>
                         </div>
                     </div>
@@ -622,6 +623,22 @@
                         <div class="chart-container">
                             <canvas id="temporalChart"></canvas>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Análise de Pedidos que podem gerar gastos no período selecionado -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header py-3" style="background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%); color: #fff;">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Análise de Pedidos que podem gerar gastos no período selecionado:
+                        </h5>
+                    </div>
+                    <div class="card-body py-4">
+                        <p class="text-muted mb-0 text-center">Conteúdo a ser definido.</p>
                     </div>
                 </div>
             </div>

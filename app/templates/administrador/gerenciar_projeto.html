@@ -157,7 +157,16 @@
                                     </span>
                                 </td>
                                 <td class="text-center">
-                                    {% if tabela.limpar_por_mes %}
+                                    {% if tabela.key == 'projecao_gasto' %}
+                                    <div class="d-flex flex-wrap gap-1 justify-content-center">
+                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="abrirModalExcluirProjecaoPorSetor()" {% if tabela.count == 0 %}disabled title="Tabela vazia"{% endif %}>
+                                            <i class="fas fa-filter me-1"></i>Excluir por setor
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-danger" onclick="confirmarLimpeza('{{ tabela.key }}', '{{ tabela.count }}', '{{ tabela.nome }}')" {% if tabela.count == 0 %}disabled title="Tabela vazia"{% endif %}>
+                                            <i class="fas fa-trash me-1"></i>Limpar tudo
+                                        </button>
+                                    </div>
+                                    {% elif tabela.limpar_por_mes %}
                                     <button type="button" class="btn btn-sm btn-danger" onclick="abrirModalLimparPorMes('{{ tabela.key }}', '{{ tabela.nome }}')" {% if tabela.count == 0 %}disabled title="Tabela vazia"{% endif %}>
                                         <i class="fas fa-calendar-alt me-1"></i>Limpar por mês
                                     </button>
@@ -284,6 +293,156 @@
     </div>
 </div>
 
+<!-- Modal Limpar Requisições Almoxarifado por mês -->
+<div class="modal fade" id="modalLimparRequisicoesPorMes" tabindex="-1" aria-labelledby="modalLimparRequisicoesPorMesLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="modalLimparRequisicoesPorMesLabel">
+                    <i class="fas fa-calendar-alt me-2"></i>Limpar por mês — Requisições Almoxarifado
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'limpar_tabela' %}" id="formLimparRequisicoesPorMes">
+                {% csrf_token %}
+                <input type="hidden" name="tabela" value="requisicao_almoxarifado">
+                <div class="modal-body">
+                    <p class="text-muted">O mês é determinado pelo campo <strong>Data da Requisição</strong> em cada registro. Selecione o ano e o(s) mês(es) que deseja excluir.</p>
+                    <div class="mb-3">
+                        <label for="anoRequisicoes" class="form-label">Ano</label>
+                        <select class="form-select" id="anoRequisicoes" name="ano_requisicoes" required>
+                            {% for y in anos_disponiveis_requisicoes %}
+                            <option value="{{ y }}" {% if y == ano_atual %}selected{% endif %}>{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Mês(es) a excluir</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for num, nome in meses_nomes.items %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="mes_requisicoes" value="{{ num }}" id="mesRequisicoes{{ num }}">
+                                <label class="form-check-label" for="mesRequisicoes{{ num }}">{{ nome }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" name="deletar_todos_requisicoes" id="deletarTodosRequisicoes">
+                        <label class="form-check-label text-danger fw-semibold" for="deletarTodosRequisicoes">Deletar TODOS os registros (ignora seleção de meses)</label>
+                    </div>
+                    <div class="alert alert-warning mt-3 mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i><strong>Atenção:</strong> Esta ação é irreversível.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger" id="btnConfirmarLimparRequisicoesPorMes">
+                        <i class="fas fa-trash me-2"></i>Confirmar e Excluir
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Limpar Notas Fiscais por mês -->
+<div class="modal fade" id="modalLimparNotasPorMes" tabindex="-1" aria-labelledby="modalLimparNotasPorMesLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="modalLimparNotasPorMesLabel">
+                    <i class="fas fa-calendar-alt me-2"></i>Limpar por mês — Notas Fiscais
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'limpar_tabela' %}" id="formLimparNotasPorMes">
+                {% csrf_token %}
+                <input type="hidden" name="tabela" value="nota_fiscal">
+                <div class="modal-body">
+                    <p class="text-muted">O mês é determinado pelo campo <strong>Data Emissão</strong> em cada registro. Selecione o ano e o(s) mês(es) que deseja excluir.</p>
+                    <div class="mb-3">
+                        <label for="anoNotas" class="form-label">Ano</label>
+                        <select class="form-select" id="anoNotas" name="ano_notas" required>
+                            {% for y in anos_disponiveis_notas %}
+                            <option value="{{ y }}" {% if y == ano_atual %}selected{% endif %}>{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Mês(es) a excluir</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for num, nome in meses_nomes.items %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="mes_notas" value="{{ num }}" id="mesNotas{{ num }}">
+                                <label class="form-check-label" for="mesNotas{{ num }}">{{ nome }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" name="deletar_todos_notas" id="deletarTodosNotas">
+                        <label class="form-check-label text-danger fw-semibold" for="deletarTodosNotas">Deletar TODOS os registros (ignora seleção de meses)</label>
+                    </div>
+                    <div class="alert alert-warning mt-3 mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i><strong>Atenção:</strong> Esta ação é irreversível.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger" id="btnConfirmarLimparNotasPorMes">
+                        <i class="fas fa-trash me-2"></i>Confirmar e Excluir
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Excluir Projeções de Gastos por setor -->
+<div class="modal fade" id="modalExcluirProjecaoPorSetor" tabindex="-1" aria-labelledby="modalExcluirProjecaoPorSetorLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="modalExcluirProjecaoPorSetorLabel">
+                    <i class="fas fa-filter me-2"></i>Excluir Projeções de Gastos por setor
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'deletar_projecao_gasto_por_setor' %}" id="formExcluirProjecaoPorSetor">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <p class="text-muted">Selecione um ou mais setores. Apenas os registros desses setores serão excluídos da tabela <strong>Projeções de Gastos</strong> (e relações vinculadas).</p>
+                    {% if setores_projecao_gasto %}
+                    <div class="list-group list-group-flush">
+                        {% for item in setores_projecao_gasto %}
+                        <label class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <span>
+                                <input type="checkbox" name="setores" value="{% if not item.setor_value %}__EMPTY__{% else %}{{ item.setor_value|escape }}{% endif %}" class="form-check-input me-2">
+                                {{ item.setor_display }}
+                            </span>
+                            <span class="badge bg-secondary rounded-pill">{{ item.count }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">Não há registros em Projeções de Gastos.</p>
+                    {% endif %}
+                    <div class="alert alert-warning mt-3 mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i><strong>Atenção:</strong> Esta ação é irreversível.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger" id="btnConfirmarExcluirPorSetor" {% if not setores_projecao_gasto %}disabled{% endif %}>
+                        <i class="fas fa-trash me-2"></i>Excluir setores selecionados
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Confirmation Modal -->
 <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -348,13 +507,39 @@
         });
     });
     
-    function abrirModalLimparPorMes(tabelaKey, tabelaNome) {
-        document.getElementById('modalTabelaNome').textContent = tabelaNome;
-        document.getElementById('tabelaLimparPorMesInput').value = tabelaKey;
-        document.getElementById('deletarTodosParadas').checked = false;
-        document.querySelectorAll('input[name="mes_paradas"]').forEach(cb => cb.checked = false);
-        const modal = new bootstrap.Modal(document.getElementById('modalLimparPorMes'));
+    function abrirModalExcluirProjecaoPorSetor() {
+        document.querySelectorAll('#formExcluirProjecaoPorSetor input[name="setores"]').forEach(cb => cb.checked = false);
+        const modal = new bootstrap.Modal(document.getElementById('modalExcluirProjecaoPorSetor'));
         modal.show();
+    }
+    
+    const formExcluirProjecaoPorSetor = document.getElementById('formExcluirProjecaoPorSetor');
+    if (formExcluirProjecaoPorSetor) {
+        formExcluirProjecaoPorSetor.addEventListener('submit', function(e) {
+            const nenhum = !document.querySelectorAll('#formExcluirProjecaoPorSetor input[name="setores"]:checked').length;
+            if (nenhum) {
+                e.preventDefault();
+                alert('Selecione pelo menos um setor para excluir.');
+            }
+        });
+    }
+    
+    function abrirModalLimparPorMes(tabelaKey, tabelaNome) {
+        if (tabelaKey === 'requisicao_almoxarifado') {
+            document.getElementById('deletarTodosRequisicoes').checked = false;
+            document.querySelectorAll('input[name="mes_requisicoes"]').forEach(cb => cb.checked = false);
+            new bootstrap.Modal(document.getElementById('modalLimparRequisicoesPorMes')).show();
+        } else if (tabelaKey === 'nota_fiscal') {
+            document.getElementById('deletarTodosNotas').checked = false;
+            document.querySelectorAll('input[name="mes_notas"]').forEach(cb => cb.checked = false);
+            new bootstrap.Modal(document.getElementById('modalLimparNotasPorMes')).show();
+        } else {
+            document.getElementById('modalTabelaNome').textContent = tabelaNome;
+            document.getElementById('tabelaLimparPorMesInput').value = tabelaKey;
+            document.getElementById('deletarTodosParadas').checked = false;
+            document.querySelectorAll('input[name="mes_paradas"]').forEach(cb => cb.checked = false);
+            new bootstrap.Modal(document.getElementById('modalLimparPorMes')).show();
+        }
     }
     
     const formLimparPorMes = document.getElementById('formLimparPorMes');
@@ -362,6 +547,30 @@
         formLimparPorMes.addEventListener('submit', function(e) {
             const deletarTodos = document.getElementById('deletarTodosParadas').checked;
             const algumMes = document.querySelectorAll('input[name="mes_paradas"]:checked').length > 0;
+            if (!deletarTodos && !algumMes) {
+                e.preventDefault();
+                alert('Selecione pelo menos um mês para excluir ou marque "Deletar TODOS os registros".');
+            }
+        });
+    }
+    
+    const formLimparRequisicoesPorMes = document.getElementById('formLimparRequisicoesPorMes');
+    if (formLimparRequisicoesPorMes) {
+        formLimparRequisicoesPorMes.addEventListener('submit', function(e) {
+            const deletarTodos = document.getElementById('deletarTodosRequisicoes').checked;
+            const algumMes = document.querySelectorAll('input[name="mes_requisicoes"]:checked').length > 0;
+            if (!deletarTodos && !algumMes) {
+                e.preventDefault();
+                alert('Selecione pelo menos um mês para excluir ou marque "Deletar TODOS os registros".');
+            }
+        });
+    }
+    
+    const formLimparNotasPorMes = document.getElementById('formLimparNotasPorMes');
+    if (formLimparNotasPorMes) {
+        formLimparNotasPorMes.addEventListener('submit', function(e) {
+            const deletarTodos = document.getElementById('deletarTodosNotas').checked;
+            const algumMes = document.querySelectorAll('input[name="mes_notas"]:checked').length > 0;
             if (!deletarTodos && !algumMes) {
                 e.preventDefault();
                 alert('Selecione pelo menos um mês para excluir ou marque "Deletar TODOS os registros".');

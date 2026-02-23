@@ -129,7 +129,7 @@
                 <div class="accordion filter-accordion" id="filterAccordion">
                     <div class="accordion-item shadow-sm border-0">
                         <h2 class="accordion-header" id="headingFilter">
-                            <button class="accordion-button {% if not ano_selecionado and not meses_selecionados and not setores_selecionados and not uso_contabil_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if ano_selecionado or meses_selecionados or setores_selecionados or uso_contabil_filtro %}true{% else %}false{% endif %}" aria-controls="collapseFilter">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="false" aria-controls="collapseFilter">
                                 <i class="fas fa-sliders-h me-2"></i>Filtros de Análise
                                 {% if ano_selecionado or meses_selecionados or setores_selecionados or uso_contabil_filtro %}
                                     <span class="badge bg-light text-dark ms-2">{% if meses_selecionados %}{{ meses_selecionados|length }}{% else %}12{% endif %} mês(es)</span>
@@ -139,7 +139,7 @@
                                 {% endif %}
                             </button>
                         </h2>
-                        <div id="collapseFilter" class="accordion-collapse collapse {% if ano_selecionado or meses_selecionados or setores_selecionados or uso_contabil_filtro %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
+                        <div id="collapseFilter" class="accordion-collapse collapse" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
                             <div class="accordion-body">
                                 <form method="GET" action="{% url 'analise_projecao_gastos' %}">
                                     <!-- Row 1: Ano+Uso Contábil (juntos) | Setor (maior) | Botões -->
@@ -323,6 +323,33 @@
                 </div>
             </div>
         </div>
+
+        <!-- Accordion: Visualizar projeções por setor (9 setores) -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion shadow-sm" id="accordionPorSetor">
+                    <div class="accordion-item border-0">
+                        <h2 class="accordion-header" id="headingPorSetor">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePorSetor" aria-expanded="false" aria-controls="collapsePorSetor">
+                                <i class="fas fa-layer-group me-2"></i><strong>Visualizar projeções por setor</strong>
+                            </button>
+                        </h2>
+                        <div id="collapsePorSetor" class="accordion-collapse collapse" aria-labelledby="headingPorSetor" data-bs-parent="#accordionPorSetor">
+                            <div class="accordion-body">
+                                <p class="text-muted mb-3">Selecione um setor para ver todas as projeções de gastos daquele setor.</p>
+                                <div class="d-flex flex-wrap gap-2">
+                                    {% for setor in setores_para_links %}
+                                        <a href="{% url 'visualizar_projecoes_gastos_por_setor' %}?setor={{ setor|urlencode }}" class="btn btn-outline-primary">{{ setor }}</a>
+                                    {% empty %}
+                                        <span class="text-muted">Nenhum setor disponível.</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         
         <!-- Gráfico de Correlação: Valores das Projeções -->
         <div class="row mb-5">
@@ -342,19 +369,46 @@
             </div>
         </div>
 
-        <!-- Gastos por Previsão de Execução (previsao_execucao) -->
+        <!-- Gastos por Previsão de Execução (previsao_execucao) — por ano, 3 barras: Total, SIM, NÃO -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header text-white d-flex flex-wrap align-items-center justify-content-between gap-2" style="background-color: #0d6efd;">
+                        <h5 class="mb-0">
+                            <i class="fas fa-calendar-check me-2"></i>Gastos por Previsão de Execução
+                        </h5>
+                        <label class="d-flex align-items-center gap-2 mb-0">
+                            <span class="text-white">Ano:</span>
+                            <select id="anoGraficoPrevisao" class="form-select form-select-sm" style="width: auto; min-width: 100px;">
+                                {% for a in anos_grafico_previsao %}
+                                <option value="{{ a }}" {% if forloop.first %}selected{% endif %}>{{ a }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                    </div>
+                    <div class="card-body">
+                        <small class="text-muted d-block mb-2">Valor (R$) por mês: Total, Serviço concluído = SIM e Serviço concluído = NÃO.</small>
+                        <div class="chart-container-large">
+                            <canvas id="gastosPrevisaoChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfico Valor por Setor (abaixo do Gastos por Previsão) -->
         <div class="row mb-5">
             <div class="col-12">
                 <div class="card shadow-sm border-0">
                     <div class="card-header text-white" style="background-color: #0d6efd;">
                         <h5 class="mb-0">
-                            <i class="fas fa-calendar-check me-2"></i>Gastos por Previsão de Execução
+                            <i class="fas fa-chart-bar me-2"></i>Valor total por setor
                         </h5>
-                        <small class="opacity-90">Uma barra por Centro de Atividade em cada mês/ano (Previsão para Execução)</small>
+                        <small class="opacity-90">Soma do valor das projeções por setor (respeita os filtros da página)</small>
                     </div>
                     <div class="card-body">
                         <div class="chart-container-large">
-                            <canvas id="gastosPrevisaoChart"></canvas>
+                            <canvas id="valorPorSetorChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -866,46 +920,28 @@
             });
         }
 
-        // Gastos por Previsão de Execução (previsao_execucao) – uma barra por centro_atividade por mês
+        // Gastos por Previsão de Execução — por ano, 3 barras (Total, SIM, NÃO), mesmo processo do gráfico Evolução (setor)
         const gastosPrevisaoCtx = document.getElementById('gastosPrevisaoChart');
-        if (gastosPrevisaoCtx) {
-            const gastosPrevisaoLabels = {{ gastos_previsao_labels|safe }};
-            const gastosPrevisaoCentros = {{ gastos_previsao_centros|safe }};
-            const gastosPrevisaoDatasets = {{ gastos_previsao_datasets|safe }};
-            const coresCentros = [
-                '#0d6efd', '#198754', '#ffc107', '#dc3545', '#0dcaf0', '#6f42c1',
-                '#fd7e14', '#20c997', '#e83e8c', '#6c757d', '#17a2b8', '#28a745',
-                '#ff6b6b', '#4ecdc4', '#95e1d3', '#a0522d', '#9370db', '#2f4f4f'
-            ];
-            const datasets = gastosPrevisaoCentros.map(function(centro, i) {
-                const cor = coresCentros[i % coresCentros.length];
-                return {
-                    label: centro,
-                    data: gastosPrevisaoDatasets[i] || [],
-                    backgroundColor: cor,
-                    borderColor: cor,
-                    borderWidth: 1
-                };
-            });
-            new Chart(gastosPrevisaoCtx.getContext('2d'), {
+        const selAnoPrevisao = document.getElementById('anoGraficoPrevisao');
+        if (gastosPrevisaoCtx && selAnoPrevisao) {
+            const gastosPrevisaoPorAno = {{ gastos_previsao_por_ano_json|safe }};
+            const anoInicial = selAnoPrevisao.value;
+            const dados = gastosPrevisaoPorAno[anoInicial] || { labels: [], valores: [], valores_sim: [], valores_nao: [] };
+            const chartPrevisao = new Chart(gastosPrevisaoCtx.getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: gastosPrevisaoLabels,
-                    datasets: datasets
+                    labels: dados.labels,
+                    datasets: [
+                        { label: 'Total (R$)', data: dados.valores || [], backgroundColor: 'rgba(13, 110, 253, 0.6)', borderColor: 'rgba(13, 110, 253, 1)', borderWidth: 1 },
+                        { label: 'Serviço concluído = SIM', data: dados.valores_sim || [], backgroundColor: 'rgba(25, 135, 84, 0.6)', borderColor: 'rgba(25, 135, 84, 1)', borderWidth: 1 },
+                        { label: 'Serviço concluído = NÃO', data: dados.valores_nao || [], backgroundColor: 'rgba(220, 53, 69, 0.6)', borderColor: 'rgba(220, 53, 69, 1)', borderWidth: 1 }
+                    ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: {
-                            position: 'top',
-                            labels: {
-                                padding: 12,
-                                font: { size: 11 },
-                                usePointStyle: true,
-                                pointStyle: 'rect'
-                            }
-                        },
+                        legend: { position: 'top', labels: { padding: 12, font: { size: 11 }, usePointStyle: true, pointStyle: 'rect' } },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
@@ -918,21 +954,13 @@
                     scales: {
                         y: {
                             beginAtZero: true,
-                            stacked: false,
                             ticks: {
-                                callback: function(value) {
-                                    return 'R$ ' + formatarMoedaBR(value).replace('R$ ', '');
-                                },
+                                callback: function(value) { return 'R$ ' + formatarMoedaBR(value).replace('R$ ', ''); },
                                 font: { size: 11 }
                             },
-                            title: {
-                                display: true,
-                                text: 'Valor (R$)',
-                                font: { size: 12, weight: 'bold' }
-                            }
+                            title: { display: true, text: 'Valor (R$)', font: { size: 12, weight: 'bold' } }
                         },
                         x: {
-                            stacked: false,
                             ticks: {
                                 font: { size: 11 },
                                 maxRotation: 45,
@@ -942,6 +970,60 @@
                                 display: true,
                                 text: 'Mês/Ano (Previsão para Execução)',
                                 font: { size: 12, weight: 'bold' }
+                            }
+                        }
+                    }
+                }
+            });
+            selAnoPrevisao.addEventListener('change', function() {
+                var y = this.value;
+                var d = gastosPrevisaoPorAno[y];
+                if (d) {
+                    chartPrevisao.data.labels = d.labels;
+                    chartPrevisao.data.datasets[0].data = d.valores || [];
+                    chartPrevisao.data.datasets[1].data = d.valores_sim || [];
+                    chartPrevisao.data.datasets[2].data = d.valores_nao || [];
+                    chartPrevisao.update();
+                }
+            });
+        }
+
+        // Gráfico Valor total por setor: X = data (mês/ano), Y = valor (R$); uma série por setor
+        const valorPorSetorCtx = document.getElementById('valorPorSetorChart');
+        if (valorPorSetorCtx) {
+            const valorPorSetorLabels = {{ valor_por_setor_labels_json|safe }};
+            const valorPorSetorDatasets = {{ valor_por_setor_datasets_json|safe }};
+            new Chart(valorPorSetorCtx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: valorPorSetorLabels,
+                    datasets: valorPorSetorDatasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.parsed.y != null ? context.parsed.y : context.parsed.x;
+                                    return (context.dataset.label || '') + ': R$ ' + formatarMoedaBR(value).replace('R$ ', '');
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Data (mês/ano)' },
+                            ticks: { font: { size: 11 }, maxRotation: 45 }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Valor (R$)' },
+                            ticks: {
+                                callback: function(v) { return 'R$ ' + formatarMoedaBR(v).replace('R$ ', ''); },
+                                font: { size: 11 }
                             }
                         }
                     }

@@ -147,9 +147,9 @@
                                     {% if filtro_numero_nf %}<input type="hidden" name="filtro_numero_nf" value="{{ filtro_numero_nf }}">{% endif %}
                                     {% if filtro_id %}<input type="hidden" name="filtro_id" value="{{ filtro_id }}">{% endif %}
                                     {% if filtro_numero_requisicao %}<input type="hidden" name="filtro_numero_requisicao" value="{{ filtro_numero_requisicao }}">{% endif %}
-                                    {% if filtro_id %}<input type="hidden" name="filtro_id" value="{{ filtro_id }}">{% endif %}
                                     {% if filtro_valor_min %}<input type="hidden" name="filtro_valor_min" value="{{ filtro_valor_min }}">{% endif %}
                                     {% if filtro_valor_max %}<input type="hidden" name="filtro_valor_max" value="{{ filtro_valor_max }}">{% endif %}
+                                    {% if order_id %}<input type="hidden" name="order_id" value="{{ order_id }}">{% endif %}
                                     
                                     <!-- Opção Mostrar Todos -->
                                     <div class="col-12 mb-3">
@@ -267,11 +267,13 @@
         <div class="row mb-4">
             <div class="col-12">
                 <form method="get" action="{% url 'consultar_projecao_gastos' %}" class="d-flex">
-                    <!-- Preservar filtros de ano/mês e colunas -->
-                    <input type="hidden" name="ano" value="{{ ano_filtro }}">
-                    {% for mes in meses_filtro %}
-                        <input type="hidden" name="mes" value="{{ mes }}">
-                    {% endfor %}
+                    <!-- Preservar filtros de ano/mês só quando já aplicados -->
+                    {% if request.GET.ano %}
+                        <input type="hidden" name="ano" value="{{ ano_filtro }}">
+                        {% for mes in meses_filtro %}
+                            <input type="hidden" name="mes" value="{{ mes }}">
+                        {% endfor %}
+                    {% endif %}
                     {% if filtro_setor %}<input type="hidden" name="filtro_setor" value="{{ filtro_setor }}">{% endif %}
                     {% if filtro_id %}<input type="hidden" name="filtro_id" value="{{ filtro_id }}">{% endif %}
                     {% if filtro_descricao %}<input type="hidden" name="filtro_descricao" value="{{ filtro_descricao }}">{% endif %}
@@ -301,19 +303,27 @@
                     </div>
                     <div class="card-body p-0">
                         <form method="get" action="{% url 'consultar_projecao_gastos' %}" id="filterForm">
-                            <!-- Preservar busca geral e filtros de ano/mês -->
+                            <!-- Preservar busca geral e filtros de ano/mês só quando já foram aplicados (evita aplicar ano/mês ao usar só o filtro Setor) -->
                             <input type="hidden" name="search" value="{{ search_query|default:'' }}">
-                            {% if filtro_id %}<input type="hidden" name="filtro_id" value="{{ filtro_id }}">{% endif %}
-                            <input type="hidden" name="ano" value="{{ ano_filtro }}">
-                            {% for mes in meses_filtro %}
-                                <input type="hidden" name="mes" value="{{ mes }}">
-                            {% endfor %}
+                            {% if order_id %}<input type="hidden" name="order_id" value="{{ order_id }}">{% endif %}
+                            {% if request.GET.ano %}
+                                <input type="hidden" name="ano" value="{{ ano_filtro }}">
+                                {% for mes in meses_filtro %}
+                                    <input type="hidden" name="mes" value="{{ mes }}">
+                                {% endfor %}
+                            {% endif %}
                             
                             <div class="table-container">
                                 <table class="table table-hover table-striped mb-0">
                                     <thead>
                                         <tr class="table-header-row">
-                                            <th class="col-id">ID</th>
+                                            <th class="col-id">
+                                                ID
+                                                <span class="d-inline-flex flex-column ms-1" style="font-size: 0.7rem; vertical-align: middle;">
+                                                    <a href="{{ url_ordenar_id_asc }}" class="text-decoration-none {% if order_id == 'asc' %}text-primary fw-bold{% else %}text-muted{% endif %}" title="Menor para maior (crescente)" aria-label="Ordenar ID crescente">↑</a>
+                                                    <a href="{{ url_ordenar_id_desc }}" class="text-decoration-none {% if order_id == 'desc' %}text-primary fw-bold{% else %}text-muted{% endif %}" title="Maior para menor (decrescente)" aria-label="Ordenar ID decrescente">↓</a>
+                                                </span>
+                                            </th>
                                             <th class="col-setor">Setor</th>
                                             <th class="col-descricao">Descrição</th>
                                             <th class="col-fornecedor">Fornecedor</th>
@@ -362,7 +372,14 @@
                                             <th class="filter-header">
                                                 <input type="text" name="filtro_numero_nf" class="filter-input" placeholder="Filtrar NF..." value="{{ filtro_numero_nf|default:'' }}" onchange="document.getElementById('filterForm').submit();">
                                             </th>
-                                            <th class="filter-header"></th>
+                                            <th class="filter-header">
+                                                <select name="filtro_servico_concluido" class="filter-input form-select" onchange="document.getElementById('filterForm').submit();">
+                                                    <option value="">Todos</option>
+                                                    <option value="SIM" {% if filtro_servico_concluido == "SIM" %}selected{% endif %}>SIM</option>
+                                                    <option value="NÃO" {% if filtro_servico_concluido == "NÃO" %}selected{% endif %}>NÃO</option>
+                                                    <option value="INDEFINIDO" {% if filtro_servico_concluido == "INDEFINIDO" %}selected{% endif %}>INDEFINIDO</option>
+                                                </select>
+                                            </th>
                                             <th class="filter-header"></th>
                                         </tr>
                                     </thead>
@@ -403,10 +420,14 @@
                                                 {{ projecao.numero_nf|default:"-" }}
                                             </td>
                                             <td class="col-servico-concluido text-center align-middle">
-                                                {% if projecao.servico_concluido %}
-                                                    <span class="badge bg-success px-2 py-1" title="Concluído: {{ projecao.servico_concluido }}">{{ projecao.servico_concluido }}</span>
+                                                {% if projecao.servico_concluido == "SIM" %}
+                                                    <span class="badge bg-success px-2 py-1">{{ projecao.servico_concluido }}</span>
+                                                {% elif projecao.servico_concluido == "NÃO" %}
+                                                    <span class="badge bg-danger px-2 py-1">{{ projecao.servico_concluido }}</span>
+                                                {% elif projecao.servico_concluido == "INDEFINIDO" %}
+                                                    <span class="badge px-2 py-1" style="background-color: #fd7e14; color: #fff;">{{ projecao.servico_concluido }}</span>
                                                 {% else %}
-                                                    <span class="badge bg-secondary bg-opacity-25 text-muted px-2 py-1">Pendente</span>
+                                                    <span class="badge bg-secondary bg-opacity-25 text-muted px-2 py-1">{{ projecao.servico_concluido|default:"Pendente" }}</span>
                                                 {% endif %}
                                             </td>
                                             <td class="text-center">
@@ -435,10 +456,10 @@
                             <ul class="pagination justify-content-center mb-0">
                                 {% if projecoes.has_previous %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page=1&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_descricao %}&filtro_descricao={{ filtro_descricao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_mes_ano %}&filtro_mes_ano={{ filtro_mes_ano }}{% endif %}{% if filtro_id %}&filtro_id={{ filtro_id }}{% endif %}{% if filtro_numero_nf %}&filtro_numero_nf={{ filtro_numero_nf }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">&laquo; Primeira</a>
+                                        <a class="page-link" href="?page=1{% if request.GET.ano %}&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_descricao %}&filtro_descricao={{ filtro_descricao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_mes_ano %}&filtro_mes_ano={{ filtro_mes_ano }}{% endif %}{% if filtro_id %}&filtro_id={{ filtro_id }}{% endif %}{% if filtro_numero_nf %}&filtro_numero_nf={{ filtro_numero_nf }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}{% if filtro_servico_concluido %}&filtro_servico_concluido={{ filtro_servico_concluido }}{% endif %}">&laquo; Primeira</a>
                                     </li>
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ projecoes.previous_page_number }}&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_descricao %}&filtro_descricao={{ filtro_descricao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_mes_ano %}&filtro_mes_ano={{ filtro_mes_ano }}{% endif %}{% if filtro_id %}&filtro_id={{ filtro_id }}{% endif %}{% if filtro_numero_nf %}&filtro_numero_nf={{ filtro_numero_nf }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Anterior</a>
+                                        <a class="page-link" href="?page={{ projecoes.previous_page_number }}{% if request.GET.ano %}&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_descricao %}&filtro_descricao={{ filtro_descricao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_mes_ano %}&filtro_mes_ano={{ filtro_mes_ano }}{% endif %}{% if filtro_id %}&filtro_id={{ filtro_id }}{% endif %}{% if filtro_numero_nf %}&filtro_numero_nf={{ filtro_numero_nf }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}{% if filtro_servico_concluido %}&filtro_servico_concluido={{ filtro_servico_concluido }}{% endif %}">Anterior</a>
                                     </li>
                                 {% endif %}
                                 
@@ -450,10 +471,10 @@
                                 
                                 {% if projecoes.has_next %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ projecoes.next_page_number }}&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_descricao %}&filtro_descricao={{ filtro_descricao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_mes_ano %}&filtro_mes_ano={{ filtro_mes_ano }}{% endif %}{% if filtro_id %}&filtro_id={{ filtro_id }}{% endif %}{% if filtro_numero_nf %}&filtro_numero_nf={{ filtro_numero_nf }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Próxima</a>
+                                        <a class="page-link" href="?page={{ projecoes.next_page_number }}{% if request.GET.ano %}&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_descricao %}&filtro_descricao={{ filtro_descricao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_mes_ano %}&filtro_mes_ano={{ filtro_mes_ano }}{% endif %}{% if filtro_id %}&filtro_id={{ filtro_id }}{% endif %}{% if filtro_numero_nf %}&filtro_numero_nf={{ filtro_numero_nf }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}{% if filtro_servico_concluido %}&filtro_servico_concluido={{ filtro_servico_concluido }}{% endif %}">Próxima</a>
                                     </li>
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ projecoes.paginator.num_pages }}&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_descricao %}&filtro_descricao={{ filtro_descricao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_mes_ano %}&filtro_mes_ano={{ filtro_mes_ano }}{% endif %}{% if filtro_id %}&filtro_id={{ filtro_id }}{% endif %}{% if filtro_numero_nf %}&filtro_numero_nf={{ filtro_numero_nf }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Última &raquo;</a>
+                                        <a class="page-link" href="?page={{ projecoes.paginator.num_pages }}{% if request.GET.ano %}&ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_setor %}&filtro_setor={{ filtro_setor }}{% endif %}{% if filtro_fornecedor %}&filtro_fornecedor={{ filtro_fornecedor }}{% endif %}{% if filtro_descricao %}&filtro_descricao={{ filtro_descricao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_mes_ano %}&filtro_mes_ano={{ filtro_mes_ano }}{% endif %}{% if filtro_id %}&filtro_id={{ filtro_id }}{% endif %}{% if filtro_numero_nf %}&filtro_numero_nf={{ filtro_numero_nf }}{% endif %}{% if filtro_numero_requisicao %}&filtro_numero_requisicao={{ filtro_numero_requisicao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}{% if filtro_servico_concluido %}&filtro_servico_concluido={{ filtro_servico_concluido }}{% endif %}">Última &raquo;</a>
                                     </li>
                                 {% endif %}
                             </ul>

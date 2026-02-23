@@ -92,42 +92,35 @@
     </div>
 </section>
 
-<!-- Current Week Info Section -->
-{% if semana_atual %}
+<!-- Current Month Info Section -->
 <section class="py-4" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-bottom: 3px solid #0d6efd;">
     <div class="container">
         <div class="row">
             <div class="col-12">
                 <div class="d-flex align-items-center justify-content-center flex-wrap gap-4">
-                    <!-- Icon Badge -->
                     <div class="d-flex align-items-center">
                         <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 56px; height: 56px;">
-                            <i class="fas fa-calendar-week fs-5"></i>
+                            <i class="fas fa-calendar-alt fs-5"></i>
                         </div>
                     </div>
-                    
-                    <!-- Week Info -->
                     <div class="flex-grow-1 text-center">
                         <div class="d-flex flex-column flex-md-row align-items-center justify-content-center flex-wrap gap-2 gap-md-3">
-                            <!-- Week Label and Badge -->
                             <div class="d-flex align-items-center gap-2">
-                                <span class="text-muted fw-medium">Semana Atual:</span>
+                                <span class="text-muted fw-medium">Mês Atual:</span>
                                 <span class="badge bg-primary fs-6 px-3 py-2 shadow-sm" style="font-weight: 600; letter-spacing: 0.5px;">
-                                    {{ semana_atual.semana }}
+                                    {{ mes_ano_label }}
                                 </span>
                             </div>
-                            
-                            <!-- Date Range -->
                             <div class="d-flex align-items-center flex-wrap justify-content-center gap-2 text-dark">
                                 <div class="d-flex align-items-center gap-1">
                                     <i class="far fa-calendar-alt text-muted"></i>
                                     <span class="small text-muted">Início:</span>
-                                    <span class="fw-semibold">{{ data_inicio_semana|date:"d/m/Y" }}</span>
+                                    <span class="fw-semibold">{{ data_inicio_mes|date:"d/m/Y" }}</span>
                                 </div>
                                 <i class="fas fa-arrow-right text-muted mx-1" style="font-size: 0.75rem;"></i>
                                 <div class="d-flex align-items-center gap-1">
                                     <span class="small text-muted">Fim:</span>
-                                    <span class="fw-semibold">{{ data_fim_semana|date:"d/m/Y" }}</span>
+                                    <span class="fw-semibold">{{ data_fim_mes|date:"d/m/Y" }}</span>
                                 </div>
                             </div>
                         </div>
@@ -137,7 +130,6 @@
         </div>
     </div>
 </section>
-{% endif %}
 
 <!-- Cards: -->
 <section class="py-5">
@@ -149,9 +141,7 @@
                         <i class="bi bi-clipboard2-data fa-2x mb-2"></i>
                         <h3 class="kpi-number format-number" data-value="{{ manutencoes_corretivas|default:0 }}">{{ manutencoes_corretivas|default:0 }}</h3>
                         <p class="mb-0">Manutenções Corretivas</p>
-                        {% if semana_atual %}
-                        <small class="opacity-75">Esta Semana</small>
-                        {% endif %}
+                        <small class="opacity-75">Este Mês</small>
                     </div>
                 </div>
             </div>
@@ -162,9 +152,7 @@
                         <i class="fas fa-chart-line fa-2x mb-2"></i>
                         <h3 class="kpi-number format-number" data-value="{{ manutencoes_preventivas|default:0 }}">{{ manutencoes_preventivas|default:0 }}</h3>
                         <p class="mb-0">Manutenções Preventivas</p>
-                        {% if semana_atual %}
-                        <small class="opacity-75">Esta Semana</small>
-                        {% endif %}
+                        <small class="opacity-75">Este Mês</small>
                     </div>
                 </div>
             </div>
@@ -175,9 +163,7 @@
                         <i class="fas fa-clock fa-2x mb-2"></i>
                         <h3 class="kpi-money format-money" data-value="{{ valor_total_semana|default:0 }}">R$ {{ valor_total_semana|floatformat:2|default:0 }}</h3>
                         <p class="mb-0">Valor Requisições</p>
-                        {% if semana_atual %}
-                        <small class="opacity-75">Esta Semana</small>
-                        {% endif %}
+                        <small class="opacity-75">Este Mês</small>
                     </div>
                 </div>
             </div>
@@ -188,9 +174,7 @@
                         <i class="fas fa-globe fa-2x mb-2"></i>
                         <h3 class="kpi-number format-number" data-value="{{ total_requisicoes_semana|default:0 }}">{{ total_requisicoes_semana|default:0 }}</h3>
                         <p class="mb-0">Requisições Almoxarifado</p>
-                        {% if semana_atual %}
-                        <small class="opacity-75">Esta Semana</small>
-                        {% endif %}
+                        <small class="opacity-75">Este Mês</small>
                     </div>
                 </div>
             </div>
@@ -213,6 +197,82 @@
                         <h3 class="kpi-number format-number" data-value="{{ total_manutentores|default:0 }}">{{ total_manutentores|default:0 }}</h3>
                         <p class="mb-0">Manutentores</p>
                         <small class="opacity-75">Total</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Orçamento, Gastos e Requisições -->
+<section class="py-4">
+    <div class="container">
+        <div class="row mb-3">
+            <div class="col-12">
+                <h5 class="mb-0 text-primary">
+                    <i class="fas fa-wallet me-2"></i>Orçamento, Gastos e Requisições:
+                    <a href="{% url 'analise_geral_orcamento' %}" class="ms-2 small fw-normal">(ver análise geral)</a>
+                </h5>
+            </div>
+        </div>
+        <div class="row g-1 align-items-stretch flex-nowrap overflow-auto">
+            <div class="col flex-grow-1" style="min-width: 0;">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                    <div class="card-body py-2 px-2 d-flex flex-column justify-content-center">
+                        <h6 class="text-muted mb-2">Orçamento Disponível</h6>
+                        <h4 class="mb-0 fw-bold format-currency">{{ total_orcamento_disponivel|floatformat:2 }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-auto d-flex align-items-stretch" style="flex-shrink: 0;">
+                <div class="card shadow-sm border-0 h-100 d-flex align-items-center justify-content-center px-1" style="min-width: 1.75rem; background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%); border: 1px dashed #6c757d;">
+                    <span class="fs-4 fw-bold text-secondary">−</span>
+                </div>
+            </div>
+            <div class="col flex-grow-1" style="min-width: 0;">
+                <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4" style="border-left-color: #6f42c1 !important;">
+                    <div class="card-body py-2 px-2 d-flex flex-column justify-content-center">
+                        <h6 class="text-muted mb-2">Requisições sem NF</h6>
+                        <h4 class="mb-0 fw-bold format-currency">{{ valor_total_requisicoes_sem_nf|floatformat:2 }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-auto d-flex align-items-stretch" style="flex-shrink: 0;">
+                <div class="card shadow-sm border-0 h-100 d-flex align-items-center justify-content-center px-1" style="min-width: 1.75rem; background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%); border: 1px dashed #6c757d;">
+                    <span class="fs-4 fw-bold text-secondary">−</span>
+                </div>
+            </div>
+            <div class="col flex-grow-1" style="min-width: 0;">
+                <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-warning">
+                    <div class="card-body py-2 px-2 d-flex flex-column justify-content-center">
+                        <h6 class="text-muted mb-2">Gastos Previstos (Serviço Concluído = NÃO)</h6>
+                        <h4 class="mb-0 fw-bold format-currency">{{ valor_servico_concluido_nao|floatformat:2 }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-auto d-flex align-items-stretch" style="flex-shrink: 0;">
+                <div class="card shadow-sm border-0 h-100 d-flex align-items-center justify-content-center px-1" style="min-width: 1.75rem; background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%); border: 1px dashed #6c757d;">
+                    <span class="fs-4 fw-bold text-secondary">−</span>
+                </div>
+            </div>
+            <div class="col flex-grow-1" style="min-width: 0;">
+                <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-success">
+                    <div class="card-body py-2 px-2 d-flex flex-column justify-content-center">
+                        <h6 class="text-muted mb-2">Valor NF Lançadas</h6>
+                        <h4 class="mb-0 fw-bold format-currency">{{ valor_total_notas_lancadas|floatformat:2 }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-auto d-flex align-items-stretch" style="flex-shrink: 0;">
+                <div class="card shadow-sm border-0 h-100 d-flex align-items-center justify-content-center px-1" style="min-width: 1.75rem; background: linear-gradient(135deg, #cfe2ff 0%, #9ec5fe 100%); border: 1px dashed #0d6efd;">
+                    <span class="fs-4 fw-bold text-primary">=</span>
+                </div>
+            </div>
+            <div class="col flex-grow-1" style="min-width: 0;">
+                <div class="card stat-card kpi-card h-100 border border-2 shadow" style="border-color: #0d6efd !important; background: linear-gradient(135deg, #e7f1ff 0%, #cfe2ff 100%);">
+                    <div class="card-body py-2 px-2 d-flex flex-column justify-content-center">
+                        <h6 class="text-muted mb-2">Saldo Parcial</h6>
+                        <h4 class="mb-0 fw-bold text-primary format-currency">{{ saldo_parcial|floatformat:2 }}</h4>
                     </div>
                 </div>
             </div>
@@ -254,12 +314,12 @@
                 </div>
             </div>
             
-            <!-- Second Section: Ordens Fechadas na Semana -->
+            <!-- Second Section: Ordens Fechadas no Mês -->
             <div class="col-md-6 mb-4">
                 <div class="card shadow-sm border-0 h-100">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-chart-bar me-2"></i>Ordens de Serviço Fechadas na Semana
+                            <i class="fas fa-chart-bar me-2"></i>Ordens de Serviço Fechadas no Mês
                         </h5>
                     </div>
                     <div class="card-body">
@@ -333,6 +393,13 @@
         // Aplicar formatação brasileira aos valores monetários
         document.querySelectorAll('.format-money').forEach(function(element) {
             const valor = parseFloat(element.getAttribute('data-value') || element.textContent.replace('R$', '').replace(/\./g, '').replace(',', '.').trim());
+            if (!isNaN(valor)) {
+                element.textContent = formatarMoedaBR(valor);
+            }
+        });
+        // Orçamento: formatar valores com classe format-currency (ex.: 1234.56 → R$ 1.234,56)
+        document.querySelectorAll('.format-currency').forEach(function(element) {
+            const valor = parseFloat(element.textContent.replace(/\s/g, '').replace(/\./g, '').replace(',', '.').trim());
             if (!isNaN(valor)) {
                 element.textContent = formatarMoedaBR(valor);
             }
@@ -567,7 +634,7 @@
                                 tooltip: { enabled: false },
                                 title: {
                                     display: true,
-                                    text: 'Nenhuma ordem fechada nesta semana',
+                                    text: 'Nenhuma ordem fechada neste mês',
                                     position: 'top',
                                     font: { size: 14, color: '#666' }
                                 }
@@ -633,7 +700,7 @@
                             x: {
                                 title: {
                                     display: true,
-                                    text: 'Dia da Semana'
+                                    text: 'Dia do Mês'
                                 }
                             }
                         }

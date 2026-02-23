@@ -193,14 +193,19 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Auto-hide alerts after 5 seconds
-    const alerts = document.querySelectorAll('.alert');
-    alerts.forEach(alert => {
-        setTimeout(() => {
-            const bsAlert = new bootstrap.Alert(alert);
-            bsAlert.close();
-        }, 5000);
-    });
+    // Auto-hide alerts after 5 seconds (except on pages that want persistent messages, e.g. importar projecao-gastos)
+    const path = window.location.pathname || '';
+    const alertsPersistPaths = ['/importar/projecao-gastos/', '/importar/projecao-gastos'];
+    const keepAlertsOpen = alertsPersistPaths.some(p => path === p || path.startsWith(p + '?'));
+    if (!keepAlertsOpen) {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            setTimeout(() => {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            }, 5000);
+        });
+    }
 
     // Gallery item hover effects with enhanced interactions
     const galleryItems = document.querySelectorAll('.gallery-item');

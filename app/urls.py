@@ -58,6 +58,7 @@ urlpatterns = [
     path('orcamento/consultar-projecao-gastos/', views.consultar_projecao_gastos, name="consultar_projecao_gastos"),
     path('orcamento/visualizar-projecao-gasto/<int:projecao_id>/', views.visualizar_projecao_gasto, name="visualizar_projecao_gasto"),
     path('orcamento/analise-projecao-gastos/', views.analise_projecao_gastos, name="analise_projecao_gastos"),
+    path('orcamento/visualizar-projecoes-gastos-por-setor/', views.visualizar_projecoes_gastos_por_setor, name="visualizar_projecoes_gastos_por_setor"),
     path('orcamento/analise-notas-fiscais/', views.analise_notas_fiscais, name="analise_notas_fiscais"),
     path('orcamento/relacionar-projecao-nota-fiscal/', views.relacionar_projecao_nota_fiscal, name="relacionar_projecao_nota_fiscal"),
     path('orcamento/consultar-planilha-rc/', views.consultar_planilha_rc, name="consultar_planilha_rc"),
@@ -167,6 +168,7 @@ urlpatterns = [
     # Administração
     path('administrador/gerenciar/', views.gerenciar_projeto, name="gerenciar_projeto"),
     path('administrador/limpar-tabela/', views.limpar_tabela, name="limpar_tabela"),
+    path('administrador/deletar-projecao-gasto-por-setor/', views.deletar_projecao_gasto_por_setor, name="deletar_projecao_gasto_por_setor"),
     
     # Agenda Geral
     path('agenda-geral/', views.agenda_geral, name="agenda_geral"),

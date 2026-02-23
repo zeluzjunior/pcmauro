@@ -63,7 +63,7 @@
                 <div class="accordion filter-accordion" id="filtrosAccordion">
                     <div class="accordion-item shadow-sm border-0">
                         <h2 class="accordion-header" id="filtrosHeading">
-                            <button class="accordion-button {% if not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="false" aria-controls="filtrosCollapse">
                                 <i class="fas fa-filter me-2"></i>
                                 <strong>Filtros</strong>
                                 {% if meses_filtro or ano_filtro %}
@@ -93,7 +93,7 @@
                                 {% endif %}
                             </button>
                         </h2>
-                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                        <div id="filtrosCollapse" class="accordion-collapse collapse" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
                             <div class="accordion-body">
                                 <form method="get" action="{% url 'analise_geral_orcamento' %}" class="row g-3">
                                     <div class="col-md-4">
@@ -198,56 +198,72 @@
             </div>
         </div>
         
-        <!-- Linha 1: Orçamento -->
-        <div class="row mb-4">
+        <!-- Linha 1: Orçamento – fluxo do saldo em uma linha: Orçamento − Requisições sem NF − Valor NF Lançadas = Saldo Parcial -->
+        <div class="row mt-4 mb-4">
             <div class="col-12">
                 <h5 class="mb-3 text-primary">
                     <i class="fas fa-wallet me-2"></i>Orçamento:
                 </h5>
             </div>
             <div class="col-12">
-                <div class="row g-3">
-                    <div class="col-md-4 col-lg-3">
+                <div class="row g-1 align-items-stretch flex-nowrap overflow-auto">
+                    <div class="col flex-grow-1" style="min-width: 0;">
                         <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">Orçamento Disponível</h6>
-                                        <h4 class="mb-0 fw-bold format-currency">{{ total_orcamento_disponivel|floatformat:2 }}</h4>
-                                    </div>
-                                    <i class="fas fa-wallet fa-2x text-primary opacity-25"></i>
-                                </div>
+                            <div class="card-body py-2 px-2 d-flex flex-column justify-content-center">
+                                <h6 class="text-muted mb-2">Orçamento Disponível</h6>
+                                <h4 class="mb-0 fw-bold format-currency">{{ total_orcamento_disponivel|floatformat:2 }}</h4>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4 col-lg-3">
-                        <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">Saldo Parcial</h6>
-                                        <h4 class="mb-0 fw-bold format-currency">{{ saldo_parcial|floatformat:2 }}</h4>
-                                        <small class="text-muted">Orçamento - Requisições - NF</small>
-                                    </div>
-                                    <i class="fas fa-calculator fa-2x text-info opacity-25"></i>
-                                </div>
+                    <div class="col-auto d-flex align-items-stretch" style="flex-shrink: 0;">
+                        <div class="card shadow-sm border-0 h-100 d-flex align-items-center justify-content-center px-1" style="min-width: 1.75rem; background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%); border: 1px dashed #6c757d;">
+                            <span class="fs-4 fw-bold text-secondary">−</span>
+                        </div>
+                    </div>
+                    <div class="col flex-grow-1" style="min-width: 0;">
+                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4" style="border-left-color: #6f42c1 !important;">
+                            <div class="card-body py-2 px-2 d-flex flex-column justify-content-center">
+                                <h6 class="text-muted mb-2">Requisições sem NF</h6>
+                                <h4 class="mb-0 fw-bold format-currency">{{ valor_total_requisicoes_sem_nf|floatformat:2 }}</h4>
                             </div>
                         </div>
                     </div>
-                    <!-- Caixas extras para Orçamento (pronto para receber dados) -->
-                    <div class="col-md-4 col-lg-3">
-                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-primary">
-                            <div class="card-body">
-                                <h6 class="text-muted mb-2">—</h6>
-                                <h4 class="mb-0 fw-bold">—</h4>
+                    <div class="col-auto d-flex align-items-stretch" style="flex-shrink: 0;">
+                        <div class="card shadow-sm border-0 h-100 d-flex align-items-center justify-content-center px-1" style="min-width: 1.75rem; background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%); border: 1px dashed #6c757d;">
+                            <span class="fs-4 fw-bold text-secondary">−</span>
+                        </div>
+                    </div>
+                    <div class="col flex-grow-1" style="min-width: 0;">
+                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-warning">
+                            <div class="card-body py-2 px-2 d-flex flex-column justify-content-center">
+                                <h6 class="text-muted mb-2">Gastos Previstos (Serviço Concluído = NÃO)</h6>
+                                <h4 class="mb-0 fw-bold format-currency">{{ valor_servico_concluido_nao|floatformat:2 }}</h4>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4 col-lg-3">
-                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-primary">
-                            <div class="card-body">
-                                <h6 class="text-muted mb-2">—</h6>
-                                <h4 class="mb-0 fw-bold">—</h4>
+                    <div class="col-auto d-flex align-items-stretch" style="flex-shrink: 0;">
+                        <div class="card shadow-sm border-0 h-100 d-flex align-items-center justify-content-center px-1" style="min-width: 1.75rem; background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%); border: 1px dashed #6c757d;">
+                            <span class="fs-4 fw-bold text-secondary">−</span>
+                        </div>
+                    </div>
+                    <div class="col flex-grow-1" style="min-width: 0;">
+                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-success">
+                            <div class="card-body py-2 px-2 d-flex flex-column justify-content-center">
+                                <h6 class="text-muted mb-2">Valor NF Lançadas</h6>
+                                <h4 class="mb-0 fw-bold format-currency">{{ valor_total_notas_lancadas|floatformat:2 }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-auto d-flex align-items-stretch" style="flex-shrink: 0;">
+                        <div class="card shadow-sm border-0 h-100 d-flex align-items-center justify-content-center px-1" style="min-width: 1.75rem; background: linear-gradient(135deg, #cfe2ff 0%, #9ec5fe 100%); border: 1px dashed #0d6efd;">
+                            <span class="fs-4 fw-bold text-primary">=</span>
+                        </div>
+                    </div>
+                    <div class="col flex-grow-1" style="min-width: 0;">
+                        <div class="card stat-card kpi-card h-100 border border-2 shadow" style="border-color: #0d6efd !important; background: linear-gradient(135deg, #e7f1ff 0%, #cfe2ff 100%);">
+                            <div class="card-body py-2 px-2 d-flex flex-column justify-content-center">
+                                <h6 class="text-muted mb-2">Saldo Parcial</h6>
+                                <h4 class="mb-0 fw-bold text-primary format-currency">{{ saldo_parcial|floatformat:2 }}</h4>
                             </div>
                         </div>
                     </div>
@@ -255,103 +271,244 @@
             </div>
         </div>
 
-        <!-- Linha 2: Requisições de Almoxarifado -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <h5 class="mb-3" style="color: #6f42c1;">
-                    <i class="fas fa-boxes me-2"></i>Requisições de Almoxarifado:
-                </h5>
-            </div>
-            <div class="col-12">
-                <div class="row g-3">
-                    <div class="col-md-4 col-lg-3">
-                        <div class="card stat-card kpi-card kpi-purple shadow-sm border-0 h-100">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">Total Requisições</h6>
-                                        <h4 class="mb-0 fw-bold format-currency">{{ valor_total_requisicoes_filtrado|floatformat:2 }}</h4>
-                                        <small class="text-muted">{{ total_requisicoes }} requisição{{ total_requisicoes|pluralize:"ões" }}</small>
+        <!-- Accordion: Previsões de Gastos, Requisições de Almoxarifado e Notas Fiscais (expandir para ver detalhes) -->
+        <div class="accordion mt-4 mb-5" id="accordionDetalhesOrcamento">
+            <div class="accordion-item border shadow-sm">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePrevisoesGastos" aria-expanded="false" aria-controls="collapsePrevisoesGastos" style="color: #fd7e14;">
+                        <i class="fas fa-chart-line me-2"></i>Previsões de Gastos
+                    </button>
+                </h2>
+                <div id="collapsePrevisoesGastos" class="accordion-collapse collapse" data-bs-parent="#accordionDetalhesOrcamento">
+                    <div class="accordion-body pt-3 pb-3">
+                        <!-- Primeira linha: Valor Total Projetado, Serviço Concluído SIM/NÃO/INDEFINIDO -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3">
+                                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Valor Total Projetado</h6>
+                                                <h4 class="mb-0 fw-bold format-currency">{{ valor_total_projetado|floatformat:2 }}</h4>
+                                                <small class="text-muted">Soma de todas as projeções</small>
+                                            </div>
+                                            <i class="fas fa-dollar-sign fa-2x text-success opacity-25"></i>
+                                        </div>
                                     </div>
-                                    <i class="fas fa-boxes fa-2x opacity-25" style="color: #6f42c1;"></i>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Serviço Concluído = SIM</h6>
+                                                <h4 class="mb-0 fw-bold format-currency">{{ valor_servico_concluido_sim|floatformat:2 }}</h4>
+                                                <small class="text-muted">{{ projecoes_servico_concluido_sim }} projeções ({{ percentual_servico_concluido_sim|floatformat:1 }}% do total)</small>
+                                            </div>
+                                            <i class="fas fa-check-circle fa-2x text-info opacity-25"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Serviço Concluído = NÃO</h6>
+                                                <h4 class="mb-0 fw-bold format-currency">{{ valor_servico_concluido_nao|floatformat:2 }}</h4>
+                                                <small class="text-muted">{{ projecoes_servico_concluido_nao }} projeções ({{ percentual_servico_concluido_nao|floatformat:1 }}% do total)</small>
+                                            </div>
+                                            <i class="fas fa-times-circle fa-2x text-danger opacity-25"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Serviço Concluído = INDEFINIDO</h6>
+                                                <h4 class="mb-0 fw-bold format-currency">{{ valor_servico_concluido_indefinido|floatformat:2 }}</h4>
+                                                <small class="text-muted">{{ projecoes_servico_concluido_indefinido }} projeções ({{ percentual_servico_concluido_indefinido|floatformat:1 }}% do total)</small>
+                                            </div>
+                                            <i class="fas fa-question-circle fa-2x text-warning opacity-25"></i>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    <!-- Caixas extras para Requisições (pronto para receber dados) -->
-                    <div class="col-md-4 col-lg-3">
-                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4" style="border-left-color: #6f42c1 !important;">
-                            <div class="card-body">
-                                <h6 class="text-muted mb-2">—</h6>
-                                <h4 class="mb-0 fw-bold">—</h4>
+                        <!-- Segunda linha: Total de Projeções, Com Número da NF, Impacto no Orçamento -->
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Total de Projeções</h6>
+                                                <h4 class="mb-0 fw-bold">{{ total_projecoes }}</h4>
+                                                <small class="text-muted">Projeções cadastradas</small>
+                                            </div>
+                                            <i class="fas fa-clipboard-list fa-2x text-primary opacity-25"></i>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 col-lg-3">
-                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4" style="border-left-color: #6f42c1 !important;">
-                            <div class="card-body">
-                                <h6 class="text-muted mb-2">—</h6>
-                                <h4 class="mb-0 fw-bold">—</h4>
+                            <div class="col-md-4">
+                                <div class="card stat-card kpi-card kpi-purple shadow-sm border-0 h-100">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Com Número da NF</h6>
+                                                <h4 class="mb-0 fw-bold format-currency">{{ valor_com_numero_nf|floatformat:2 }}</h4>
+                                                <small class="text-muted">{{ projecoes_com_numero_nf }} projeções ({{ percentual_com_numero_nf|floatformat:1 }}% do total)</small>
+                                            </div>
+                                            <i class="fas fa-file-invoice fa-2x opacity-25" style="color: #6f42c1;"></i>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 col-lg-3">
-                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4" style="border-left-color: #6f42c1 !important;">
-                            <div class="card-body">
-                                <h6 class="text-muted mb-2">—</h6>
-                                <h4 class="mb-0 fw-bold">—</h4>
+                            <div class="col-md-4">
+                                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Impacto no Orçamento</h6>
+                                                <h4 class="mb-0 fw-bold">{% if percentual_impacto_orcamento is not None %}{{ percentual_impacto_orcamento|floatformat:1 }}%{% else %}—{% endif %}</h4>
+                                                <small class="text-muted">Projetado sobre orçamento do período{% if valor_orcamento_periodo %} (R$ {{ valor_orcamento_periodo|floatformat:2 }}){% endif %}</small>
+                                            </div>
+                                            <i class="fas fa-percentage fa-2x text-success opacity-25"></i>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Linha 3: Notas Fiscais -->
-        <div class="row mb-5">
-            <div class="col-12">
-                <h5 class="mb-3 text-success">
-                    <i class="fas fa-file-invoice-dollar me-2"></i>Notas Fiscais:
-                </h5>
-            </div>
-            <div class="col-12">
-                <div class="row g-3">
-                    <div class="col-md-4 col-lg-3">
-                        <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-muted mb-2">Valor NF Lançadas</h6>
-                                        <h4 class="mb-0 fw-bold format-currency">{{ valor_total_notas_lancadas|floatformat:2 }}</h4>
-                                        <small class="text-muted">Situação: LANÇADA | Uso: 242</small>
+            <div class="accordion-item border shadow-sm">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapseRequisicoes" aria-expanded="false" aria-controls="collapseRequisicoes" style="color: #6f42c1;">
+                        <i class="fas fa-boxes me-2"></i>Requisições de Almoxarifado
+                    </button>
+                </h2>
+                <div id="collapseRequisicoes" class="accordion-collapse collapse" data-bs-parent="#accordionDetalhesOrcamento">
+                    <div class="accordion-body pt-3 pb-3">
+                        <div class="row g-3">
+                            <div class="col-md-4 col-lg-3">
+                                <div class="card stat-card kpi-card kpi-purple shadow-sm border-0 h-100">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Total Requisições</h6>
+                                                <h4 class="mb-0 fw-bold format-currency">{{ valor_total_requisicoes_filtrado|floatformat:2 }}</h4>
+                                                <small class="text-muted">{{ total_requisicoes }} requisição{{ total_requisicoes|pluralize:"ões" }}</small>
+                                            </div>
+                                            <i class="fas fa-boxes fa-2x opacity-25" style="color: #6f42c1;"></i>
+                                        </div>
                                     </div>
-                                    <i class="fas fa-file-invoice-dollar fa-2x text-success opacity-25"></i>
+                                </div>
+                            </div>
+                            <div class="col-md-4 col-lg-3">
+                                <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4" style="border-left-color: #6f42c1 !important;">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Requisições com Nota Fiscal</h6>
+                                                <h4 class="mb-0 fw-bold format-currency">{{ valor_total_requisicoes_com_nf|floatformat:2 }}</h4>
+                                                <small class="text-muted">{{ total_requisicoes_com_nf }} requisição{{ total_requisicoes_com_nf|pluralize:"ões" }}</small>
+                                            </div>
+                                            <i class="fas fa-file-invoice fa-2x opacity-25" style="color: #6f42c1;"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 col-lg-3">
+                                <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4" style="border-left-color: #6f42c1 !important;">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Requisições sem Nota Fiscal</h6>
+                                                <h4 class="mb-0 fw-bold format-currency">{{ valor_total_requisicoes_sem_nf|floatformat:2 }}</h4>
+                                                <small class="text-muted">{{ total_requisicoes_sem_nf }} requisição{{ total_requisicoes_sem_nf|pluralize:"ões" }}</small>
+                                            </div>
+                                            <i class="fas fa-boxes fa-2x opacity-25" style="color: #6f42c1;"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 col-lg-3">
+                                <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4" style="border-left-color: #6f42c1 !important;">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Requisições sem NF: impacto no orçamento</h6>
+                                                <h4 class="mb-0 fw-bold">{{ percentual_requisicoes_sem_nf_sobre_orcamento|floatformat:1 }}%</h4>
+                                                <small class="text-muted">do orçamento total</small>
+                                            </div>
+                                            <i class="fas fa-percent fa-2x opacity-25" style="color: #6f42c1;"></i>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <!-- Caixas extras para Notas Fiscais (pronto para receber dados) -->
-                    <div class="col-md-4 col-lg-3">
-                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-success">
-                            <div class="card-body">
-                                <h6 class="text-muted mb-2">—</h6>
-                                <h4 class="mb-0 fw-bold">—</h4>
+                </div>
+            </div>
+            <div class="accordion-item border shadow-sm">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNotasFiscais" aria-expanded="false" aria-controls="collapseNotasFiscais" style="color: #198754;">
+                        <i class="fas fa-file-invoice-dollar me-2"></i>Notas Fiscais
+                    </button>
+                </h2>
+                <div id="collapseNotasFiscais" class="accordion-collapse collapse" data-bs-parent="#accordionDetalhesOrcamento">
+                    <div class="accordion-body pt-3 pb-3">
+                        <div class="row g-3">
+                            <div class="col-md-4 col-lg-3">
+                                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Valor NF Lançadas</h6>
+                                                <h4 class="mb-0 fw-bold format-currency">{{ valor_total_notas_lancadas|floatformat:2 }}</h4>
+                                                <small class="text-muted">Situação: LANÇADA | Uso: 242</small>
+                                            </div>
+                                            <i class="fas fa-file-invoice-dollar fa-2x text-success opacity-25"></i>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 col-lg-3">
-                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-success">
-                            <div class="card-body">
-                                <h6 class="text-muted mb-2">—</h6>
-                                <h4 class="mb-0 fw-bold">—</h4>
+                            <div class="col-md-4 col-lg-3">
+                                <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-success">
+                                    <div class="card-body">
+                                        <h6 class="text-muted mb-2">—</h6>
+                                        <h4 class="mb-0 fw-bold">—</h4>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 col-lg-3">
-                        <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-success">
-                            <div class="card-body">
-                                <h6 class="text-muted mb-2">—</h6>
-                                <h4 class="mb-0 fw-bold">—</h4>
+                            <div class="col-md-4 col-lg-3">
+                                <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-success">
+                                    <div class="card-body">
+                                        <h6 class="text-muted mb-2">—</h6>
+                                        <h4 class="mb-0 fw-bold">—</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 col-lg-3">
+                                <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-success">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Valor NF Lançadas: impacto no orçamento</h6>
+                                                <h4 class="mb-0 fw-bold">{{ percentual_notas_lancadas_sobre_orcamento|floatformat:1 }}%</h4>
+                                                <small class="text-muted">do orçamento total</small>
+                                            </div>
+                                            <i class="fas fa-percent fa-2x text-success opacity-25"></i>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

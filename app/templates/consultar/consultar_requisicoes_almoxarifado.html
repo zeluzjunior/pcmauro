@@ -108,11 +108,11 @@
         <div class="accordion mb-4 filter-accordion" id="filterAccordion">
             <div class="accordion-item border-0 bg-transparent">
                 <h2 class="accordion-header" id="headingFilter">
-                    <button class="accordion-button {% if not ano_filtro and not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if ano_filtro or meses_filtro %}true{% else %}false{% endif %}" aria-controls="collapseFilter">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="false" aria-controls="collapseFilter">
                         <i class="fas fa-filter me-2"></i>Filtros de Data
                     </button>
                 </h2>
-                <div id="collapseFilter" class="accordion-collapse collapse {% if ano_filtro or meses_filtro %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
+                <div id="collapseFilter" class="accordion-collapse collapse" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
                     <div class="accordion-body">
                         <form method="GET" class="row g-3 align-items-end" action="{% url 'consultar_requisicoes_almoxarifado' %}">
                             <!-- Preservar busca geral e ordenação -->
@@ -316,7 +316,15 @@
                                                 <input type="text" name="filter_usuario_criou" class="filter-input" value="{{ filter_usuario_criou|default:'' }}" placeholder="Criou">
                                             </th>
                                             <th>
-                                                <input type="text" name="filter_operacao" class="filter-input" value="{{ filter_operacao|default:'' }}" placeholder="Operação">
+                                                <select name="filter_operacao" class="form-select form-select-sm filter-input">
+                                                    <option value="">Todos</option>
+                                                    {% if has_operacao_vazio %}
+                                                    <option value="__VAZIO__" {% if filter_operacao == '__VAZIO__' %}selected{% endif %}>(vazio)</option>
+                                                    {% endif %}
+                                                    {% for op in operacoes_disponiveis %}
+                                                    <option value="{{ op|escape }}" {% if filter_operacao == op %}selected{% endif %}>{{ op }}</option>
+                                                    {% endfor %}
+                                                </select>
                                             </th>
                                             <th class="col-acoes">Ações</th>
                                         </tr>
