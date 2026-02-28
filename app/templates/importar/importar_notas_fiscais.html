@@ -47,11 +47,11 @@
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="onlyNewRecords" name="only_new_records" checked>
                                     <label class="form-check-label" for="onlyNewRecords">
-                                        <strong>Apenas adicionar novos registros</strong> (registros duplicados serão ignorados)
+                                        Apenas adicionar novos registros (duplicados ignorados)
                                     </label>
                                     <div class="form-text">
                                         <i class="fas fa-info-circle me-1"></i>
-                                        Quando marcado, apenas registros que ainda não existem na tabela serão importados. Registros duplicados serão ignorados.
+                                        Padrão: só importa notas novas. <strong>Para atualizar dados existentes, desmarque esta opção e marque a opção abaixo.</strong>
                                     </div>
                                 </div>
                             </div>
@@ -59,11 +59,11 @@
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="updateExisting" name="update_existing">
                                     <label class="form-check-label" for="updateExisting">
-                                        Atualizar registros existentes
+                                        <strong>Atualizar registros existentes</strong>
                                     </label>
                                     <div class="form-text">
                                         <i class="fas fa-info-circle me-1"></i>
-                                        Quando marcado, registros existentes serão atualizados com os dados do arquivo. <strong>Nota:</strong> Se "Apenas adicionar novos registros" estiver marcado, esta opção será ignorada.
+                                        Marque para atualizar notas já importadas (situação, datas, valores, etc.). Identificação: emitente + nota + série + modelo.
                                     </div>
                                 </div>
                             </div>
@@ -156,14 +156,30 @@ window.addEventListener('load', function() {
     const form = document.getElementById('importarForm');
     const submitBtn = document.getElementById('submitBtn');
     const fileInput = document.getElementById('fileInput');
+    const onlyNewRecords = document.getElementById('onlyNewRecords');
+    const updateExisting = document.getElementById('updateExisting');
+    
+    // Ao marcar "Atualizar registros existentes", desmarcar "Apenas adicionar novos"
+    if (updateExisting) {
+        updateExisting.addEventListener('change', function() {
+            if (this.checked && onlyNewRecords) {
+                onlyNewRecords.checked = false;
+            }
+        });
+    }
+    // Ao marcar "Apenas adicionar novos", desmarcar "Atualizar"
+    if (onlyNewRecords) {
+        onlyNewRecords.addEventListener('change', function() {
+            if (this.checked && updateExisting) {
+                updateExisting.checked = false;
+            }
+        });
+    }
     
     if (!form || !submitBtn) {
         console.error('Form ou botão de submit não encontrado!');
         return;
     }
-    
-    console.log('Form encontrado:', form);
-    console.log('Botão de submit encontrado:', submitBtn);
     
     // Remover qualquer listener do main.js que possa estar interferindo
     const newSubmitBtn = submitBtn.cloneNode(true);

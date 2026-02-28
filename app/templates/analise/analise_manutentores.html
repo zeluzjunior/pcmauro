@@ -17,12 +17,27 @@
         height: 400px;
         margin-bottom: 30px;
     }
+    .chart-container-xl {
+        position: relative;
+        height: 450px;
+        margin-bottom: 20px;
+    }
     .stat-card {
-        transition: transform 0.2s;
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
+        height: 100%;
+        min-height: 110px;
     }
     .stat-card:hover {
         transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
     }
+    .stat-card.border-primary { border-left-color: #0d6efd; }
+    .stat-card.border-success { border-left-color: #198754; }
+    .stat-card.border-info { border-left-color: #0dcaf0; }
+    .stat-card.border-warning { border-left-color: #ffc107; }
+    .stat-card.border-danger { border-left-color: #dc3545; }
+    .stat-card.border-secondary { border-left-color: #6c757d; }
     .kpi-card {
         border-left: 4px solid;
     }
@@ -32,6 +47,7 @@
     .kpi-info { border-left-color: #0dcaf0; }
     .kpi-danger { border-left-color: #dc3545; }
     .kpi-purple { border-left-color: #6f42c1; }
+    .kpi-secondary { border-left-color: #6c757d; }
 </style>
 {% endblock %}
 
@@ -58,57 +74,83 @@
 <!-- Main Content -->
 <section class="py-5">
     <div class="container">
-        <!-- KPI Cards -->
-        <div class="row mb-5">
-            <div class="col-md-3 mb-4">
-                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+        <!-- KPI Cards - Classificação por Turno e Local -->
+        <div class="row mb-2">
+            <div class="col-md-2 mb-3 d-flex">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 w-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="text-muted mb-2">Total de Manutentores</h6>
+                                <h6 class="text-muted mb-2">Total</h6>
                                 <h2 class="mb-0 fw-bold">{{ total_count }}</h2>
+                                <small class="text-muted">Manutentores</small>
                             </div>
-                            <i class="bi bi-person-lines-fill fa-3x text-primary opacity-25"></i>
+                            <i class="bi bi-person-lines-fill fa-2x text-primary opacity-25"></i>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
-                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+            <div class="col-md-2 mb-3 d-flex">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 w-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="text-muted mb-2">Últimos 30 Dias</h6>
-                                <h2 class="mb-0 fw-bold">{{ manutentores_recentes }}</h2>
+                                <h6 class="text-muted mb-2">Turno A</h6>
+                                <h2 class="mb-0 fw-bold">{{ turno_a_count }}</h2>
                             </div>
-                            <i class="fas fa-calendar-day fa-3x text-success opacity-25"></i>
+                            <i class="fas fa-sun fa-2x text-primary opacity-25"></i>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
-                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+            <div class="col-md-2 mb-3 d-flex">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 w-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="text-muted mb-2">Mês Atual</h6>
-                                <h2 class="mb-0 fw-bold">{{ manutentores_mes_atual }}</h2>
+                                <h6 class="text-muted mb-2">Turno B</h6>
+                                <h2 class="mb-0 fw-bold">{{ turno_b_count }}</h2>
                             </div>
-                            <i class="fas fa-calendar-alt fa-3x text-warning opacity-25"></i>
+                            <i class="fas fa-moon fa-2x text-success opacity-25"></i>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
-                <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+            <div class="col-md-2 mb-3 d-flex">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 w-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="text-muted mb-2">Com Máquinas</h6>
-                                <h2 class="mb-0 fw-bold">{{ manutentores_com_maquinas }}</h2>
-                                <small class="text-muted">{{ percentual_com_maquinas }}% do total</small>
+                                <h6 class="text-muted mb-2">Turno C</h6>
+                                <h2 class="mb-0 fw-bold">{{ turno_c_count }}</h2>
                             </div>
-                            <i class="fas fa-cogs fa-3x text-info opacity-25"></i>
+                            <i class="fas fa-cloud fa-2x text-info opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 mb-3 d-flex">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 w-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Externa</h6>
+                                <h2 class="mb-0 fw-bold">{{ externa_count }}</h2>
+                            </div>
+                            <i class="fas fa-external-link-alt fa-2x text-warning opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 mb-3 d-flex">
+                <div class="card stat-card kpi-card kpi-secondary shadow-sm border-0 w-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Civil</h6>
+                                <h2 class="mb-0 fw-bold">{{ civil_count }}</h2>
+                            </div>
+                            <i class="fas fa-hard-hat fa-2x text-secondary opacity-25"></i>
                         </div>
                     </div>
                 </div>
@@ -116,41 +158,30 @@
         </div>
 
         <div class="row mb-5">
-            <div class="col-md-4 mb-4">
-                <div class="card stat-card kpi-card kpi-purple shadow-sm border-0">
+            <div class="col-md-6 mb-3 d-flex">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 w-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="text-muted mb-2">Com Manutenções</h6>
-                                <h2 class="mb-0 fw-bold">{{ manutentores_com_manutencoes }}</h2>
+                                <h6 class="text-muted mb-2">Frigorífico</h6>
+                                <h2 class="mb-0 fw-bold">{{ frigorifico_count }}</h2>
+                                <small class="text-muted">manutentores</small>
                             </div>
-                            <i class="fas fa-tools fa-3x text-purple opacity-25"></i>
+                            <i class="fas fa-snowflake fa-3x text-info opacity-25"></i>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4 mb-4">
-                <div class="card stat-card kpi-card kpi-danger shadow-sm border-0">
+            <div class="col-md-6 mb-3 d-flex">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 w-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="text-muted mb-2">Total Máquinas Relacionadas</h6>
-                                <h2 class="mb-0 fw-bold">{{ total_maquinas_relacionadas }}</h2>
+                                <h6 class="text-muted mb-2">Indústria</h6>
+                                <h2 class="mb-0 fw-bold">{{ industria_count }}</h2>
+                                <small class="text-muted">manutentores</small>
                             </div>
-                            <i class="fas fa-industry fa-3x text-danger opacity-25"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4 mb-4">
-                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="text-muted mb-2">Total Manutenções Relacionadas</h6>
-                                <h2 class="mb-0 fw-bold">{{ total_manutencoes_relacionadas }}</h2>
-                            </div>
-                            <i class="fas fa-wrench fa-3x text-success opacity-25"></i>
+                            <i class="fas fa-industry fa-3x text-primary opacity-25"></i>
                         </div>
                     </div>
                 </div>
@@ -192,26 +223,9 @@
             </div>
         </div>
 
-        <!-- Charts Row 2 -->
+        <!-- Distribuição de Máquinas por Manutentor (linha inteira) -->
         <div class="row mb-5">
-            <!-- Gráfico de Linha: Evolução Temporal -->
-            <div class="col-md-8 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-line me-2"></i>Evolução Temporal (Últimos 12 Meses)
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container-large">
-                            <canvas id="temporalChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Gráfico de Doughnut: Distribuição de Máquinas -->
-            <div class="col-md-4 mb-4">
+            <div class="col-12 mb-4">
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-warning text-white">
                         <h5 class="mb-0">
@@ -219,8 +233,36 @@
                         </h5>
                     </div>
                     <div class="card-body">
-                        <div class="chart-container">
-                            <canvas id="distribuicaoMaquinasChart"></canvas>
+                        <div class="row">
+                            <div class="col-lg-8">
+                                <div class="chart-container-xl">
+                                    <canvas id="distribuicaoMaquinasChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="col-lg-4">
+                                <h6 class="text-muted mb-3">Resumo por faixa</h6>
+                                <table class="table table-sm table-striped">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Faixa</th>
+                                            <th class="text-end">Qtd</th>
+                                            <th class="text-end">%</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for label, count in distribuicao_maquinas_zip %}
+                                        <tr>
+                                            <td>{{ label }}</td>
+                                            <td class="text-end">{{ count }}</td>
+                                            <td class="text-end">{% if total_count %}{% widthratio count total_count 100 %}%{% else %}0%{% endif %}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                <p class="small text-muted mb-0 mt-2">
+                                    <strong>Total:</strong> {{ total_count }} manutentores
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -411,40 +453,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Gráfico de Linha: Evolução Temporal
-    const temporalCtx = document.getElementById('temporalChart');
-    if (temporalCtx) {
-        new Chart(temporalCtx, {
-            type: 'line',
-            data: {
-                labels: {{ meses_labels|safe }},
-                datasets: [{
-                    label: 'Manutentores Cadastrados',
-                    data: {{ meses_data|safe }},
-                    borderColor: '#198754',
-                    backgroundColor: 'rgba(25, 135, 84, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: true
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
-            }
-        });
-    }
-
-    // Gráfico de Doughnut: Distribuição de Máquinas
+    // Gráfico de Doughnut: Distribuição de Máquinas (mais granular, 9 faixas)
     const distribuicaoMaquinasCtx = document.getElementById('distribuicaoMaquinasChart');
     if (distribuicaoMaquinasCtx) {
         new Chart(distribuicaoMaquinasCtx, {
@@ -454,9 +463,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 datasets: [{
                     data: {{ distribuicao_maquinas_data|safe }},
                     backgroundColor: [
-                        '#0d6efd', '#198754', '#ffc107', '#dc3545', '#0dcaf0',
-                        '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d'
-                    ]
+                        '#6c757d', '#0d6efd', '#198754', '#ffc107', '#dc3545',
+                        '#0dcaf0', '#6f42c1', '#fd7e14', '#20c997'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
                 }]
             },
             options: {
@@ -464,7 +475,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        position: 'bottom'
+                        position: 'right',
+                        labels: {
+                            padding: 16,
+                            usePointStyle: true
+                        }
                     }
                 }
             }

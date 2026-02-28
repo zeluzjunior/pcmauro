@@ -18,11 +18,19 @@
         margin-bottom: 30px;
     }
     .stat-card {
-        transition: transform 0.2s;
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
     }
     .stat-card:hover {
         transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
     }
+    .stat-card.border-primary { border-left-color: #0d6efd; }
+    .stat-card.border-success { border-left-color: #198754; }
+    .stat-card.border-info { border-left-color: #0dcaf0; }
+    .stat-card.border-warning { border-left-color: #ffc107; }
+    .stat-card.border-danger { border-left-color: #dc3545; }
+    .stat-card.border-secondary { border-left-color: #6c757d; }
     .kpi-card {
         border-left: 4px solid;
     }
@@ -32,6 +40,7 @@
     .kpi-info { border-left-color: #0dcaf0; }
     .kpi-danger { border-left-color: #dc3545; }
     .kpi-purple { border-left-color: #6f42c1; }
+    .text-purple { color: #6f42c1 !important; }
     /* Esconder menu de controle padrão do OrgChart */
     [data-ctrl-menu] {
         display: none !important;
@@ -65,123 +74,143 @@
 
         <!-- KPI Cards -->
         <div class="mb-5">
-            <!-- Primeira linha: 5 cards principais (3+2+2+2+3 = 12 colunas) -->
-            <div class="row mb-4">
-                <div class="col-md-3 col-sm-6 mb-4">
-                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+            <!-- Primeira linha: 5 cards principais -->
+            <div class="row mb-2">
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex flex-column align-items-center text-center">
-                                <i class="fas fa-cogs fa-2x text-primary opacity-75 mb-2"></i>
-                                <h6 class="text-muted mb-2 small">Total de Máquinas</h6>
-                                <h2 class="mb-0 fw-bold">{{ total_count }}</h2>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Total de Máquinas</h6>
+                                    <h2 class="mb-0 fw-bold">{{ total_count }}</h2>
+                                </div>
+                                <i class="fas fa-cogs fa-3x text-primary opacity-25"></i>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-2 col-sm-6 mb-4">
-                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                <div class="col-md-2 col-sm-6 mb-3">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex flex-column align-items-center text-center">
-                                <i class="fas fa-check-circle fa-2x text-success opacity-75 mb-2"></i>
-                                <h6 class="text-muted mb-2 small">Máquinas Ativas</h6>
-                                <h3 class="mb-0 fw-bold">{{ maquinas_ativas }}</h3>
-                                <small class="text-muted">{{ percentual_ativas }}%</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Máquinas Ativas</h6>
+                                    <h2 class="mb-0 fw-bold">{{ maquinas_ativas }}</h2>
+                                    <small class="text-muted">{{ percentual_ativas }}%</small>
+                                </div>
+                                <i class="fas fa-check-circle fa-3x text-success opacity-25"></i>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-2 col-sm-6 mb-4">
-                    <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
+                <div class="col-md-2 col-sm-6 mb-3">
+                    <div class="card stat-card kpi-card kpi-danger shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex flex-column align-items-center text-center">
-                                <i class="fas fa-times-circle fa-2x text-danger opacity-75 mb-2"></i>
-                                <h6 class="text-muted mb-2 small">Máquinas Inativas</h6>
-                                <h3 class="mb-0 fw-bold">{{ maquinas_inativas }}</h3>
-                                <small class="text-muted">{{ percentual_inativas }}%</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Máquinas Inativas</h6>
+                                    <h2 class="mb-0 fw-bold">{{ maquinas_inativas }}</h2>
+                                    <small class="text-muted">{{ percentual_inativas }}%</small>
+                                </div>
+                                <i class="fas fa-times-circle fa-3x text-danger opacity-25"></i>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-2 col-sm-6 mb-4">
-                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                <div class="col-md-2 col-sm-6 mb-3">
+                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex flex-column align-items-center text-center">
-                                <i class="fas fa-calendar-day fa-2x text-warning opacity-75 mb-2"></i>
-                                <h6 class="text-muted mb-2 small">Últimos 30 Dias</h6>
-                                <h3 class="mb-0 fw-bold">{{ maquinas_recentes }}</h3>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Últimos 30 Dias</h6>
+                                    <h2 class="mb-0 fw-bold">{{ maquinas_recentes }}</h2>
+                                </div>
+                                <i class="fas fa-calendar-day fa-3x text-warning opacity-25"></i>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 col-sm-6 mb-4">
-                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex flex-column align-items-center text-center">
-                                <i class="fas fa-calendar-alt fa-2x text-info opacity-75 mb-2"></i>
-                                <h6 class="text-muted mb-2 small">Mês Atual</h6>
-                                <h2 class="mb-0 fw-bold">{{ maquinas_mes_atual }}</h2>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Mês Atual</h6>
+                                    <h2 class="mb-0 fw-bold">{{ maquinas_mes_atual }}</h2>
+                                </div>
+                                <i class="fas fa-calendar-alt fa-3x text-info opacity-25"></i>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Segunda linha: 5 cards complementares (2+3+2+3+2 = 12 colunas) -->
-            <div class="row">
-                <div class="col-md-2 col-sm-6 mb-4">
-                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+            <!-- Segunda linha: 5 cards complementares -->
+            <div class="row mb-5">
+                <div class="col-md-2 col-sm-6 mb-3">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex flex-column align-items-center text-center">
-                                <i class="fas fa-barcode fa-2x text-primary opacity-75 mb-2"></i>
-                                <h6 class="text-muted mb-2 small">Com Patrimônio</h6>
-                                <h3 class="mb-0 fw-bold">{{ maquinas_com_patrimonio }}</h3>
-                                <small class="text-muted">{{ percentual_patrimonio }}%</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com Patrimônio</h6>
+                                    <h2 class="mb-0 fw-bold">{{ maquinas_com_patrimonio }}</h2>
+                                    <small class="text-muted">{{ percentual_patrimonio }}%</small>
+                                </div>
+                                <i class="fas fa-barcode fa-3x text-primary opacity-25"></i>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 col-sm-6 mb-4">
-                    <div class="card stat-card kpi-card kpi-purple shadow-sm border-0 h-100">
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card stat-card kpi-card kpi-purple shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex flex-column align-items-center text-center">
-                                <i class="fas fa-camera fa-2x text-purple opacity-75 mb-2"></i>
-                                <h6 class="text-muted mb-2 small">Com Foto</h6>
-                                <h2 class="mb-0 fw-bold">{{ maquinas_com_foto }}</h2>
-                                <small class="text-muted">{{ percentual_foto }}% do total</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com Foto</h6>
+                                    <h2 class="mb-0 fw-bold">{{ maquinas_com_foto }}</h2>
+                                    <small class="text-muted">{{ percentual_foto }}% do total</small>
+                                </div>
+                                <i class="fas fa-camera fa-3x text-purple opacity-25"></i>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-2 col-sm-6 mb-4">
-                    <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
+                <div class="col-md-2 col-sm-6 mb-3">
+                    <div class="card stat-card kpi-card kpi-danger shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex flex-column align-items-center text-center">
-                                <i class="fas fa-id-card fa-2x text-danger opacity-75 mb-2"></i>
-                                <h6 class="text-muted mb-2 small">Com Placa</h6>
-                                <h3 class="mb-0 fw-bold">{{ maquinas_com_placa }}</h3>
-                                <small class="text-muted">{{ percentual_placa }}%</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com Placa</h6>
+                                    <h2 class="mb-0 fw-bold">{{ maquinas_com_placa }}</h2>
+                                    <small class="text-muted">{{ percentual_placa }}%</small>
+                                </div>
+                                <i class="fas fa-id-card fa-3x text-danger opacity-25"></i>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 col-sm-6 mb-4">
-                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex flex-column align-items-center text-center">
-                                <i class="fas fa-building fa-2x text-success opacity-75 mb-2"></i>
-                                <h6 class="text-muted mb-2 small">Setores Únicos</h6>
-                                <h2 class="mb-0 fw-bold">{{ setores_count }}</h2>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Setores Únicos</h6>
+                                    <h2 class="mb-0 fw-bold">{{ setores_count }}</h2>
+                                </div>
+                                <i class="fas fa-building fa-3x text-success opacity-25"></i>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-2 col-sm-6 mb-4">
-                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                <div class="col-md-2 col-sm-6 mb-3">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
                         <div class="card-body">
-                            <div class="d-flex flex-column align-items-center text-center">
-                                <i class="fas fa-sitemap fa-2x text-info opacity-75 mb-2"></i>
-                                <h6 class="text-muted mb-2 small">Unidades Únicas</h6>
-                                <h3 class="mb-0 fw-bold">{{ unidades_count }}</h3>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Unidades Únicas</h6>
+                                    <h2 class="mb-0 fw-bold">{{ unidades_count }}</h2>
+                                </div>
+                                <i class="fas fa-sitemap fa-3x text-info opacity-25"></i>
                             </div>
                         </div>
                     </div>

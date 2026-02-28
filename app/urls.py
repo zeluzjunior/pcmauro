@@ -1,8 +1,10 @@
 from django.urls import path, include
+from django.views.generic import RedirectView
 from . import views
 
 urlpatterns = [
     path('', views.home, name="home"),
+    path('orcamento/', RedirectView.as_view(pattern_name='analise_geral_orcamento', permanent=False)),
     path('home/', views.home, name="home"),
     path('about/', views.about, name="about"),
     path('em-desenvolvimento/', views.em_desenvolvimento, name="em_desenvolvimento"),
@@ -28,6 +30,9 @@ urlpatterns = [
     path('importar/locais-e-cas/', views.importar_locais_e_cas, name="importar_locais_e_cas"),
     path('importar/estoque/', views.importar_estoque, name="importar_estoque"),
     path('importar/projecao-gastos/', views.importar_projecao_gastos, name="importar_projecao_gastos"),
+
+    # Exportar Dados
+    path('exportar/maquinas/', views.exportar_maquinas, name="exportar_maquinas"),
     
     # Ajuste Relatórios SIGA
     path('ajuste-relatorios-siga/relatorio-nf-estf0198/', views.relatorio_nf_estf0198, name="relatorio_nf_estf0198"),

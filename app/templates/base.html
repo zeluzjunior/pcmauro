@@ -259,6 +259,7 @@
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="utilidadesDropdown">
                             <li><a class="dropdown-item" href="#" data-sidebar-toggle="importar-collapse"><i class="fas fa-upload me-2"></i>Importar Dados</a></li>
+                            <li><a class="dropdown-item" href="#" data-sidebar-toggle="exportar-collapse"><i class="fas fa-download me-2"></i>Exportar Dados</a></li>
                             <li><a class="dropdown-item" href="#" data-sidebar-toggle="ajuda-collapse"><i class="fas fa-question-circle me-2"></i>Ajuda</a></li>
                         </ul>
                     </li>
@@ -590,8 +591,9 @@
                                         <i class="fas fa-chart-line"></i>
                                         Notas Fiscais
                                     </button>
-                                    <div class="collapse" id="orcamento-notas-fiscais-collapse">
+                                        <div class="collapse" id="orcamento-notas-fiscais-collapse">
                                         <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
+                                            <li><a href="{% url 'importar_notas_fiscais' %}" class="link-dark rounded"><i class="fas fa-upload me-2"></i>Importar/Atualizar Notas Fiscais</a></li>
                                              <li><a href="{% url 'analise_notas_fiscais' %}" class="link-dark rounded"><i class="fas fa-chart-pie me-2"></i>Análise de Notas Fiscais</a></li>
                                             <li><a href="{% url 'consultar_notas_fiscais' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Notas Fiscais</a></li>
                                         </ul>
@@ -723,6 +725,19 @@
                                     <li><a href="{% url 'importar_notas_fiscais' %}" class="link-dark rounded"><i class="bi bi-receipt me-2"></i>Notas Fiscais</a></li>
                                     <li><a href="{% url 'importar_controle_nf_e_rc' %}" class="link-dark rounded"><i class="bi bi-table me-2"></i>Planilha de Controle RC e NF</a></li>
                                     <li><a href="{% url 'importar_paradas_maquina' %}" class="link-dark rounded"><i class="bi bi-stop-circle me-2"></i>Paradas de Máquina</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
+                        <!-- Exportar Dados -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#exportar-collapse" aria-expanded="false">
+                                <i class="bi bi-download me-2"></i>
+                                <span class="btn-toggle-text">Exportar Dados</span>
+                            </button>
+                            <div class="collapse" id="exportar-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'exportar_maquinas' %}" class="link-dark rounded"><i class="bi bi-gear me-2"></i>Máquinas</a></li>
                                 </ul>
                             </div>
                         </li>

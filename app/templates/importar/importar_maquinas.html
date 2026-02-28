@@ -44,26 +44,23 @@
                                 <div class="form-text">Formatos aceitos: Excel (.xlsx, .xls, .xlsm) ou CSV (.csv)</div>
                             </div>
                             <div class="mb-3">
+                                <label class="form-label fw-bold">O que fazer com máquinas que já existem no sistema?</label>
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="onlyNewRecords" name="only_new_records" checked>
                                     <label class="form-check-label" for="onlyNewRecords">
-                                        <strong>Apenas adicionar novos registros</strong> (registros duplicados serão ignorados)
+                                        <strong>Apenas adicionar novas</strong> — ignorar duplicados (código já cadastrado)
                                     </label>
-                                    <div class="form-text">
-                                        <i class="fas fa-info-circle me-1"></i>
-                                        Quando marcado, apenas máquinas que ainda não existem na tabela serão importadas. Máquinas com código já cadastrado serão ignoradas.
+                                    <div class="form-text ms-4">
+                                        Máquinas com código já cadastrado serão ignoradas. Dados editados manualmente no sistema são preservados.
                                     </div>
                                 </div>
-                            </div>
-                            <div class="mb-3">
-                                <div class="form-check">
+                                <div class="form-check mt-2">
                                     <input class="form-check-input" type="checkbox" id="updateExisting" name="update_existing">
                                     <label class="form-check-label" for="updateExisting">
-                                        Atualizar registros existentes
+                                        <strong>Atualizar existentes</strong> — sobrescrever com dados do arquivo
                                     </label>
-                                    <div class="form-text">
-                                        <i class="fas fa-info-circle me-1"></i>
-                                        Quando marcado, máquinas existentes serão atualizadas com os dados do arquivo. <strong>Nota:</strong> Se "Apenas adicionar novos registros" estiver marcado, esta opção será ignorada.
+                                    <div class="form-text ms-4">
+                                        Permite escolher <em>quais campos</em> serão atualizados. Campos não marcados mantêm os valores atuais (preserva edições manuais).
                                     </div>
                                 </div>
                             </div>
@@ -73,9 +70,9 @@
                                 <div class="card border-primary">
                                     <div class="card-header bg-light">
                                         <h6 class="mb-0">
-                                            <i class="fas fa-check-square me-2"></i>Selecionar Campos para Atualização
+                                            <i class="fas fa-check-square me-2"></i>Quais campos atualizar?
                                         </h6>
-                                        <small class="text-muted">Marque os campos que deseja atualizar. Campos não marcados manterão os valores atuais no banco de dados.</small>
+                                        <small class="text-muted d-block mt-1">Marque apenas os campos que deseja sobrescrever. <strong>Campos desmarcados = manter valores atuais no banco</strong> (incluindo edições feitas no sistema).</small>
                                     </div>
                                     <div class="card-body">
                                         <div class="row">
@@ -149,9 +146,10 @@
                                                     </label>
                                                 </div>
                                                 <div class="form-check mb-2">
-                                                    <input class="form-check-input field-checkbox" type="checkbox" id="update_descr_gerenc" name="update_fields" value="descr_gerenc" checked>
+                                                    <input class="form-check-input field-checkbox" type="checkbox" id="update_descr_gerenc" name="update_fields" value="descr_gerenc">
                                                     <label class="form-check-label" for="update_descr_gerenc">
                                                         Descrição Gerência (DESCR_GERENC)
+                                                        <span class="badge bg-warning text-dark ms-1" title="Frequentemente editado manualmente">manual</span>
                                                     </label>
                                                 </div>
                                             </div>
@@ -162,6 +160,9 @@
                                             </button>
                                             <button type="button" class="btn btn-sm btn-outline-secondary" id="deselectAllFields">
                                                 <i class="fas fa-times me-1"></i>Desmarcar Todos
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-warning" id="preserveManualFields" title="Desmarca campos frequentemente editados manualmente (ex: Descrição Gerência)">
+                                                <i class="fas fa-hand-paper me-1"></i>Preservar Edições Manuais
                                             </button>
                                         </div>
                                     </div>
@@ -376,6 +377,17 @@ window.addEventListener('load', function() {
         deselectAllBtn.addEventListener('click', function() {
             fieldCheckboxes.forEach(function(checkbox) {
                 checkbox.checked = false;
+            });
+        });
+    }
+
+    // Botão "Preservar Edições Manuais" - desmarca campos frequentemente editados
+    const preserveManualBtn = document.getElementById('preserveManualFields');
+    const manualEditFields = ['descr_gerenc', 'descr_setormanut', 'descr_maquina'];
+    if (preserveManualBtn && fieldCheckboxes.length > 0) {
+        preserveManualBtn.addEventListener('click', function() {
+            fieldCheckboxes.forEach(function(checkbox) {
+                checkbox.checked = !manualEditFields.includes(checkbox.value);
             });
         });
     }

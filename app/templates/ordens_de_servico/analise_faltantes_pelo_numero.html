@@ -76,11 +76,6 @@
         background: linear-gradient(90deg, #dc3545 0%, #c82333 100%);
     }
     
-    .progress-ring {
-        width: 120px;
-        height: 120px;
-    }
-    
     .summary-box {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
@@ -100,6 +95,51 @@
         font-size: 1.1rem;
         opacity: 0.9;
     }
+
+    /* Circular progress ring for % Completo */
+    .progress-ring-cell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .progress-ring {
+        width: 56px;
+        height: 56px;
+        position: relative;
+    }
+    .progress-ring svg {
+        transform: rotate(-90deg);
+    }
+    .progress-ring circle {
+        fill: none;
+        stroke-width: 6;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.5s ease, stroke 0.3s ease;
+    }
+    .progress-ring .bg {
+        stroke: #e9ecef;
+    }
+    .progress-ring .fill {
+        stroke-dasharray: 141.4;
+        stroke-dashoffset: 141.4;
+    }
+    .progress-ring.ring-success .fill { stroke: #198754; }
+    .progress-ring.ring-info .fill { stroke: #0dcaf0; }
+    .progress-ring.ring-warning .fill { stroke: #ffc107; }
+    .progress-ring.ring-danger .fill { stroke: #dc3545; }
+    .progress-ring-value {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-weight: 700;
+        font-size: 0.75rem;
+        line-height: 1;
+    }
+    .progress-ring.ring-success .progress-ring-value { color: #198754; }
+    .progress-ring.ring-info .progress-ring-value { color: #0dcaf0; }
+    .progress-ring.ring-warning .progress-ring-value { color: #856404; }
+    .progress-ring.ring-danger .progress-ring-value { color: #dc3545; }
 </style>
 {% endblock %}
 
@@ -263,42 +303,40 @@
                                     <span class="badge bg-danger fs-6 px-3 py-2">{{ intervalo.faltantes }}</span>
                                 </td>
                                 <td class="text-center">
-                                    <div class="d-flex align-items-center justify-content-center">
-                                        <div class="progress" style="height: 30px; width: 100%; max-width: 200px; position: relative; border-radius: 15px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                            {% if intervalo.percentual_completo >= 99 %}
-                                                <div class="progress-bar bg-success" role="progressbar" 
-                                                     style="width: {{ intervalo.percentual_completo }}%; background: linear-gradient(90deg, #198754 0%, #20c997 100%) !important; transition: width 0.6s ease;" 
-                                                     aria-valuenow="{{ intervalo.percentual_completo }}" 
-                                                     aria-valuemin="0" 
-                                                     aria-valuemax="100">
-                                                    <strong style="color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); font-size: 0.9rem;">{{ intervalo.percentual_completo }}%</strong>
-                                                </div>
-                                            {% elif intervalo.percentual_completo >= 95 %}
-                                                <div class="progress-bar bg-info" role="progressbar" 
-                                                     style="width: {{ intervalo.percentual_completo }}%; background: linear-gradient(90deg, #0dcaf0 0%, #0aa2c0 100%) !important; transition: width 0.6s ease;" 
-                                                     aria-valuenow="{{ intervalo.percentual_completo }}" 
-                                                     aria-valuemin="0" 
-                                                     aria-valuemax="100">
-                                                    <strong style="color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); font-size: 0.9rem;">{{ intervalo.percentual_completo }}%</strong>
-                                                </div>
-                                            {% elif intervalo.percentual_completo >= 90 %}
-                                                <div class="progress-bar bg-warning" role="progressbar" 
-                                                     style="width: {{ intervalo.percentual_completo }}%; background: linear-gradient(90deg, #ffc107 0%, #ff9800 100%) !important; transition: width 0.6s ease;" 
-                                                     aria-valuenow="{{ intervalo.percentual_completo }}" 
-                                                     aria-valuemin="0" 
-                                                     aria-valuemax="100">
-                                                    <strong style="color: #333; text-shadow: 1px 1px 2px rgba(255,255,255,0.5); font-size: 0.9rem;">{{ intervalo.percentual_completo }}%</strong>
-                                                </div>
-                                            {% else %}
-                                                <div class="progress-bar bg-danger" role="progressbar" 
-                                                     style="width: {{ intervalo.percentual_completo }}%; background: linear-gradient(90deg, #dc3545 0%, #c82333 100%) !important; transition: width 0.6s ease;" 
-                                                     aria-valuenow="{{ intervalo.percentual_completo }}" 
-                                                     aria-valuemin="0" 
-                                                     aria-valuemax="100">
-                                                    <strong style="color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); font-size: 0.9rem;">{{ intervalo.percentual_completo }}%</strong>
-                                                </div>
-                                            {% endif %}
-                                        </div>
+                                    <div class="progress-ring-cell">
+                                        {% if intervalo.percentual_completo >= 99 %}
+                                            <div class="progress-ring ring-success" role="progressbar" aria-valuenow="{{ intervalo.percentual_completo }}" aria-valuemin="0" aria-valuemax="100">
+                                                <svg width="56" height="56" viewBox="0 0 56 56">
+                                                    <circle class="bg" cx="28" cy="28" r="22.5"/>
+                                                    <circle class="fill" cx="28" cy="28" r="22.5" data-pct="{{ intervalo.percentual_completo }}"/>
+                                                </svg>
+                                                <span class="progress-ring-value">{{ intervalo.percentual_completo }}%</span>
+                                            </div>
+                                        {% elif intervalo.percentual_completo >= 95 %}
+                                            <div class="progress-ring ring-info" role="progressbar" aria-valuenow="{{ intervalo.percentual_completo }}" aria-valuemin="0" aria-valuemax="100">
+                                                <svg width="56" height="56" viewBox="0 0 56 56">
+                                                    <circle class="bg" cx="28" cy="28" r="22.5"/>
+                                                    <circle class="fill" cx="28" cy="28" r="22.5" data-pct="{{ intervalo.percentual_completo }}"/>
+                                                </svg>
+                                                <span class="progress-ring-value">{{ intervalo.percentual_completo }}%</span>
+                                            </div>
+                                        {% elif intervalo.percentual_completo >= 90 %}
+                                            <div class="progress-ring ring-warning" role="progressbar" aria-valuenow="{{ intervalo.percentual_completo }}" aria-valuemin="0" aria-valuemax="100">
+                                                <svg width="56" height="56" viewBox="0 0 56 56">
+                                                    <circle class="bg" cx="28" cy="28" r="22.5"/>
+                                                    <circle class="fill" cx="28" cy="28" r="22.5" data-pct="{{ intervalo.percentual_completo }}"/>
+                                                </svg>
+                                                <span class="progress-ring-value">{{ intervalo.percentual_completo }}%</span>
+                                            </div>
+                                        {% else %}
+                                            <div class="progress-ring ring-danger" role="progressbar" aria-valuenow="{{ intervalo.percentual_completo }}" aria-valuemin="0" aria-valuemax="100">
+                                                <svg width="56" height="56" viewBox="0 0 56 56">
+                                                    <circle class="bg" cx="28" cy="28" r="22.5"/>
+                                                    <circle class="fill" cx="28" cy="28" r="22.5" data-pct="{{ intervalo.percentual_completo }}"/>
+                                                </svg>
+                                                <span class="progress-ring-value">{{ intervalo.percentual_completo }}%</span>
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 </td>
                                 <td class="text-center">
@@ -388,6 +426,19 @@
         </div>
     </div>
 </section>
+
+<!-- Progress ring initialization -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const circumference = 2 * Math.PI * 22.5;
+    document.querySelectorAll('.progress-ring .fill[data-pct]').forEach(function(el) {
+        const pct = parseFloat(el.getAttribute('data-pct')) || 0;
+        const offset = circumference * (1 - pct / 100);
+        el.style.strokeDasharray = circumference;
+        el.style.strokeDashoffset = offset;
+    });
+});
+</script>
 
 <!-- Chart.js Scripts -->
 {% if total_faltantes > 0 %}

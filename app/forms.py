@@ -138,6 +138,7 @@ class MaquinaForm(forms.ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        gerenc_choices = kwargs.pop('gerenc_choices', None)
         super().__init__(*args, **kwargs)
         # Torna cd_maquina obrigatório
         self.fields['cd_maquina'].required = True
@@ -147,7 +148,24 @@ class MaquinaForm(forms.ModelForm):
         self.fields['arquivo_pdf'].required = False
         self.fields['diagrama_eletrico'].required = False
         self.fields['pecas_reposicao'].required = False
-        
+
+        # Descrição Gerência: usar select com opções do DB quando gerenc_choices for passado
+        if gerenc_choices is not None:
+            choices = [('', '-- Selecione ou deixe em branco --')]
+            existing = {g for g in gerenc_choices if g}
+            choices.extend([(g, g) for g in sorted(existing)])
+            # Incluir valor atual da máquina se não estiver nas opções (ex: valor customizado)
+            if self.instance and self.instance.pk and self.instance.descr_gerenc:
+                current = self.instance.descr_gerenc.strip()
+                if current and current not in existing:
+                    choices.append((current, f'{current} (atual)'))
+            self.fields['descr_gerenc'] = forms.ChoiceField(
+                label='Descrição Gerência',
+                choices=choices,
+                required=False,
+                widget=forms.Select(attrs={'class': 'form-control'})
+            )
+
         # Filtrar CentroAtividade baseado no cd_setormanut
         # Assumindo que cd_setormanut corresponde ao ca do CentroAtividade
         if self.instance and self.instance.pk and self.instance.cd_setormanut:

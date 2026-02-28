@@ -3522,44 +3522,39 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
                         with open(file, 'r', encoding=encoding) as f:
                             content = f.read()
                     
-                    # Ler CSV manualmente para tratar colunas duplicadas (ex: duas colunas "Situação")
-                    lines = content.strip().split('\n')
-                    if not lines:
+                    # Ler CSV com csv.reader para suportar campos entre aspas (com ; dentro)
+                    import csv
+                    import io
+                    import unicodedata
+                    reader = csv.reader(io.StringIO(content), delimiter=';')
+                    rows = list(reader)
+                    if not rows:
                         raise ValidationError("Arquivo CSV vazio")
                     
-                    # Ler cabeçalho e tratar duplicatas
-                    header_line = lines[0]
-                    headers_raw = [h.strip() for h in header_line.split(';')]
-                    
-                    # Criar headers únicos para colunas duplicadas
-                    headers = []
+                    headers_raw = [h.strip() for h in rows[0]]
                     header_count = {}
+                    headers = []
                     for header in headers_raw:
                         header_lower = header.lower()
-                        # Normalizar para comparar (remover acentos e case)
-                        import unicodedata
                         header_normalized = unicodedata.normalize('NFKD', header_lower).encode('ASCII', 'ignore').decode('ASCII')
                         if header_normalized in header_count:
                             header_count[header_normalized] += 1
-                            # Para a segunda ocorrência de "Situação", usar "Situação_2"
                             headers.append(f"{header}_{header_count[header_normalized]}")
                         else:
-                            header_count[header_normalized] = 0
+                            header_count[header_normalized] = 1
                             headers.append(header)
                     
-                    # Ler dados
                     data = []
-                    for line_num, line in enumerate(lines[1:], start=2):
-                        if not line.strip():
+                    for line_num, values in enumerate(rows[1:], start=2):
+                        if not values or not any(str(v).strip() for v in values):
                             continue
-                        values = [v.strip() for v in line.split(';')]
                         row_dict = {}
                         for idx, value in enumerate(values):
                             if idx < len(headers):
-                                header = headers[idx]
-                                if value:
-                                    row_dict[header] = value
-                        if row_dict:  # Adicionar apenas se não estiver vazio
+                                v = value.strip() if value else ''
+                                if v:
+                                    row_dict[headers[idx]] = v
+                        if row_dict:
                             data.append(row_dict)
                     
                     break  # Se conseguir ler, sair do loop
@@ -3646,28 +3641,49 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
                     )
                     
                     # Situação detalhada - segunda coluna (ex: "Solicitação autorizada por: ...")
+                    # Nota: duplicatas são nomeadas como Situação_1, Situação_2, etc.
                     situacao_detalhada = _safe_str(
-                        row_data.get('Situação_2') or  # Segunda ocorrência quando há duplicatas
-                        row_data.get('situação_2') or
-                        row_data.get('SITUAÇÃO_2') or
-                        row_data.get('Situacao_2') or
-                        row_data.get('SITUACAO_2')
+                        row_data.get('Situação_2') or row_data.get('Situação_1') or
+                        row_data.get('situação_2') or row_data.get('situação_1') or
+                        row_data.get('SITUAÇÃO_2') or row_data.get('SITUAÇÃO_1') or
+                        row_data.get('Situacao_2') or row_data.get('Situacao_1') or
+                        row_data.get('SITUACAO_2') or row_data.get('SITUACAO_1')
                     )
                     
-                    # UsuÃ¡rio e AutorizaÃ§Ã£o
-                    nome_usuario = _safe_str(row_data.get('Nome usuÃ¡rio') or row_data.get('nome usuÃ¡rio') or row_data.get('NOME USUÃRIO') or row_data.get('Nome usuario') or row_data.get('NOME USUARIO'), max_length=255)
+                    # Usuário e Autorização (suporta encoding latin-1 e utf-8)
+                    nome_usuario = _safe_str(
+                        row_data.get('Nome usuário') or row_data.get('Nome usuÃ¡rio') or
+                        row_data.get('nome usuário') or row_data.get('Nome usuario') or
+                        row_data.get('NOME USUARIO'), max_length=255
+                    )
                     autorizador = _safe_str(row_data.get('Autorizador') or row_data.get('autorizador') or row_data.get('AUTORIZADOR'), max_length=255)
                     
-                    # ObservaÃ§Ãµes
-                    observacoes = _safe_str(row_data.get('ObservaÃ§Ãµes') or row_data.get('observaÃ§Ãµes') or row_data.get('OBSERVAÃ‡Ã•ES') or row_data.get('Observacoes') or row_data.get('OBSERVACOES'))
-                    observacoes_csc = _safe_str(row_data.get('ObservaÃ§Ãµes CSC') or row_data.get('observaÃ§Ãµes csc') or row_data.get('OBSERVAÃ‡Ã•ES CSC') or row_data.get('Observacoes CSC') or row_data.get('OBSERVACOES CSC'))
-                    observacoes_autorizacao = _safe_str(row_data.get('ObservaÃ§Ãµes autorizaÃ§Ã£o') or row_data.get('observaÃ§Ãµes autorizaÃ§Ã£o') or row_data.get('OBSERVAÃ‡Ã•ES AUTORIZAÃ‡ÃƒO') or row_data.get('Observacoes autorizacao') or row_data.get('OBSERVACOES AUTORIZACAO'))
+                    # Observações (suporta encoding latin-1 e utf-8)
+                    observacoes = _safe_str(
+                        row_data.get('Observações') or row_data.get('ObservaÃ§Ãµes') or
+                        row_data.get('observações') or row_data.get('Observacoes') or
+                        row_data.get('OBSERVACOES')
+                    )
+                    observacoes_csc = _safe_str(
+                        row_data.get('Observações CSC') or row_data.get('ObservaÃ§Ãµes CSC') or
+                        row_data.get('observações csc') or row_data.get('Observacoes CSC') or
+                        row_data.get('OBSERVACOES CSC')
+                    )
+                    observacoes_autorizacao = _safe_str(
+                        row_data.get('Observações autorização') or row_data.get('ObservaÃ§Ãµes autorizaÃ§Ã£o') or
+                        row_data.get('observações autorização') or row_data.get('Observacoes autorizacao') or
+                        row_data.get('OBSERVACOES AUTORIZACAO')
+                    )
                     
                     # LanÃ§amento
                     lancamento_tesf0028 = _safe_str(row_data.get('LANCAMENTO TESF0028') or row_data.get('lancamento tesf0028') or row_data.get('Lancamento TESF0028'), max_length=255)
                     
                     # Uso Contábil - extrair apenas parte inteira (242,00 -> 242)
-                    uso_contabil_raw = row_data.get('Uso contábil') or row_data.get('uso contábil') or row_data.get('USO CONTÁBIL') or row_data.get('Uso contabil') or row_data.get('USO CONTABIL') or row_data.get('uso contabil')
+                    uso_contabil_raw = (
+                        row_data.get('Uso contábil') or row_data.get('Uso contabil') or
+                        row_data.get('uso contábil') or row_data.get('uso contabil') or
+                        row_data.get('USO CONTÁBIL') or row_data.get('USO CONTABIL')
+                    )
                     uso_contabil = _safe_uso_contabil(uso_contabil_raw, default='')
                     
                     # Preparar dados para criaÃ§Ã£o/atualizaÃ§Ã£o
@@ -3701,28 +3717,64 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
                         'lancamento_tesf0028': lancamento_tesf0028,
                     }
                     
-                    # Criar ou atualizar registro
-                    if update_existing:
-                        nota_obj, created = NotaFiscal.objects.update_or_create(
-                            emitente=emitente,
-                            nota=nota,
-                            serie=serie or '',
-                            modelo=modelo or '',
-                            defaults=nota_data
-                        )
-                        if created:
-                            created_count += 1
-                        else:
-                            updated_count += 1
+                    # Normalizar serie/modelo vazios para '' (consistência com unique_together)
+                    serie_norm = (serie or '').strip()
+                    modelo_norm = (modelo or '').strip()
+                    
+                    # Lookup considera NULL e '' como equivalentes (registros antigos podem ter NULL)
+                    from django.db.models import Q
+                    lookup = Q(emitente=emitente, nota=nota)
+                    if serie_norm:
+                        lookup &= Q(serie=serie_norm)
                     else:
-                        nota_obj, created = NotaFiscal.objects.get_or_create(
-                            emitente=emitente,
-                            nota=nota,
-                            serie=serie or '',
-                            modelo=modelo or '',
-                            defaults=nota_data
-                        )
-                        if created:
+                        lookup &= (Q(serie='') | Q(serie__isnull=True))
+                    if modelo_norm:
+                        lookup &= Q(modelo=modelo_norm)
+                    else:
+                        lookup &= (Q(modelo='') | Q(modelo__isnull=True))
+                    
+                    if update_existing:
+                        nota_obj = None
+                        # Priorizar registro com serie/modelo vazios (legado) para evitar duplicatas
+                        # Ex: NF 20100 METALURGICA BALENA - BD tem (emitente, nota, '', '') e (emitente, nota, 'S', '99')
+                        if serie_norm or modelo_norm:
+                            lookup_fallback = Q(emitente=emitente, nota=nota) & (
+                                Q(serie='') | Q(serie__isnull=True)
+                            ) & (Q(modelo='') | Q(modelo__isnull=True))
+                            candidates = list(NotaFiscal.objects.filter(lookup_fallback))
+                            if len(candidates) == 1:
+                                nota_obj = candidates[0]
+                                # Remover duplicata com serie/modelo do CSV para evitar unique_together ao salvar
+                                dup_lookup = Q(emitente=emitente, nota=nota)
+                                if serie_norm:
+                                    dup_lookup &= Q(serie=serie_norm)
+                                else:
+                                    dup_lookup &= (Q(serie='') | Q(serie__isnull=True))
+                                if modelo_norm:
+                                    dup_lookup &= Q(modelo=modelo_norm)
+                                else:
+                                    dup_lookup &= (Q(modelo='') | Q(modelo__isnull=True))
+                                NotaFiscal.objects.filter(dup_lookup).exclude(id=nota_obj.id).delete()
+                        if nota_obj is None:
+                            try:
+                                nota_obj = NotaFiscal.objects.get(lookup)
+                            except NotaFiscal.DoesNotExist:
+                                pass
+                            except NotaFiscal.MultipleObjectsReturned:
+                                nota_obj = NotaFiscal.objects.filter(lookup).first()
+                        if nota_obj:
+                            for key, val in nota_data.items():
+                                setattr(nota_obj, key, val)
+                            nota_obj.save()
+                            updated_count += 1
+                        else:
+                            nota_obj = NotaFiscal.objects.create(**nota_data)
+                            created_count += 1
+                    else:
+                        if NotaFiscal.objects.filter(lookup).exists():
+                            pass  # Já existe - ignorar
+                        else:
+                            NotaFiscal.objects.create(**nota_data)
                             created_count += 1
                     
                 except Exception as e:

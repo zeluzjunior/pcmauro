@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Exportar Máquinas{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Exportar Dados</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Exportar Máquinas</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-download me-2"></i>Exportar Máquinas
+                </h1>
+                <p class="lead">Exporte dados de máquinas para arquivo Excel ou CSV</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <div class="row mb-5">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-export me-2"></i>Exportar Dados
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-4">
+                            Selecione o formato desejado e clique no botão para baixar o arquivo com os dados das máquinas cadastradas no sistema.
+                        </p>
+                        <form method="get" action="{% url 'exportar_maquinas' %}" id="exportarForm">
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Formato do arquivo</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="formato" id="formatoExcel" value="xlsx" checked>
+                                    <label class="form-check-label" for="formatoExcel">
+                                        <i class="fas fa-file-excel me-1 text-success"></i>Excel (.xlsx)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="formato" id="formatoCsv" value="csv">
+                                    <label class="form-check-label" for="formatoCsv">
+                                        <i class="fas fa-file-csv me-1 text-info"></i>CSV (.csv)
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-success btn-lg" name="download" value="1">
+                                    <i class="fas fa-download me-2"></i>Exportar e Baixar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Informações
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-0 text-muted">
+                            O arquivo exportado conterá todas as máquinas ativas cadastradas no sistema, incluindo campos como código, descrição, setor, unidade, patrimônio e descrição de gerência.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show mt-3" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

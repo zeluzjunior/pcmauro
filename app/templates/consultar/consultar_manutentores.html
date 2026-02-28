@@ -5,6 +5,28 @@
 
 {% block extra_css %}
 <style>
+    .stat-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .stat-card.border-primary { border-left-color: #0d6efd; }
+    .stat-card.border-success { border-left-color: #198754; }
+    .stat-card.border-info { border-left-color: #0dcaf0; }
+    .stat-card.border-warning { border-left-color: #ffc107; }
+    .stat-card.border-danger { border-left-color: #dc3545; }
+    .stat-card.border-secondary { border-left-color: #6c757d; }
+    .kpi-card {
+        border-left: 4px solid;
+    }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
     .table-container {
         max-height: 600px;
         overflow-y: auto;
@@ -34,6 +56,58 @@
     .filter-row th {
         background-color: #e9ecef;
         padding: 4px 8px !important;
+    }
+    /* Colunas centralizadas (exceto Nome - col 2) */
+    #manutentoresTable thead th:nth-child(1),
+    #manutentoresTable thead th:nth-child(3),
+    #manutentoresTable thead th:nth-child(4),
+    #manutentoresTable thead th:nth-child(5),
+    #manutentoresTable thead th:nth-child(6),
+    #manutentoresTable thead th:nth-child(7),
+    #manutentoresTable thead th:nth-child(8),
+    #manutentoresTable tbody td:nth-child(1),
+    #manutentoresTable tbody td:nth-child(3),
+    #manutentoresTable tbody td:nth-child(4),
+    #manutentoresTable tbody td:nth-child(5),
+    #manutentoresTable tbody td:nth-child(6),
+    #manutentoresTable tbody td:nth-child(7),
+    #manutentoresTable tbody td:nth-child(8) {
+        text-align: center;
+        vertical-align: middle;
+    }
+    /* Botões de ação - visual compacto */
+    .btn-action {
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+    }
+    .btn-action:hover {
+        transform: translateY(-2px);
+    }
+    .btn-action.btn-view {
+        background: rgba(13, 110, 253, 0.1);
+        color: #0d6efd;
+        border: 1px solid rgba(13, 110, 253, 0.3);
+    }
+    .btn-action.btn-view:hover {
+        background: #0d6efd;
+        color: white;
+        border-color: #0d6efd;
+    }
+    .btn-action.btn-edit {
+        background: rgba(255, 193, 7, 0.15);
+        color: #856404;
+        border: 1px solid rgba(255, 193, 7, 0.4);
+    }
+    .btn-action.btn-edit:hover {
+        background: #ffc107;
+        color: #212529;
+        border-color: #ffc107;
     }
 </style>
 {% endblock %}
@@ -168,36 +242,60 @@
         </div>
 
         <!-- Statistics -->
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white">
+        <div class="row mb-2">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
                     <div class="card-body">
-                        <h5 class="card-title">Total</h5>
-                        <p class="card-text display-6">{{ total_count }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_count }}</h2>
+                                <small class="text-muted">Manutentores cadastrados</small>
+                            </div>
+                            <i class="fas fa-users fa-3x text-primary opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card bg-info text-white">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
                     <div class="card-body">
-                        <h5 class="card-title">Mostrando</h5>
-                        <p class="card-text display-6">{{ manutentores|length }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Mostrando</h6>
+                                <h2 class="mb-0 fw-bold">{{ manutentores|length }}</h2>
+                                <small class="text-muted">Nesta página</small>
+                            </div>
+                            <i class="fas fa-list fa-3x text-info opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card bg-success text-white">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
                     <div class="card-body">
-                        <h5 class="card-title">Tipos</h5>
-                        <p class="card-text display-6">{{ tipos_count }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Tipos</h6>
+                                <h2 class="mb-0 fw-bold">{{ tipos_count }}</h2>
+                                <small class="text-muted">Tipos distintos</small>
+                            </div>
+                            <i class="fas fa-tags fa-3x text-success opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card bg-warning text-white">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
                     <div class="card-body">
-                        <h5 class="card-title">Turnos</h5>
-                        <p class="card-text display-6">{{ turnos_count }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Turnos</h6>
+                                <h2 class="mb-0 fw-bold">{{ turnos_count }}</h2>
+                                <small class="text-muted">Turnos distintos</small>
+                            </div>
+                            <i class="fas fa-clock fa-3x text-warning opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -218,7 +316,6 @@
                                 <th>Cadastro</th>
                                 <th>Nome</th>
                                 <th>Cargo</th>
-                                <th>Posto</th>
                                 <th>Tipo</th>
                                 <th>Turno</th>
                                 <th>Local de Trabalho</th>
@@ -236,19 +333,16 @@
                                     <input type="text" class="filter-input" placeholder="Filtrar Cargo..." data-column="2">
                                 </th>
                                 <th class="filter-header">
-                                    <input type="text" class="filter-input" placeholder="Filtrar Posto..." data-column="3">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Tipo..." data-column="3">
                                 </th>
                                 <th class="filter-header">
-                                    <input type="text" class="filter-input" placeholder="Filtrar Tipo..." data-column="4">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Turno..." data-column="4">
                                 </th>
                                 <th class="filter-header">
-                                    <input type="text" class="filter-input" placeholder="Filtrar Turno..." data-column="5">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Local..." data-column="5">
                                 </th>
                                 <th class="filter-header">
-                                    <input type="text" class="filter-input" placeholder="Filtrar Local..." data-column="6">
-                                </th>
-                                <th class="filter-header">
-                                    <input type="text" class="filter-input" placeholder="Filtrar Horário..." data-column="7">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Horário..." data-column="6">
                                 </th>
                                 <th class="filter-header">
                                     <!-- Sem filtro na coluna de ações -->
@@ -272,7 +366,6 @@
                                         </a>
                                     </td>
                                     <td>{{ manutentor.Cargo|default:"-"|truncatewords:5 }}</td>
-                                    <td>{{ manutentor.Posto|default:"-"|truncatewords:5 }}</td>
                                     <td>
                                         <span class="badge bg-info">{{ manutentor.get_tipo_display|default:"-" }}</span>
                                     </td>
@@ -290,12 +383,12 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <div class="btn-group" role="group">
-                                            <a href="{% url 'visualizar_manutentor' manutentor.Matricula %}" class="btn btn-sm btn-primary" title="Visualizar detalhes">
-                                                <i class="fas fa-eye me-1"></i>Visualizar
+                                        <div class="d-flex gap-1 justify-content-center">
+                                            <a href="{% url 'visualizar_manutentor' manutentor.Matricula %}" class="btn btn-action btn-view" title="Visualizar detalhes">
+                                                <i class="fas fa-eye"></i>
                                             </a>
-                                            <a href="{% url 'editar_manutentor' manutentor.Matricula %}" class="btn btn-sm btn-warning" title="Editar manutentor">
-                                                <i class="fas fa-edit me-1"></i>Editar
+                                            <a href="{% url 'editar_manutentor' manutentor.Matricula %}" class="btn btn-action btn-edit" title="Editar manutentor">
+                                                <i class="fas fa-edit"></i>
                                             </a>
                                         </div>
                                     </td>
@@ -303,7 +396,7 @@
                                 {% endfor %}
                             {% else %}
                                 <tr>
-                                    <td colspan="9" class="text-center py-5">
+                                    <td colspan="8" class="text-center py-5">
                                         <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
                                         <p class="text-muted">Nenhum manutentor encontrado.</p>
                                         <a href="{% url 'cadastrar_manutentor' %}" class="btn btn-primary">

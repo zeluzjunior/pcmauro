@@ -29,6 +29,7 @@ LOCAL_TRABALHO = (
     ('Industria', 'Industria'),
     ('Frigorífico', 'Frigorífico'),
     ('Civil', 'Civil'),
+    ('Externa', 'Externa'),
     ('Indefinido', 'Indefinido'),
     ('ETE/ETA', 'ETE/ETA'),
     ('Utilidades', 'Utilidades'),

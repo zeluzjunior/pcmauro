@@ -142,8 +142,9 @@
                         <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro or filtro_situacao or filtro_uso_contabil %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
                             <div class="accordion-body">
                                 <form method="get" action="{% url 'consultar_notas_fiscais' %}" class="row g-3">
-                                    <!-- Preservar busca geral -->
+                                    <!-- Preservar busca geral e ordenação -->
                                     <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                                    <input type="hidden" name="ordenar_total" value="{{ ordenar_total|default:'' }}">
                                     
                                     <!-- Filtros de Data -->
                                     <div class="col-md-3">
@@ -278,6 +279,7 @@
                     {% endfor %}
                     <input type="hidden" name="filtro_situacao" value="{{ filtro_situacao|default:'' }}">
                     <input type="hidden" name="filtro_uso_contabil" value="{{ filtro_uso_contabil|default:'' }}">
+                    <input type="hidden" name="ordenar_total" value="{{ ordenar_total|default:'' }}">
                     <input type="text" name="search" class="form-control me-2" placeholder="Buscar por nota, emitente, situação..." value="{{ search_query|default:'' }}">
                     <button type="submit" class="btn btn-outline-primary">
                         <i class="fas fa-search"></i> Buscar
@@ -364,7 +366,7 @@
                             {% for mes in meses_filtro %}
                                 <input type="hidden" name="mes" value="{{ mes }}">
                             {% endfor %}
-                            <!-- Note: filtro_situacao and filtro_uso_contabil are in the filter row as selects, so they will be submitted automatically -->
+                            <!-- filtro_situacao and filtro_uso_contabil are in the filter row as selects -->
                             
                             <div class="table-container">
                                 <table class="table table-hover table-striped mb-0">
@@ -403,10 +405,11 @@
                                                 </select>
                                             </th>
                                             <th>
-                                                <div class="d-flex gap-1">
-                                                    <input type="text" name="filtro_total_min" class="filter-input" value="{{ filtro_total_min|default:'' }}" placeholder="Min" style="width: 48%;" onchange="document.getElementById('filterForm').submit();">
-                                                    <input type="text" name="filtro_total_max" class="filter-input" value="{{ filtro_total_max|default:'' }}" placeholder="Max" style="width: 48%;" onchange="document.getElementById('filterForm').submit();">
-                                                </div>
+                                                <select name="ordenar_total" class="filter-input" onchange="document.getElementById('filterForm').submit();">
+                                                    <option value="">Ordenar Total</option>
+                                                    <option value="desc" {% if ordenar_total == 'desc' %}selected{% endif %}>Maior → Menor</option>
+                                                    <option value="asc" {% if ordenar_total == 'asc' %}selected{% endif %}>Menor → Maior</option>
+                                                </select>
                                             </th>
                                             <th>
                                                 <select name="filtro_uso_contabil" class="filter-input" onchange="document.getElementById('filterForm').submit();">
@@ -482,10 +485,10 @@
                     <ul class="pagination justify-content-center">
                         {% if notas.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if filtro_nota %}&filtro_nota={{ filtro_nota }}{% endif %}{% if filtro_emitente %}&filtro_emitente={{ filtro_emitente }}{% endif %}{% if filtro_data_emissao %}&filtro_data_emissao={{ filtro_data_emissao }}{% endif %}{% if filtro_data_autorizacao %}&filtro_data_autorizacao={{ filtro_data_autorizacao }}{% endif %}{% if filtro_situacao %}&filtro_situacao={{ filtro_situacao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_total_min %}&filtro_total_min={{ filtro_total_min }}{% endif %}{% if filtro_total_max %}&filtro_total_max={{ filtro_total_max }}{% endif %}&page=1">Primeira</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if filtro_nota %}&filtro_nota={{ filtro_nota }}{% endif %}{% if filtro_emitente %}&filtro_emitente={{ filtro_emitente }}{% endif %}{% if filtro_data_emissao %}&filtro_data_emissao={{ filtro_data_emissao }}{% endif %}{% if filtro_data_autorizacao %}&filtro_data_autorizacao={{ filtro_data_autorizacao }}{% endif %}{% if filtro_situacao %}&filtro_situacao={{ filtro_situacao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if ordenar_total %}&ordenar_total={{ ordenar_total }}{% endif %}&page=1">Primeira</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if filtro_nota %}&filtro_nota={{ filtro_nota }}{% endif %}{% if filtro_emitente %}&filtro_emitente={{ filtro_emitente }}{% endif %}{% if filtro_data_emissao %}&filtro_data_emissao={{ filtro_data_emissao }}{% endif %}{% if filtro_data_autorizacao %}&filtro_data_autorizacao={{ filtro_data_autorizacao }}{% endif %}{% if filtro_situacao %}&filtro_situacao={{ filtro_situacao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_total_min %}&filtro_total_min={{ filtro_total_min }}{% endif %}{% if filtro_total_max %}&filtro_total_max={{ filtro_total_max }}{% endif %}&page={{ notas.previous_page_number }}">Anterior</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if filtro_nota %}&filtro_nota={{ filtro_nota }}{% endif %}{% if filtro_emitente %}&filtro_emitente={{ filtro_emitente }}{% endif %}{% if filtro_data_emissao %}&filtro_data_emissao={{ filtro_data_emissao }}{% endif %}{% if filtro_data_autorizacao %}&filtro_data_autorizacao={{ filtro_data_autorizacao }}{% endif %}{% if filtro_situacao %}&filtro_situacao={{ filtro_situacao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if ordenar_total %}&ordenar_total={{ ordenar_total }}{% endif %}&page={{ notas.previous_page_number }}">Anterior</a>
                             </li>
                         {% endif %}
                         
@@ -497,10 +500,10 @@
                         
                         {% if notas.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if filtro_nota %}&filtro_nota={{ filtro_nota }}{% endif %}{% if filtro_emitente %}&filtro_emitente={{ filtro_emitente }}{% endif %}{% if filtro_data_emissao %}&filtro_data_emissao={{ filtro_data_emissao }}{% endif %}{% if filtro_data_autorizacao %}&filtro_data_autorizacao={{ filtro_data_autorizacao }}{% endif %}{% if filtro_situacao %}&filtro_situacao={{ filtro_situacao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_total_min %}&filtro_total_min={{ filtro_total_min }}{% endif %}{% if filtro_total_max %}&filtro_total_max={{ filtro_total_max }}{% endif %}&page={{ notas.next_page_number }}">Próxima</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if filtro_nota %}&filtro_nota={{ filtro_nota }}{% endif %}{% if filtro_emitente %}&filtro_emitente={{ filtro_emitente }}{% endif %}{% if filtro_data_emissao %}&filtro_data_emissao={{ filtro_data_emissao }}{% endif %}{% if filtro_data_autorizacao %}&filtro_data_autorizacao={{ filtro_data_autorizacao }}{% endif %}{% if filtro_situacao %}&filtro_situacao={{ filtro_situacao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if ordenar_total %}&ordenar_total={{ ordenar_total }}{% endif %}&page={{ notas.next_page_number }}">Próxima</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if filtro_nota %}&filtro_nota={{ filtro_nota }}{% endif %}{% if filtro_emitente %}&filtro_emitente={{ filtro_emitente }}{% endif %}{% if filtro_data_emissao %}&filtro_data_emissao={{ filtro_data_emissao }}{% endif %}{% if filtro_data_autorizacao %}&filtro_data_autorizacao={{ filtro_data_autorizacao }}{% endif %}{% if filtro_situacao %}&filtro_situacao={{ filtro_situacao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if filtro_total_min %}&filtro_total_min={{ filtro_total_min }}{% endif %}{% if filtro_total_max %}&filtro_total_max={{ filtro_total_max }}{% endif %}&page={{ notas.paginator.num_pages }}">Última</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if filtro_nota %}&filtro_nota={{ filtro_nota }}{% endif %}{% if filtro_emitente %}&filtro_emitente={{ filtro_emitente }}{% endif %}{% if filtro_data_emissao %}&filtro_data_emissao={{ filtro_data_emissao }}{% endif %}{% if filtro_data_autorizacao %}&filtro_data_autorizacao={{ filtro_data_autorizacao }}{% endif %}{% if filtro_situacao %}&filtro_situacao={{ filtro_situacao }}{% endif %}{% if filtro_uso_contabil %}&filtro_uso_contabil={{ filtro_uso_contabil }}{% endif %}{% if ordenar_total %}&ordenar_total={{ ordenar_total }}{% endif %}&page={{ notas.paginator.num_pages }}">Última</a>
                             </li>
                         {% endif %}
                     </ul>

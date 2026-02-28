@@ -1877,7 +1877,67 @@ def ajustar_maquinas_outros(request):
     from django.db.models import Count, Q
     from django.core.paginator import Paginator
     
-    # Buscar todos os valores únicos de descr_gerenc
+    # Queryset base: máquinas OUTROS (inclui NULL/vazio)
+    base_queryset = Maquina.objects.filter(ativo=True).filter(
+        Q(descr_gerenc__iexact='OUTROS') |
+        Q(descr_gerenc__isnull=True) |
+        Q(descr_gerenc='')
+    ).order_by('cd_maquina')
+    
+    # Filtros da tabela (query params)
+    filter_codigo = request.GET.get('filter_codigo', '').strip()
+    filter_descricao = request.GET.get('filter_descricao', '').strip()
+    filter_gerenc = request.GET.get('filter_gerenc', '').strip()
+    filter_setor = request.GET.get('filter_setor', '').strip()
+    filter_patrimonio = request.GET.get('filter_patrimonio', '').strip()
+    
+    maquinas_queryset = base_queryset
+    if filter_codigo:
+        try:
+            codigo_int = int(filter_codigo)
+            maquinas_queryset = maquinas_queryset.filter(cd_maquina=codigo_int)
+        except ValueError:
+            from django.db.models.functions import Cast
+            from django.db.models import CharField
+            maquinas_queryset = maquinas_queryset.annotate(
+                cd_str=Cast('cd_maquina', CharField())
+            ).filter(cd_str__icontains=filter_codigo)
+    if filter_descricao:
+        maquinas_queryset = maquinas_queryset.filter(descr_maquina__icontains=filter_descricao)
+    if filter_gerenc:
+        if filter_gerenc.upper() == 'NULL':
+            maquinas_queryset = maquinas_queryset.filter(
+                Q(descr_gerenc__isnull=True) | Q(descr_gerenc='')
+            )
+        else:
+            maquinas_queryset = maquinas_queryset.filter(descr_gerenc__icontains=filter_gerenc)
+    if filter_setor:
+        maquinas_queryset = maquinas_queryset.filter(cd_setormanut=filter_setor)
+    if filter_patrimonio:
+        maquinas_queryset = maquinas_queryset.filter(nro_patrimonio__icontains=filter_patrimonio)
+    
+    # Paginação
+    paginator = Paginator(maquinas_queryset, 50)
+    page_number = request.GET.get('page', 1)
+    maquinas_outros_paginated = paginator.get_page(page_number)
+    
+    # Valores únicos para dropdowns
+    filter_gerenc_options = list(
+        base_queryset.exclude(descr_gerenc__isnull=True)
+        .exclude(descr_gerenc='')
+        .values_list('descr_gerenc', flat=True)
+        .distinct()
+        .order_by('descr_gerenc')
+    )
+    filter_setor_options = list(
+        base_queryset.exclude(cd_setormanut__isnull=True)
+        .exclude(cd_setormanut='')
+        .values_list('cd_setormanut', flat=True)
+        .distinct()
+        .order_by('cd_setormanut')
+    )
+    
+    # Buscar todos os valores únicos de descr_gerenc (para resumo/cards)
     valores_gerenc = Maquina.objects.filter(
         ativo=True
     ).exclude(
@@ -1888,17 +1948,13 @@ def ajustar_maquinas_outros(request):
         total=Count('id')
     ).order_by('descr_gerenc')
     
-    # Agrupar máquinas por descr_gerenc
     maquinas_por_gerenc = {}
     maquinas_outros = []
     
     for item in valores_gerenc:
         gerenc = item['descr_gerenc']
         total = item['total']
-        
-        # Verificar se descr_gerenc é "OUTROS" (case-insensitive)
         if gerenc and gerenc.upper().strip() == 'OUTROS':
-            # É "OUTROS" - foco principal
             maquinas_outros.append({
                 'descr_gerenc': gerenc,
                 'total': total,
@@ -1908,17 +1964,15 @@ def ajustar_maquinas_outros(request):
                 ).order_by('cd_maquina')
             })
         else:
-            # Outros valores de descr_gerenc (para resumo)
             maquinas_por_gerenc[gerenc] = {
                 'descr_gerenc': gerenc,
                 'total': total,
                 'maquinas': Maquina.objects.filter(
                     ativo=True,
                     descr_gerenc=gerenc
-                ).order_by('cd_maquina')[:10]  # Limitar a 10 para preview
+                ).order_by('cd_maquina')[:10]
             }
     
-    # Máquinas com descr_gerenc NULL ou vazio também podem ser consideradas "OUTROS"
     maquinas_null = Maquina.objects.filter(
         ativo=True
     ).filter(
@@ -1936,22 +1990,15 @@ def ajustar_maquinas_outros(request):
             ).order_by('cd_maquina')
         })
     
-    # Estatísticas
     total_maquinas = Maquina.objects.filter(ativo=True).count()
     total_outros = sum(item['total'] for item in maquinas_outros)
     total_com_gerenc_valida = total_maquinas - total_outros
-    
-    # Paginação para máquinas OUTROS (se houver muitas)
-    todas_maquinas_outros = []
-    for grupo in maquinas_outros:
-        todas_maquinas_outros.extend(list(grupo['maquinas']))
-    
-    paginator = Paginator(todas_maquinas_outros, 50)
-    page_number = request.GET.get('page', 1)
-    maquinas_outros_paginated = paginator.get_page(page_number)
-    
-    # Obter lista de valores únicos de descr_gerenc para referência
     gerenc_choices = sorted(set(maquinas_por_gerenc.keys()))
+    
+    # Build query string for pagination (preserve filters)
+    query_params = request.GET.copy()
+    if 'page' in query_params:
+        query_params.pop('page')
     
     context = {
         'page_title': 'Ajustar Máquinas - OUTROS',
@@ -1964,6 +2011,14 @@ def ajustar_maquinas_outros(request):
         'total_com_gerenc_valida': total_com_gerenc_valida,
         'percentual_outros': round((total_outros / total_maquinas * 100) if total_maquinas > 0 else 0, 1),
         'gerenc_choices': gerenc_choices,
+        'filter_codigo': filter_codigo,
+        'filter_descricao': filter_descricao,
+        'filter_gerenc': filter_gerenc,
+        'filter_setor': filter_setor,
+        'filter_patrimonio': filter_patrimonio,
+        'filter_gerenc_options': filter_gerenc_options,
+        'filter_setor_options': filter_setor_options,
+        'query_params': query_params,
     }
     return render(request, 'maquinas/ajustar_maquinas_outros.html', context)
 
@@ -2301,6 +2356,84 @@ def importar_maquinas(request):
         'updated_count': updated_count,
     }
     return render(request, 'importar/importar_maquinas.html', context)
+
+
+def exportar_maquinas(request):
+    """Exportar Máquinas - página e download de arquivo"""
+    from django.http import HttpResponse
+    from app.models import Maquina
+    import csv
+    import io
+    from datetime import datetime
+
+    if request.GET.get('download') and request.GET.get('formato'):
+        formato = request.GET.get('formato', 'xlsx').lower()
+        maquinas = Maquina.objects.filter(ativo=True).order_by('cd_maquina')
+        filename_base = f'maquinas_export_{datetime.now().strftime("%Y%m%d_%H%M")}'
+
+        if formato == 'csv':
+            output = io.StringIO()
+            writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+            headers = ['CD_MAQUINA', 'CD_UNID', 'NOME_UNID', 'CS_TT_MAQUINA', 'DESCR_MAQUINA', 'CD_SETORMANUT',
+                       'DESCR_SETORMANUT', 'CD_PRIOMAQUTV', 'NRO_PATRIMONIO', 'CD_MODELO', 'CD_GRUPO',
+                       'CD_TPCENTATIV', 'DESCR_GERENC']
+            writer.writerow(headers)
+            for m in maquinas:
+                writer.writerow([
+                    m.cd_maquina or '',
+                    m.cd_unid or '',
+                    m.nome_unid or '',
+                    m.cs_tt_maquina or '',
+                    m.descr_maquina or '',
+                    m.cd_setormanut or '',
+                    m.descr_setormanut or '',
+                    m.cd_priomaqutv or '',
+                    m.nro_patrimonio or '',
+                    m.cd_modelo or '',
+                    m.cd_grupo or '',
+                    m.cd_tpcentativ or '',
+                    m.descr_gerenc or '',
+                ])
+            response = HttpResponse(output.getvalue().encode('utf-8-sig'), content_type='text/csv; charset=utf-8-sig')
+            response['Content-Disposition'] = f'attachment; filename="{filename_base}.csv"'
+            return response
+
+        elif formato == 'xlsx':
+            import openpyxl
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = 'Máquinas'
+            headers = ['CD_MAQUINA', 'CD_UNID', 'NOME_UNID', 'CS_TT_MAQUINA', 'DESCR_MAQUINA', 'CD_SETORMANUT',
+                       'DESCR_SETORMANUT', 'CD_PRIOMAQUTV', 'NRO_PATRIMONIO', 'CD_MODELO', 'CD_GRUPO',
+                       'CD_TPCENTATIV', 'DESCR_GERENC']
+            for col, h in enumerate(headers, 1):
+                ws.cell(row=1, column=col, value=h)
+            for row_idx, m in enumerate(maquinas, 2):
+                ws.cell(row=row_idx, column=1, value=m.cd_maquina)
+                ws.cell(row=row_idx, column=2, value=m.cd_unid)
+                ws.cell(row=row_idx, column=3, value=m.nome_unid)
+                ws.cell(row=row_idx, column=4, value=m.cs_tt_maquina)
+                ws.cell(row=row_idx, column=5, value=m.descr_maquina)
+                ws.cell(row=row_idx, column=6, value=m.cd_setormanut)
+                ws.cell(row=row_idx, column=7, value=m.descr_setormanut)
+                ws.cell(row=row_idx, column=8, value=m.cd_priomaqutv)
+                ws.cell(row=row_idx, column=9, value=m.nro_patrimonio)
+                ws.cell(row=row_idx, column=10, value=m.cd_modelo)
+                ws.cell(row=row_idx, column=11, value=m.cd_grupo)
+                ws.cell(row=row_idx, column=12, value=m.cd_tpcentativ)
+                ws.cell(row=row_idx, column=13, value=m.descr_gerenc)
+            output = io.BytesIO()
+            wb.save(output)
+            output.seek(0)
+            response = HttpResponse(output.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = f'attachment; filename="{filename_base}.xlsx"'
+            return response
+
+    context = {
+        'page_title': 'Exportar Máquinas',
+        'active_page': 'exportar_maquinas',
+    }
+    return render(request, 'exportar/exportar_maquinas.html', context)
 
 
 def importar_manutentores(request):
@@ -2796,8 +2929,9 @@ def importar_notas_fiscais(request):
         update_existing = request.POST.get('update_existing') == 'on'
         only_new_records = request.POST.get('only_new_records') == 'on'
         
-        # Se "only_new_records" estiver marcado, não atualizar existentes
-        if only_new_records:
+        # Se "Atualizar registros existentes" estiver marcado, respeitar (prioridade)
+        # Caso contrário, se "only_new_records" estiver marcado, não atualizar
+        if only_new_records and not update_existing:
             update_existing = False
         
         # Processar arquivo
@@ -5878,7 +6012,7 @@ def analise_paradas_maquina(request):
         try:
             periodo_inicio = datetime(ano_filtro, 1, 1).date()
             if meses_filtro_int:
-                # Se há meses selecionados, usar apenas o primeiro e último mês selecionado
+                # Se há meses selecionados, usar apenas os meses selecionados (não o intervalo entre primeiro e último)
                 primeiro_mes = min(meses_filtro_int)
                 ultimo_mes = max(meses_filtro_int)
                 periodo_inicio = datetime(ano_filtro, primeiro_mes, 1).date()
@@ -5886,124 +6020,111 @@ def analise_paradas_maquina(request):
                 periodo_fim = datetime(ano_filtro, ultimo_mes, ultimo_dia).date()
                 if periodo_fim > hoje_date:
                     periodo_fim = hoje_date
+                # Lista de meses a iterar: apenas os selecionados
+                meses_para_iterar = [datetime(ano_filtro, m, 1).date() for m in meses_filtro_int]
             else:
                 # Todos os meses do ano
                 periodo_fim = datetime(ano_filtro, 12, 31).date()
                 if periodo_fim > hoje_date:
                     periodo_fim = hoje_date
+                meses_para_iterar = []
+                d = periodo_inicio.replace(day=1)
+                while d <= periodo_fim:
+                    meses_para_iterar.append(d)
+                    if d.month == 12:
+                        d = d.replace(year=d.year + 1, month=1)
+                    else:
+                        d = d.replace(month=d.month + 1)
         except (ValueError, TypeError):
             periodo_inicio = (hoje_date - timedelta(days=365)).replace(day=1)
             periodo_fim = hoje_date
+            meses_para_iterar = []
+            d = periodo_inicio.replace(day=1)
+            while d <= periodo_fim:
+                meses_para_iterar.append(d)
+                if d.month == 12:
+                    d = d.replace(year=d.year + 1, month=1)
+                else:
+                    d = d.replace(month=d.month + 1)
     else:
         periodo_inicio = (hoje_date - timedelta(days=365)).replace(day=1)
         periodo_fim = hoje_date
+        meses_para_iterar = []
+        d = periodo_inicio.replace(day=1)
+        while d <= periodo_fim:
+            meses_para_iterar.append(d)
+            if d.month == 12:
+                d = d.replace(year=d.year + 1, month=1)
+            else:
+                d = d.replace(month=d.month + 1)
     
     # Produção esperada (Frigorífico): soma de total_abate_planejado da config para cada mês no período filtrado
     producao_esperada_frig = 0
-    _data_cfg = periodo_inicio.replace(day=1)
-    while _data_cfg <= periodo_fim:
+    for _data_cfg in meses_para_iterar:
         cfg = ConfigParadaMaquina.objects.filter(
             ano=_data_cfg.year, mes=_data_cfg.month, secao='frigorifico'
         ).first()
         if cfg and cfg.total_abate_planejado is not None:
             producao_esperada_frig += cfg.total_abate_planejado
-        # Próximo mês
-        if _data_cfg.month == 12:
-            _data_cfg = _data_cfg.replace(year=_data_cfg.year + 1, month=1)
-        else:
-            _data_cfg = _data_cfg.replace(month=_data_cfg.month + 1)
     
     # Soma Suínos Abatidos (Frigorífico): soma de ProducaoDiaria.suinos_abatidos para cada mês no período filtrado
-    # Se periodo_fim cai no meio do mês, só somar dias até periodo_fim.day
     soma_suinos_abatidos_frig = 0
-    _data_pd = periodo_inicio.replace(day=1)
-    while _data_pd <= periodo_fim:
+    for _data_pd in meses_para_iterar:
         qs_pd = ProducaoDiaria.objects.filter(ano=_data_pd.year, mes=_data_pd.month)
         if _data_pd.year == periodo_fim.year and _data_pd.month == periodo_fim.month:
             qs_pd = qs_pd.filter(dia__lte=periodo_fim.day)
         result = qs_pd.aggregate(s=Sum('suinos_abatidos'))['s']
         if result is not None:
             soma_suinos_abatidos_frig += result
-        if _data_pd.month == 12:
-            _data_pd = _data_pd.replace(year=_data_pd.year + 1, month=1)
-        else:
-            _data_pd = _data_pd.replace(month=_data_pd.month + 1)
     
     # Soma Produção Indústria: soma de ProducaoDiaria.producao_industria para cada mês no período filtrado
-    # Se periodo_fim cai no meio do mês, só somar dias até periodo_fim.day
     soma_producao_industria = Decimal('0.00')
-    _data_pi = periodo_inicio.replace(day=1)
-    while _data_pi <= periodo_fim:
+    for _data_pi in meses_para_iterar:
         qs_pi = ProducaoDiaria.objects.filter(ano=_data_pi.year, mes=_data_pi.month)
         if _data_pi.year == periodo_fim.year and _data_pi.month == periodo_fim.month:
             qs_pi = qs_pi.filter(dia__lte=periodo_fim.day)
         result = qs_pi.aggregate(s=Sum('producao_industria'))['s']
         if result is not None:
             soma_producao_industria += Decimal(str(result))
-        if _data_pi.month == 12:
-            _data_pi = _data_pi.replace(year=_data_pi.year + 1, month=1)
-        else:
-            _data_pi = _data_pi.replace(month=_data_pi.month + 1)
     
     # Perda Máxima planejada (Frigorífico): soma por mês de total_abate_planejado × (perda_maximo / 100)
-    # perda_maximo no DB está em % (ex.: 1.84 = 1.84%)
     perda_maxima_calculada_frig = Decimal('0.00')
-    _data_perda = periodo_inicio.replace(day=1)
-    while _data_perda <= periodo_fim:
+    for _data_perda in meses_para_iterar:
         cfg = ConfigParadaMaquina.objects.filter(
             ano=_data_perda.year, mes=_data_perda.month, secao='frigorifico'
         ).first()
         if cfg and cfg.perda_maximo is not None and cfg.total_abate_planejado is not None:
             perda_maxima_calculada_frig += (Decimal(str(cfg.perda_maximo)) / Decimal('100')) * Decimal(str(cfg.total_abate_planejado))
-        if _data_perda.month == 12:
-            _data_perda = _data_perda.replace(year=_data_perda.year + 1, month=1)
-        else:
-            _data_perda = _data_perda.replace(month=_data_perda.month + 1)
     
     # Perda Restante (Frigorífico): Perda Máx. (calculada) - Soma Capacidade (Perdas)
     perda_restante_frig = perda_maxima_calculada_frig - soma_capacidade_frig
     
     # Dias úteis (Frigorífico): soma de ConfigParadaMaquina.dias_uteis para cada mês no período
     dias_uteis_total_frig = 0
-    _data_du = periodo_inicio.replace(day=1)
-    while _data_du <= periodo_fim:
+    for _data_du in meses_para_iterar:
         cfg = ConfigParadaMaquina.objects.filter(
             ano=_data_du.year, mes=_data_du.month, secao='frigorifico'
         ).first()
         if cfg and cfg.dias_uteis is not None:
             dias_uteis_total_frig += cfg.dias_uteis
-        if _data_du.month == 12:
-            _data_du = _data_du.replace(year=_data_du.year + 1, month=1)
-        else:
-            _data_du = _data_du.replace(month=_data_du.month + 1)
     
     # Dias úteis (Indústria): soma de ConfigParadaMaquina.dias_uteis_industria para cada mês no período
     dias_uteis_total_industria = 0
-    _data_du_ind = periodo_inicio.replace(day=1)
-    while _data_du_ind <= periodo_fim:
+    for _data_du_ind in meses_para_iterar:
         cfg = ConfigParadaMaquina.objects.filter(
             ano=_data_du_ind.year, mes=_data_du_ind.month, secao='industria'
         ).first()
         if cfg and cfg.dias_uteis_industria is not None:
             dias_uteis_total_industria += cfg.dias_uteis_industria
-        if _data_du_ind.month == 12:
-            _data_du_ind = _data_du_ind.replace(year=_data_du_ind.year + 1, month=1)
-        else:
-            _data_du_ind = _data_du_ind.replace(month=_data_du_ind.month + 1)
     
     # Total Produção Planejada (Indústria): soma de ConfigParadaMaquina.total_producao_planejada_industria para cada mês no período
     total_producao_planejada_industria = 0
-    _data_tpp = periodo_inicio.replace(day=1)
-    while _data_tpp <= periodo_fim:
+    for _data_tpp in meses_para_iterar:
         cfg = ConfigParadaMaquina.objects.filter(
             ano=_data_tpp.year, mes=_data_tpp.month, secao='industria'
         ).first()
         if cfg and cfg.total_producao_planejada_industria is not None:
             total_producao_planejada_industria += cfg.total_producao_planejada_industria
-        if _data_tpp.month == 12:
-            _data_tpp = _data_tpp.replace(year=_data_tpp.year + 1, month=1)
-        else:
-            _data_tpp = _data_tpp.replace(month=_data_tpp.month + 1)
     
     # Produção diária planejada (Indústria): total planejada / dias úteis (média por dia útil)
     producao_diaria_planejada_industria = (
@@ -6015,81 +6136,56 @@ def analise_paradas_maquina(request):
     # Suínos Abatidos por dia (Frigorífico): média de ConfigParadaMaquina.suinos_abatidos no período
     suinos_abatidos_por_dia_soma = 0
     suinos_abatidos_por_dia_n = 0
-    _data_sad = periodo_inicio.replace(day=1)
-    while _data_sad <= periodo_fim:
+    for _data_sad in meses_para_iterar:
         cfg = ConfigParadaMaquina.objects.filter(
             ano=_data_sad.year, mes=_data_sad.month, secao='frigorifico'
         ).first()
         if cfg and cfg.suinos_abatidos is not None:
             suinos_abatidos_por_dia_soma += cfg.suinos_abatidos
             suinos_abatidos_por_dia_n += 1
-        if _data_sad.month == 12:
-            _data_sad = _data_sad.replace(year=_data_sad.year + 1, month=1)
-        else:
-            _data_sad = _data_sad.replace(month=_data_sad.month + 1)
     suinos_abatidos_por_dia_medio_frig = (suinos_abatidos_por_dia_soma / suinos_abatidos_por_dia_n) if suinos_abatidos_por_dia_n else None
     
     # % de Perda Máximo (Frigorífico): primeiro valor configurado no período (ConfigParadaMaquina.perda_maximo)
     perda_maximo_frig = None
-    _data_pm = periodo_inicio.replace(day=1)
-    while _data_pm <= periodo_fim:
+    for _data_pm in meses_para_iterar:
         cfg = ConfigParadaMaquina.objects.filter(
             ano=_data_pm.year, mes=_data_pm.month, secao='frigorifico'
         ).first()
         if cfg and cfg.perda_maximo is not None:
             perda_maximo_frig = cfg.perda_maximo
             break
-        if _data_pm.month == 12:
-            _data_pm = _data_pm.replace(year=_data_pm.year + 1, month=1)
-        else:
-            _data_pm = _data_pm.replace(month=_data_pm.month + 1)
     
     # % de Perda Máximo (Indústria): primeiro valor configurado no período (ConfigParadaMaquina.perda_maximo_industria)
     perda_maximo_industria = None
-    _data_pmi = periodo_inicio.replace(day=1)
-    while _data_pmi <= periodo_fim:
+    for _data_pmi in meses_para_iterar:
         cfg = ConfigParadaMaquina.objects.filter(
             ano=_data_pmi.year, mes=_data_pmi.month, secao='industria'
         ).first()
         if cfg and cfg.perda_maximo_industria is not None:
             perda_maximo_industria = cfg.perda_maximo_industria
             break
-        if _data_pmi.month == 12:
-            _data_pmi = _data_pmi.replace(year=_data_pmi.year + 1, month=1)
-        else:
-            _data_pmi = _data_pmi.replace(month=_data_pmi.month + 1)
     
     # Perda Máxima planejada (Indústria): soma por mês de total_producao_planejada_industria × (perda_maximo_industria / 100)
     perda_maxima_planejada_industria = Decimal('0.00')
-    _data_pmpi = periodo_inicio.replace(day=1)
-    while _data_pmpi <= periodo_fim:
+    for _data_pmpi in meses_para_iterar:
         cfg = ConfigParadaMaquina.objects.filter(
             ano=_data_pmpi.year, mes=_data_pmpi.month, secao='industria'
         ).first()
         if cfg and cfg.perda_maximo_industria is not None and cfg.total_producao_planejada_industria is not None:
             perda_maxima_planejada_industria += (Decimal(str(cfg.perda_maximo_industria)) / Decimal('100')) * Decimal(str(cfg.total_producao_planejada_industria))
-        if _data_pmpi.month == 12:
-            _data_pmpi = _data_pmpi.replace(year=_data_pmpi.year + 1, month=1)
-        else:
-            _data_pmpi = _data_pmpi.replace(month=_data_pmpi.month + 1)
     
     # Perda Restante (Indústria): Perda Máxima planejada - Total de Perdas (Kg)
     perda_restante_industria = perda_maxima_planejada_industria - soma_capacidade_ind
     
     # Fator de Eficiência % (Indústria): primeiro valor configurado no período
     fator_eficiencia_industria = None
-    _data_fei = periodo_inicio.replace(day=1)
-    while _data_fei <= periodo_fim:
+    for _data_fei in meses_para_iterar:
         cfg = ConfigParadaMaquina.objects.filter(
             ano=_data_fei.year, mes=_data_fei.month, secao='industria'
         ).first()
         if cfg and cfg.fator_eficiencia_industria is not None:
             fator_eficiencia_industria = cfg.fator_eficiencia_industria
             break
-        if _data_fei.month == 12:
-            _data_fei = _data_fei.replace(year=_data_fei.year + 1, month=1)
-        else:
-            _data_fei = _data_fei.replace(month=_data_fei.month + 1)
     
     # Indicador sem Fator de Correção (Indústria): Total de Perdas (Kg) / Produção realizada (como %)
     if soma_producao_industria and soma_producao_industria > 0:
@@ -6105,18 +6201,13 @@ def analise_paradas_maquina(request):
     
     # Fator de Eficiência % (Frigorífico): primeiro valor configurado no período (ConfigParadaMaquina.fator_eficiencia)
     fator_eficiencia_frig = None
-    _data_fe = periodo_inicio.replace(day=1)
-    while _data_fe <= periodo_fim:
+    for _data_fe in meses_para_iterar:
         cfg = ConfigParadaMaquina.objects.filter(
             ano=_data_fe.year, mes=_data_fe.month, secao='frigorifico'
         ).first()
         if cfg and cfg.fator_eficiencia is not None:
             fator_eficiencia_frig = cfg.fator_eficiencia
             break
-        if _data_fe.month == 12:
-            _data_fe = _data_fe.replace(year=_data_fe.year + 1, month=1)
-        else:
-            _data_fe = _data_fe.replace(month=_data_fe.month + 1)
     
     # Indicador sem Fator de Correção (Frigorífico): Total carcaças Perdidas / Total suínos abatidos (como %)
     if soma_suinos_abatidos_frig and int(soma_suinos_abatidos_frig) > 0:
@@ -6131,9 +6222,8 @@ def analise_paradas_maquina(request):
     else:
         indicador_atual_frig = None
     
-    # Gerar meses do período — contagens diretas para garantir alinhamento com o filtro
-    data_atual = periodo_inicio.replace(day=1)
-    while data_atual <= periodo_fim:
+    # Gerar meses do período — contagens diretas para garantir alinhamento com o filtro (apenas meses selecionados)
+    for data_atual in meses_para_iterar:
         # Calcular último dia do mês
         ultimo_dia_mes = monthrange(data_atual.year, data_atual.month)[1]
         fim_mes_calc = datetime(data_atual.year, data_atual.month, ultimo_dia_mes).date()
@@ -6173,12 +6263,6 @@ def analise_paradas_maquina(request):
         meses_horas_frig.append(float(horas_frig))
         meses_data_ind.append(count_ind)
         meses_horas_ind.append(float(horas_ind))
-        
-        # Próximo mês
-        if data_atual.month == 12:
-            data_atual = data_atual.replace(year=data_atual.year + 1, month=1, day=1)
-        else:
-            data_atual = data_atual.replace(month=data_atual.month + 1, day=1)
     
     # Rótulo do período para o gráfico (ex: "Jan/2025 - Fev/2025" ou "2025")
     if meses_labels:
@@ -6361,22 +6445,53 @@ def analise_paradas_maquina(request):
             l_horas.append(float(dados['horas']))
         recentes = list(qs.order_by('-data', '-horario_inicial')[:20])
 
-        # Paradas por Máquina (via ParadaMaquinaOS -> OrdemServicoCorretiva)
+        # Paradas por Máquina (via ParadaMaquinaOS -> OrdemServicoCorretiva, ou fallback: extrair OS de motivo/acao)
         maquina_paradas_d = defaultdict(lambda: {'count': 0, 'descr': ''})
         parada_ids = list(qs.values_list('id', flat=True))
+        
+        def _add_maquina_from_os(os_num_str):
+            try:
+                if not os_num_str or not str(os_num_str).strip().isdigit():
+                    return
+                os_int = int(str(os_num_str).strip())
+                os_obj = OrdemServicoCorretiva.objects.filter(cd_ordemserv=os_int).first()
+                if os_obj and os_obj.cd_maquina is not None:
+                    maquina_paradas_d[os_obj.cd_maquina]['count'] += 1
+                    maquina_paradas_d[os_obj.cd_maquina]['descr'] = os_obj.descr_maquina or ''
+            except (ValueError, TypeError):
+                pass
+        
         if parada_ids:
+            # 1) Usar ParadaMaquinaOS (associações confirmadas)
             for pmo in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=parada_ids).select_related('parada_maquina'):
-                try:
-                    os_num = pmo.os_numero.strip()
-                    if not os_num or not os_num.isdigit():
-                        continue
-                    os_int = int(os_num)
-                    os_obj = OrdemServicoCorretiva.objects.filter(cd_ordemserv=os_int).first()
-                    if os_obj and os_obj.cd_maquina is not None:
-                        maquina_paradas_d[os_obj.cd_maquina]['count'] += 1
-                        maquina_paradas_d[os_obj.cd_maquina]['descr'] = os_obj.descr_maquina or ''
-                except (ValueError, TypeError):
-                    continue
+                _add_maquina_from_os(pmo.os_numero)
+        
+        # 2) Fallback: se não há dados em ParadaMaquinaOS, extrair OS de motivo/acao (mesma lógica da página Analise Máquina por Parada)
+        if not maquina_paradas_d:
+            import re
+            os_standalone = re.compile(r'\b\d{5,6}\b')
+            os_com_prefixo = re.compile(
+                r'(?:OS|ordem|n[°º]|#|ref|numero|número)(?:\s*:?\s*)?(\d{5,6})\b',
+                re.IGNORECASE
+            )
+            def extract_os(text):
+                if not text or not isinstance(text, str):
+                    return []
+                found = set()
+                found.update(os_standalone.findall(text))
+                found.update(os_com_prefixo.findall(text))
+                found.update(re.findall(r'[\s\-_\.\/\(]\s*(\d{5,6})(?=[\s\-_\.\/\)]|$)', text))
+                return list(found)
+            
+            for parada in qs:
+                texto = ' '.join(filter(None, [
+                    str(parada.motivo or ''), str(parada.acao or ''),
+                    str(parada.nro or ''), str(parada.descr_parada or '')
+                ]))
+                for os_num in extract_os(texto):
+                    if len(os_num) in (5, 6):
+                        _add_maquina_from_os(os_num)
+        
         sorted_maq = sorted(maquina_paradas_d.items(), key=lambda x: x[1]['count'], reverse=True)
         maq_labels = []
         maq_data = []
@@ -7288,21 +7403,7 @@ def consultar_notas_fiscais(request):
     if filtro_data_autorizacao:
         notas_list = notas_list.filter(data_autorizacao__icontains=filtro_data_autorizacao)
     
-    filtro_total_min = request.GET.get('filtro_total_min', '').strip()
-    if filtro_total_min:
-        try:
-            total_min = Decimal(filtro_total_min)
-            notas_list = notas_list.filter(total_nota__gte=total_min)
-        except (ValueError, TypeError):
-            pass
-    
-    filtro_total_max = request.GET.get('filtro_total_max', '').strip()
-    if filtro_total_max:
-        try:
-            total_max = Decimal(filtro_total_max)
-            notas_list = notas_list.filter(total_nota__lte=total_max)
-        except (ValueError, TypeError):
-            pass
+    ordenar_total = request.GET.get('ordenar_total', '').strip()
     
     # Obter valores únicos para os dropdowns de filtros (baseado nos dados já filtrados - ANTES da paginação)
     # Isso garante que os filtros mostrem apenas valores que existem na tabela filtrada
@@ -7331,8 +7432,13 @@ def consultar_notas_fiscais(request):
         data_autorizacao=''
     ).values_list('data_autorizacao', flat=True).distinct().order_by('data_autorizacao')
     
-    # Ordenar por data de emissão (mais recente primeiro)
-    notas_list = notas_list.order_by('-data_emissao', '-created_at')
+    # Ordenar por data de emissão (mais recente primeiro) ou por total conforme seleção
+    if ordenar_total == 'desc':
+        notas_list = notas_list.order_by('-total_nota', '-data_emissao', '-created_at')
+    elif ordenar_total == 'asc':
+        notas_list = notas_list.order_by('total_nota', '-data_emissao', '-created_at')
+    else:
+        notas_list = notas_list.order_by('-data_emissao', '-created_at')
     
     # Estatísticas baseadas nos dados FILTRADOS (antes da paginação)
     total_count = notas_list.count()
@@ -7393,8 +7499,7 @@ def consultar_notas_fiscais(request):
         'filtro_uso_contabil': filtro_uso_contabil,
         'filtro_data_emissao': filtro_data_emissao,
         'filtro_data_autorizacao': filtro_data_autorizacao,
-        'filtro_total_min': filtro_total_min,
-        'filtro_total_max': filtro_total_max,
+        'ordenar_total': ordenar_total,
     }
     return render(request, 'consultar/consultar_notas_fiscais.html', context)
 
@@ -10938,6 +11043,15 @@ def editar_maquina(request, maquina_id):
     except Maquina.DoesNotExist:
         messages.error(request, 'Máquina não encontrada.')
         return redirect('consultar_maquinas')
+
+    # Valores únicos de descr_gerenc no DB para o select
+    gerenc_choices = list(
+        Maquina.objects.exclude(descr_gerenc__isnull=True)
+        .exclude(descr_gerenc='')
+        .values_list('descr_gerenc', flat=True)
+        .distinct()
+        .order_by('descr_gerenc')
+    )
     
     if request.method == 'POST':
         print(f"DEBUG - POST recebido para editar máquina {maquina_id}")
@@ -10947,7 +11061,7 @@ def editar_maquina(request, maquina_id):
             print(f"DEBUG - Arquivo recebido: {request.FILES['foto'].name}, Tamanho: {request.FILES['foto'].size}")
         print(f"DEBUG - request.POST: {request.POST}")
         
-        form = MaquinaForm(request.POST, request.FILES, instance=maquina)
+        form = MaquinaForm(request.POST, request.FILES, instance=maquina, gerenc_choices=gerenc_choices)
         print(f"DEBUG - Form criado. is_valid(): {form.is_valid()}")
         
         if form.is_valid():
@@ -10969,7 +11083,7 @@ def editar_maquina(request, maquina_id):
                 print(f"DEBUG - Campo {field}: {errors}")
             handle_form_errors(form, request)
     else:
-        form = MaquinaForm(instance=maquina)
+        form = MaquinaForm(instance=maquina, gerenc_choices=gerenc_choices)
     
     # Buscar documentos relacionados à máquina
     from app.models import MaquinaDocumento
@@ -13220,26 +13334,21 @@ def analise_manutentores(request):
     """Análise de Manutentores - Dashboard com estatísticas"""
     from app.models import Manutentor, ManutentorMaquina, OrdemServicoCorretiva, OrdemServicoCorretivaFicha
     from django.db.models import Count, Q
-    from datetime import datetime, timedelta
-    from collections import defaultdict
     import json
     
     # Estatísticas básicas
     total_count = Manutentor.objects.count()
     
-    # Manutentores recentes (últimos 30 dias)
-    data_30_dias_atras = datetime.now() - timedelta(days=30)
-    manutentores_recentes = Manutentor.objects.filter(
-        created_at__gte=data_30_dias_atras
-    ).count()
+    # Contagem por turno (A, B, C no campo turno) e local (Externa, Civil no campo local_trab)
+    turno_a_count = Manutentor.objects.filter(Q(turno__iexact='Turno A') | Q(turno__iexact='A')).count()
+    turno_b_count = Manutentor.objects.filter(Q(turno__iexact='Turno B') | Q(turno__iexact='B')).count()
+    turno_c_count = Manutentor.objects.filter(Q(turno__iexact='Turno C') | Q(turno__iexact='C')).count()
+    externa_count = Manutentor.objects.filter(local_trab__iexact='Externa').count()
+    civil_count = Manutentor.objects.filter(local_trab__iexact='Civil').count()
+    frigorifico_count = Manutentor.objects.filter(local_trab__iexact='Frigorífico').count()
+    industria_count = Manutentor.objects.filter(local_trab__iexact='Industria').count()
     
-    # Manutentores do mês atual
-    mes_atual = datetime.now().replace(day=1)
-    manutentores_mes_atual = Manutentor.objects.filter(
-        created_at__gte=mes_atual
-    ).count()
-    
-    # Manutentores com máquinas relacionadas
+    # Manutentores com máquinas relacionadas (usado em outras partes)
     manutentores_com_maquinas = Manutentor.objects.filter(
         maquinas__isnull=False
     ).distinct().count()
@@ -13275,32 +13384,30 @@ def analise_manutentores(request):
     locais_labels = [item['local_trab'] or 'Não informado' for item in locais_data_dict]
     locais_data = [item['total'] for item in locais_data_dict]
     
-    # Evolução Temporal (últimos 12 meses)
-    manutentores_por_mes = defaultdict(int)
-    manutentores = Manutentor.objects.all().order_by('created_at')
-    for manutentor in manutentores:
-        if manutentor.created_at:
-            mes_ano = manutentor.created_at.strftime('%Y-%m')
-            manutentores_por_mes[mes_ano] += 1
-    
-    meses_ordenados = sorted(manutentores_por_mes.keys())[-12:]
-    meses_labels = [datetime.strptime(m, '%Y-%m').strftime('%b/%Y') for m in meses_ordenados]
-    meses_data = [manutentores_por_mes[m] for m in meses_ordenados]
-    
-    # Distribuição de Máquinas por Manutentor (0, 1-5, 6-10, 11+)
-    distribuicao_maquinas_labels = ['0 máquinas', '1-5 máquinas', '6-10 máquinas', '11+ máquinas']
-    distribuicao_maquinas_data = [0, 0, 0, 0]
+    # Distribuição de Máquinas por Manutentor (mais granular: 0, 1, 2, 3, 4, 5, 6-10, 11-15, 16+)
+    distribuicao_maquinas_labels = ['0 máquinas', '1 máquina', '2 máquinas', '3 máquinas', '4 máquinas', '5 máquinas', '6-10 máquinas', '11-15 máquinas', '16+ máquinas']
+    distribuicao_maquinas_data = [0, 0, 0, 0, 0, 0, 0, 0, 0]
     
     for manutentor in Manutentor.objects.all():
         qtd_maquinas = ManutentorMaquina.objects.filter(manutentor=manutentor).count()
         if qtd_maquinas == 0:
             distribuicao_maquinas_data[0] += 1
-        elif qtd_maquinas <= 5:
+        elif qtd_maquinas == 1:
             distribuicao_maquinas_data[1] += 1
-        elif qtd_maquinas <= 10:
+        elif qtd_maquinas == 2:
             distribuicao_maquinas_data[2] += 1
-        else:
+        elif qtd_maquinas == 3:
             distribuicao_maquinas_data[3] += 1
+        elif qtd_maquinas == 4:
+            distribuicao_maquinas_data[4] += 1
+        elif qtd_maquinas == 5:
+            distribuicao_maquinas_data[5] += 1
+        elif qtd_maquinas <= 10:
+            distribuicao_maquinas_data[6] += 1
+        elif qtd_maquinas <= 15:
+            distribuicao_maquinas_data[7] += 1
+        else:
+            distribuicao_maquinas_data[8] += 1
     
     # Top 10 Cargos
     cargos_data_dict = Manutentor.objects.exclude(Cargo__isnull=True).exclude(Cargo='').values('Cargo').annotate(
@@ -13342,8 +13449,13 @@ def analise_manutentores(request):
         'page_title': 'Análise de Manutentores',
         'active_page': 'analise_manutentores',
         'total_count': total_count,
-        'manutentores_recentes': manutentores_recentes,
-        'manutentores_mes_atual': manutentores_mes_atual,
+        'turno_a_count': turno_a_count,
+        'turno_b_count': turno_b_count,
+        'turno_c_count': turno_c_count,
+        'externa_count': externa_count,
+        'civil_count': civil_count,
+        'frigorifico_count': frigorifico_count,
+        'industria_count': industria_count,
         'manutentores_com_maquinas': manutentores_com_maquinas,
         'percentual_com_maquinas': round(percentual_com_maquinas, 1),
         'manutentores_com_manutencoes': manutentores_com_manutencoes,
@@ -13354,10 +13466,9 @@ def analise_manutentores(request):
         'turnos_data': json.dumps(turnos_data),
         'locais_labels': json.dumps(locais_labels),
         'locais_data': json.dumps(locais_data),
-        'meses_labels': json.dumps(meses_labels),
-        'meses_data': json.dumps(meses_data),
         'distribuicao_maquinas_labels': json.dumps(distribuicao_maquinas_labels),
         'distribuicao_maquinas_data': json.dumps(distribuicao_maquinas_data),
+        'distribuicao_maquinas_zip': list(zip(distribuicao_maquinas_labels, distribuicao_maquinas_data)),
         'cargos_labels': json.dumps(cargos_labels),
         'cargos_data': json.dumps(cargos_data),
         # Dados para tabelas
