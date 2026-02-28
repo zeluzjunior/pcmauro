@@ -3,68 +3,109 @@
 
 {% block title %}Centros de Atividade - Meu Projeto Django{% endblock %}
 
+{% block extra_css %}
+<style>
+    .stat-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .kpi-card {
+        border-left: 4px solid;
+    }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-secondary { border-left-color: #6c757d; }
+</style>
+{% endblock %}
+
 {% block content %}
 
-<!-- Statistics Section -->
+<!-- Statistics Section (mesmo padrão da Análise Geral de Máquinas) -->
 <section class="py-5 bg-light">
     <div class="container">
-        <div class="row text-center">
-            <div class="col-md-4 col-lg-2 mb-4">
-                <div class="card border-0 bg-primary text-white">
+        <div class="row mb-2">
+            <div class="col-md-4 col-lg-2 mb-3">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
                     <div class="card-body">
-                        <i class="fas fa-building fa-2x mb-2"></i>
-                        <h3 class="display-4 fw-bold">{{ total_frigorifico|default:0 }}</h3>
-                        <p class="mb-0">Frigorífico</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Frigorífico</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_frigorifico|default:0 }}</h2>
+                            </div>
+                            <i class="fas fa-building fa-3x text-primary opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <div class="col-md-4 col-lg-2 mb-4">
-                <div class="card border-0 bg-success text-white">
+            <div class="col-md-4 col-lg-2 mb-3">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
                     <div class="card-body">
-                        <i class="fas fa-industry fa-2x mb-2"></i>
-                        <h3 class="display-4 fw-bold">{{ total_industria|default:0 }}</h3>
-                        <p class="mb-0">Indústria</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Indústria</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_industria|default:0 }}</h2>
+                            </div>
+                            <i class="fas fa-industry fa-3x text-success opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <div class="col-md-4 col-lg-2 mb-4">
-                <div class="card border-0 bg-warning text-white">
+            <div class="col-md-4 col-lg-2 mb-3">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
                     <div class="card-body">
-                        <i class="fas fa-bolt fa-2x mb-2"></i>
-                        <h3 class="display-4 fw-bold">{{ total_utilidades|default:0 }}</h3>
-                        <p class="mb-0">Utilidades</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Utilidades</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_utilidades|default:0 }}</h2>
+                            </div>
+                            <i class="fas fa-bolt fa-3x text-warning opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <div class="col-md-4 col-lg-2 mb-4">
-                <div class="card border-0 bg-danger text-white">
+            <div class="col-md-4 col-lg-2 mb-3">
+                <div class="card stat-card kpi-card kpi-danger shadow-sm border-0">
                     <div class="card-body">
-                        <i class="fas fa-building fa-2x mb-2"></i>
-                        <h3 class="display-4 fw-bold">{{ total_externa|default:0 }}</h3>
-                        <p class="mb-0">Externa</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Externa</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_externa|default:0 }}</h2>
+                            </div>
+                            <i class="fas fa-building fa-3x text-danger opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <div class="col-md-4 col-lg-2 mb-4">
-                <div class="card border-0 bg-secondary text-white">
+            <div class="col-md-4 col-lg-2 mb-3">
+                <div class="card stat-card kpi-card kpi-secondary shadow-sm border-0">
                     <div class="card-body">
-                        <i class="fas fa-handshake fa-2x mb-2"></i>
-                        <h3 class="display-4 fw-bold">{{ total_apoio|default:0 }}</h3>
-                        <p class="mb-0">Apoio</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Apoio</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_apoio|default:0 }}</h2>
+                            </div>
+                            <i class="fas fa-handshake fa-3x text-secondary opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <div class="col-md-4 col-lg-2 mb-4">
-                <div class="card border-0 bg-info text-white">
+            <div class="col-md-4 col-lg-2 mb-3">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
                     <div class="card-body">
-                        <i class="fas fa-chart-pie fa-2x mb-2"></i>
-                        <h3 class="display-4 fw-bold">{{ total_geral|default:0 }}</h3>
-                        <p class="mb-0">Total</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_geral|default:0 }}</h2>
+                            </div>
+                            <i class="fas fa-chart-pie fa-3x text-info opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -56,6 +56,15 @@
                                     </label>
                                 </div>
                             </div>
+                            <div class="mb-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="incluir_inativas" id="incluirInativas" value="1">
+                                    <label class="form-check-label" for="incluirInativas">
+                                        Incluir máquinas inativas
+                                    </label>
+                                </div>
+                                <small class="text-muted">Se desmarcado, apenas máquinas ativas são exportadas.</small>
+                            </div>
                             <div class="d-grid gap-2">
                                 <button type="submit" class="btn btn-success btn-lg" name="download" value="1">
                                     <i class="fas fa-download me-2"></i>Exportar e Baixar
@@ -78,7 +87,7 @@
                     </div>
                     <div class="card-body">
                         <p class="mb-0 text-muted">
-                            O arquivo exportado conterá todas as máquinas ativas cadastradas no sistema, incluindo campos como código, descrição, setor, unidade, patrimônio e descrição de gerência.
+                            O arquivo exportado conterá os dados da tabela Máquinas: código, descrição, setor, unidade, patrimônio, centro de atividade, ativo, datas de criação/atualização e nomes dos arquivos anexados (foto, PDF, etc.), no formato Excel ou CSV.
                         </p>
                     </div>
                 </div>

@@ -44,11 +44,7 @@ CLASSI_CA = (
     ('INDUSTRIALIZADOS', 'INDUSTRIALIZADOS'),
 )
 
-RESPONSAVEL_PCM = (
-    ('JOSÉ', 'JOSÉ'),
-    ('RHUAN', 'RHUAN'),
-    ('KARINE', 'KARINE'),
-)
+RESPONSAVEL_PCM = (('JOSÉ', 'JOSÉ'),('RHUAN', 'RHUAN'),('KARINE', 'KARINE'),)
 
 
 class Maquina(models.Model):
@@ -364,6 +360,7 @@ class CentroAtividade(models.Model):
     encarregado_responsavel = models.CharField('Encarregado Responsável', max_length=255, blank=True, null=True)
     local = models.CharField('Local', max_length=255, blank=True, null=True, help_text='Local do Centro de Atividade')
     observacoes = models.TextField('Observações', blank=True, null=True, help_text='Observações sobre o local')
+    imagem = models.CharField('Imagem', max_length=500, blank=True, null=True, help_text='Caminho da imagem (relativo a static/)')
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
     updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
 

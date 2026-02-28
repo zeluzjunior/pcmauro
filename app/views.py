@@ -2028,14 +2028,26 @@ def maquina_primaria_secundaria(request):
     from .models import Maquina, MaquinaPrimariaSecundaria
     from django.contrib import messages
     
-    # Buscar máquinas primárias (descr_gerenc = "MÁQUINAS PRINCIPAL") - apenas ativas
+    # Filtro por setor (descr_setormanut) - GET
+    filtro_setor = (request.GET.get('setor') or request.GET.get('descr_setormanut') or '').strip() or None
+    setores_disponiveis = list(
+        Maquina.objects.exclude(descr_setormanut__isnull=True)
+        .exclude(descr_setormanut='')
+        .values_list('descr_setormanut', flat=True)
+        .distinct()
+        .order_by('descr_setormanut')
+    )
+    
+    # Buscar máquinas primárias (descr_gerenc = "MÁQUINAS PRINCIPAL") - apenas ativas; opcionalmente filtrar por setor
     maquinas_primarias = Maquina.objects.filter(
         descr_gerenc__iexact='MÁQUINAS PRINCIPAL',
         ativo=True
-    ).order_by('cd_maquina')
+    )
+    if filtro_setor:
+        maquinas_primarias = maquinas_primarias.filter(descr_setormanut=filtro_setor)
+    maquinas_primarias = maquinas_primarias.order_by('cd_maquina')
     
-    # Buscar máquinas secundárias que ainda não estão relacionadas - apenas ativas
-    # Excluir máquinas que já são primárias E máquinas que já estão relacionadas como secundárias
+    # Buscar máquinas secundárias que ainda não estão relacionadas - apenas ativas; opcionalmente filtrar por setor
     maquinas_secundarias_relacionadas = MaquinaPrimariaSecundaria.objects.values_list('maquina_secundaria_id', flat=True)
     maquinas_secundarias = Maquina.objects.filter(
         ativo=True
@@ -2043,10 +2055,15 @@ def maquina_primaria_secundaria(request):
         descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
     ).exclude(
         id__in=maquinas_secundarias_relacionadas
-    ).order_by('cd_maquina')
+    )
+    if filtro_setor:
+        maquinas_secundarias = maquinas_secundarias.filter(descr_setormanut=filtro_setor)
+    maquinas_secundarias = maquinas_secundarias.order_by('cd_maquina')
     
-    # Buscar relacionamentos existentes
+    # Buscar relacionamentos existentes; opcionalmente filtrar por setor da máquina primária
     relacionamentos = MaquinaPrimariaSecundaria.objects.select_related('maquina_primaria', 'maquina_secundaria').order_by('-created_at')
+    if filtro_setor:
+        relacionamentos = relacionamentos.filter(maquina_primaria__descr_setormanut=filtro_setor)
     
     # Processar POST para criar relacionamentos
     if request.method == 'POST':
@@ -2121,14 +2138,23 @@ def maquina_primaria_secundaria(request):
                 except Exception as e:
                     messages.error(request, f'Erro ao remover relacionamento: {str(e)}')
         
-        return redirect('maquina_primaria_secundaria')
+        from django.urls import reverse
+        from urllib.parse import quote
+        url = reverse('maquina_primaria_secundaria')
+        # Manter filtro setor após POST (vem do GET na página ou do hidden no form)
+        setor_redirect = request.POST.get('redirect_setor') or filtro_setor
+        if setor_redirect:
+            url += '?setor=' + quote(setor_redirect)
+        return redirect(url)
     
     context = {
         'page_title': 'Agrupar Máquinas Primárias e Secundárias',
         'active_page': 'maquina_primaria_secundaria',
         'maquinas_primarias': maquinas_primarias,
         'maquinas_secundarias': maquinas_secundarias,
-        'relacionamentos': relacionamentos
+        'relacionamentos': relacionamentos,
+        'setores_disponiveis': setores_disponiveis,
+        'filtro_setor': filtro_setor,
     }
     return render(request, 'maquinas/maquina_primaria_secundaria.html', context)
 
@@ -2359,41 +2385,69 @@ def importar_maquinas(request):
 
 
 def exportar_maquinas(request):
-    """Exportar Máquinas - página e download de arquivo"""
+    """Exportar Máquinas - página e download Excel/CSV com dados da tabela Maquina"""
     from django.http import HttpResponse
     from app.models import Maquina
     import csv
     import io
     from datetime import datetime
 
-    if request.GET.get('download') and request.GET.get('formato'):
-        formato = request.GET.get('formato', 'xlsx').lower()
-        maquinas = Maquina.objects.filter(ativo=True).order_by('cd_maquina')
+    formato = (request.GET.get('formato') or '').strip().lower()
+    if formato in ('csv', 'xlsx'):
+        # Exportar todas as máquinas (tabela Maquina); filtro ativo opcional via GET
+        incluir_inativas = request.GET.get('incluir_inativas') == '1'
+        if incluir_inativas:
+            maquinas = Maquina.objects.all().order_by('cd_maquina')
+        else:
+            maquinas = Maquina.objects.filter(ativo=True).order_by('cd_maquina')
+        maquinas = maquinas.select_related('centro_atividade')
         filename_base = f'maquinas_export_{datetime.now().strftime("%Y%m%d_%H%M")}'
+
+        # Cabeçalhos: ordem preferida (descr_setormanut, cd_setormanut, descr_maquina, cd_maquina, descr_gerenc primeiro), demais a seguir
+        headers = [
+            'descr_setormanut', 'cd_setormanut', 'descr_maquina', 'cd_maquina', 'descr_gerenc',
+            'cd_unid', 'nome_unid', 'cs_tt_maquina', 'cd_priomaqutv', 'nro_patrimonio',
+            'cd_modelo', 'cd_grupo', 'cd_tpcentativ',
+            'centro_atividade_id', 'centro_atividade_ca', 'ativo', 'created_at', 'updated_at',
+            'foto', 'placa_identificacao', 'codigo_aurora', 'codigo_fabricante',
+            'arquivo_pdf', 'diagrama_eletrico', 'pecas_reposicao',
+        ]
+
+        def row_from_maquina(m):
+            return [
+                m.descr_setormanut or '',
+                m.cd_setormanut or '',
+                m.descr_maquina or '',
+                m.cd_maquina,
+                m.descr_gerenc or '',
+                m.cd_unid,
+                m.nome_unid or '',
+                m.cs_tt_maquina,
+                m.cd_priomaqutv,
+                m.nro_patrimonio or '',
+                m.cd_modelo,
+                m.cd_grupo,
+                m.cd_tpcentativ,
+                m.centro_atividade_id,
+                m.centro_atividade.ca if m.centro_atividade else '',
+                m.ativo,
+                m.created_at.strftime('%Y-%m-%d %H:%M:%S') if m.created_at else '',
+                m.updated_at.strftime('%Y-%m-%d %H:%M:%S') if m.updated_at else '',
+                m.foto.name if m.foto else '',
+                m.placa_identificacao.name if m.placa_identificacao else '',
+                m.codigo_aurora.name if m.codigo_aurora else '',
+                m.codigo_fabricante.name if m.codigo_fabricante else '',
+                m.arquivo_pdf.name if m.arquivo_pdf else '',
+                m.diagrama_eletrico.name if m.diagrama_eletrico else '',
+                m.pecas_reposicao.name if m.pecas_reposicao else '',
+            ]
 
         if formato == 'csv':
             output = io.StringIO()
             writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
-            headers = ['CD_MAQUINA', 'CD_UNID', 'NOME_UNID', 'CS_TT_MAQUINA', 'DESCR_MAQUINA', 'CD_SETORMANUT',
-                       'DESCR_SETORMANUT', 'CD_PRIOMAQUTV', 'NRO_PATRIMONIO', 'CD_MODELO', 'CD_GRUPO',
-                       'CD_TPCENTATIV', 'DESCR_GERENC']
             writer.writerow(headers)
             for m in maquinas:
-                writer.writerow([
-                    m.cd_maquina or '',
-                    m.cd_unid or '',
-                    m.nome_unid or '',
-                    m.cs_tt_maquina or '',
-                    m.descr_maquina or '',
-                    m.cd_setormanut or '',
-                    m.descr_setormanut or '',
-                    m.cd_priomaqutv or '',
-                    m.nro_patrimonio or '',
-                    m.cd_modelo or '',
-                    m.cd_grupo or '',
-                    m.cd_tpcentativ or '',
-                    m.descr_gerenc or '',
-                ])
+                writer.writerow(row_from_maquina(m))
             response = HttpResponse(output.getvalue().encode('utf-8-sig'), content_type='text/csv; charset=utf-8-sig')
             response['Content-Disposition'] = f'attachment; filename="{filename_base}.csv"'
             return response
@@ -2403,25 +2457,11 @@ def exportar_maquinas(request):
             wb = openpyxl.Workbook()
             ws = wb.active
             ws.title = 'Máquinas'
-            headers = ['CD_MAQUINA', 'CD_UNID', 'NOME_UNID', 'CS_TT_MAQUINA', 'DESCR_MAQUINA', 'CD_SETORMANUT',
-                       'DESCR_SETORMANUT', 'CD_PRIOMAQUTV', 'NRO_PATRIMONIO', 'CD_MODELO', 'CD_GRUPO',
-                       'CD_TPCENTATIV', 'DESCR_GERENC']
             for col, h in enumerate(headers, 1):
                 ws.cell(row=1, column=col, value=h)
             for row_idx, m in enumerate(maquinas, 2):
-                ws.cell(row=row_idx, column=1, value=m.cd_maquina)
-                ws.cell(row=row_idx, column=2, value=m.cd_unid)
-                ws.cell(row=row_idx, column=3, value=m.nome_unid)
-                ws.cell(row=row_idx, column=4, value=m.cs_tt_maquina)
-                ws.cell(row=row_idx, column=5, value=m.descr_maquina)
-                ws.cell(row=row_idx, column=6, value=m.cd_setormanut)
-                ws.cell(row=row_idx, column=7, value=m.descr_setormanut)
-                ws.cell(row=row_idx, column=8, value=m.cd_priomaqutv)
-                ws.cell(row=row_idx, column=9, value=m.nro_patrimonio)
-                ws.cell(row=row_idx, column=10, value=m.cd_modelo)
-                ws.cell(row=row_idx, column=11, value=m.cd_grupo)
-                ws.cell(row=row_idx, column=12, value=m.cd_tpcentativ)
-                ws.cell(row=row_idx, column=13, value=m.descr_gerenc)
+                for col_idx, val in enumerate(row_from_maquina(m), 1):
+                    ws.cell(row=row_idx, column=col_idx, value=val)
             output = io.BytesIO()
             wb.save(output)
             output.seek(0)

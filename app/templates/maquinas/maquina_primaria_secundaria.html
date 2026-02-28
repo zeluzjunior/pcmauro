@@ -48,9 +48,36 @@
                         </h5>
                     </div>
                     <div class="card-body p-4">
+                        <!-- Filtro por Setor (para Máquina Primária e lista abaixo) -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="bg-light rounded py-2 px-3 border">
+                                    <form method="get" action="{% url 'maquina_primaria_secundaria' %}" class="d-flex flex-wrap align-items-center gap-2 mb-0">
+                                        <label for="filtroSetor" class="form-label mb-0 text-muted small fw-semibold">
+                                            <i class="fas fa-filter me-1"></i>Filtrar por Setor (descr_setormanut):
+                                        </label>
+                                        <select name="setor" id="filtroSetor" class="form-select form-select-sm" style="max-width: 280px;">
+                                            <option value="">-- Todos os setores --</option>
+                                            {% for setor in setores_disponiveis %}
+                                                <option value="{{ setor }}" {% if filtro_setor == setor %}selected{% endif %}>{{ setor }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <button type="submit" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-search me-1"></i>Filtrar
+                                        </button>
+                                        {% if filtro_setor %}
+                                            <a href="{% url 'maquina_primaria_secundaria' %}" class="btn btn-sm btn-outline-secondary">Limpar filtro</a>
+                                            <span class="badge bg-info">Setor: {{ filtro_setor }}</span>
+                                        {% endif %}
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
                         <form method="post" action="{% url 'maquina_primaria_secundaria' %}" id="relacionamentoForm">
                             {% csrf_token %}
                             <input type="hidden" name="criar_relacionamento" value="1">
+                            {% if filtro_setor %}<input type="hidden" name="redirect_setor" value="{{ filtro_setor }}">{% endif %}
                             
                             <div class="row g-4">
                                 <!-- Máquina Primária -->
@@ -60,6 +87,9 @@
                                             <h6 class="mb-0">
                                                 <i class="fas fa-star me-2"></i>Máquina Primária
                                                 <span class="text-danger">*</span>
+                                                {% if filtro_setor %}
+                                                    <span class="badge bg-light text-dark ms-2">Setor: {{ filtro_setor }}</span>
+                                                {% endif %}
                                             </h6>
                                         </div>
                                         <div class="card-body">
@@ -117,6 +147,9 @@
                                             <h6 class="mb-0">
                                                 <i class="fas fa-cogs me-2"></i>Máquinas Secundárias
                                                 <span class="text-danger">*</span>
+                                                {% if filtro_setor %}
+                                                    <span class="badge bg-light text-dark ms-2">Setor: {{ filtro_setor }}</span>
+                                                {% endif %}
                                             </h6>
                                         </div>
                                         <div class="card-body">
