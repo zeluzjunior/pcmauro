@@ -128,7 +128,7 @@
                     <div class="row g-4">
                         {% for centro in centros_frigorifico %}
                         <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="centro-card-link">
+                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="centro-card-link" target="_blank" rel="noopener noreferrer">
                                 <div class="centro-card">
                                     <div class="centro-card-image-wrapper">
                                         {% if centro.imagem %}
@@ -182,7 +182,7 @@
                     <div class="row g-4">
                         {% for centro in centros_industria %}
                         <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="centro-card-link">
+                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="centro-card-link" target="_blank" rel="noopener noreferrer">
                                 <div class="centro-card centro-card-industria">
                                     <div class="centro-card-image-wrapper">
                                         {% if centro.imagem %}
@@ -238,7 +238,7 @@
                     <div class="row g-4">
                         {% for centro in centros_utilidades %}
                         <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="centro-card-link">
+                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="centro-card-link" target="_blank" rel="noopener noreferrer">
                                 <div class="centro-card centro-card-utilidades">
                                     <div class="centro-card-image-wrapper">
                                         {% if centro.imagem %}
@@ -292,7 +292,7 @@
                     <div class="row g-4">
                         {% for centro in centros_externa %}
                         <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="centro-card-link">
+                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="centro-card-link" target="_blank" rel="noopener noreferrer">
                                 <div class="centro-card centro-card-externa">
                                     <div class="centro-card-image-wrapper">
                                         {% if centro.imagem %}
@@ -348,7 +348,7 @@
                     <div class="row g-4">
                         {% for centro in centros_apoio %}
                         <div class="col-6 col-sm-4 col-md-2 col-lg-2">
-                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="centro-card-link">
+                            <a href="{% url 'visualizar_centro_de_atividade' centro.id %}" class="centro-card-link" target="_blank" rel="noopener noreferrer">
                                 <div class="centro-card centro-card-apoio">
                                     <div class="centro-card-image-wrapper">
                                         {% if centro.imagem %}

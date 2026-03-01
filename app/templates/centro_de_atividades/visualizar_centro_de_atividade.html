@@ -27,6 +27,21 @@
     [data-ctrl-menu] {
         display: none !important;
     }
+    .kpi-mini {
+        border-left: 4px solid;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .kpi-mini:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,0.1);
+    }
+    .ca-hero-img {
+        max-height: 120px;
+        width: auto;
+        object-fit: contain;
+        border-radius: 8px;
+        border: 2px solid rgba(255,255,255,0.5);
+    }
 </style>
 {% endblock %}
 
@@ -34,17 +49,85 @@
 <!-- Page Header -->
 <section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
     <div class="container">
-        <div class="row">
-            <div class="col-12">
+        <div class="row align-items-center">
+            <div class="col-12 col-lg-8">
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'consultar_locais_e_cas' %}" class="text-white">Locais e CAs</a></li>
-                        <li class="breadcrumb-item active text-white" aria-current="page">Visualizar CA {{ ca.ca }}</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">CA {{ ca.ca }}{% if ca.sigla %} ({{ ca.sigla }}){% endif %}</li>
                     </ol>
                 </nav>
-                <h1 class="display-4 fw-bold mt-3">Visualizar Centro de Atividade</h1>
-                <p class="lead">Detalhes completos do CA {{ ca.ca }}</p>
+                <h1 class="display-4 fw-bold mt-3">Centro de Atividade {{ ca.ca }}</h1>
+                <p class="lead mb-0">{{ ca.descricao|default:"Detalhes e indicadores do CA." }}</p>
+                {% if ca.local %}
+                    <p class="mt-2 mb-0 opacity-90"><i class="fas fa-map-marker-alt me-1"></i>{{ ca.local }}</p>
+                {% endif %}
+            </div>
+            {% if ca.imagem %}
+            <div class="col-12 col-lg-4 text-lg-end mt-3 mt-lg-0">
+                <img src="{% static ca.imagem %}" alt="CA {{ ca.ca }}" class="ca-hero-img" onerror="this.style.display='none'">
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<!-- KPI Summary -->
+<section class="py-3 bg-light border-bottom">
+    <div class="container-fluid px-5">
+        <div class="row g-2">
+            <div class="col-6 col-md-3">
+                <div class="card kpi-mini border-0 shadow-sm h-100 border-primary">
+                    <div class="card-body py-3">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-cogs fa-2x text-primary me-2 opacity-75"></i>
+                            <div>
+                                <span class="text-muted small d-block">Máquinas</span>
+                                <span class="fw-bold fs-5">{{ total_maquinas }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card kpi-mini border-0 shadow-sm h-100 border-danger">
+                    <div class="card-body py-3">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-wrench fa-2x text-danger me-2 opacity-75"></i>
+                            <div>
+                                <span class="text-muted small d-block">OS Corretivas</span>
+                                <span class="fw-bold fs-5">{{ total_os_corretivas }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card kpi-mini border-0 shadow-sm h-100 border-success">
+                    <div class="card-body py-3">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-clipboard-check fa-2x text-success me-2 opacity-75"></i>
+                            <div>
+                                <span class="text-muted small d-block">OS Preventivas</span>
+                                <span class="fw-bold fs-5">{{ total_os_preventivas }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card kpi-mini border-0 shadow-sm h-100 border-info">
+                    <div class="card-body py-3">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-users-cog fa-2x text-info me-2 opacity-75"></i>
+                            <div>
+                                <span class="text-muted small d-block">Manutentores</span>
+                                <span class="fw-bold fs-5">{{ total_manutentores }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -55,22 +138,22 @@
     <div class="container-fluid px-5">
         <div class="row">
             <div class="col-12">
-                    <!-- Informações Principais -->
+                    <!-- Informações do Centro de Atividade (Principais + Adicionais) -->
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-info-circle me-2"></i>Informações Principais
+                            <i class="fas fa-info-circle me-2"></i>Informações do Centro de Atividade
                         </h5>
                     </div>
                     <div class="card-body">
                         <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label fw-bold">CA (Código do Centro de Atividade)</label>
-                                <p class="form-control-plaintext">{{ ca.ca }}</p>
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <label class="form-label fw-bold">CA (Código)</label>
+                                <p class="form-control-plaintext mb-0">{{ ca.ca }}</p>
                             </div>
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-6 col-lg-4 mb-3">
                                 <label class="form-label fw-bold">Sigla</label>
-                                <p class="form-control-plaintext">
+                                <p class="form-control-plaintext mb-0">
                                     {% if ca.sigla %}
                                         <span class="badge bg-secondary fs-6">{{ ca.sigla }}</span>
                                     {% else %}
@@ -78,26 +161,9 @@
                                     {% endif %}
                                 </p>
                             </div>
-                            <div class="col-md-12 mb-3">
-                                <label class="form-label fw-bold">Descrição</label>
-                                <p class="form-control-plaintext">{{ ca.descricao|default:"Não informado" }}</p>
-                            </div>
-                        </div>
-                            </div>
-                        </div>
-
-                <!-- Informações Adicionais -->
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-info me-2"></i>Informações Adicionais
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-6 col-lg-4 mb-3">
                                 <label class="form-label fw-bold">Índice</label>
-                                <p class="form-control-plaintext">
+                                <p class="form-control-plaintext mb-0">
                                     {% if ca.indice %}
                                         <span class="badge bg-info text-dark fs-6">{{ ca.indice }}</span>
                                     {% else %}
@@ -105,67 +171,141 @@
                                     {% endif %}
                                 </p>
                             </div>
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label fw-bold">Descrição</label>
+                                <p class="form-control-plaintext mb-0">{{ ca.descricao|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <label class="form-label fw-bold">Local / Área</label>
+                                <p class="form-control-plaintext mb-0">{{ ca.local|default:"Não informado" }}</p>
+                            </div>
+                            <div class="col-md-6 col-lg-4 mb-3">
                                 <label class="form-label fw-bold">Encarregado Responsável</label>
-                                <p class="form-control-plaintext">{{ ca.encarregado_responsavel|default:"Não informado" }}</p>
+                                <p class="form-control-plaintext mb-0">{{ ca.encarregado_responsavel|default:"Não informado" }}</p>
                             </div>
-                        </div>
+                            {% if ca.observacoes %}
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label fw-bold">Observações</label>
+                                <p class="form-control-plaintext mb-0">{{ ca.observacoes }}</p>
                             </div>
+                            {% endif %}
                         </div>
+                    </div>
+                </div>
 
-                <!-- Locais do Centro de Atividade -->
+                <!-- Gráfico: Ocorrência de OS Corretivas (por mês) -->
                 <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-warning text-dark">
+                    <div class="card-header bg-danger text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-map-marker-alt me-2"></i>Locais do Centro de Atividade
+                            <i class="fas fa-chart-line me-2"></i>Ocorrência de Ordens de Serviço Corretivas
                         </h5>
                     </div>
                     <div class="card-body">
-                        {% if ca.locais.all %}
-                            <div class="row">
-                                {% for local in ca.locais.all %}
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card border-warning">
-                                            <div class="card-body">
-                                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                                    <h6 class="card-title text-primary mb-0">
-                                                        <i class="fas fa-map-marker-alt me-2"></i>Local {{ forloop.counter }}
-                                                    </h6>
-                                                    <a href="{% url 'visualizar_local' local.id %}" class="btn btn-sm btn-outline-primary" title="Visualizar detalhes do local">
-                                                        <i class="fas fa-eye"></i>
-                                                    </a>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label fw-bold small">Local:</label>
-                                                    <p class="mb-0">{{ local.local }}</p>
-                                                </div>
-                                                {% if local.observacoes %}
-                                                    <div class="mb-2">
-                                                        <label class="form-label fw-bold small">Observações:</label>
-                                                        <p class="mb-0 text-muted small">{{ local.observacoes|truncatewords:15 }}</p>
-                                                    </div>
-                                                {% endif %}
-                                                <div class="mt-2 pt-2 border-top">
-                                                    <small class="text-muted">
-                                                        <i class="fas fa-calendar me-1"></i>
-                                                        Criado em: {{ local.created_at|date:"d/m/Y H:i:s" }}<br>
-                                                        <i class="fas fa-edit me-1"></i>
-                                                        Atualizado em: {{ local.updated_at|date:"d/m/Y H:i:s" }}
-                                                    </small>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                {% endfor %}
+                        <p class="text-muted small mb-3">Quantidade de OS Corretivas por mês: <strong>Abertura (dt_abertura_solicita)</strong> e <strong>Encerramento (dt_encordmanu)</strong>.</p>
+                        <div style="height: 280px;">
+                            <canvas id="osCorretivasChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Linhas de Produção -->
+                {% if linhas_producao %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-industry me-2"></i>Linhas de Produção
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-2">Este CA está associado às seguintes linhas de produção (paradas e análises):</p>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for linha in linhas_producao %}
+                                <span class="badge bg-warning text-dark fs-6">{{ linha }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Resumo de Manutenção -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-tools me-2"></i>Resumo de Manutenção
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <h6 class="text-danger"><i class="fas fa-wrench me-1"></i>Ordens de Serviço Corretivas</h6>
+                                <p class="mb-0">Total registrado para este CA: <strong>{{ total_os_corretivas }}</strong></p>
                             </div>
-                        {% else %}
-                            <div class="alert alert-info mb-0">
-                                <i class="fas fa-info-circle me-2"></i>
-                                Nenhum local cadastrado para este Centro de Atividade.
-                            </div>
-                        {% endif %}
+                            <div class="col-md-6">
+                                <h6 class="text-success"><i class="fas fa-clipboard-check me-1"></i>Ordens de Serviço Preventivas</h6>
+                                <p class="mb-0">Total registrado para este CA: <strong>{{ total_os_preventivas }}</strong></p>
                             </div>
                         </div>
+                        <div class="row">
+                            {% if ultimas_os_corretivas %}
+                            <div class="col-md-6">
+                                <h6 class="text-muted small">Últimas 5 OS Corretivas</h6>
+                                <ul class="list-group list-group-flush small">
+                                    {% for os in ultimas_os_corretivas %}
+                                    <li class="list-group-item d-flex justify-content-between px-0">
+                                        <span>OS {{ os.cd_ordemserv }}</span>
+                                        <span class="text-muted">{{ os.descr_maquina|truncatewords:4 }}</span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                            {% if ultimas_os_preventivas %}
+                            <div class="col-md-6">
+                                <h6 class="text-muted small">Últimas 5 OS Preventivas</h6>
+                                <ul class="list-group list-group-flush small">
+                                    {% for os in ultimas_os_preventivas %}
+                                    <li class="list-group-item d-flex justify-content-between px-0">
+                                        <span>OS {{ os.cd_ordemserv }}</span>
+                                        <span class="text-muted">{{ os.descr_maquina|truncatewords:4 }}</span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% if not ultimas_os_corretivas and not ultimas_os_preventivas %}
+                            <p class="text-muted mb-0 small">Nenhuma ordem de serviço recente listada para este CA.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Equipe / Manutentores -->
+                {% if manutentores_list %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header text-white" style="background-color: #0d6efd;">
+                        <h5 class="mb-0">
+                            <i class="fas fa-users-cog me-2"></i>Equipe (Manutentores vinculados)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">Manutentores associados às máquinas deste Centro de Atividade.</p>
+                        <div class="row">
+                            {% for man in manutentores_list %}
+                            <div class="col-md-6 col-lg-4 mb-2">
+                                <div class="d-flex align-items-center p-2 rounded bg-light">
+                                    <i class="fas fa-user-cog text-primary me-2"></i>
+                                    <div>
+                                        <span class="fw-bold">{{ man.Nome|default:"—" }}</span>
+                                        {% if man.Cargo %}<br><small class="text-muted">{{ man.Cargo }}</small>{% endif %}
+                                        {% if man.Matricula %}<br><small class="text-muted">Mat. {{ man.Matricula }}</small>{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
 
                 <!-- Hierarquia de Máquinas -->
                 <div class="card shadow-sm mb-4">
@@ -242,12 +382,15 @@
                 </div>
 
                 <!-- Botões de Ação -->
-                <div class="d-flex justify-content-between mt-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-center mt-4 gap-2">
                     <a href="{% url 'consultar_locais_e_cas' %}" class="btn btn-secondary">
                         <i class="fas fa-arrow-left me-2"></i>Voltar para Lista
                     </a>
-                    <div>
-                        <a href="{% url 'editar_centro_de_atividades' ca.id %}" class="btn btn-warning me-2">
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="{% url 'centros_de_atividade' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-chart-bar me-2"></i>Análise de CAs
+                        </a>
+                        <a href="{% url 'editar_centro_de_atividades' ca.id %}" class="btn btn-warning">
                             <i class="fas fa-edit me-2"></i>Editar
                         </a>
                         <a href="{% url 'consultar_locais_e_cas' %}?search={{ ca.ca }}" class="btn btn-info">
@@ -262,7 +405,67 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
+    // Gráfico de ocorrência de OS Corretivas por mês (Abertura e Encerramento)
+    (function() {
+        var el = document.getElementById('osCorretivasChart');
+        if (!el) return;
+        var labels = {{ meses_os_corretivas_labels|safe }};
+        var dataAbertura = {{ meses_os_corretivas_data_abertura|safe }};
+        var dataEncordmanu = {{ meses_os_corretivas_data_encordmanu|safe }};
+        if (!labels || labels.length === 0) {
+            labels = ['Nenhum dado'];
+            dataAbertura = [0];
+            dataEncordmanu = [0];
+        }
+        if (typeof Chart !== 'undefined') {
+            new Chart(el.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Abertura (dt_abertura_solicita)',
+                            data: dataAbertura,
+                            backgroundColor: 'rgba(220, 53, 69, 0.7)',
+                            borderColor: 'rgb(220, 53, 69)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Encerramento (dt_encordmanu)',
+                            data: dataEncordmanu,
+                            backgroundColor: 'rgba(40, 167, 69, 0.7)',
+                            borderColor: 'rgb(40, 167, 69)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) { return ctx.dataset.label + ': ' + ctx.parsed.y; }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        },
+                        x: {
+                            ticks: { maxRotation: 45, minRotation: 35 }
+                        }
+                    }
+                }
+            });
+        }
+    })();
+
     // Função para carregar o script do OrgChartJS
     function loadOrgChartScript() {
         return new Promise(function(resolve, reject) {
@@ -487,5 +690,3 @@
     }
 </script>
 {% endblock %}
-
-

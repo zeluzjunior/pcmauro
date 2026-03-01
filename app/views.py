@@ -4046,7 +4046,7 @@ def cadastrar_local_e_cas(request):
         'active_page': 'cadastrar_centro_de_atividade',
         'form': form,
     }
-    return render(request, 'cadastrar/cadastrar_centro_de_atividade.html', context)
+    return render(request, 'centro_de_atividades/cadastrar_centro_de_atividade.html', context)
 
 
 def consultar_locais_e_cas(request):
@@ -4142,54 +4142,46 @@ def consultar_locais_e_cas(request):
         'filter_local': filter_local,
         'search_query': search_query,
     }
-    return render(request, 'consultar/consultar_centros_de_atividades.html', context)
+    return render(request, 'centro_de_atividades/consultar_centros_de_atividades.html', context)
 
 
 def visualizar_centro_de_atividade(request, ca_id):
     """Visualizar detalhes de um Centro de Atividade específico"""
-    from app.models import CentroAtividade, Maquina, MaquinaPrimariaSecundaria
+    from app.models import (
+        CentroAtividade,
+        Maquina,
+        MaquinaPrimariaSecundaria,
+        OrdemServicoCorretiva,
+        OrdemServicoPreventiva,
+        ConfigLinhaProducaoCentroAtividade,
+        ManutentorMaquina,
+    )
+    from django.db.models import Q
     import json
-    
+
     try:
         centro_atividade = CentroAtividade.objects.get(id=ca_id)
     except CentroAtividade.DoesNotExist:
         messages.error(request, 'Centro de Atividade não encontrado.')
         return redirect('consultar_locais_e_cas')
-    
+
     # Buscar máquinas relacionadas a este Centro de Atividade
-    # Máquinas podem estar relacionadas através de:
-    # 1. centro_atividade (campo direto na tabela Maquina)
-    # 2. cd_tpcentativ (campo direto na tabela Maquina que corresponde ao número do CA)
-    from django.db.models import Q
-    
     maquinas_do_ca = Maquina.objects.filter(
         Q(centro_atividade=centro_atividade) |
         Q(cd_tpcentativ=centro_atividade.ca)
     ).distinct()
-    
-    print(f"DEBUG: Centro de Atividade CA={centro_atividade.ca}, ID={centro_atividade.id}")
-    print(f"DEBUG: Total de máquinas encontradas no CA (via centro_atividade): {Maquina.objects.filter(centro_atividade=centro_atividade).count()}")
-    print(f"DEBUG: Total de máquinas encontradas no CA (via cd_tpcentativ={centro_atividade.ca}): {Maquina.objects.filter(cd_tpcentativ=centro_atividade.ca).count()}")
-    print(f"DEBUG: Total de máquinas encontradas no CA (total combinado): {maquinas_do_ca.count()}")
-    
+
     # Buscar máquinas primárias (descr_gerenc = "MÁQUINAS PRINCIPAL") relacionadas a este CA
     maquinas_primarias = maquinas_do_ca.filter(
         descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
     ).order_by('cd_maquina')
-    
-    print(f"DEBUG: Máquinas primárias encontradas: {maquinas_primarias.count()}")
-    if maquinas_primarias.exists():
-        for mp in maquinas_primarias[:5]:  # Mostrar apenas as 5 primeiras para debug
-            print(f"  - Máquina Primária: {mp.cd_maquina} - {mp.descr_maquina}")
-    
-    # Buscar relacionamentos entre máquinas primárias e secundárias para estas máquinas
+
+    # Relacionamentos primária-secundária
     relacionamentos = MaquinaPrimariaSecundaria.objects.filter(
         maquina_primaria__in=maquinas_primarias
     ).select_related(
         'maquina_primaria', 'maquina_secundaria'
     ).order_by('maquina_primaria__cd_maquina', 'maquina_secundaria__cd_maquina')
-    
-    print(f"DEBUG: Relacionamentos encontrados: {relacionamentos.count()}")
     
     # Construir lista de nós no formato OrgChartJS
     nodes = []
@@ -4227,21 +4219,91 @@ def visualizar_centro_de_atividade(request, ca_id):
         if foto_url:
             node_data['img_0'] = foto_url
         nodes.append(node_data)
-    
-    print(f"DEBUG: Total de nós criados: {len(nodes)}")
-    if nodes:
-        print(f"DEBUG: Primeiro nó: {nodes[0]}")
-    
+
     # Serializar JSON
     try:
         dados_json_str = json.dumps(nodes, ensure_ascii=False, default=str)
-    except Exception as e:
-        print(f"Erro ao serializar JSON: {e}")
-        dados_json_str = json.dumps([{
-            'id': 0,
-            'name': 'Erro ao processar dados'
-        }], ensure_ascii=False)
-    
+    except Exception:
+        dados_json_str = json.dumps([{'id': 0, 'name': 'Erro ao processar dados'}], ensure_ascii=False)
+
+    # Ordens de serviço: correlacionar pelo setor de manutenção (cd_setormanut)
+    # das máquinas deste CA (os dados vêm por setor, não por cd_tpcentativ)
+
+    setores_do_ca = list(
+        maquinas_do_ca.exclude(cd_setormanut__isnull=True)
+        .exclude(cd_setormanut='')
+        .values_list('cd_setormanut', flat=True)
+        .distinct()
+    )
+
+    if setores_do_ca:
+        qs_os_corretivas = OrdemServicoCorretiva.objects.filter(cd_setormanut__in=setores_do_ca)
+        qs_os_preventivas = OrdemServicoPreventiva.objects.filter(cd_setormanut__in=setores_do_ca)
+    else:
+        # Fallback: sem máquinas com setor, usar cd_tpcentativ
+        qs_os_corretivas = OrdemServicoCorretiva.objects.filter(cd_tpcentativ=centro_atividade.ca)
+        qs_os_preventivas = OrdemServicoPreventiva.objects.filter(cd_tpcentativ=centro_atividade.ca)
+
+    total_os_corretivas = qs_os_corretivas.count()
+    total_os_preventivas = qs_os_preventivas.count()
+    ultimas_os_corretivas = qs_os_corretivas.order_by('-cd_ordemserv')[:5]
+    ultimas_os_preventivas = qs_os_preventivas.order_by('-cd_ordemserv')[:5]
+
+    # OS Corretivas por mês: duas séries (dt_abertura_solicita e dt_encordmanu)
+    from datetime import datetime as dt_parse
+
+    def _parse_date_str(date_str):
+        if not date_str or not str(date_str).strip():
+            return None
+        s = str(date_str).strip()
+        part = s.split(' ')[0] if ' ' in s else s
+        for fmt in ('%d/%m/%Y', '%d-%m-%Y', '%d.%m.%Y', '%Y-%m-%d', '%Y/%m/%d', '%d/%m/%y', '%d-%m-%y'):
+            try:
+                return dt_parse.strptime(part, fmt).date()
+            except (ValueError, TypeError):
+                continue
+        return None
+
+    count_by_abertura = {}   # (year, month) -> count
+    count_by_encordmanu = {}  # (year, month) -> count
+    for os_item in qs_os_corretivas.only('dt_abertura_solicita', 'dt_encordmanu'):
+        d_ab = _parse_date_str(os_item.dt_abertura_solicita)
+        if d_ab:
+            key = (d_ab.year, d_ab.month)
+            count_by_abertura[key] = count_by_abertura.get(key, 0) + 1
+        d_enc = _parse_date_str(os_item.dt_encordmanu)
+        if d_enc:
+            key = (d_enc.year, d_enc.month)
+            count_by_encordmanu[key] = count_by_encordmanu.get(key, 0) + 1
+
+    all_months = sorted(set(count_by_abertura) | set(count_by_encordmanu))
+    if len(all_months) > 12:
+        all_months = all_months[-12:]
+    meses_os_corretivas_labels = []
+    meses_os_corretivas_data_abertura = []
+    meses_os_corretivas_data_encordmanu = []
+    for (y, m) in all_months:
+        meses_os_corretivas_labels.append(dt_parse(y, m, 1).strftime('%b/%Y'))
+        meses_os_corretivas_data_abertura.append(count_by_abertura.get((y, m), 0))
+        meses_os_corretivas_data_encordmanu.append(count_by_encordmanu.get((y, m), 0))
+
+    # Linhas de produção configuradas para este CA
+    linhas_producao = list(
+        ConfigLinhaProducaoCentroAtividade.objects.filter(
+            centro_atividade=centro_atividade
+        ).values_list('descr_linha_producao', flat=True).distinct().order_by('descr_linha_producao')
+    )
+
+    # Manutentores vinculados às máquinas deste CA
+    manutentores_vinculados = ManutentorMaquina.objects.filter(
+        maquina__in=maquinas_do_ca
+    ).select_related('manutentor').order_by('manutentor__Nome')
+    manutentores_list = list(
+        {m.manutentor for m in manutentores_vinculados}
+    )
+    manutentores_list.sort(key=lambda x: (x.Nome or '').upper())
+    total_manutentores = len(manutentores_list)
+
     context = {
         'page_title': f'Visualizar CA {centro_atividade.ca}',
         'active_page': 'consultar_locais_e_cas',
@@ -4251,9 +4313,19 @@ def visualizar_centro_de_atividade(request, ca_id):
         'total_relacionamentos': relacionamentos.count(),
         'total_maquinas': maquinas_do_ca.count(),
         'has_maquinas': maquinas_do_ca.exists(),
-        'has_primarias': maquinas_primarias.exists()
+        'has_primarias': maquinas_primarias.exists(),
+        'total_os_corretivas': total_os_corretivas,
+        'total_os_preventivas': total_os_preventivas,
+        'ultimas_os_corretivas': ultimas_os_corretivas,
+        'ultimas_os_preventivas': ultimas_os_preventivas,
+        'linhas_producao': linhas_producao,
+        'manutentores_list': manutentores_list,
+        'total_manutentores': total_manutentores,
+        'meses_os_corretivas_labels': json.dumps(meses_os_corretivas_labels, ensure_ascii=False),
+        'meses_os_corretivas_data_abertura': json.dumps(meses_os_corretivas_data_abertura),
+        'meses_os_corretivas_data_encordmanu': json.dumps(meses_os_corretivas_data_encordmanu),
     }
-    return render(request, 'visualizar/visualizar_centro_de_atividade.html', context)
+    return render(request, 'centro_de_atividades/visualizar_centro_de_atividade.html', context)
 
 
 def visualizar_local(request, ca_id):
@@ -4398,7 +4470,7 @@ def editar_ca_e_locais(request, ca_id):
         'form': form,
         'centro_atividade': centro_atividade,
     }
-    return render(request, 'editar/editar_centro_de_atividades.html', context)
+    return render(request, 'centro_de_atividades/editar_centro_de_atividades.html', context)
 
 
 def cadastrar_maquina(request):
