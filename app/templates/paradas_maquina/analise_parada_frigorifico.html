@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Análise Frigorífico - Paradas de Máquina{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chart-container { position: relative; height: 300px; margin-bottom: 30px; }
+    .chart-container-large { position: relative; height: 400px; margin-bottom: 30px; }
+    .stat-card { transition: transform 0.2s; }
+    .stat-card:hover { transform: translateY(-5px); }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+    #mesSelecionadoFrig { transition: all 0.3s ease; cursor: pointer; font-weight: 500; }
+    #mesSelecionadoFrig:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); transform: translateY(-1px); }
+    #mesSelecionadoFrig:focus { box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.25); border-color: #198754; outline: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'analise_paradas_maquina' %}" class="text-white">Paradas de Máquina</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise Frigorífico</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3"><i class="fas fa-industry me-2"></i>Análise Frigorífico</h1>
+                <p class="lead">Dashboard de paradas de máquinas - seção Frigorífico</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <!-- Filtros -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion filter-accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button {% if not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                                <i class="fas fa-filter me-2"></i><strong>Filtros</strong>
+                                {% if meses_filtro or ano_filtro %}
+                                    <span class="badge bg-info ms-2">
+                                        {% if meses_filtro %}{% if meses_filtro|length == 1 %}
+                                            {% if meses_filtro.0 == 1 %}Janeiro{% elif meses_filtro.0 == 2 %}Fevereiro{% elif meses_filtro.0 == 3 %}Março{% elif meses_filtro.0 == 4 %}Abril{% elif meses_filtro.0 == 5 %}Maio{% elif meses_filtro.0 == 6 %}Junho{% elif meses_filtro.0 == 7 %}Julho{% elif meses_filtro.0 == 8 %}Agosto{% elif meses_filtro.0 == 9 %}Setembro{% elif meses_filtro.0 == 10 %}Outubro{% elif meses_filtro.0 == 11 %}Novembro{% elif meses_filtro.0 == 12 %}Dezembro{% endif %} de {{ ano_filtro }}
+                                            {% else %}{{ meses_filtro|length }} meses de {{ ano_filtro }}{% endif %}
+                                        {% else %}Todos os meses de {{ ano_filtro }}{% endif %}
+                                    </span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'analise_parada_frigorifico' %}" class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="ano" class="form-label">Ano</label>
+                                        <select class="form-select" id="ano" name="ano" required>
+                                            {% for ano in anos_disponiveis %}<option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>{% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Meses</label>
+                                        <div class="row g-2">
+                                            {% for mes_num, mes_nome in meses_nomes.items %}
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="{{ mes_num }}" id="mes{{ mes_num }}" {% if mes_num in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes{{ mes_num }}">{{ mes_nome }}</label>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosMeses()">Selecionar Todos</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">Desmarcar Todos</button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-2"></i>Filtrar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-light border mb-4">
+            <i class="fas fa-cog me-2"></i>
+            <strong>Frigorífico</strong> é definido na página <a href="{% url 'configuracao_parada_maquina' %}">Configuração</a> (seção &quot;Recursos incluídos na Análise das Paradas de Máquinas&quot;), com base na coluna <code>descr_linha_producao</code>.
+        </div>
+
+        <!-- KPIs Frigorífico -->
+        <div class="row mb-4">
+            <p class="text-muted mb-4">Dados baseados na projeção de produção e abate:</p>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Suínos Abatidos por dia (planejados)</h6><h4 class="mb-0 fw-bold">{% if suinos_abatidos_por_dia_medio_frig is not None %}{{ suinos_abatidos_por_dia_medio_frig|number_br:0 }}{% else %}-{% endif %}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Dias úteis planejados:</h6><h4 class="mb-0 fw-bold">{{ dias_uteis_total_frig|default:0|number_br:0 }}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Total Abatido planejados:</h6><h4 class="mb-0 fw-bold">{{ producao_esperada_frig|default:0|number_br:0 }}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">% Perda Máximo:</h6><h4 class="mb-0 fw-bold">{% if perda_maximo_frig is not None %}{{ perda_maximo_frig|number_br:2 }}%{% else %}-{% endif %}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Perda Máxima planejada:</h6><h4 class="mb-0 fw-bold">{{ perda_maxima_calculada_frig|number_br:2 }}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Fator de Eficiência %:</h6><h4 class="mb-0 fw-bold">{% if fator_eficiencia_frig is not None %}{{ fator_eficiencia_frig|number_br:2 }}%{% else %}-{% endif %}</h4></div></div></div>
+        </div>
+        <div class="row mb-4">
+            <p class="text-muted mb-4">Dados calculados usando a produção REAL como base:</p>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Quantidade de Paradas:</h6><h4 class="mb-0 fw-bold">{{ total_paradas_frig|number_br:0 }}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Total de suínos já abatidos:</h6><h4 class="mb-0 fw-bold">{{ soma_suinos_abatidos_frig|default:0|number_br:0 }}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Total de carcaças Perdidas:</h6><h4 class="mb-0 fw-bold">{{ soma_capacidade_frig|number_br:2 }}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Perda Máxima restante:</h6><h4 class="mb-0 fw-bold">{{ perda_restante_frig|number_br:2 }}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Indicador sem Fator de Correção:</h6><h4 class="mb-0 fw-bold">{% if indicador_sem_fator_frig is not None %}{{ indicador_sem_fator_frig|number_br:2 }}%{% else %}-{% endif %}</h4></div></div></div>
+            <div class="col-md-2 mb-3">{% if indicador_atual_frig is not None and perda_maximo_frig is not None and indicador_atual_frig > perda_maximo_frig %}<div class="card border-0 border-start border-4 border-danger shadow-sm" style="border-left-width: 6px !important; background: linear-gradient(135deg, rgba(220, 53, 69, 0.08) 0%, rgba(220, 53, 69, 0.02) 100%);">{% else %}<div class="card border-0 border-start border-4 border-success shadow-sm" style="border-left-width: 6px !important; background: linear-gradient(135deg, rgba(25, 135, 84, 0.08) 0%, rgba(25, 135, 84, 0.02) 100%);">{% endif %}
+                <div class="card-body py-3 d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1 small fw-semibold">{% if indicador_atual_frig is not None and perda_maximo_frig is not None and indicador_atual_frig > perda_maximo_frig %}<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Indicador Atual</span>{% else %}<span class="text-success"><i class="fas fa-bullseye me-1"></i>Indicador Atual</span>{% endif %}</h6>
+                        <h4 class="mb-0 fw-bold {% if indicador_atual_frig is not None and perda_maximo_frig is not None and indicador_atual_frig > perda_maximo_frig %}text-danger{% else %}text-success{% endif %}" style="font-size: 1.5rem;">{% if indicador_atual_frig is not None %}{{ indicador_atual_frig|number_br:2 }}%{% else %}-{% endif %}</h4>
+                    </div>
+                    <i class="fas fa-chart-line fa-2x opacity-25 ms-2 {% if indicador_atual_frig is not None and perda_maximo_frig is not None and indicador_atual_frig > perda_maximo_frig %}text-danger{% else %}text-success{% endif %}"></i>
+                </div>
+            </div></div>
+        </div>
+
+        <!-- Evolução Diária -->
+        <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><div class="d-flex justify-content-between align-items-center flex-wrap"><h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Evolução Diária (Frigorífico)</h5><div class="input-group" style="max-width: 220px;"><span class="input-group-text bg-white border-end-0"><i class="fas fa-calendar-alt text-primary"></i></span><input type="month" class="form-control border-start-0" id="mesSelecionadoFrig" value="{{ mes_selecionado }}" style="font-weight: 500;"></div></div></div><div class="card-body"><div class="chart-container-large"><canvas id="dailyChartFrig"></canvas></div></div></div></div></div>
+        <!-- Paradas por Máquina -->
+        <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Paradas por Máquina (Frigorífico)</h5></div><div class="card-body"><p class="text-muted small mb-2">Quantidade de paradas associadas a cada máquina via Ordem de Serviço. <strong>Clique na barra</strong> para abrir a página da máquina.</p><div class="chart-container-large"><canvas id="maquinasChartFrig"></canvas></div></div></div></div></div>
+        <!-- Top Paradas / Turnos -->
+        <div class="row mb-4"><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-info text-white"><h5 class="mb-0">Top 10 Paradas (Frigorífico)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="paradasChartFrig"></canvas></div></div></div></div><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-warning text-white"><h5 class="mb-0">Turnos (Frigorífico)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="turnosChartFrig"></canvas></div></div></div></div></div>
+        <!-- Pareto -->
+        <div class="row mb-4"><div class="col-12 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Pareto – Paradas por Máquina (Frigorífico)</h5></div><div class="card-body"><p class="text-muted small mb-2">Barras ordenadas por quantidade de paradas com linha de percentual acumulado (80/20).</p><div class="chart-container-large"><canvas id="paretoMaquinasChartFrig"></canvas></div></div></div></div></div>
+        <div class="row mb-4">
+            <div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-info text-white"><h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Pareto – Top 10 Paradas (Frigorífico)</h5></div><div class="card-body"><p class="text-muted small mb-2">Top 10 paradas com linha de percentual acumulado (80/20).</p><div class="chart-container-large"><canvas id="paretoParadasChartFrig"></canvas></div></div></div></div>
+            <div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Pareto – Paradas por Setor de Manutenção (Frigorífico)</h5></div><div class="card-body"><p class="text-muted small mb-2">Paradas agrupadas pelo <strong>cd_setormanut</strong> da OS relacionada.</p><div class="chart-container-large"><canvas id="paretoSetormanutChartFrig"></canvas></div></div></div></div>
+        </div>
+        <!-- Análise Prédio do Abate -->
+        <div class="row mb-4">
+            <div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><h5 class="mb-0"><i class="fas fa-table me-2"></i>Análise de Máquina atribuída ao Prédio do Abate</h5></div><div class="card-body">
+                <p class="text-muted small mb-3">Paradas do <strong>PRÉDIO ABATE E RESFRIAMENTO</strong> (cod_recurso=99985342, linha_producao=99985342 ou OS com cd_setormanut=99985342).</p>
+                {% if analise_predio_abate %}
+                <div class="table-responsive"><table class="table table-striped table-hover table-bordered"><thead class="table-primary"><tr><th>Parada</th><th class="w-50">descr_queixa (OS)</th><th>Máquina inferida</th></tr></thead><tbody>
+                    {% for item in analise_predio_abate %}<tr><td><small><a href="{% url 'visualizar_parada_de_maquina' item.parada.id %}">{{ item.parada_info }}</a></small></td><td><small>{{ item.descr_queixa|linebreaksbr|default:"-" }}</small></td><td><small>{{ item.maquina_inferida }}</small></td></tr>{% endfor %}
+                </tbody></table></div>
+                {% else %}<p class="text-muted mb-0">Não há paradas do PRÉDIO ABATE E RESFRIAMENTO no período filtrado.</p>{% endif %}
+            </div></div></div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+function selecionarTodosMeses() { document.querySelectorAll('input[name="mes"]').forEach(cb => cb.checked = true); }
+function desmarcarTodosMeses() { document.querySelectorAll('input[name="mes"]').forEach(cb => cb.checked = false); }
+</script>
+<script>
+function waitForChartJS(cb, max) { max = max || 100; var n = 0; function chk() { n++; if (typeof Chart !== 'undefined') cb(); else if (n < max) setTimeout(chk, 100); } chk(); }
+document.addEventListener('DOMContentLoaded', function() {
+    waitForChartJS(function() {
+        if (typeof Chart === 'undefined') return;
+        function createDailySectionChart(canvasId, mesInputId, secao) {
+            const ctx = document.getElementById(canvasId), inp = document.getElementById(mesInputId);
+            if (!ctx || !inp) return;
+            let ch = null;
+            function upd(mesAno) { if (ch) ch.destroy(); const [ano, mes] = mesAno.split('-').map(Number);
+                fetch('/api/dados-diarios-paradas/?ano=' + ano + '&mes=' + mes + '&secao=' + secao).then(r => r.json()).then(data => {
+                    if (!data.labels || !data.labels.length) { ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
+                    ch = new Chart(ctx.getContext('2d'), { type: 'line', data: { labels: data.labels, datasets: [
+                        { label: 'Quantidade', data: data.data, borderColor: '#198754', backgroundColor: 'rgba(25, 135, 84, 0.1)', tension: 0.4, fill: true, yAxisID: 'y' },
+                        { label: 'Total Horas', data: data.horas, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.4, fill: true, yAxisID: 'y1' }
+                    ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } }, scales: { y: { type: 'linear', display: true, position: 'left', beginAtZero: true }, y1: { type: 'linear', display: true, position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } } } } });
+                }).catch(() => { ctx.parentElement.innerHTML = '<div class="alert alert-danger m-3">Erro ao carregar.</div>'; });
+            }
+            inp.addEventListener('change', function() { upd(this.value); }); upd(inp.value);
+        }
+        createDailySectionChart('dailyChartFrig', 'mesSelecionadoFrig', 'frigorifico');
+        function createMaquinasBarChart(canvasId, labels, data, urls, bgColor) {
+            const ctx = document.getElementById(canvasId); if (!ctx || !labels || !labels.length) { if (ctx) ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
+            ctx.style.cursor = 'pointer';
+            new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: labels, datasets: [{ label: '', data: data, backgroundColor: bgColor }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } }, onClick: function(evt, els) { if (els.length && urls && urls[els[0].index]) window.location.href = urls[els[0].index]; } } });
+        }
+        function createBarSectionChart(canvasId, labels, data, bgColor) {
+            const ctx = document.getElementById(canvasId); if (!ctx || !labels || !labels.length) { if (ctx) ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
+            new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: labels, datasets: [{ label: '', data: data, backgroundColor: bgColor }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } } });
+        }
+        function createParetoChart(canvasId, labels, data, barColor) {
+            const ctx = document.getElementById(canvasId); if (!ctx || !labels || !labels.length) { if (ctx) ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
+            const total = data.reduce((a,b)=>a+b,0), cumul = []; let s=0; for (let i=0;i<data.length;i++) { s+=data[i]; cumul.push(total>0?s/total*100:0); }
+            new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: labels, datasets: [
+                { label: 'Quantidade', data: data, backgroundColor: barColor, yAxisID: 'y' },
+                { label: '% Acumulado', data: cumul, type: 'line', borderColor: '#dc3545', fill: false, tension: 0.3, pointRadius: 4, yAxisID: 'y1' }
+            ]}, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true } }, scales: { y: { type: 'linear', position: 'left', beginAtZero: true }, y1: { type: 'linear', position: 'right', min: 0, max: 100, grid: { drawOnChartArea: false }, ticks: { callback: v => v + '%' } } } } });
+        }
+        function createDoughnutSectionChart(canvasId, labels, dataCount, dataHoras) {
+            const ctx = document.getElementById(canvasId); if (!ctx || !labels || !labels.length) { if (ctx) ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
+            new Chart(ctx.getContext('2d'), { type: 'doughnut', data: { labels: labels, datasets: [
+                { label: 'Quantidade', data: dataCount, backgroundColor: ['#0d6efd','#198754','#ffc107','#dc3545','#0dcaf0','#6f42c1'] },
+                { label: 'Horas', data: dataHoras, backgroundColor: ['#0d6efd','#198754','#ffc107','#dc3545','#0dcaf0','#6f42c1'] }
+            ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } } } });
+        }
+        createBarSectionChart('paradasChartFrig', {{ section_frig_top_paradas_labels|safe }}, {{ section_frig_top_paradas_data|safe }}, '#0dcaf0');
+        createMaquinasBarChart('maquinasChartFrig', {{ section_frig_maquinas_labels|safe }}, {{ section_frig_maquinas_data|safe }}, {{ section_frig_maquinas_urls|safe }}, '#0d6efd');
+        createParetoChart('paretoMaquinasChartFrig', {{ section_frig_maquinas_labels|safe }}, {{ section_frig_maquinas_data|safe }}, '#0d6efd');
+        createParetoChart('paretoParadasChartFrig', {{ section_frig_top_paradas_labels|safe }}, {{ section_frig_top_paradas_data|safe }}, '#0dcaf0');
+        createParetoChart('paretoSetormanutChartFrig', {{ section_frig_setormanut_labels|safe }}, {{ section_frig_setormanut_data|safe }}, '#6c757d');
+        createDoughnutSectionChart('turnosChartFrig', {{ section_frig_turnos_labels|safe }}, {{ section_frig_turnos_data_count|safe }}, {{ section_frig_turnos_data_horas|safe }});
+    });
+});
+</script>
+{% endblock %}

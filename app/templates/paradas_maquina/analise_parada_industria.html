@@ -1,0 +1,234 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Análise Indústria - Paradas de Máquina{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chart-container { position: relative; height: 300px; margin-bottom: 30px; }
+    .chart-container-large { position: relative; height: 400px; margin-bottom: 30px; }
+    .stat-card { transition: transform 0.2s; }
+    .stat-card:hover { transform: translateY(-5px); }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+    #mesSelecionadoInd { transition: all 0.3s ease; cursor: pointer; font-weight: 500; }
+    #mesSelecionadoInd:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); transform: translateY(-1px); }
+    #mesSelecionadoInd:focus { box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.25); border-color: #6c757d; outline: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'analise_paradas_maquina' %}" class="text-white">Paradas de Máquina</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise Indústria</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3"><i class="fas fa-cogs me-2"></i>Análise Indústria</h1>
+                <p class="lead">Dashboard de paradas de máquinas - seção Indústria (Capacidade)</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <!-- Filtros -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion filter-accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button {% if not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                                <i class="fas fa-filter me-2"></i><strong>Filtros</strong>
+                                {% if meses_filtro or ano_filtro %}
+                                    <span class="badge bg-info ms-2">
+                                        {% if meses_filtro %}{% if meses_filtro|length == 1 %}
+                                            {% if meses_filtro.0 == 1 %}Janeiro{% elif meses_filtro.0 == 2 %}Fevereiro{% elif meses_filtro.0 == 3 %}Março{% elif meses_filtro.0 == 4 %}Abril{% elif meses_filtro.0 == 5 %}Maio{% elif meses_filtro.0 == 6 %}Junho{% elif meses_filtro.0 == 7 %}Julho{% elif meses_filtro.0 == 8 %}Agosto{% elif meses_filtro.0 == 9 %}Setembro{% elif meses_filtro.0 == 10 %}Outubro{% elif meses_filtro.0 == 11 %}Novembro{% elif meses_filtro.0 == 12 %}Dezembro{% endif %} de {{ ano_filtro }}
+                                            {% else %}{{ meses_filtro|length }} meses de {{ ano_filtro }}{% endif %}
+                                        {% else %}Todos os meses de {{ ano_filtro }}{% endif %}
+                                    </span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'analise_parada_industria' %}" class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="ano" class="form-label">Ano</label>
+                                        <select class="form-select" id="ano" name="ano" required>
+                                            {% for ano in anos_disponiveis %}<option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>{% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Meses</label>
+                                        <div class="row g-2">
+                                            {% for mes_num, mes_nome in meses_nomes.items %}
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="{{ mes_num }}" id="mes{{ mes_num }}" {% if mes_num in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes{{ mes_num }}">{{ mes_nome }}</label>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosMeses()">Selecionar Todos</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">Desmarcar Todos</button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-2"></i>Filtrar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-light border mb-4">
+            <i class="fas fa-cog me-2"></i>
+            <strong>Indústria</strong> é definida na página <a href="{% url 'configuracao_parada_maquina' %}">Configuração</a> (seção &quot;Recursos incluídos na Análise das Paradas de Máquinas&quot;). Os gráficos usam <strong>Capacidade</strong> (Kg) como métrica.
+        </div>
+
+        <!-- KPIs Indústria -->
+        <div class="row mb-4">
+            <p class="text-muted mb-4">Dados baseados na projeção de produção e abate:</p>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Produção diária planejada:</h6><h4 class="mb-0 fw-bold">{% if producao_diaria_planejada_industria is not None %}{{ producao_diaria_planejada_industria|number_br:0 }}{% else %}-{% endif %}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Dias úteis planejados:</h6><h4 class="mb-0 fw-bold">{{ dias_uteis_total_industria|default:0|number_br:0 }}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Total Produção Planejada:</h6><h4 class="mb-0 fw-bold">{{ total_producao_planejada_industria|default:0|number_br:0 }}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">% Perda Máxima:</h6><h4 class="mb-0 fw-bold">{% if perda_maximo_industria is not None %}{{ perda_maximo_industria|number_br:2 }}%{% else %}-{% endif %}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Perda Máxima planejada:</h6><h4 class="mb-0 fw-bold">{{ perda_maxima_planejada_industria|number_br:2 }}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Fator de Eficiência %:</h6><h4 class="mb-0 fw-bold">{% if fator_eficiencia_industria is not None %}{{ fator_eficiencia_industria|number_br:2 }}%{% else %}-{% endif %}</h4></div></div></div>
+        </div>
+        <div class="row mb-4">
+            <p class="text-muted mb-4">Dados calculados usando a produção REAL como base:</p>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Total de Paradas:</h6><h4 class="mb-0 fw-bold">{{ total_paradas_ind|number_br:0 }}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Produção realizada:</h6><h4 class="mb-0 fw-bold">{{ soma_producao_industria|number_br:2 }}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Total de Perdas (Kg):</h6><h4 class="mb-0 fw-bold">{{ soma_capacidade_ind|number_br:2 }}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Total de Perdas Restantes:</h6><h4 class="mb-0 fw-bold">{{ perda_restante_industria|number_br:2 }}</h4></div></div></div>
+            <div class="col-md-2 mb-3"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-3"><h6 class="text-muted mb-0 small">Indicador sem Fator de Correção:</h6><h4 class="mb-0 fw-bold">{% if indicador_sem_fator_industria is not None %}{{ indicador_sem_fator_industria|number_br:2 }}%{% else %}-{% endif %}</h4></div></div></div>
+            <div class="col-md-2 mb-3">{% if indicador_atual_industria is not None and perda_maximo_industria is not None and indicador_atual_industria > perda_maximo_industria %}<div class="card border-0 border-start border-4 border-danger shadow-sm" style="border-left-width: 6px !important; background: linear-gradient(135deg, rgba(220, 53, 69, 0.08) 0%, rgba(220, 53, 69, 0.02) 100%);">{% else %}<div class="card border-0 border-start border-4 border-success shadow-sm" style="border-left-width: 6px !important; background: linear-gradient(135deg, rgba(25, 135, 84, 0.08) 0%, rgba(25, 135, 84, 0.02) 100%);">{% endif %}
+                <div class="card-body py-3 d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1 small fw-semibold">{% if indicador_atual_industria is not None and perda_maximo_industria is not None and indicador_atual_industria > perda_maximo_industria %}<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Indicador Atual</span>{% else %}<span class="text-success"><i class="fas fa-bullseye me-1"></i>Indicador Atual</span>{% endif %}</h6>
+                        <h4 class="mb-0 fw-bold {% if indicador_atual_industria is not None and perda_maximo_industria is not None and indicador_atual_industria > perda_maximo_industria %}text-danger{% else %}text-success{% endif %}" style="font-size: 1.5rem;">{% if indicador_atual_industria is not None %}{{ indicador_atual_industria|number_br:2 }}%{% else %}-{% endif %}</h4>
+                    </div>
+                    <i class="fas fa-chart-line fa-2x opacity-25 ms-2 {% if indicador_atual_industria is not None and perda_maximo_industria is not None and indicador_atual_industria > perda_maximo_industria %}text-danger{% else %}text-success{% endif %}"></i>
+                </div>
+            </div></div>
+        </div>
+
+        <!-- Evolução Diária -->
+        <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><div class="d-flex justify-content-between align-items-center flex-wrap"><h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Evolução Diária (Indústria - Capacidade)</h5><div class="input-group" style="max-width: 220px;"><span class="input-group-text bg-white border-end-0"><i class="fas fa-calendar-alt text-secondary"></i></span><input type="month" class="form-control border-start-0" id="mesSelecionadoInd" value="{{ mes_selecionado }}" style="font-weight: 500;"></div></div></div><div class="card-body"><div class="chart-container-large"><canvas id="dailyChartInd"></canvas></div></div></div></div></div>
+        <!-- Paradas por Máquina -->
+        <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Paradas por Máquina (Indústria - Capacidade)</h5></div><div class="card-body"><p class="text-muted small mb-2">Capacidade (Kg) associada a cada máquina. <strong>Clique na barra</strong> para abrir a página da máquina.</p><div class="chart-container-large"><canvas id="maquinasChartInd"></canvas></div></div></div></div></div>
+        <!-- Top Recursos / Paradas / Turnos -->
+        <div class="row mb-4"><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0">Top 10 Recursos (Indústria - Capacidade)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="recursosQtdChartInd"></canvas></div></div></div></div><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-danger text-white"><h5 class="mb-0">Top 10 Recursos por Horas (Indústria)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="recursosHorasChartInd"></canvas></div></div></div></div></div>
+        <div class="row mb-4"><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-info text-white"><h5 class="mb-0">Top 10 Paradas (Indústria - Capacidade)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="paradasChartInd"></canvas></div></div></div></div><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-warning text-white"><h5 class="mb-0">Turnos (Indústria)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="turnosChartInd"></canvas></div></div></div></div></div>
+        <!-- Pareto -->
+        <div class="row mb-4"><div class="col-12 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Pareto – Paradas por Máquina (Indústria)</h5></div><div class="card-body"><p class="text-muted small mb-2">Barras ordenadas por Capacidade com linha de percentual acumulado (80/20).</p><div class="chart-container-large"><canvas id="paretoMaquinasChartInd"></canvas></div></div></div></div></div>
+        <div class="row mb-4">
+            <div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-info text-white"><h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Pareto – Top 10 Paradas (Indústria)</h5></div><div class="card-body"><p class="text-muted small mb-2">Top 10 paradas com linha de percentual acumulado (80/20).</p><div class="chart-container-large"><canvas id="paretoParadasChartInd"></canvas></div></div></div></div>
+            <div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Pareto – Paradas por Setor de Manutenção (Indústria)</h5></div><div class="card-body"><p class="text-muted small mb-2">Paradas agrupadas pelo <strong>cd_setormanut</strong> da OS relacionada.</p><div class="chart-container-large"><canvas id="paretoSetormanutChartInd"></canvas></div></div></div></div>
+        </div>
+        <!-- Pizza -->
+        <div class="row mb-4">
+            <div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Pizza – Paradas por Máquina (Indústria)</h5></div><div class="card-body"><p class="text-muted small mb-2">Distribuição em percentual.</p><div class="chart-container-large"><canvas id="pieMaquinasChartInd"></canvas></div></div></div></div>
+            <div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Pizza – Paradas por Setor de Manutenção (Indústria)</h5></div><div class="card-body"><p class="text-muted small mb-2">Distribuição em percentual.</p><div class="chart-container-large"><canvas id="pieSetormanutChartInd"></canvas></div></div></div></div>
+        </div>
+        <!-- Linhas de Produção -->
+        <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0">Linhas de Produção (Indústria)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="linhasChartInd"></canvas></div></div></div></div></div>
+        <!-- Pareto Linhas 924 -->
+        <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Pareto – Linhas de Produção (Indicador 924)</h5></div><div class="card-body"><p class="text-muted small mb-2">Paradas por linha de produção com linha de percentual acumulado (80/20).</p><div class="chart-container-large"><canvas id="paretoLinhasChartInd924"></canvas></div></div></div></div></div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+function selecionarTodosMeses() { document.querySelectorAll('input[name="mes"]').forEach(cb => cb.checked = true); }
+function desmarcarTodosMeses() { document.querySelectorAll('input[name="mes"]').forEach(cb => cb.checked = false); }
+</script>
+<script>
+function waitForChartJS(cb, max) { max = max || 100; var n = 0; function chk() { n++; if (typeof Chart !== 'undefined') cb(); else if (n < max) setTimeout(chk, 100); } chk(); }
+document.addEventListener('DOMContentLoaded', function() {
+    waitForChartJS(function() {
+        if (typeof Chart === 'undefined') return;
+        function createDailySectionChart(canvasId, mesInputId, secao) {
+            const ctx = document.getElementById(canvasId), inp = document.getElementById(mesInputId);
+            if (!ctx || !inp) return;
+            let ch = null;
+            function upd(mesAno) { if (ch) ch.destroy(); const [ano, mes] = mesAno.split('-').map(Number);
+                fetch('/api/dados-diarios-paradas/?ano=' + ano + '&mes=' + mes + '&secao=' + secao).then(r => r.json()).then(data => {
+                    if (!data.labels || !data.labels.length) { ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
+                    ch = new Chart(ctx.getContext('2d'), { type: 'line', data: { labels: data.labels, datasets: [
+                        { label: (secao === 'industria' ? 'Capacidade' : 'Quantidade'), data: data.data, borderColor: '#198754', backgroundColor: 'rgba(25, 135, 84, 0.1)', tension: 0.4, fill: true, yAxisID: 'y' },
+                        { label: 'Total Horas', data: data.horas, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.4, fill: true, yAxisID: 'y1' }
+                    ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } }, scales: { y: { type: 'linear', display: true, position: 'left', beginAtZero: true }, y1: { type: 'linear', display: true, position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } } } } });
+                }).catch(() => { ctx.parentElement.innerHTML = '<div class="alert alert-danger m-3">Erro ao carregar.</div>'; });
+            }
+            inp.addEventListener('change', function() { upd(this.value); }); upd(inp.value);
+        }
+        createDailySectionChart('dailyChartInd', 'mesSelecionadoInd', 'industria');
+        function createMaquinasBarChart(canvasId, labels, data, urls, bgColor, capacidade) {
+            const ctx = document.getElementById(canvasId); if (!ctx || !labels || !labels.length) { if (ctx) ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
+            const afterLabel = capacidade ? function(ctx) { const idx = ctx.dataIndex, cap = capacidade[idx]; return (cap != null && cap !== 0) ? 'Capacidade: ' + Number(cap).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 2}) : ''; } : function() { return ''; };
+            ctx.style.cursor = 'pointer';
+            new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: labels, datasets: [{ label: '', data: data, backgroundColor: bgColor }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { afterLabel: afterLabel } } }, scales: { x: { beginAtZero: true } }, onClick: function(evt, els) { if (els.length && urls && urls[els[0].index]) window.location.href = urls[els[0].index]; } } });
+        }
+        function createBarSectionChart(canvasId, labels, data, bgColor, capacidade) {
+            const ctx = document.getElementById(canvasId); if (!ctx || !labels || !labels.length) { if (ctx) ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
+            const tooltipOpt = capacidade ? { callbacks: { afterLabel: function(ctx) { const idx = ctx.dataIndex, cap = capacidade[idx]; return (cap != null && cap !== 0) ? 'Capacidade: ' + Number(cap).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 2}) : ''; } } } : {};
+            new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: labels, datasets: [{ label: '', data: data, backgroundColor: bgColor }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: tooltipOpt }, scales: { x: { beginAtZero: true } } } });
+        }
+        function createParetoChart(canvasId, labels, data, barColor, capacidade) {
+            const ctx = document.getElementById(canvasId); if (!ctx || !labels || !labels.length) { if (ctx) ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
+            const total = data.reduce((a,b)=>a+b,0), cumul = []; let s=0; for (let i=0;i<data.length;i++) { s+=data[i]; cumul.push(total>0?s/total*100:0); }
+            const tooltipOpt = capacidade ? { callbacks: { afterLabel: function(ctx) { if (ctx.datasetIndex !== 0) return ''; const idx = ctx.dataIndex, cap = capacidade[idx]; return (cap != null && cap !== 0) ? 'Capacidade: ' + Number(cap).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 2}) : ''; } } } : {};
+            new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: labels, datasets: [
+                { label: 'Capacidade', data: data, backgroundColor: barColor, yAxisID: 'y' },
+                { label: '% Acumulado', data: cumul, type: 'line', borderColor: '#dc3545', fill: false, tension: 0.3, pointRadius: 4, yAxisID: 'y1' }
+            ]}, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true }, tooltip: tooltipOpt }, scales: { y: { type: 'linear', position: 'left', beginAtZero: true }, y1: { type: 'linear', position: 'right', min: 0, max: 100, grid: { drawOnChartArea: false }, ticks: { callback: v => v + '%' } } } } });
+        }
+        function createDoughnutSectionChart(canvasId, labels, dataCount, dataHoras) {
+            const ctx = document.getElementById(canvasId); if (!ctx || !labels || !labels.length) { if (ctx) ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
+            new Chart(ctx.getContext('2d'), { type: 'doughnut', data: { labels: labels, datasets: [
+                { label: 'Quantidade', data: dataCount, backgroundColor: ['#0d6efd','#198754','#ffc107','#dc3545','#0dcaf0','#6f42c1'] },
+                { label: 'Horas', data: dataHoras, backgroundColor: ['#0d6efd','#198754','#ffc107','#dc3545','#0dcaf0','#6f42c1'] }
+            ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } } } });
+        }
+        function createPieChart(canvasId, labels, data) {
+            const ctx = document.getElementById(canvasId); if (!ctx || !labels || !labels.length) { if (ctx) ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
+            const palette = ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#0dcaf0', '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d'];
+            new Chart(ctx.getContext('2d'), { type: 'pie', data: { labels: labels, datasets: [{ label: 'Capacidade', data: data, backgroundColor: labels.map((_,i)=>palette[i%palette.length]), borderColor: '#fff', borderWidth: 1 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'right' }, tooltip: { callbacks: { label: function(ctx) { const t = ctx.dataset.data.reduce((a,b)=>a+b,0); return ctx.label + ': ' + ctx.raw + ' (' + (t>0 ? (ctx.raw/t*100).toFixed(1) : 0) + '%)'; } } } } } });
+        }
+        createMaquinasBarChart('maquinasChartInd', {{ section_ind_maquinas_labels|safe }}, {{ section_ind_maquinas_data|safe }}, {{ section_ind_maquinas_urls|safe }}, '#6c757d');
+        createParetoChart('paretoMaquinasChartInd', {{ section_ind_maquinas_labels|safe }}, {{ section_ind_maquinas_data|safe }}, '#6c757d');
+        createParetoChart('paretoParadasChartInd', {{ section_ind_top_paradas_labels|safe }}, {{ section_ind_top_paradas_data|safe }}, '#0dcaf0');
+        createParetoChart('paretoSetormanutChartInd', {{ section_ind_setormanut_labels|safe }}, {{ section_ind_setormanut_data|safe }}, '#6c757d');
+        createBarSectionChart('recursosQtdChartInd', {{ section_ind_top_recursos_labels|safe }}, {{ section_ind_top_recursos_data|safe }}, '#6c757d');
+        createBarSectionChart('recursosHorasChartInd', {{ section_ind_top_recursos_horas_labels|safe }}, {{ section_ind_top_recursos_horas_data|safe }}, '#dc3545');
+        createBarSectionChart('paradasChartInd', {{ section_ind_top_paradas_labels|safe }}, {{ section_ind_top_paradas_data|safe }}, '#0dcaf0');
+        createDoughnutSectionChart('turnosChartInd', {{ section_ind_turnos_labels|safe }}, {{ section_ind_turnos_data_count|safe }}, {{ section_ind_turnos_data_horas|safe }});
+        createBarSectionChart('linhasChartInd', {{ section_ind_linhas_labels|safe }}, {{ section_ind_linhas_data_count|safe }}, '#6c757d');
+        createPieChart('pieMaquinasChartInd', {{ section_ind_maquinas_labels|safe }}, {{ section_ind_maquinas_data|safe }});
+        createPieChart('pieSetormanutChartInd', {{ section_ind_setormanut_labels|safe }}, {{ section_ind_setormanut_data|safe }});
+        createParetoChart('paretoLinhasChartInd924', {{ section_ind_924_linhas_labels|safe }}, {{ section_ind_924_linhas_data_count|safe }}, '#6c757d', {{ section_ind_924_linhas_data_capacidade|safe }});
+    });
+});
+</script>
+{% endblock %}

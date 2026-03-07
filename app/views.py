@@ -4155,6 +4155,8 @@ def visualizar_centro_de_atividade(request, ca_id):
         OrdemServicoPreventiva,
         ConfigLinhaProducaoCentroAtividade,
         ManutentorMaquina,
+        RequisicaoAlmoxarifado,
+        ControleRCeNF,
     )
     from django.db.models import Q
     import json
@@ -4182,6 +4184,16 @@ def visualizar_centro_de_atividade(request, ca_id):
     ).select_related(
         'maquina_primaria', 'maquina_secundaria'
     ).order_by('maquina_primaria__cd_maquina', 'maquina_secundaria__cd_maquina')
+
+    # Estrutura para lista Principal/Secundária: [{primaria, secundarias}, ...]
+    from collections import defaultdict
+    rel_por_primaria = defaultdict(list)
+    for rel in relacionamentos:
+        rel_por_primaria[rel.maquina_primaria_id].append(rel.maquina_secundaria)
+    primarias_com_secundarias = [
+        {'primaria': p, 'secundarias': rel_por_primaria.get(p.id, [])}
+        for p in maquinas_primarias
+    ]
     
     # Construir lista de nós no formato OrgChartJS
     nodes = []
@@ -4249,7 +4261,27 @@ def visualizar_centro_de_atividade(request, ca_id):
     ultimas_os_corretivas = qs_os_corretivas.order_by('-cd_ordemserv')[:5]
     ultimas_os_preventivas = qs_os_preventivas.order_by('-cd_ordemserv')[:5]
 
-    # OS Corretivas por mês: duas séries (dt_abertura_solicita e dt_encordmanu)
+    # Corretivas excluindo lubrificação (para a aba Corretivas)
+    qs_os_corretivas_sem_lub = qs_os_corretivas.exclude(descr_tpordservtv__icontains='LUBRIFICAÇÃO')
+    ultimas_os_corretivas_sem_lub = qs_os_corretivas_sem_lub.order_by('-cd_ordemserv')[:5]
+
+    # Lubrificação: subset de OS Corretivas com tipo LUBRIFICAÇÃO
+    qs_os_lubrificacao = qs_os_corretivas.filter(descr_tpordservtv__icontains='LUBRIFICAÇÃO')
+    total_os_lubrificacao = qs_os_lubrificacao.count()
+    ultimas_os_lubrificacao = qs_os_lubrificacao.order_by('-cd_ordemserv')[:5]
+    total_os_corretivas_sem_lub = total_os_corretivas - total_os_lubrificacao
+
+    # Top 5 máquinas com mais OS corretivas (excluindo lubrificação)
+    from django.db.models import Count
+    top_maquinas_corretivas = (
+        qs_os_corretivas.exclude(descr_tpordservtv__icontains='LUBRIFICAÇÃO')
+        .exclude(cd_maquina__isnull=True)
+        .values('cd_maquina', 'descr_maquina')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:5]
+    )
+
+    # Helper: dados mensais para qualquer queryset de OS (dt_abertura_solicita e dt_encordmanu)
     from datetime import datetime as dt_parse
 
     def _parse_date_str(date_str):
@@ -4264,28 +4296,68 @@ def visualizar_centro_de_atividade(request, ca_id):
                 continue
         return None
 
-    count_by_abertura = {}   # (year, month) -> count
-    count_by_encordmanu = {}  # (year, month) -> count
-    for os_item in qs_os_corretivas.only('dt_abertura_solicita', 'dt_encordmanu'):
-        d_ab = _parse_date_str(os_item.dt_abertura_solicita)
-        if d_ab:
-            key = (d_ab.year, d_ab.month)
-            count_by_abertura[key] = count_by_abertura.get(key, 0) + 1
-        d_enc = _parse_date_str(os_item.dt_encordmanu)
-        if d_enc:
-            key = (d_enc.year, d_enc.month)
-            count_by_encordmanu[key] = count_by_encordmanu.get(key, 0) + 1
+    def _build_monthly_data(qs, limit=12):
+        count_ab = {}
+        count_enc = {}
+        for os_item in qs.only('dt_abertura_solicita', 'dt_encordmanu'):
+            d_ab = _parse_date_str(os_item.dt_abertura_solicita)
+            if d_ab:
+                k = (d_ab.year, d_ab.month)
+                count_ab[k] = count_ab.get(k, 0) + 1
+            d_enc = _parse_date_str(os_item.dt_encordmanu)
+            if d_enc:
+                k = (d_enc.year, d_enc.month)
+                count_enc[k] = count_enc.get(k, 0) + 1
+        all_m = sorted(set(count_ab) | set(count_enc))
+        if len(all_m) > limit:
+            all_m = all_m[-limit:]
+        labels = [dt_parse(y, m, 1).strftime('%b/%Y') for (y, m) in all_m]
+        data_ab = [count_ab.get((y, m), 0) for (y, m) in all_m]
+        data_enc = [count_enc.get((y, m), 0) for (y, m) in all_m]
+        return labels, data_ab, data_enc, all_m
 
-    all_months = sorted(set(count_by_abertura) | set(count_by_encordmanu))
-    if len(all_months) > 12:
-        all_months = all_months[-12:]
-    meses_os_corretivas_labels = []
-    meses_os_corretivas_data_abertura = []
-    meses_os_corretivas_data_encordmanu = []
-    for (y, m) in all_months:
-        meses_os_corretivas_labels.append(dt_parse(y, m, 1).strftime('%b/%Y'))
-        meses_os_corretivas_data_abertura.append(count_by_abertura.get((y, m), 0))
-        meses_os_corretivas_data_encordmanu.append(count_by_encordmanu.get((y, m), 0))
+    # Corretivas (excl. lubrificação): dados mensais
+    meses_corretivas_labels, meses_corretivas_abertura, meses_corretivas_encordmanu, _ = _build_monthly_data(qs_os_corretivas_sem_lub)
+
+    # Preventivas: dados mensais e top máquinas
+    meses_preventivas_labels, meses_preventivas_abertura, meses_preventivas_encordmanu, _ = _build_monthly_data(qs_os_preventivas)
+    top_maquinas_preventivas = (
+        qs_os_preventivas.exclude(cd_maquina__isnull=True)
+        .values('cd_maquina', 'descr_maquina')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:5]
+    )
+
+    # Lubrificação: dados mensais e top máquinas
+    meses_lubrificacao_labels, meses_lubrificacao_abertura, meses_lubrificacao_encordmanu, _ = _build_monthly_data(qs_os_lubrificacao)
+    top_maquinas_lubrificacao = (
+        qs_os_lubrificacao.exclude(cd_maquina__isnull=True)
+        .values('cd_maquina', 'descr_maquina')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:5]
+    )
+
+    # Análises (trend: último mês vs penúltimo)
+    def _trend_analysis(labels, data_ab, data_enc):
+        if not labels or len(labels) < 2:
+            return None, None
+        total_ultimo = (data_ab[-1] if data_ab else 0) + (data_enc[-1] if data_enc else 0)
+        total_anterior = (data_ab[-2] if len(data_ab) > 1 else 0) + (data_enc[-2] if len(data_enc) > 1 else 0)
+        diff = total_ultimo - total_anterior
+        pct = (100 * diff / total_anterior) if total_anterior else 0
+        return diff, pct
+
+    trend_corretivas = _trend_analysis(meses_corretivas_labels, meses_corretivas_abertura, meses_corretivas_encordmanu)
+    trend_preventivas = _trend_analysis(meses_preventivas_labels, meses_preventivas_abertura, meses_preventivas_encordmanu)
+    trend_lubrificacao = _trend_analysis(meses_lubrificacao_labels, meses_lubrificacao_abertura, meses_lubrificacao_encordmanu)
+
+    # % de lubrificação em relação ao total de corretivas (incl. lubrificação)
+    lubrificacao_pct = (100 * total_os_lubrificacao / total_os_corretivas) if total_os_corretivas else 0
+
+    # Manter compatibilidade: meses_os_corretivas_* para gráfico existente (agora usa corretivas_sem_lub)
+    meses_os_corretivas_labels = meses_corretivas_labels
+    meses_os_corretivas_data_abertura = meses_corretivas_abertura
+    meses_os_corretivas_data_encordmanu = meses_corretivas_encordmanu
 
     # Linhas de produção configuradas para este CA
     linhas_producao = list(
@@ -4304,6 +4376,74 @@ def visualizar_centro_de_atividade(request, ca_id):
     manutentores_list.sort(key=lambda x: (x.Nome or '').upper())
     total_manutentores = len(manutentores_list)
 
+    # Orçamento: RequisicaoAlmoxarifado e ControleRCeNF
+    from django.db.models import Sum
+    from decimal import Decimal
+
+    ca_num = centro_atividade.ca
+    qs_requisicoes = RequisicaoAlmoxarifado.objects.filter(cd_centro_ativ=ca_num)
+    qs_requisicoes_custo = qs_requisicoes.filter(cd_depo=1)
+    total_requisicoes = qs_requisicoes.count()
+    total_valor_requisicoes = qs_requisicoes_custo.aggregate(s=Sum('vlr_movto_estoq'))['s'] or Decimal('0')
+    total_valor_requisicoes = abs(total_valor_requisicoes)
+
+    # ControleRCeNF: ca_rateio pode ser "4120", "CA 4120", "CA4120", etc.
+    q_controle = (
+        Q(ca_rateio=str(ca_num)) |
+        Q(ca_rateio__icontains=' ' + str(ca_num)) |
+        Q(ca_rateio__startswith=str(ca_num) + ' ') |
+        Q(ca_rateio__endswith=' ' + str(ca_num)) |
+        Q(ca_rateio__iexact='CA ' + str(ca_num)) |
+        Q(ca_rateio__iexact='CA' + str(ca_num))
+    )
+    qs_controle_rc = ControleRCeNF.objects.filter(q_controle)
+    total_controle_rc = qs_controle_rc.count()
+    agg_controle = qs_controle_rc.aggregate(
+        soma_pedido=Sum('valor_total_pedido'),
+        soma_nf=Sum('valor_nf'),
+        soma_saldo=Sum('saldo_residual_pedido'),
+    )
+    total_valor_pedido_rc = agg_controle['soma_pedido'] or Decimal('0')
+    total_valor_nf_rc = agg_controle['soma_nf'] or Decimal('0')
+    total_saldo_residual_rc = agg_controle['soma_saldo'] or Decimal('0')
+
+    # Requisições por mês (valor e quantidade)
+    req_por_mes = {}
+    for req in qs_requisicoes_custo.exclude(data_requisicao__isnull=True).only('data_requisicao', 'vlr_movto_estoq'):
+        key = (req.data_requisicao.year, req.data_requisicao.month)
+        if key not in req_por_mes:
+            req_por_mes[key] = {'valor': Decimal('0'), 'count': 0}
+        req_por_mes[key]['valor'] += abs(req.vlr_movto_estoq or 0)
+        req_por_mes[key]['count'] += 1
+    meses_req = sorted(req_por_mes.keys())
+    if len(meses_req) > 12:
+        meses_req = meses_req[-12:]
+    orc_req_labels = [dt_parse(y, m, 1).strftime('%b/%Y') for (y, m) in meses_req]
+    orc_req_valores = [float(req_por_mes[(y, m)]['valor']) for (y, m) in meses_req]
+    orc_req_counts = [req_por_mes[(y, m)]['count'] for (y, m) in meses_req]
+
+    # Controle RC por mês (valor_total_pedido, por data_rc)
+    rc_por_mes = {}
+    for c in qs_controle_rc.exclude(data_rc__isnull=True).only('data_rc', 'valor_total_pedido', 'valor_nf'):
+        if hasattr(c.data_rc, 'year'):
+            key = (c.data_rc.year, c.data_rc.month)
+        else:
+            continue
+        if key not in rc_por_mes:
+            rc_por_mes[key] = {'pedido': Decimal('0'), 'nf': Decimal('0'), 'count': 0}
+        rc_por_mes[key]['pedido'] += (c.valor_total_pedido or 0)
+        rc_por_mes[key]['nf'] += (c.valor_nf or 0)
+        rc_por_mes[key]['count'] += 1
+    meses_rc = sorted(rc_por_mes.keys())
+    if len(meses_rc) > 12:
+        meses_rc = meses_rc[-12:]
+    orc_rc_labels = [dt_parse(y, m, 1).strftime('%b/%Y') for (y, m) in meses_rc]
+    orc_rc_pedidos = [float(rc_por_mes[(y, m)]['pedido']) for (y, m) in meses_rc]
+    orc_rc_nfs = [float(rc_por_mes[(y, m)]['nf']) for (y, m) in meses_rc]
+
+    # Total orçamento (requisições + RC/NF)
+    total_orcamento_geral = total_valor_requisicoes + total_valor_nf_rc
+
     context = {
         'page_title': f'Visualizar CA {centro_atividade.ca}',
         'active_page': 'consultar_locais_e_cas',
@@ -4314,16 +4454,51 @@ def visualizar_centro_de_atividade(request, ca_id):
         'total_maquinas': maquinas_do_ca.count(),
         'has_maquinas': maquinas_do_ca.exists(),
         'has_primarias': maquinas_primarias.exists(),
+        'primarias_com_secundarias': primarias_com_secundarias,
         'total_os_corretivas': total_os_corretivas,
         'total_os_preventivas': total_os_preventivas,
+        'total_os_lubrificacao': total_os_lubrificacao,
+        'total_os_corretivas_sem_lub': total_os_corretivas_sem_lub,
         'ultimas_os_corretivas': ultimas_os_corretivas,
+        'ultimas_os_corretivas_sem_lub': ultimas_os_corretivas_sem_lub,
         'ultimas_os_preventivas': ultimas_os_preventivas,
+        'ultimas_os_lubrificacao': ultimas_os_lubrificacao,
+        'top_maquinas_corretivas': list(top_maquinas_corretivas),
+        'top_maquinas_preventivas': list(top_maquinas_preventivas),
+        'top_maquinas_lubrificacao': list(top_maquinas_lubrificacao),
         'linhas_producao': linhas_producao,
         'manutentores_list': manutentores_list,
         'total_manutentores': total_manutentores,
         'meses_os_corretivas_labels': json.dumps(meses_os_corretivas_labels, ensure_ascii=False),
         'meses_os_corretivas_data_abertura': json.dumps(meses_os_corretivas_data_abertura),
         'meses_os_corretivas_data_encordmanu': json.dumps(meses_os_corretivas_data_encordmanu),
+        'meses_preventivas_labels': json.dumps(meses_preventivas_labels, ensure_ascii=False),
+        'meses_preventivas_abertura': json.dumps(meses_preventivas_abertura),
+        'meses_preventivas_encordmanu': json.dumps(meses_preventivas_encordmanu),
+        'meses_lubrificacao_labels': json.dumps(meses_lubrificacao_labels, ensure_ascii=False),
+        'meses_lubrificacao_abertura': json.dumps(meses_lubrificacao_abertura),
+        'meses_lubrificacao_encordmanu': json.dumps(meses_lubrificacao_encordmanu),
+        'trend_corretivas': trend_corretivas,
+        'trend_preventivas': trend_preventivas,
+        'trend_lubrificacao': trend_lubrificacao,
+        'lubrificacao_pct': round(lubrificacao_pct, 1),
+        'top_maquinas_corretivas_json': json.dumps([{'label': (m['descr_maquina'] or str(m['cd_maquina']))[:25], 'total': m['total']} for m in top_maquinas_corretivas], ensure_ascii=False),
+        'top_maquinas_preventivas_json': json.dumps([{'label': (m['descr_maquina'] or str(m['cd_maquina']))[:25], 'total': m['total']} for m in top_maquinas_preventivas], ensure_ascii=False),
+        'top_maquinas_lubrificacao_json': json.dumps([{'label': (m['descr_maquina'] or str(m['cd_maquina']))[:25], 'total': m['total']} for m in top_maquinas_lubrificacao], ensure_ascii=False),
+        # Orçamento
+        'total_requisicoes': total_requisicoes,
+        'total_valor_requisicoes': total_valor_requisicoes,
+        'total_controle_rc': total_controle_rc,
+        'total_valor_pedido_rc': total_valor_pedido_rc,
+        'total_valor_nf_rc': total_valor_nf_rc,
+        'total_saldo_residual_rc': total_saldo_residual_rc,
+        'total_orcamento_geral': total_orcamento_geral,
+        'orc_req_labels': json.dumps(orc_req_labels, ensure_ascii=False),
+        'orc_req_valores': json.dumps(orc_req_valores),
+        'orc_req_counts': json.dumps(orc_req_counts),
+        'orc_rc_labels': json.dumps(orc_rc_labels, ensure_ascii=False),
+        'orc_rc_pedidos': json.dumps(orc_rc_pedidos),
+        'orc_rc_nfs': json.dumps(orc_rc_nfs),
     }
     return render(request, 'centro_de_atividades/visualizar_centro_de_atividade.html', context)
 
@@ -4980,32 +5155,14 @@ def consultar_maquinas(request):
     
     filter_setor = request.GET.get('filter_setor', '').strip()
     if filter_setor:
-        # Se for um valor exato (da lista de opções), usar busca exata
-        # Caso contrário, usar busca parcial
         maquinas_list = maquinas_list.filter(descr_setormanut=filter_setor)
-    
-    filter_unidade = request.GET.get('filter_unidade', '').strip()
-    if filter_unidade:
-        maquinas_list = maquinas_list.filter(nome_unid__icontains=filter_unidade)
-    
-    filter_patrimonio = request.GET.get('filter_patrimonio', '').strip()
-    if filter_patrimonio:
-        maquinas_list = maquinas_list.filter(nro_patrimonio__icontains=filter_patrimonio)
-    
-    filter_prioridade = request.GET.get('filter_prioridade', '').strip()
-    if filter_prioridade:
-        try:
-            prioridade_num = int(float(filter_prioridade))
-            maquinas_list = maquinas_list.filter(cd_priomaqutv=prioridade_num)
-        except (ValueError, TypeError):
-            maquinas_list = maquinas_list.filter(cd_priomaqutv__icontains=filter_prioridade)
     
     filter_gerenc = request.GET.get('filter_gerenc', '').strip()
     if filter_gerenc:
         maquinas_list = maquinas_list.filter(descr_gerenc=filter_gerenc)
     
-    # Ordenar por código da máquina
-    maquinas_list = maquinas_list.order_by('cd_maquina')
+    # Ordenar por código da máquina e prefetch manutentores
+    maquinas_list = maquinas_list.order_by('cd_maquina').prefetch_related('manutentores__manutentor')
     
     # Paginação
     paginator = Paginator(maquinas_list, 100)  # 100 itens por página
@@ -5047,9 +5204,6 @@ def consultar_maquinas(request):
         'filter_codigo': filter_codigo,
         'filter_descricao': filter_descricao,
         'filter_setor': filter_setor,
-        'filter_unidade': filter_unidade,
-        'filter_patrimonio': filter_patrimonio,
-        'filter_prioridade': filter_prioridade,
         'filter_gerenc': filter_gerenc,
         'search_query': search_query,
     }
@@ -5664,7 +5818,7 @@ def visualizar_requisicao_almoxarifado(request, requisicao_id):
 
 def consultar_paradas_maquina(request):
     """Consultar/listar paradas de máquinas com filtros de ano e mês"""
-    from app.models import ParadaMaquina
+    from app.models import ParadaMaquina, ParadaMaquinaOS, OrdemServicoCorretiva, Maquina
     from datetime import datetime
     from django.db.models import Q
     from django.core.paginator import Paginator
@@ -5742,10 +5896,34 @@ def consultar_paradas_maquina(request):
             Q(motivo__icontains=search_query) |
             Q(acao__icontains=search_query)
         )
-    
+
+    # Filtros de coluna (server-side) - aplicados antes da paginação para total correto
+    col_descr_recurso = request.GET.get('col_descr_recurso', '').strip()
+    col_cod_parada = request.GET.get('col_cod_parada', '').strip()
+    col_descr_parada = request.GET.get('col_descr_parada', '').strip()
+    col_descr_linha = request.GET.get('col_descr_linha', '').strip()
+    col_turno = request.GET.get('col_turno', '').strip()
+    col_motivo = request.GET.get('col_motivo', '').strip()
+    col_acao = request.GET.get('col_acao', '').strip()
+    if col_descr_recurso:
+        paradas_list = paradas_list.filter(descr_recurso__icontains=col_descr_recurso)
+    if col_cod_parada:
+        paradas_list = paradas_list.filter(cod_parada__icontains=col_cod_parada)
+    if col_descr_parada:
+        paradas_list = paradas_list.filter(descr_parada__icontains=col_descr_parada)
+    if col_descr_linha:
+        paradas_list = paradas_list.filter(descr_linha_producao__icontains=col_descr_linha)
+    if col_turno:
+        paradas_list = paradas_list.filter(turno__icontains=col_turno)
+    if col_motivo:
+        paradas_list = paradas_list.filter(motivo__icontains=col_motivo)
+    if col_acao:
+        paradas_list = paradas_list.filter(acao__icontains=col_acao)
+
     # Ordenar por data (mais recente primeiro) e horário inicial
     paradas_list = paradas_list.order_by('-data', '-horario_inicial', 'cod_recurso')
-    
+    paradas_list = paradas_list.prefetch_related('os_confirmadas')
+
     # Estatísticas baseadas nos dados FILTRADOS (antes da paginação)
     total_count = paradas_list.count()
     recursos_count = paradas_list.exclude(cod_recurso__isnull=True).values('cod_recurso').distinct().count()
@@ -5757,10 +5935,102 @@ def consultar_paradas_maquina(request):
         if parada.dif_hora:
             total_horas_paradas += float(parada.dif_hora)
     
+    # Calcular total de capacidade (filtros da página)
+    from django.db.models import Sum
+    total_capacidade_result = paradas_list.aggregate(s=Sum('capacidade'))
+    total_capacidade = float(total_capacidade_result['s'] or 0)
+
+    # Export Excel (antes da paginação - exporta todos os dados filtrados)
+    if request.GET.get('export') == 'xlsx':
+        import openpyxl
+        import io
+        from django.http import HttpResponse
+        paradas_export = list(paradas_list[:50000])  # limite para evitar timeout
+        parada_ids_export = [p.id for p in paradas_export]
+        parada_os_map_export = {}
+        for pmo in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=parada_ids_export).values('parada_maquina_id', 'os_numero'):
+            pid = pmo['parada_maquina_id']
+            os_num = str(pmo.get('os_numero') or '').strip()
+            if os_num and os_num.isdigit() and len(os_num) in (5, 6):
+                parada_os_map_export.setdefault(pid, []).append(os_num)
+        os_numeros_export = []
+        for nums in parada_os_map_export.values():
+            os_numeros_export.extend(nums)
+        os_numeros_export = list(set(int(n) for n in os_numeros_export if n.isdigit()))
+        os_to_maquina_export = {}
+        if os_numeros_export:
+            for o in OrdemServicoCorretiva.objects.filter(cd_ordemserv__in=os_numeros_export).values('cd_ordemserv', 'cd_maquina', 'descr_maquina'):
+                os_to_maquina_export[o['cd_ordemserv']] = {'cd_maquina': o['cd_maquina'], 'descr_maquina': o.get('descr_maquina') or ''}
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'Paradas de Máquina'
+        headers = ['Data', 'Horário Inicial', 'Horário Final', 'Descrição Recurso', 'Máquina', 'Nome Máquina', 'Cód. Parada', 'Descrição Parada', 'Descrição Linha', 'Turno', 'Capacidade', 'Motivo', 'Ação', 'OS']
+        for col, h in enumerate(headers, 1):
+            ws.cell(row=1, column=col, value=h)
+        for row_idx, parada in enumerate(paradas_export, 2):
+            first_os = (parada_os_map_export.get(parada.id) or [None])[0]
+            os_int = int(first_os) if first_os and str(first_os).isdigit() else None
+            info = os_to_maquina_export.get(os_int, {}) if os_int else {}
+            cd_maq = info.get('cd_maquina', '') or ''
+            descr_maq = info.get('descr_maquina', '') or ''
+            os_str = ', '.join(parada_os_map_export.get(parada.id, [])) or ''
+            ws.cell(row=row_idx, column=1, value=parada.data.strftime('%d/%m/%Y') if parada.data else '')
+            ws.cell(row=row_idx, column=2, value=parada.horario_inicial.strftime('%H:%M') if parada.horario_inicial else '')
+            ws.cell(row=row_idx, column=3, value=parada.horario_final.strftime('%H:%M') if parada.horario_final else '')
+            ws.cell(row=row_idx, column=4, value=parada.descr_recurso or '')
+            ws.cell(row=row_idx, column=5, value=cd_maq)
+            ws.cell(row=row_idx, column=6, value=descr_maq)
+            ws.cell(row=row_idx, column=7, value=parada.cod_parada or '')
+            ws.cell(row=row_idx, column=8, value=parada.descr_parada or '')
+            ws.cell(row=row_idx, column=9, value=parada.descr_linha_producao or '')
+            ws.cell(row=row_idx, column=10, value=parada.turno or '')
+            ws.cell(row=row_idx, column=11, value=float(parada.capacidade) if parada.capacidade is not None else 0)
+            ws.cell(row=row_idx, column=12, value=parada.motivo or '')
+            ws.cell(row=row_idx, column=13, value=parada.acao or '')
+            ws.cell(row=row_idx, column=14, value=os_str)
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        filename = f'paradas_maquina_{hoje.strftime("%Y%m%d_%H%M")}.xlsx'
+        response = HttpResponse(output.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+    
     # Paginação (após calcular estatísticas)
-    paginator = Paginator(paradas_list, 100)  # 100 itens por página
+    paginator = Paginator(paradas_list, 200)  # 200 itens por página
     page_number = request.GET.get('page', 1)
     paradas = paginator.get_page(page_number)
+    
+    # Obter Máquina relacionada via ParadaMaquinaOS -> OrdemServicoCorretiva (evitar N+1)
+    os_numeros = []
+    parada_os_map = {}  # parada_id -> os_numero (primeira OS confirmada)
+    for parada in paradas:
+        first_os = next((pmo for pmo in parada.os_confirmadas.all() if pmo.os_numero), None)
+        if first_os and str(first_os.os_numero).strip().isdigit():
+            os_num = int(str(first_os.os_numero).strip())
+            os_numeros.append(os_num)
+            parada_os_map[parada.id] = os_num
+    os_to_maquina = {}
+    if os_numeros:
+        for os_obj in OrdemServicoCorretiva.objects.filter(cd_ordemserv__in=os_numeros).values('cd_ordemserv', 'cd_maquina', 'descr_maquina'):
+            os_to_maquina[os_obj['cd_ordemserv']] = {'cd_maquina': os_obj['cd_maquina'], 'descr_maquina': os_obj['descr_maquina']}
+        cd_maquinas = [m['cd_maquina'] for m in os_to_maquina.values() if m['cd_maquina'] is not None]
+        maquina_ids = {m['cd_maquina']: m['id'] for m in Maquina.objects.filter(cd_maquina__in=cd_maquinas).values('id', 'cd_maquina')}
+        for os_num, info in os_to_maquina.items():
+            info['maquina_id'] = maquina_ids.get(info['cd_maquina'])
+    for parada in paradas:
+        os_num = parada_os_map.get(parada.id)
+        if os_num and os_num in os_to_maquina:
+            info = os_to_maquina[os_num]
+            parada.maquina_info = {
+                'cd_maquina': info['cd_maquina'],
+                'descr_maquina': info.get('descr_maquina') or '',
+                'maquina_id': info.get('maquina_id'),
+            }
+        else:
+            parada.maquina_info = None
+        # Lista de OS confirmadas para exibir na coluna OS
+        parada.os_list = [pmo.os_numero for pmo in parada.os_confirmadas.all() if pmo.os_numero]
     
     # Meses para o template
     meses_choices = [
@@ -5768,7 +6038,17 @@ def consultar_paradas_maquina(request):
         (5, 'Maio'), (6, 'Junho'), (7, 'Julho'), (8, 'Agosto'),
         (9, 'Setembro'), (10, 'Outubro'), (11, 'Novembro'), (12, 'Dezembro'),
     ]
-    
+
+    def _build_export_url(req):
+        qd = req.GET.copy()
+        if 'export' in qd:
+            qd.pop('export')
+        if 'page' in qd:
+            qd.pop('page')
+        qs = qd.urlencode()
+        base = req.path
+        return f'{base}?{qs}&export=xlsx' if qs else f'{base}?export=xlsx'
+
     context = {
         'page_title': 'Consultar Paradas de Máquina',
         'active_page': 'consultar_paradas_maquina',
@@ -5777,6 +6057,7 @@ def consultar_paradas_maquina(request):
         'recursos_count': recursos_count,
         'linhas_count': linhas_count,
         'total_horas_paradas': total_horas_paradas,
+        'total_capacidade': total_capacidade,
         # Filtros de data
         'ano_filtro': ano_filtro,
         'meses_filtro': meses_filtro_int,
@@ -5785,6 +6066,15 @@ def consultar_paradas_maquina(request):
         'meses_choices': meses_choices,
         # Preservar filtros no contexto
         'search_query': search_query,
+        # Filtros de coluna (para manter valores nos inputs)
+        'col_descr_recurso': col_descr_recurso,
+        'col_cod_parada': col_cod_parada,
+        'col_descr_parada': col_descr_parada,
+        'col_descr_linha': col_descr_linha,
+        'col_turno': col_turno,
+        'col_motivo': col_motivo,
+        'col_acao': col_acao,
+        'export_paradas_url': _build_export_url(request),
     }
     
     return render(request, 'paradas_maquina/consultar_paradas_de_maquina.html', context)
@@ -5975,7 +6265,7 @@ def configuracao_parada_maquina(request):
     return render(request, 'paradas_maquina/configuracao_parada_de_maquina.html', context)
 
 
-def analise_paradas_maquina(request):
+def _analise_paradas_maquina_impl(request, template_name):
     """Análise de paradas de máquinas com estatísticas e gráficos. Frigorífico/Indústria conforme ConfigRecursoParadaMaquina (descr_recurso)."""
     from app.models import ParadaMaquina, ParadaMaquinaOS, OrdemServicoCorretiva, Maquina, ConfigRecursoParadaMaquina, ConfigParadaMaquina, ProducaoDiaria
     from datetime import datetime, timedelta
@@ -6362,7 +6652,8 @@ def analise_paradas_maquina(request):
             if parada.dif_hora:
                 horas_frig += Decimal(str(parada.dif_hora))
         base_ind = base_filter.filter(descr_linha_producao__in=recursos_industria) if recursos_industria else ParadaMaquina.objects.none()
-        count_ind = base_ind.count()
+        cap_ind = base_ind.aggregate(s=Sum('capacidade'))['s']
+        cap_ind = float(cap_ind) if cap_ind is not None else 0.0
         horas_ind = Decimal('0.00')
         for parada in base_ind:
             if parada.dif_hora:
@@ -6373,7 +6664,7 @@ def analise_paradas_maquina(request):
         meses_horas.append(float(horas_mes))
         meses_data_frig.append(count_frig)
         meses_horas_frig.append(float(horas_frig))
-        meses_data_ind.append(count_ind)
+        meses_data_ind.append(cap_ind)
         meses_horas_ind.append(float(horas_ind))
     
     # Rótulo do período para o gráfico (ex: "Jan/2025 - Fev/2025" ou "2025")
@@ -6490,78 +6781,106 @@ def analise_paradas_maquina(request):
     # Paradas recentes (últimas 20)
     paradas_recentes_list = queryset_base.order_by('-data', '-horario_inicial')[:20]
 
-    def _build_section_charts(qs):
-        """Construir top recursos, top paradas, turnos, linhas e paradas recentes para um queryset."""
+    def _build_section_charts(qs, use_capacidade=False):
+        """Construir top recursos, top paradas, turnos, linhas e paradas recentes para um queryset.
+        Se use_capacidade=True, ordena e exibe Capacidade em vez de quantidade de paradas."""
         recursos_unicos_s = qs.exclude(cod_recurso__isnull=True).values('cod_recurso').distinct().count()
         linhas_unicas_s = qs.exclude(linha_producao__isnull=True).values('linha_producao').distinct().count()
         total_h_s = sum((Decimal(str(p.dif_hora)) for p in qs if p.dif_hora), Decimal('0.00'))
         count_s = qs.count()
         media_horas_s = total_h_s / count_s if count_s > 0 else Decimal('0.00')
-        top_r_qtd = qs.exclude(cod_recurso__isnull=True).values('cod_recurso', 'descr_recurso').annotate(total_count=Count('id')).order_by('-total_count')[:10]
+        top_r_qtd = qs.exclude(cod_recurso__isnull=True).values('cod_recurso', 'descr_recurso').annotate(
+            total_count=Count('id'),
+            total_capacidade=Sum('capacidade') or 0
+        ).order_by('-total_capacidade' if use_capacidade else '-total_count')[:10]
         top_r_labels = []
         top_r_data = []
+        top_r_capacidade = []
         for r in top_r_qtd:
             descr = r['descr_recurso'] or f"Recurso {r['cod_recurso']}"
             if len(descr) > 40:
                 descr = descr[:37] + "..."
             top_r_labels.append(f"{r['cod_recurso']} - {descr}")
-            top_r_data.append(r['total_count'])
-        recursos_horas_d = defaultdict(lambda: Decimal('0.00'))
+            val = float(r['total_capacidade'] or 0) if use_capacidade else r['total_count']
+            top_r_data.append(val)
+            top_r_capacidade.append(float(r['total_capacidade'] or 0))
+        recursos_horas_d = defaultdict(lambda: {'horas': Decimal('0.00'), 'capacidade': Decimal('0.00')})
         for p in qs.exclude(cod_recurso__isnull=True):
             if p.dif_hora:
-                recursos_horas_d[p.cod_recurso] += Decimal(str(p.dif_hora))
-        sorted_r = sorted(recursos_horas_d.items(), key=lambda x: x[1], reverse=True)[:10]
+                recursos_horas_d[p.cod_recurso]['horas'] += Decimal(str(p.dif_hora))
+            if p.capacidade is not None:
+                recursos_horas_d[p.cod_recurso]['capacidade'] += Decimal(str(p.capacidade))
+        sort_key = (lambda x: x[1]['capacidade']) if use_capacidade else (lambda x: x[1]['horas'])
+        sorted_r = sorted(recursos_horas_d.items(), key=sort_key, reverse=True)[:10]
         top_r_h_labels = []
         top_r_h_data = []
-        for cod, horas in sorted_r:
+        top_r_h_capacidade = []
+        for cod, dados in sorted_r:
             parada = qs.filter(cod_recurso=cod).first()
             descr = parada.descr_recurso if parada and parada.descr_recurso else f"Recurso {cod}"
             if len(descr) > 40:
                 descr = descr[:37] + "..."
             top_r_h_labels.append(f"{cod} - {descr}")
-            top_r_h_data.append(float(horas))
-        top_p_qtd = qs.exclude(cod_parada__isnull=True).exclude(cod_parada='').values('cod_parada', 'descr_parada').annotate(total_count=Count('id')).order_by('-total_count')[:10]
+            val = float(dados['capacidade']) if use_capacidade else float(dados['horas'])
+            top_r_h_data.append(val)
+            top_r_h_capacidade.append(float(dados['capacidade']))
+        top_p_qtd = qs.exclude(cod_parada__isnull=True).exclude(cod_parada='').values('cod_parada', 'descr_parada').annotate(
+            total_count=Count('id'),
+            total_capacidade=Sum('capacidade')
+        ).order_by('-total_capacidade' if use_capacidade else '-total_count')[:10]
         top_p_labels = []
         top_p_data = []
+        top_p_capacidade = []
         for p in top_p_qtd:
             descr = p['descr_parada'] or f"Parada {p['cod_parada']}"
             if len(descr) > 40:
                 descr = descr[:37] + "..."
             top_p_labels.append(f"{p['cod_parada']} - {descr}")
-            top_p_data.append(p['total_count'])
-        turnos_d = defaultdict(lambda: {'count': 0, 'horas': Decimal('0.00')})
+            val = float(p.get('total_capacidade') or 0) if use_capacidade else p['total_count']
+            top_p_data.append(val)
+            top_p_capacidade.append(float(p.get('total_capacidade') or 0))
+        turnos_d = defaultdict(lambda: {'count': 0, 'horas': Decimal('0.00'), 'capacidade': Decimal('0.00')})
         for p in qs.exclude(turno__isnull=True).exclude(turno=''):
             turnos_d[p.turno]['count'] += 1
             if p.dif_hora:
                 turnos_d[p.turno]['horas'] += Decimal(str(p.dif_hora))
-        sorted_t = sorted(turnos_d.items(), key=lambda x: x[1]['count'], reverse=True)
+            if p.capacidade is not None:
+                turnos_d[p.turno]['capacidade'] += Decimal(str(p.capacidade))
+        sort_t_key = (lambda x: x[1]['capacidade']) if use_capacidade else (lambda x: x[1]['count'])
+        sorted_t = sorted(turnos_d.items(), key=sort_t_key, reverse=True)
         t_labels = [str(t) if t else 'Não informado' for t, _ in sorted_t]
-        t_count = [d['count'] for _, d in sorted_t]
+        t_count = [float(d['capacidade']) if use_capacidade else d['count'] for _, d in sorted_t]
         t_horas = [float(d['horas']) for _, d in sorted_t]
-        linhas_d = defaultdict(lambda: {'count': 0, 'horas': Decimal('0.00')})
+        t_capacidade = [float(d['capacidade']) for _, d in sorted_t]
+        linhas_d = defaultdict(lambda: {'count': 0, 'horas': Decimal('0.00'), 'capacidade': Decimal('0.00')})
         for p in qs.exclude(linha_producao__isnull=True):
             linhas_d[p.linha_producao]['count'] += 1
             if p.dif_hora:
                 linhas_d[p.linha_producao]['horas'] += Decimal(str(p.dif_hora))
-        sorted_l = sorted(linhas_d.items(), key=lambda x: x[1]['count'], reverse=True)[:10]
+            if p.capacidade is not None:
+                linhas_d[p.linha_producao]['capacidade'] += Decimal(str(p.capacidade))
+        sort_l_key = (lambda x: x[1]['capacidade']) if use_capacidade else (lambda x: x[1]['count'])
+        sorted_l = sorted(linhas_d.items(), key=sort_l_key, reverse=True)[:10]
         l_labels = []
         l_count = []
         l_horas = []
+        l_capacidade = []
         for linha_id, dados in sorted_l:
             parada = qs.filter(linha_producao=linha_id).first()
             descr = parada.descr_linha_producao if parada and parada.descr_linha_producao else f"Linha {linha_id}"
             if len(descr) > 30:
                 descr = descr[:27] + "..."
             l_labels.append(f"{linha_id} - {descr}")
-            l_count.append(dados['count'])
+            l_count.append(float(dados['capacidade']) if use_capacidade else dados['count'])
             l_horas.append(float(dados['horas']))
+            l_capacidade.append(float(dados['capacidade']))
         recentes = list(qs.order_by('-data', '-horario_inicial')[:20])
 
         # Paradas por Máquina (via ParadaMaquinaOS -> OrdemServicoCorretiva, ou fallback: extrair OS de motivo/acao)
-        maquina_paradas_d = defaultdict(lambda: {'count': 0, 'descr': ''})
+        maquina_paradas_d = defaultdict(lambda: {'count': 0, 'descr': '', 'capacidade': Decimal('0.00')})
         parada_ids = list(qs.values_list('id', flat=True))
         
-        def _add_maquina_from_os(os_num_str):
+        def _add_maquina_from_os(os_num_str, capacidade=Decimal('0.00')):
             try:
                 if not os_num_str or not str(os_num_str).strip().isdigit():
                     return
@@ -6570,13 +6889,15 @@ def analise_paradas_maquina(request):
                 if os_obj and os_obj.cd_maquina is not None:
                     maquina_paradas_d[os_obj.cd_maquina]['count'] += 1
                     maquina_paradas_d[os_obj.cd_maquina]['descr'] = os_obj.descr_maquina or ''
+                    maquina_paradas_d[os_obj.cd_maquina]['capacidade'] += capacidade
             except (ValueError, TypeError):
                 pass
         
         if parada_ids:
             # 1) Usar ParadaMaquinaOS (associações confirmadas)
             for pmo in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=parada_ids).select_related('parada_maquina'):
-                _add_maquina_from_os(pmo.os_numero)
+                cap = Decimal(str(pmo.parada_maquina.capacidade or 0))
+                _add_maquina_from_os(pmo.os_numero, capacidade=cap)
         
         # 2) Fallback: se não há dados em ParadaMaquinaOS, extrair OS de motivo/acao (mesma lógica da página Analise Máquina por Parada)
         if not maquina_paradas_d:
@@ -6596,27 +6917,90 @@ def analise_paradas_maquina(request):
                 return list(found)
             
             for parada in qs:
+                cap = Decimal(str(parada.capacidade or 0))
                 texto = ' '.join(filter(None, [
                     str(parada.motivo or ''), str(parada.acao or ''),
                     str(parada.nro or ''), str(parada.descr_parada or '')
                 ]))
                 for os_num in extract_os(texto):
                     if len(os_num) in (5, 6):
-                        _add_maquina_from_os(os_num)
+                        _add_maquina_from_os(os_num, capacidade=cap)
         
-        sorted_maq = sorted(maquina_paradas_d.items(), key=lambda x: x[1]['count'], reverse=True)
+        sort_maq_key = (lambda x: x[1]['capacidade']) if use_capacidade else (lambda x: x[1]['count'])
+        sorted_maq = sorted(maquina_paradas_d.items(), key=sort_maq_key, reverse=True)
         maq_labels = []
         maq_data = []
+        maq_capacidade = []
         maq_urls = []
         for cd_maq, d in sorted_maq:
             descr = (d['descr'] or '')[:40]
             if d['descr'] and len(d['descr']) > 40:
                 descr += "..."
             maq_labels.append(f"{cd_maq} - {descr}" if descr else str(cd_maq))
-            maq_data.append(d['count'])
+            maq_data.append(float(d['capacidade']) if use_capacidade else d['count'])
+            maq_capacidade.append(float(d['capacidade']))
             # Link para página da máquina (visualizar_maquina usa maquina_id)
             m_obj = Maquina.objects.filter(cd_maquina=cd_maq).first()
             maq_urls.append(f"/maquinas/visualizar/{m_obj.id}/" if m_obj else "")
+
+        # Paradas por cd_setormanut (via ParadaMaquinaOS -> OrdemServicoCorretiva, ou fallback: extrair OS de motivo/acao)
+        setormanut_d = defaultdict(lambda: {'count': 0, 'descr': '', 'capacidade': Decimal('0.00')})
+
+        def _add_setormanut_from_os(os_num_str, capacidade=Decimal('0.00')):
+            try:
+                if not os_num_str or not str(os_num_str).strip().isdigit():
+                    return
+                os_int = int(str(os_num_str).strip())
+                os_obj = OrdemServicoCorretiva.objects.filter(cd_ordemserv=os_int).first()
+                if os_obj and os_obj.cd_setormanut:
+                    key = str(os_obj.cd_setormanut).strip()
+                    setormanut_d[key]['count'] += 1
+                    setormanut_d[key]['descr'] = os_obj.descr_setormanut or ''
+                    setormanut_d[key]['capacidade'] += capacidade
+            except (ValueError, TypeError):
+                pass
+
+        if parada_ids:
+            for pmo in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=parada_ids).select_related('parada_maquina'):
+                cap = Decimal(str(pmo.parada_maquina.capacidade or 0))
+                _add_setormanut_from_os(pmo.os_numero, capacidade=cap)
+        if not setormanut_d:
+            import re
+            os_standalone = re.compile(r'\b\d{5,6}\b')
+            os_com_prefixo = re.compile(
+                r'(?:OS|ordem|n[°º]|#|ref|numero|número)(?:\s*:?\s*)?(\d{5,6})\b',
+                re.IGNORECASE
+            )
+            def extract_os(text):
+                if not text or not isinstance(text, str):
+                    return []
+                found = set()
+                found.update(os_standalone.findall(text))
+                found.update(os_com_prefixo.findall(text))
+                found.update(re.findall(r'[\s\-_\.\/\(]\s*(\d{5,6})(?=[\s\-_\.\/\)]|$)', text))
+                return list(found)
+            for parada in qs:
+                cap = Decimal(str(parada.capacidade or 0))
+                texto = ' '.join(filter(None, [
+                    str(parada.motivo or ''), str(parada.acao or ''),
+                    str(parada.nro or ''), str(parada.descr_parada or '')
+                ]))
+                for os_num in extract_os(texto):
+                    if len(os_num) in (5, 6):
+                        _add_setormanut_from_os(os_num, capacidade=cap)
+
+        sort_setor_key = (lambda x: x[1]['capacidade']) if use_capacidade else (lambda x: x[1]['count'])
+        sorted_setor = sorted(setormanut_d.items(), key=sort_setor_key, reverse=True)
+        setormanut_labels = []
+        setormanut_data = []
+        setormanut_capacidade = []
+        for key, d in sorted_setor:
+            descr = (d['descr'] or '')[:35]
+            if d['descr'] and len(d['descr']) > 35:
+                descr += "..."
+            setormanut_labels.append(f"{key} - {descr}" if descr else str(key))
+            setormanut_data.append(float(d['capacidade']) if use_capacidade else d['count'])
+            setormanut_capacidade.append(float(d['capacidade']))
 
         return {
             'recursos_unicos': recursos_unicos_s,
@@ -6624,25 +7008,158 @@ def analise_paradas_maquina(request):
             'media_horas': media_horas_s,
             'top_recursos_labels': top_r_labels,
             'top_recursos_data': top_r_data,
+            'top_recursos_capacidade': top_r_capacidade,
             'top_recursos_horas_labels': top_r_h_labels,
             'top_recursos_horas_data': top_r_h_data,
+            'top_recursos_horas_capacidade': top_r_h_capacidade,
             'top_paradas_labels': top_p_labels,
             'top_paradas_data': top_p_data,
+            'top_paradas_capacidade': top_p_capacidade,
             'turnos_labels': t_labels,
             'turnos_data_count': t_count,
             'turnos_data_horas': t_horas,
+            'turnos_data_capacidade': t_capacidade,
             'linhas_labels': l_labels,
             'linhas_data_count': l_count,
             'linhas_data_horas': l_horas,
+            'linhas_data_capacidade': l_capacidade,
             'paradas_recentes_list': recentes,
             'maquinas_labels': maq_labels,
             'maquinas_data': maq_data,
+            'maquinas_capacidade': maq_capacidade,
             'maquinas_urls': maq_urls,
+            'setormanut_labels': setormanut_labels,
+            'setormanut_data': setormanut_data,
+            'setormanut_capacidade': setormanut_capacidade,
         }
 
     section_frig = _build_section_charts(qs_frigorifico) if recursos_frigorifico else _build_section_charts(ParadaMaquina.objects.none())
-    section_ind = _build_section_charts(qs_industria) if recursos_industria else _build_section_charts(ParadaMaquina.objects.none())
-    
+    section_ind = _build_section_charts(qs_industria, use_capacidade=True) if recursos_industria else _build_section_charts(ParadaMaquina.objects.none())
+    section_ind_924 = _build_section_charts(qs_industria, use_capacidade=True) if recursos_industria else _build_section_charts(ParadaMaquina.objects.none())
+
+    # Análise de Máquina atribuída ao Prédio do Abate: cod_recurso/linha 99985342 ou OS com cd_setormanut=99985342
+    analise_predio_abate = []
+    CODIGO_PREDIO_ABATE = 99985342
+    CODIGO_PREDIO_ABATE_STR = '99985342'
+    parada_ids_predio = set()
+    qs_predio_abate = ParadaMaquina.objects.none()
+
+    # 1) Parada de Máquina com cod_recurso=99985342 ou linha_producao=99985342 (PRÉDIO ABATE E RESFRIAMENTO)
+    qs_direct = queryset_base.filter(
+        Q(cod_recurso=CODIGO_PREDIO_ABATE) |
+        Q(linha_producao=CODIGO_PREDIO_ABATE) |
+        Q(descr_linha_producao__icontains='PRÉDIO ABATE E RESFRIAMENTO') |
+        Q(descr_linha_producao__icontains=CODIGO_PREDIO_ABATE_STR)
+    )
+    parada_ids_predio.update(qs_direct.values_list('id', flat=True))
+
+    # 2) Paradas vinculadas a OS com cd_setormanut=99985342 ou descr PRÉDIO ABATE
+    os_predio = OrdemServicoCorretiva.objects.filter(
+        Q(cd_setormanut=CODIGO_PREDIO_ABATE_STR) |
+        Q(descr_setormanut__icontains='PRÉDIO ABATE E RESFRIAMENTO')
+    ).values_list('cd_ordemserv', flat=True)
+    os_numeros_predio = set(str(o) for o in os_predio if o is not None)
+    if os_numeros_predio:
+        import re
+        parada_ids_from_pmo = set(
+            ParadaMaquinaOS.objects.filter(os_numero__in=os_numeros_predio)
+            .values_list('parada_maquina_id', flat=True)
+        )
+        parada_ids_predio.update(parada_ids_from_pmo)
+        os_standalone = re.compile(r'\b\d{5,6}\b')
+        os_com_prefixo = re.compile(
+            r'(?:OS|ordem|n[°º]|#|ref|numero|número)(?:\s*:?\s*)?(\d{5,6})\b',
+            re.IGNORECASE
+        )
+        def extract_os(text):
+            if not text or not isinstance(text, str):
+                return []
+            found = set()
+            found.update(os_standalone.findall(text))
+            found.update(os_com_prefixo.findall(text))
+            found.update(re.findall(r'[\s\-_\.\/\(]\s*(\d{5,6})(?=[\s\-_\.\/\)]|$)', text))
+            return list(found)
+        for parada in queryset_base.exclude(id__in=parada_ids_predio):
+            texto = ' '.join(filter(None, [
+                str(parada.motivo or ''), str(parada.acao or ''),
+                str(parada.nro or ''), str(parada.descr_parada or '')
+            ]))
+            for n in extract_os(texto):
+                if len(n) in (5, 6) and n in os_numeros_predio:
+                    parada_ids_predio.add(parada.id)
+                    break
+
+    if parada_ids_predio:
+        import re
+        os_standalone = re.compile(r'\b\d{5,6}\b')
+        os_com_prefixo = re.compile(
+            r'(?:OS|ordem|n[°º]|#|ref|numero|número)(?:\s*:?\s*)?(\d{5,6})\b',
+            re.IGNORECASE
+        )
+        def extract_os(text):
+            if not text or not isinstance(text, str):
+                return []
+            found = set()
+            found.update(os_standalone.findall(text))
+            found.update(os_com_prefixo.findall(text))
+            found.update(re.findall(r'[\s\-_\.\/\(]\s*(\d{5,6})(?=[\s\-_\.\/\)]|$)', text))
+            return list(found)
+        maquinas_raw = list(
+            Maquina.objects.exclude(descr_maquina__isnull=True)
+            .exclude(descr_maquina='')
+            .values_list('cd_maquina', 'descr_maquina')
+        )
+        maquinas_descricoes = [(cd, d) for cd, d in maquinas_raw if d and len(str(d).strip()) > 4]
+        os_pmo_map = {}
+        for pmo in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=parada_ids_predio).values('parada_maquina_id', 'os_numero'):
+            os_pmo_map.setdefault(pmo['parada_maquina_id'], []).append(pmo['os_numero'])
+        qs_predio_abate = queryset_base.filter(id__in=parada_ids_predio)
+        for parada in qs_predio_abate.order_by('-data', '-horario_inicial'):
+            os_numeros = os_pmo_map.get(parada.id, [])
+            if not os_numeros:
+                texto = ' '.join(filter(None, [
+                    str(parada.motivo or ''), str(parada.acao or ''),
+                    str(parada.nro or ''), str(parada.descr_parada or '')
+                ]))
+                os_numeros = [n for n in extract_os(texto) if len(n) in (5, 6)]
+            descr_queixa = ''
+            maquina_inferida = ''
+            os_obj = None
+            if os_numeros:
+                try:
+                    os_int = int(str(os_numeros[0]).strip())
+                    os_obj = OrdemServicoCorretiva.objects.filter(cd_ordemserv=os_int).first()
+                except (ValueError, TypeError):
+                    pass
+            if os_obj:
+                descr_queixa = (os_obj.descr_queixa or '').strip()
+                if os_obj.descr_maquina or os_obj.cd_maquina:
+                    maquina_inferida = f"{os_obj.cd_maquina or ''} - {os_obj.descr_maquina or ''}".strip(' -')
+            if not maquina_inferida and descr_queixa:
+                texto_queixa = (descr_queixa or '').strip().lower()
+                best_match = None
+                best_len = 0
+                for cd_maq, descr_maq in maquinas_descricoes:
+                    if not descr_maq:
+                        continue
+                    d = str(descr_maq).strip().lower()
+                    if len(d) > 4 and d in texto_queixa and len(d) > best_len:
+                        best_match = f"{cd_maq} - {descr_maq}"
+                        best_len = len(d)
+                if best_match:
+                    maquina_inferida = best_match
+            if not maquina_inferida:
+                maquina_inferida = 'Não identificada'
+            parada_info = f"{parada.data} | {parada.cod_recurso or '-'} | {parada.descr_parada or parada.descr_recurso or '-'}"
+            if parada.horario_inicial:
+                parada_info += f" | {parada.horario_inicial.strftime('%H:%M')}"
+            analise_predio_abate.append({
+                'parada': parada,
+                'parada_info': parada_info,
+                'descr_queixa': descr_queixa or '-',
+                'maquina_inferida': maquina_inferida,
+            })
+
     # Dados diários para o mês selecionado (para o gráfico de evolução diária)
     if ano_filtro and meses_filtro_int:
         try:
@@ -6691,18 +7208,20 @@ def analise_paradas_maquina(request):
         for parada in qs_frigorifico.filter(data=data_dia):
             if parada.dif_hora:
                 horas_frig += Decimal(str(parada.dif_hora))
-        count_ind = qs_industria.filter(data=data_dia).count()
+        cap_ind = Decimal('0.00')
         horas_ind = Decimal('0.00')
         for parada in qs_industria.filter(data=data_dia):
             if parada.dif_hora:
                 horas_ind += Decimal(str(parada.dif_hora))
+            if parada.capacidade is not None:
+                cap_ind += Decimal(str(parada.capacidade))
         
         dias_labels.append(data_dia.strftime('%d/%m'))
         dias_data.append(count)
         dias_horas.append(float(horas_dia))
         dias_data_frig.append(count_frig)
         dias_horas_frig.append(float(horas_frig))
-        dias_data_ind.append(count_ind)
+        dias_data_ind.append(float(cap_ind))
         dias_horas_ind.append(float(horas_ind))
     
     # Determinar mês selecionado para o gráfico diário
@@ -6823,9 +7342,37 @@ def analise_paradas_maquina(request):
         'section_frig_maquinas_labels': json.dumps(section_frig['maquinas_labels']),
         'section_frig_maquinas_data': json.dumps(section_frig['maquinas_data']),
         'section_frig_maquinas_urls': json.dumps(section_frig['maquinas_urls']),
+        'section_frig_setormanut_labels': json.dumps(section_frig['setormanut_labels']),
+        'section_frig_setormanut_data': json.dumps(section_frig['setormanut_data']),
         'section_ind_maquinas_labels': json.dumps(section_ind['maquinas_labels']),
         'section_ind_maquinas_data': json.dumps(section_ind['maquinas_data']),
         'section_ind_maquinas_urls': json.dumps(section_ind['maquinas_urls']),
+        'section_ind_setormanut_labels': json.dumps(section_ind['setormanut_labels']),
+        'section_ind_setormanut_data': json.dumps(section_ind['setormanut_data']),
+        'section_ind_924_top_recursos_labels': json.dumps(section_ind_924['top_recursos_labels']),
+        'section_ind_924_top_recursos_data': json.dumps(section_ind_924['top_recursos_data']),
+        'section_ind_924_top_recursos_capacidade': json.dumps(section_ind_924['top_recursos_capacidade']),
+        'section_ind_924_top_recursos_horas_labels': json.dumps(section_ind_924['top_recursos_horas_labels']),
+        'section_ind_924_top_recursos_horas_data': json.dumps(section_ind_924['top_recursos_horas_data']),
+        'section_ind_924_top_recursos_horas_capacidade': json.dumps(section_ind_924['top_recursos_horas_capacidade']),
+        'section_ind_924_top_paradas_labels': json.dumps(section_ind_924['top_paradas_labels']),
+        'section_ind_924_top_paradas_data': json.dumps(section_ind_924['top_paradas_data']),
+        'section_ind_924_top_paradas_capacidade': json.dumps(section_ind_924['top_paradas_capacidade']),
+        'section_ind_924_turnos_labels': json.dumps(section_ind_924['turnos_labels']),
+        'section_ind_924_turnos_data_count': json.dumps(section_ind_924['turnos_data_count']),
+        'section_ind_924_turnos_data_horas': json.dumps(section_ind_924['turnos_data_horas']),
+        'section_ind_924_turnos_data_capacidade': json.dumps(section_ind_924['turnos_data_capacidade']),
+        'section_ind_924_linhas_labels': json.dumps(section_ind_924['linhas_labels']),
+        'section_ind_924_linhas_data_count': json.dumps(section_ind_924['linhas_data_count']),
+        'section_ind_924_linhas_data_capacidade': json.dumps(section_ind_924['linhas_data_capacidade']),
+        'section_ind_924_maquinas_labels': json.dumps(section_ind_924['maquinas_labels']),
+        'section_ind_924_maquinas_data': json.dumps(section_ind_924['maquinas_data']),
+        'section_ind_924_maquinas_capacidade': json.dumps(section_ind_924['maquinas_capacidade']),
+        'section_ind_924_maquinas_urls': json.dumps(section_ind_924['maquinas_urls']),
+        'section_ind_924_setormanut_labels': json.dumps(section_ind_924['setormanut_labels']),
+        'section_ind_924_setormanut_data': json.dumps(section_ind_924['setormanut_data']),
+        'section_ind_924_setormanut_capacidade': json.dumps(section_ind_924['setormanut_capacidade']),
+        'analise_predio_abate': analise_predio_abate,
         # Filtros
         'anos_disponiveis': anos_disponiveis_list,
         'meses_nomes': meses_nomes,
@@ -6833,14 +7380,28 @@ def analise_paradas_maquina(request):
         'meses_filtro': meses_filtro_int,
         'periodo_chart_label': periodo_chart_label,
     }
-    return render(request, 'paradas_maquina/analise_paradas_de_maquina.html', context)
+    return render(request, template_name, context)
 
 
-def analise_maquina_por_parada(request):
+def analise_paradas_maquina(request):
+    """Análise geral - página com links para Frigorífico e Indústria."""
+    return _analise_paradas_maquina_impl(request, 'paradas_maquina/analise_paradas_de_maquina.html')
+
+
+def analise_parada_frigorifico(request):
+    """Análise de paradas - seção Frigorífico."""
+    return _analise_paradas_maquina_impl(request, 'paradas_maquina/analise_parada_frigorifico.html')
+
+
+def analise_parada_industria(request):
+    """Análise de paradas - seção Indústria."""
+    return _analise_paradas_maquina_impl(request, 'paradas_maquina/analise_parada_industria.html')
+
+
+def relacionar_ordem_com_parada(request):
     """
-    Análise de ParadaMaquina focada em extrair Ordens de Serviço (OS) dos campos motivo e acao.
-    OS são identificadas por sequências de 5 ou 6 dígitos. Mesmos filtros (ano/mês) da página analise_paradas_maquina.
-    Permite confirmar associações que são salvas em ParadaMaquinaOS para uso em outras análises.
+    Relacionar Paradas de Máquina com Ordens de Serviço.
+    Detecta OS nos campos motivo e ação (5-6 dígitos), permite confirmar associações e informar OS manualmente.
     """
     from app.models import ParadaMaquina, ParadaMaquinaOS
     from datetime import datetime
@@ -6853,9 +7414,9 @@ def analise_maquina_por_parada(request):
 
     # Processar confirmações (POST)
     if request.method == 'POST':
+        from django.db import transaction
         ano_post = request.POST.get('ano')
         meses_post = request.POST.getlist('mes')
-        # Pares (parada_id, os_numero) confirmados (checkboxes marcados)
         confirmados_set = set()
         for key in request.POST:
             if key.startswith('confirm_'):
@@ -6868,7 +7429,6 @@ def analise_maquina_por_parada(request):
                             confirmados_set.add((parada_id, os_num))
                     except (ValueError, TypeError):
                         pass
-        # Pares exibidos na tabela (hidden input displayed_pairs: "pid:os,pid:os,...")
         displayed_pairs = set()
         raw = request.POST.get('displayed_pairs', '')
         for part in raw.split(','):
@@ -6882,58 +7442,247 @@ def analise_maquina_por_parada(request):
                 except (ValueError, TypeError):
                     pass
         parada_ids_displayed = {p for p, _ in displayed_pairs}
-        # Remover confirmações que estavam na tabela mas usuário desmarcou
-        for parada_id in parada_ids_displayed:
-            for rec in ParadaMaquinaOS.objects.filter(parada_maquina_id=parada_id):
-                pair = (rec.parada_maquina_id, rec.os_numero)
-                if pair in displayed_pairs and pair not in confirmados_set:
-                    rec.delete()
-        # Criar confirmações marcadas
-        for parada_id, os_num in confirmados_set:
-            ParadaMaquinaOS.objects.get_or_create(
-                parada_maquina_id=parada_id,
-                os_numero=os_num,
-                defaults={}
-            )
-        # Processar OS manuais (Paradas sem OS)
-        for key in request.POST:
-            if key.startswith('manual_os_'):
-                try:
-                    parada_id = int(key.replace('manual_os_', ''))
-                    valor = request.POST.get(key, '').strip()
-                    if valor:
-                        # Extrair apenas dígitos 5-6
-                        import re as re_mod
-                        nums = re_mod.findall(r'\d{5,6}', valor)
-                        for os_num in nums:
-                            if len(os_num) in (5, 6):
-                                ParadaMaquinaOS.objects.get_or_create(
-                                    parada_maquina_id=parada_id,
-                                    os_numero=os_num,
-                                    defaults={}
-                                )
-                except (ValueError, TypeError):
-                    pass
-        # Para paradas sem OS: se campo manual vazio, remover associação existente
         raw_manual_ids = request.POST.get('displayed_manual_ids', '')
+        manual_parada_ids = set()
         for pid_str in raw_manual_ids.split(','):
             try:
                 parada_id = int(pid_str.strip())
-                valor = request.POST.get(f'manual_os_{parada_id}', '').strip()
-                if not valor:
-                    ParadaMaquinaOS.objects.filter(parada_maquina_id=parada_id).delete()
+                manual_parada_ids.add(parada_id)
             except (ValueError, TypeError):
                 pass
+
+        with transaction.atomic():
+            for parada_id in parada_ids_displayed:
+                for rec in ParadaMaquinaOS.objects.filter(parada_maquina_id=parada_id):
+                    pair = (rec.parada_maquina_id, rec.os_numero)
+                    if pair in displayed_pairs and pair not in confirmados_set:
+                        rec.delete()
+            for parada_id, os_num in confirmados_set:
+                ParadaMaquinaOS.objects.get_or_create(
+                    parada_maquina_id=parada_id,
+                    os_numero=str(os_num).strip(),
+                    defaults={}
+                )
+            for parada_id in manual_parada_ids:
+                valor = request.POST.get(f'manual_os_{parada_id}', '').strip()
+                ParadaMaquinaOS.objects.filter(parada_maquina_id=parada_id).delete()
+                if valor:
+                    import re as re_mod
+                    nums = re_mod.findall(r'\d{5,6}', valor)
+                    for os_num in nums:
+                        os_num = str(os_num).strip()
+                        if len(os_num) in (5, 6) and os_num.isdigit():
+                            ParadaMaquinaOS.objects.create(
+                                parada_maquina_id=parada_id,
+                                os_numero=os_num,
+                            )
         messages.success(request, 'Associações salvas com sucesso.')
         redirect_params = []
         if ano_post:
             redirect_params.append(f'ano={ano_post}')
         for m in (meses_post or []):
             redirect_params.append(f'mes={m}')
-        url = reverse('analise_maquina_por_parada')
+        linha_post = request.POST.get('linha_filtro', '').strip()
+        if linha_post:
+            redirect_params.append(f'linha_filtro={linha_post}')
+        url = reverse('relacionar_ordem_com_parada')
         if redirect_params:
             url += '?' + '&'.join(redirect_params)
         return redirect(url)
+
+    # Anos e meses disponíveis
+    anos_disponiveis = ParadaMaquina.objects.exclude(data__isnull=True).values_list('data__year', flat=True).distinct().order_by('-data__year')
+    hoje = datetime.now()
+    ano_filtro = request.GET.get('ano', None)
+    meses_filtro = request.GET.getlist('mes')
+    if not ano_filtro:
+        ano_filtro = str(hoje.year)
+    try:
+        ano_filtro = int(ano_filtro)
+    except (ValueError, TypeError):
+        ano_filtro = hoje.year
+
+    meses_filtro_int = []
+    if meses_filtro:
+        for mes in meses_filtro:
+            try:
+                mes_int = int(mes)
+                if 1 <= mes_int <= 12:
+                    meses_filtro_int.append(mes_int)
+            except (ValueError, TypeError):
+                continue
+        meses_filtro_int = sorted(list(set(meses_filtro_int)))
+
+    queryset_base = ParadaMaquina.objects.exclude(data__isnull=True)
+    if ano_filtro:
+        queryset_base = queryset_base.filter(data__year=ano_filtro)
+        if meses_filtro_int:
+            mes_conditions = Q()
+            for mes in meses_filtro_int:
+                mes_conditions |= Q(data__month=mes)
+            queryset_base = queryset_base.filter(mes_conditions)
+
+    linha_filtro = request.GET.get('linha_filtro', '').strip()
+    linhas_disponiveis = list(
+        queryset_base.exclude(linha_producao__isnull=True)
+        .values('linha_producao', 'descr_linha_producao')
+        .distinct()
+        .order_by('linha_producao')
+    )
+    if linha_filtro:
+        try:
+            linha_int = int(linha_filtro)
+            queryset_base = queryset_base.filter(linha_producao=linha_int)
+        except (ValueError, TypeError):
+            queryset_base = queryset_base.filter(descr_linha_producao__icontains=linha_filtro)
+
+    os_standalone = re.compile(r'\b\d{5,6}\b')
+    os_com_prefixo = re.compile(
+        r'(?:OS|ordem|n[°º]|#|ref|numero|número)(?:\s*:?\s*)?(\d{5,6})\b',
+        re.IGNORECASE
+    )
+
+    def extract_os(text):
+        if not text or not isinstance(text, str):
+            return []
+        found = set()
+        found.update(os_standalone.findall(text))
+        found.update(os_com_prefixo.findall(text))
+        found.update(re.findall(r'[\s\-_\.\/\(]\s*(\d{5,6})(?=[\s\-_\.\/\)]|$)', text))
+        return list(found)
+
+    registros_com_os = []
+    registros_sem_os = []
+    os_to_registros = defaultdict(list)
+    total_registros = 0
+
+    for parada in queryset_base:
+        total_registros += 1
+        texto = ' '.join(filter(None, [str(parada.motivo or ''), str(parada.acao or '')]))
+        os_encontradas = extract_os(texto)
+        if os_encontradas:
+            registros_com_os.append({
+                'parada': parada,
+                'os_list': sorted(os_encontradas),
+                'motivo_preview': (parada.motivo or '')[:200],
+                'acao_preview': (parada.acao or '')[:200],
+            })
+            for os_num in os_encontradas:
+                os_to_registros[os_num].append(parada.id)
+        else:
+            registros_sem_os.append(parada)
+
+    parada_ids_com_os = [item['parada'].id for item in registros_com_os]
+    os_confirmadas_set = set()
+    if parada_ids_com_os:
+        for rec in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=parada_ids_com_os):
+            os_confirmadas_set.add((rec.parada_maquina_id, rec.os_numero))
+    manual_os_map = defaultdict(list)
+    if registros_sem_os:
+        parada_ids_sem = [p.id for p in registros_sem_os]
+        for rec in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=parada_ids_sem):
+            manual_os_map[rec.parada_maquina_id].append(rec.os_numero)
+    registros_sem_os_with_manual = [
+        {'parada': p, 'manual_os_str': ', '.join(manual_os_map.get(p.id, []))}
+        for p in registros_sem_os
+    ]
+    # Paradas sem OS: dividir em "já tem OS manual" vs "ainda sem OS"
+    registros_com_os_manual = [item for item in registros_sem_os_with_manual if item['manual_os_str'].strip()]
+    registros_sem_os_ainda = [item for item in registros_sem_os_with_manual if not item['manual_os_str'].strip()]
+    for item in registros_com_os:
+        item['os_list_with_status'] = [
+            (os_num, (item['parada'].id, os_num) in os_confirmadas_set)
+            for os_num in item['os_list']
+        ]
+
+    os_resumo = []
+    for os_num in sorted(os_to_registros.keys(), key=lambda x: (len(os_to_registros[x]), x), reverse=True):
+        os_resumo.append({
+            'os_num': os_num,
+            'qtd_paradas': len(os_to_registros[os_num]),
+        })
+
+    # Resumo unificado: todas as paradas com status de OS (automática, manual ou sem)
+    parada_to_com_os = {item['parada'].id: item for item in registros_com_os}
+    parada_to_manual = {item['parada'].id: item for item in registros_sem_os_with_manual}
+    paradas_resumo = []
+    for parada in queryset_base.order_by('data', 'id'):
+        row = {
+            'parada': parada,
+            'tem_os': False,
+            'origem': 'Sem OS',
+            'os_display': '-',
+        }
+        if parada.id in parada_to_com_os:
+            item = parada_to_com_os[parada.id]
+            os_parts = []
+            for os_num, confirmado in item['os_list_with_status']:
+                os_parts.append(f"{os_num} ✓" if confirmado else os_num)
+            row['tem_os'] = True
+            row['origem'] = 'Automática'
+            row['os_display'] = ', '.join(os_parts) if os_parts else '-'
+        elif parada.id in parada_to_manual:
+            item = parada_to_manual[parada.id]
+            manual_str = item['manual_os_str'].strip()
+            if manual_str:
+                row['tem_os'] = True
+                row['origem'] = 'Manual'
+                row['os_display'] = manual_str
+        paradas_resumo.append(row)
+
+    # Opções de filtro baseadas nos dados (Recurso, Linha de Produção, Origem)
+    filter_recursos = sorted(set((r['parada'].descr_recurso or '') for r in paradas_resumo), key=lambda x: (x or 'zzz').lower())
+    filter_linhas = sorted(set((r['parada'].descr_linha_producao or '') for r in paradas_resumo), key=lambda x: (x or 'zzz').lower())
+    filter_origens = ['Automática', 'Manual', 'Sem OS']
+
+    meses_nomes = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+    anos_disponiveis_list = sorted(set(list(anos_disponiveis) + [hoje.year]), reverse=True)
+    if not anos_disponiveis_list:
+        anos_disponiveis_list = [hoje.year]
+
+    context = {
+        'page_title': 'Relacionar Ordem de Serviço com Parada',
+        'active_page': 'relacionar_ordem_com_parada',
+        'anos_disponiveis': anos_disponiveis_list,
+        'meses_nomes': meses_nomes,
+        'ano_filtro': ano_filtro,
+        'meses_filtro': meses_filtro_int,
+        'linha_filtro': linha_filtro,
+        'linhas_disponiveis': linhas_disponiveis,
+        'total_registros': total_registros,
+        'registros_com_os': registros_com_os,
+        'registros_sem_os': registros_sem_os,
+        'qtd_com_os': len(registros_com_os),
+        'qtd_sem_os': len(registros_sem_os),
+        'registros_com_os_manual': registros_com_os_manual,
+        'registros_sem_os_ainda': registros_sem_os_ainda,
+        'os_resumo': os_resumo,
+        'os_unicas_count': len(os_to_registros),
+        'qtd_confirmadas': len(os_confirmadas_set) + sum(len(v) for v in manual_os_map.values()),
+        'displayed_pairs': ','.join(f"{item['parada'].id}:{os_num}" for item in registros_com_os for os_num in item['os_list']),
+        'displayed_manual_ids': ','.join(str(item['parada'].id) for item in registros_sem_os_ainda),
+        'paradas_resumo': paradas_resumo,
+        'filter_recursos': filter_recursos,
+        'filter_linhas': filter_linhas,
+        'filter_origens': filter_origens,
+    }
+    return render(request, 'parada_de_maquina/relacionar_ordem_com_parada.html', context)
+
+
+def analise_maquina_por_parada(request):
+    """
+    Análise de ParadaMaquina focada em Máquinas relacionadas às Paradas (Indústria).
+    Usa associações ParadaMaquinaOS para vincular paradas a máquinas.
+    """
+    from app.models import ParadaMaquina, ParadaMaquinaOS, OrdemServicoCorretiva, Maquina, ConfigRecursoParadaMaquina
+    from datetime import datetime
+    from django.db.models import Q
+    import re
+    from collections import defaultdict
 
     # Anos e meses disponíveis (igual analise_paradas_maquina)
     anos_disponiveis = ParadaMaquina.objects.exclude(data__isnull=True).values_list('data__year', flat=True).distinct().order_by('-data__year')
@@ -6964,9 +7713,7 @@ def analise_maquina_por_parada(request):
             except (ValueError, TypeError):
                 continue
         meses_filtro_int = sorted(list(set(meses_filtro_int)))
-    elif not has_explicit_filter:
-        # Primeira carga: aplicar filtro do mês atual
-        meses_filtro_int = [hoje.month]
+    # Sem default de mês: igual à página Análise - quando vazio, usa todos os meses do ano
 
     # Queryset filtrado
     queryset_base = ParadaMaquina.objects.exclude(data__isnull=True)
@@ -6978,76 +7725,296 @@ def analise_maquina_por_parada(request):
                 mes_conditions |= Q(data__month=mes)
             queryset_base = queryset_base.filter(mes_conditions)
 
-    # Regex melhorada para Ordem de Serviço: standalone 5-6 dígitos OU após prefixos comuns
-    os_standalone = re.compile(r'\b\d{5,6}\b')
-    # Prefixos: OS, OS12345, OS 12345, Nº 12345, #12345, ordem 12345, ref 12345, etc.
-    os_com_prefixo = re.compile(
-        r'(?:OS|ordem|n[°º]|#|ref|numero|número)(?:\s*:?\s*)?(\d{5,6})\b',
-        re.IGNORECASE
+    # Linha de Produção (main filter)
+    linha_filtro = request.GET.get('linha_filtro', '').strip()
+    linhas_disponiveis = list(
+        queryset_base.exclude(linha_producao__isnull=True)
+        .values('linha_producao', 'descr_linha_producao')
+        .distinct()
+        .order_by('linha_producao')
     )
+    if linha_filtro:
+        try:
+            linha_int = int(linha_filtro)
+            queryset_base = queryset_base.filter(linha_producao=linha_int)
+        except (ValueError, TypeError):
+            queryset_base = queryset_base.filter(descr_linha_producao__icontains=linha_filtro)
 
-    def extract_os(text):
+    # Tabela de Máquinas relacionadas às Paradas de Máquina (Indústria + ABATE)
+    from decimal import Decimal
+    recursos_industria = set(
+        ConfigRecursoParadaMaquina.objects.filter(secao='industria').values_list('descr_recurso', flat=True)
+    )
+    linhas_para_analise = set(recursos_industria) if recursos_industria else set()
+    linhas_para_analise.add('ABATE')  # Sempre incluir ABATE (descr_linha_producao)
+    paradas_para_maquinas = queryset_base.filter(descr_linha_producao__in=linhas_para_analise) if linhas_para_analise else queryset_base
+    # Filtro de Linha específico da tabela de máquinas (independente do filtro principal)
+    linha_filtro_maq = request.GET.get('linha_filtro_maq', '').strip()
+    linhas_disponiveis_maq = list(
+        paradas_para_maquinas.exclude(linha_producao__isnull=True)
+        .values('linha_producao', 'descr_linha_producao')
+        .distinct()
+        .order_by('linha_producao')
+    )
+    if linha_filtro_maq:
+        try:
+            linha_int = int(linha_filtro_maq)
+            paradas_para_maquinas = paradas_para_maquinas.filter(linha_producao=linha_int)
+        except (ValueError, TypeError):
+            paradas_para_maquinas = paradas_para_maquinas.filter(descr_linha_producao__icontains=linha_filtro_maq)
+    maquina_agg = defaultdict(lambda: {'count': 0, 'horas': Decimal('0'), 'capacidade': Decimal('0'), 'linhas': set(), 'descr_maquina': ''})
+    parada_ids_maq = list(paradas_para_maquinas.values_list('id', flat=True))
+    paradas_maq_list = list(paradas_para_maquinas)
+    parada_processed = set()
+
+    def _add_parada_to_maquina(parada, cd_m, descr_maquina=''):
+        """Adiciona a parada (capacidade e horas completas) à máquina. Uma parada = uma máquina (via OS)."""
+        maquina_agg[cd_m]['count'] += 1
+        maquina_agg[cd_m]['horas'] += Decimal(str(parada.dif_hora or 0))
+        maquina_agg[cd_m]['capacidade'] += Decimal(str(parada.capacidade or 0))
+        maquina_agg[cd_m]['descr_maquina'] = descr_maquina
+        linha_key = (parada.linha_producao, parada.descr_linha_producao or '')
+        maquina_agg[cd_m]['linhas'].add(linha_key)
+
+    def extract_os_maq(text):
         if not text or not isinstance(text, str):
             return []
         found = set()
-        found.update(os_standalone.findall(text))
-        found.update(os_com_prefixo.findall(text))
-        # Sequência 5-6 dígitos após separadores (ex: "ref.12345", "-12345", "(12345)")
+        found.update(re.compile(r'\b\d{5,6}\b').findall(text))
+        found.update(re.compile(r'(?:OS|ordem|n[°º]|#|ref|numero|número)(?:\s*:?\s*)?(\d{5,6})\b', re.IGNORECASE).findall(text))
         found.update(re.findall(r'[\s\-_\.\/\(]\s*(\d{5,6})(?=[\s\-_\.\/\)]|$)', text))
         return list(found)
 
-    # Analisar cada registro
-    registros_com_os = []
-    registros_sem_os = []
-    os_to_registros = defaultdict(list)
-    total_registros = 0
-
-    # Carregar associações já confirmadas
-    parada_ids_com_os = []
-    for parada in queryset_base:
-        total_registros += 1
-        texto = ' '.join(filter(None, [str(parada.motivo or ''), str(parada.acao or '')]))
-        os_encontradas = extract_os(texto)
-        if os_encontradas:
-            parada_ids_com_os.append(parada.id)
-            registros_com_os.append({
-                'parada': parada,
-                'os_list': sorted(os_encontradas),
-                'motivo_preview': (parada.motivo or '')[:200],
-                'acao_preview': (parada.acao or '')[:200],
-            })
-            for os_num in os_encontradas:
-                os_to_registros[os_num].append(parada.id)
-        else:
-            registros_sem_os.append(parada)
-
-    os_confirmadas_set = set()
-    if parada_ids_com_os:
-        for rec in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=parada_ids_com_os):
-            os_confirmadas_set.add((rec.parada_maquina_id, rec.os_numero))
-    # OS manuais para paradas sem detecção (podem ter mais de uma)
-    manual_os_map = defaultdict(list)
-    if registros_sem_os:
-        parada_ids_sem = [p.id for p in registros_sem_os]
-        for rec in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=parada_ids_sem):
-            manual_os_map[rec.parada_maquina_id].append(rec.os_numero)
-    registros_sem_os_with_manual = [
-        {'parada': p, 'manual_os_str': ', '.join(manual_os_map.get(p.id, []))}
-        for p in registros_sem_os
-    ]
-    for item in registros_com_os:
-        item['os_list_with_status'] = [
-            (os_num, (item['parada'].id, os_num) in os_confirmadas_set)
-            for os_num in item['os_list']
-        ]
-
-    # Resumo: OS únicas e contagem de paradas por OS
-    os_resumo = []
-    for os_num in sorted(os_to_registros.keys(), key=lambda x: (len(os_to_registros[x]), x), reverse=True):
-        os_resumo.append({
-            'os_num': os_num,
-            'qtd_paradas': len(os_to_registros[os_num]),
+    # Para cada Parada de Máquina: encontrar a OS associada → encontrar a Máquina da OS → adicionar parada inteira à máquina
+    # Múltiplas paradas podem ir para a mesma máquina. A mesma OS pode ser usada por várias paradas.
+    # Cada parada contribui 100% da sua capacidade para a máquina (sem divisão).
+    os_to_maquina = {}  # os_num -> (cd_maquina, descr_maquina)
+    if parada_ids_maq:
+        for pmo in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=parada_ids_maq).select_related('parada_maquina'):
+            parada = pmo.parada_maquina
+            if parada.id in parada_processed:
+                continue
+            if not pmo.os_numero or not str(pmo.os_numero).strip().isdigit():
+                continue
+            try:
+                os_int = int(str(pmo.os_numero).strip())
+            except (ValueError, TypeError):
+                continue
+            if os_int not in os_to_maquina:
+                o = OrdemServicoCorretiva.objects.filter(cd_ordemserv=os_int).values('cd_maquina', 'descr_maquina').first()
+                if o and o.get('cd_maquina') is not None:
+                    os_to_maquina[os_int] = (o['cd_maquina'], o.get('descr_maquina') or '')
+                else:
+                    os_to_maquina[os_int] = None
+            info = os_to_maquina[os_int]
+            if info:
+                cd_m, descr = info
+                _add_parada_to_maquina(parada, cd_m, descr)
+                parada_processed.add(parada.id)
+        # Fallback: paradas sem ParadaMaquinaOS, extrair OS de motivo/acao/nro/descr_parada
+        for parada in paradas_maq_list:
+            if parada.id in parada_processed:
+                continue
+            texto = ' '.join(filter(None, [
+                str(parada.motivo or ''), str(parada.acao or ''),
+                str(parada.nro or ''), str(parada.descr_parada or '')
+            ]))
+            for os_num in extract_os_maq(texto):
+                if len(os_num) in (5, 6):
+                    try:
+                        os_int = int(os_num)
+                        if os_int not in os_to_maquina:
+                            o = OrdemServicoCorretiva.objects.filter(cd_ordemserv=os_int).values('cd_maquina', 'descr_maquina').first()
+                            if o and o.get('cd_maquina') is not None:
+                                os_to_maquina[os_int] = (o['cd_maquina'], o.get('descr_maquina') or '')
+                            else:
+                                os_to_maquina[os_int] = None
+                        info = os_to_maquina.get(os_int)
+                        if info:
+                            cd_m, descr = info
+                            _add_parada_to_maquina(parada, cd_m, descr)
+                            parada_processed.add(parada.id)
+                        break
+                    except (ValueError, TypeError):
+                        continue
+    cd_maquinas_list = list(maquina_agg.keys())
+    maquina_ids_map = {}
+    if cd_maquinas_list:
+        maquina_ids_map = {m['cd_maquina']: m['id'] for m in Maquina.objects.filter(cd_maquina__in=cd_maquinas_list).values('id', 'cd_maquina')}
+    maquinas_related = []
+    for cd_m, d in sorted(maquina_agg.items(), key=lambda x: -x[1]['count']):
+        linhas_sorted = sorted(d['linhas'], key=lambda x: (x[0] if x[0] is not None else 0, (x[1] or '')[:50]))
+        linhas_str = ', '.join((f"{l[0]} - {(l[1] or '')[:30]}" if l[1] else str(l[0])) for l in linhas_sorted[:5])
+        if len(d['linhas']) > 5:
+            linhas_str += f' (+{len(d["linhas"])-5} mais)'
+        linhas_full = ', '.join((f"{l[0]} - {(l[1] or '')[:80]}" if l[1] else str(l[0])) for l in linhas_sorted)
+        maquinas_related.append({
+            'cd_maquina': cd_m,
+            'descr_maquina': d['descr_maquina'] or '-',
+            'maquina_id': maquina_ids_map.get(cd_m),
+            'qtd_paradas': d['count'],
+            'total_horas': float(d['horas']),
+            'capacidade': float(d['capacidade']),
+            'linhas': linhas_str or '-',
+            'linhas_full': linhas_full or '-',
         })
+
+    paradas_sem_maquina = None
+    paradas_sem_ids = [p.id for p in paradas_maq_list if p.id not in parada_processed]
+    if paradas_sem_ids:
+        cap_sem = sum(float(p.capacidade or 0) for p in paradas_maq_list if p.id in paradas_sem_ids)
+        if cap_sem > 0 or len(paradas_sem_ids) > 0:
+            paradas_sem_objs = [p for p in paradas_maq_list if p.id in paradas_sem_ids]
+            qtd_sem = len(paradas_sem_objs)
+            horas_sem = sum(float(p.dif_hora or 0) for p in paradas_sem_objs)
+            linhas_sem = set()
+            recursos_sem = set()
+            for p in paradas_sem_objs:
+                if p.linha_producao or p.descr_linha_producao:
+                    linhas_sem.add(f"{p.linha_producao or '-'} - {(p.descr_linha_producao or '')[:40]}")
+                if p.cod_recurso or p.descr_recurso:
+                    recursos_sem.add(f"{p.cod_recurso or '-'} - {(p.descr_recurso or '')[:30]}")
+            # OS por parada: ParadaMaquinaOS ou extração de motivo/acao
+            os_por_parada = {}
+            for rec in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=paradas_sem_ids).values_list('parada_maquina_id', 'os_numero'):
+                pid, os_num = rec[0], str(rec[1] or '').strip()
+                if os_num and len(os_num) in (5, 6):
+                    os_por_parada.setdefault(pid, []).append(os_num)
+            for pid in paradas_sem_ids:
+                if pid not in os_por_parada:
+                    p_obj = next((x for x in paradas_sem_objs if x.id == pid), None)
+                    if p_obj:
+                        texto = ' '.join(filter(None, [str(p_obj.motivo or ''), str(p_obj.acao or '')]))
+                        found = extract_os_maq(texto)
+                        if found:
+                            os_por_parada[pid] = found[:5]  # limit to 5
+            paradas_detalhe = []
+            for p in paradas_sem_objs:
+                os_list = os_por_parada.get(p.id, [])
+                os_display = ', '.join(os_list) if os_list else '-'
+                paradas_detalhe.append({
+                    'id': p.id,
+                    'data': p.data.strftime('%d/%m/%Y') if p.data else '-',
+                    'recurso': f"{p.cod_recurso or '-'} - {(p.descr_recurso or '')[:35]}",
+                    'parada': f"{p.cod_parada or '-'} - {(p.descr_parada or '')[:40]}",
+                    'linha': f"{p.linha_producao or '-'} - {(p.descr_linha_producao or '')[:30]}",
+                    'os': os_display,
+                    'capacidade': float(p.capacidade or 0),
+                    'horas': float(p.dif_hora or 0),
+                })
+            paradas_sem_maquina = {
+                'cd_maquina': '-',
+                'descr_maquina': 'Paradas sem máquina associada',
+                'linhas': ', '.join(sorted(linhas_sem)[:5]) or '-',
+                'linhas_full': ', '.join(sorted(linhas_sem)) or '-',
+                'qtd_paradas': qtd_sem,
+                'total_horas': horas_sem,
+                'capacidade': cap_sem,
+                'maquina_id': None,
+                'origem': 'Paradas sem associação ParadaMaquinaOS e sem número de OS em motivo/ação/nro/descr_parada.',
+                'relacionado': (
+                    ('Linhas: ' + ', '.join(sorted(linhas_sem)[:8]) if linhas_sem else '') +
+                    (' | ' if linhas_sem and recursos_sem else '') +
+                    ('Recursos: ' + ', '.join(sorted(recursos_sem)[:8]) if recursos_sem else '')
+                ) or 'Paradas diversas',
+                'paradas_detalhe': paradas_detalhe,
+            }
+
+    # Capacidade esperada: soma direta de paradas_para_maquinas (referência da página Análise)
+    from django.db.models import Sum as SumModel
+    soma_capacidade_esperada = paradas_para_maquinas.aggregate(s=SumModel('capacidade'))['s']
+    soma_capacidade_esperada = float(soma_capacidade_esperada or 0)
+
+    sum_maq_qtd = sum(m['qtd_paradas'] for m in maquinas_related)
+    sum_maq_horas = sum(m['total_horas'] for m in maquinas_related)
+    sum_maq_cap = sum(m['capacidade'] for m in maquinas_related)
+    maquinas_totais_identificadas = {
+        'qtd_paradas': sum_maq_qtd,
+        'total_horas': sum_maq_horas,
+        'capacidade': sum_maq_cap,
+    }
+    if paradas_sem_maquina:
+        sum_maq_qtd += paradas_sem_maquina['qtd_paradas']
+        sum_maq_horas += paradas_sem_maquina['total_horas']
+        sum_maq_cap += paradas_sem_maquina['capacidade']
+    maquinas_totais = {
+        'qtd_paradas': sum_maq_qtd,
+        'total_horas': sum_maq_horas,
+        'capacidade': sum_maq_cap,
+    }
+
+    # Export Excel
+    if request.GET.get('export') == 'xlsx':
+        import openpyxl
+        import io
+        from django.http import HttpResponse
+        from datetime import datetime
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'Máquinas Relacionadas'
+        headers = ['Cód. Máquina', 'Descrição Máquina', 'Linhas de Produção', 'Qtd. Paradas', 'Total Horas', 'Capacidade']
+        for col, h in enumerate(headers, 1):
+            ws.cell(row=1, column=col, value=h)
+        row_idx = 2
+        for m in maquinas_related:
+            ws.cell(row=row_idx, column=1, value=m['cd_maquina'])
+            ws.cell(row=row_idx, column=2, value=m['descr_maquina'])
+            ws.cell(row=row_idx, column=3, value=m.get('linhas_full', m['linhas']))
+            ws.cell(row=row_idx, column=4, value=m['qtd_paradas'])
+            ws.cell(row=row_idx, column=5, value=round(m['total_horas'], 2))
+            ws.cell(row=row_idx, column=6, value=round(m['capacidade'], 3))
+            row_idx += 1
+        if paradas_sem_maquina:
+            ws.cell(row=row_idx, column=1, value='-')
+            ws.cell(row=row_idx, column=2, value=paradas_sem_maquina['descr_maquina'] + '. ' + paradas_sem_maquina['origem'] + ' Relacionado: ' + paradas_sem_maquina['relacionado'])
+            ws.cell(row=row_idx, column=3, value=paradas_sem_maquina.get('linhas_full', paradas_sem_maquina['linhas']))
+            ws.cell(row=row_idx, column=4, value=paradas_sem_maquina['qtd_paradas'])
+            ws.cell(row=row_idx, column=5, value=round(paradas_sem_maquina['total_horas'], 2))
+            ws.cell(row=row_idx, column=6, value=round(paradas_sem_maquina['capacidade'], 3))
+            row_idx += 1
+            ws2 = wb.create_sheet('Paradas sem máquina', 1)
+            ws2.cell(row=1, column=1, value='ID')
+            ws2.cell(row=1, column=2, value='Data')
+            ws2.cell(row=1, column=3, value='Recurso')
+            ws2.cell(row=1, column=4, value='Parada')
+            ws2.cell(row=1, column=5, value='Linha')
+            ws2.cell(row=1, column=6, value='Ordem de Serviço')
+            ws2.cell(row=1, column=7, value='Capacidade')
+            ws2.cell(row=1, column=8, value='Horas')
+            for i, pd in enumerate(paradas_sem_maquina.get('paradas_detalhe', []), 2):
+                ws2.cell(row=i, column=1, value=pd['id'])
+                ws2.cell(row=i, column=2, value=pd.get('data', ''))
+                ws2.cell(row=i, column=3, value=pd.get('recurso', ''))
+                ws2.cell(row=i, column=4, value=pd.get('parada', ''))
+                ws2.cell(row=i, column=5, value=pd.get('linha', ''))
+                ws2.cell(row=i, column=6, value=pd.get('os', '-'))
+                ws2.cell(row=i, column=7, value=round(pd.get('capacidade', 0), 3))
+                ws2.cell(row=i, column=8, value=round(pd.get('horas', 0), 2))
+        row_tot = row_idx + 1
+        ws.cell(row=row_tot, column=1, value='Total')
+        ws.cell(row=row_tot, column=4, value=maquinas_totais['qtd_paradas'])
+        ws.cell(row=row_tot, column=5, value=round(maquinas_totais['total_horas'], 2))
+        ws.cell(row=row_tot, column=6, value=round(maquinas_totais['capacidade'], 3))
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        filename = f'maquinas_relacionadas_paradas_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    def _build_export_maquinas_url(req):
+        qd = req.GET.copy()
+        if 'export' in qd:
+            qd.pop('export')
+        if 'page' in qd:
+            qd.pop('page')
+        qs = qd.urlencode()
+        base = req.path
+        return f'{base}?{qs}&export=xlsx' if qs else f'{base}?export=xlsx'
 
     meses_nomes = {
         1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
@@ -7062,6 +8029,11 @@ def analise_maquina_por_parada(request):
     if not anos_disponiveis_list:
         anos_disponiveis_list = [hoje.year]
 
+    # Taxa de identificação: % de paradas com máquina identificada
+    taxa_identificacao = None
+    if maquinas_totais['qtd_paradas'] > 0:
+        taxa_identificacao = round(100.0 * maquinas_totais_identificadas['qtd_paradas'] / maquinas_totais['qtd_paradas'], 1)
+
     context = {
         'page_title': 'Análise Máquina por Parada (OS)',
         'active_page': 'analise_maquina_por_parada',
@@ -7069,17 +8041,17 @@ def analise_maquina_por_parada(request):
         'meses_nomes': meses_nomes,
         'ano_filtro': ano_filtro,
         'meses_filtro': meses_filtro_int,
-        'total_registros': total_registros,
-        'registros_com_os': registros_com_os,
-        'registros_sem_os': registros_sem_os,
-        'qtd_com_os': len(registros_com_os),
-        'qtd_sem_os': len(registros_sem_os),
-        'os_resumo': os_resumo,
-        'os_unicas_count': len(os_to_registros),
-        'qtd_confirmadas': len(os_confirmadas_set) + sum(len(v) for v in manual_os_map.values()),
-        'displayed_pairs': ','.join(f"{item['parada'].id}:{os_num}" for item in registros_com_os for os_num in item['os_list']),
-        'registros_sem_os_with_manual': registros_sem_os_with_manual,
-        'displayed_manual_ids': ','.join(str(p.id) for p in registros_sem_os),
+        'maquinas_related': maquinas_related,
+        'maquinas_totais': maquinas_totais,
+        'maquinas_totais_identificadas': maquinas_totais_identificadas,
+        'soma_capacidade_esperada': soma_capacidade_esperada,
+        'paradas_sem_maquina': paradas_sem_maquina,
+        'linhas_disponiveis': linhas_disponiveis,
+        'linha_filtro': linha_filtro,
+        'linhas_disponiveis_maq': linhas_disponiveis_maq,
+        'linha_filtro_maq': linha_filtro_maq,
+        'export_maquinas_url': _build_export_maquinas_url(request),
+        'taxa_identificacao': taxa_identificacao,
     }
     return render(request, 'parada_de_maquina/analise_maquina_por_parada.html', context)
 
@@ -7120,6 +8092,7 @@ def api_dados_diarios_paradas(request):
         dias_horas_frig = []
         dias_data_ind = []
         dias_horas_ind = []
+        dias_capacidade_ind = []
         
         for dia in range(1, ultimo_dia.day + 1):
             data_dia = primeiro_dia.replace(day=dia)
@@ -7138,9 +8111,12 @@ def api_dados_diarios_paradas(request):
                     horas_frig += Decimal(str(parada.dif_hora))
             count_ind = qs_dia.filter(descr_linha_producao__in=recursos_industria).count() if recursos_industria else 0
             horas_ind = Decimal('0.00')
+            cap_ind = Decimal('0.00')
             for parada in qs_dia.filter(descr_linha_producao__in=recursos_industria) if recursos_industria else []:
                 if parada.dif_hora:
                     horas_ind += Decimal(str(parada.dif_hora))
+                if parada.capacidade is not None:
+                    cap_ind += Decimal(str(parada.capacidade))
             
             dias_labels.append(data_dia.strftime('%d/%m'))
             dias_data.append(count)
@@ -7149,6 +8125,7 @@ def api_dados_diarios_paradas(request):
             dias_horas_frig.append(float(horas_frig))
             dias_data_ind.append(count_ind)
             dias_horas_ind.append(float(horas_ind))
+            dias_capacidade_ind.append(float(cap_ind))
         
         secao = request.GET.get('secao', '').strip().lower()
         if secao == 'frigorifico':
@@ -7160,7 +8137,7 @@ def api_dados_diarios_paradas(request):
         if secao == 'industria':
             return JsonResponse({
                 'labels': dias_labels,
-                'data': dias_data_ind,
+                'data': dias_capacidade_ind,
                 'horas': dias_horas_ind
             })
         return JsonResponse({
@@ -7169,7 +8146,7 @@ def api_dados_diarios_paradas(request):
             'horas': dias_horas,
             'data_frig': dias_data_frig,
             'horas_frig': dias_horas_frig,
-            'data_ind': dias_data_ind,
+            'data_ind': dias_capacidade_ind,
             'horas_ind': dias_horas_ind
         })
         
@@ -13664,7 +14641,7 @@ def editar_manutentor(request, matricula):
         'form': form,
         'manutentor': manutentor,
     }
-    return render(request, 'visualizar/editar_manutentor.html', context)
+    return render(request, 'editar/editar_manutentor.html', context)
 
 
 def consultar_manutentores(request):
@@ -14449,6 +15426,9 @@ def gerenciar_projeto(request):
             item['setor_display'] = item['setor']
             item['setor_value'] = item['setor']
     
+    # Dias 1-31 para seleção na exclusão por dia (Requisições Almoxarifado)
+    dias_mes = list(range(1, 32))
+
     context = {
         'page_title': 'Gerenciar Projeto',
         'active_page': 'gerenciar_projeto',
@@ -14462,6 +15442,7 @@ def gerenciar_projeto(request):
         'anos_disponiveis_requisicoes': anos_disponiveis_requisicoes,
         'anos_disponiveis_notas': anos_disponiveis_notas,
         'meses_nomes': meses_nomes,
+        'dias_mes': dias_mes,
         'ano_atual': ano_atual,
         'setores_projecao_gasto': setores_projecao_gasto,
     }
@@ -14575,6 +15556,9 @@ def limpar_tabela(request):
                 meses_raw = request.POST.getlist('mes_requisicoes')
                 meses = [int(m) for m in meses_raw if m and 1 <= int(m) <= 12]
                 meses = sorted(set(meses))
+                dias_raw = request.POST.getlist('dia_requisicoes')
+                dias = [int(d) for d in dias_raw if d and 1 <= int(d) <= 31]
+                dias = sorted(set(dias))
                 if not ano or not meses:
                     messages.error(request, 'Selecione pelo menos um ano e um mês para excluir, ou marque "Deletar TODOS os registros".')
                     return redirect('gerenciar_projeto')
@@ -14582,17 +15566,27 @@ def limpar_tabela(request):
                 for m in meses:
                     mes_conditions |= Q(data_requisicao__month=m)
                 qs = RequisicaoAlmoxarifado.objects.filter(data_requisicao__year=ano).filter(mes_conditions)
+                # Se dias específicos foram selecionados, filtrar por eles
+                if dias:
+                    dia_conditions = Q()
+                    for d in dias:
+                        dia_conditions |= Q(data_requisicao__day=d)
+                    qs = qs.filter(dia_conditions)
                 count = qs.count()
                 if count > 0:
                     with transaction.atomic():
                         qs.delete()
                     nomes_meses = {1:'Janeiro',2:'Fevereiro',3:'Março',4:'Abril',5:'Maio',6:'Junho',7:'Julho',8:'Agosto',9:'Setembro',10:'Outubro',11:'Novembro',12:'Dezembro'}
                     nomes = [nomes_meses.get(m, str(m)) for m in meses]
-                    messages.success(request, f'{count} registro(s) de Requisições Almoxarifado ({", ".join(nomes)}/{ano}) foram removidos permanentemente.')
+                    if dias:
+                        msg_dias = ', '.join(str(d) for d in dias)
+                        messages.success(request, f'{count} registro(s) de Requisições Almoxarifado ({", ".join(nomes)}/{ano}, dias {msg_dias}) foram removidos permanentemente.')
+                    else:
+                        messages.success(request, f'{count} registro(s) de Requisições Almoxarifado ({", ".join(nomes)}/{ano}) foram removidos permanentemente.')
                 else:
-                    messages.info(request, 'Não há registros para os meses selecionados em Requisições Almoxarifado.')
+                    messages.info(request, 'Não há registros para os meses/dias selecionados em Requisições Almoxarifado.')
             except (ValueError, TypeError) as e:
-                messages.error(request, f'Ano ou mês(es) inválidos: {str(e)}')
+                messages.error(request, f'Ano, mês(es) ou dia(s) inválidos: {str(e)}')
         return redirect('gerenciar_projeto')
     
     # Tratamento especial: NotaFiscal — limpar por mês (campo data_emissao é CharField, parse em Python)
@@ -16438,9 +17432,9 @@ def consultar_projecao_gastos(request):
         except Exception:
             pass
     
-    # Paginação
+    # Paginação (150 itens por página para ver mais registros de uma vez)
     try:
-        paginator = Paginator(projecoes_list, 50)
+        paginator = Paginator(projecoes_list, 150)
         page_number = request.GET.get('page', 1)
         try:
             page_number = int(page_number)
@@ -16449,7 +17443,7 @@ def consultar_projecao_gastos(request):
         projecoes = paginator.get_page(page_number)
     except Exception as e:
         empty_list = ProjecaoGasto.objects.none()
-        paginator = Paginator(empty_list, 50)
+        paginator = Paginator(empty_list, 150)
         projecoes = paginator.page(1)
     
     # Obter valores únicos para os dropdowns de filtros da tabela
@@ -18794,6 +19788,10 @@ def consultar_planilha_rc(request):
     if filtro_uso:
         controles_list = controles_list.filter(uso__icontains=filtro_uso)
     
+    filtro_classificacao = request.GET.get('filtro_classificacao', '').strip()
+    if filtro_classificacao:
+        controles_list = controles_list.filter(classificacao__icontains=filtro_classificacao)
+    
     filtro_valor_min = request.GET.get('filtro_valor_min', '').strip()
     if filtro_valor_min:
         try:
@@ -18824,12 +19822,12 @@ def consultar_planilha_rc(request):
     page_number = request.GET.get('page', 1)
     controles = paginator.get_page(page_number)
     
-    # Estatísticas
-    total_count = ControleRCeNF.objects.count()
-    empresas_count = ControleRCeNF.objects.exclude(empresa__isnull=True).exclude(empresa='').values('empresa').distinct().count()
+    # Estatísticas (baseadas no queryset filtrado, para os boxes refletirem os filtros)
+    total_count = controles_list.count()
+    empresas_count = controles_list.exclude(empresa__isnull=True).exclude(empresa='').values('empresa').distinct().count()
     
-    # Calcular valor total
-    valor_total_result = ControleRCeNF.objects.aggregate(
+    # Calcular valor total (sobre os registros filtrados)
+    valor_total_result = controles_list.aggregate(
         total_pedido=Sum('valor_total_pedido'),
         total_nf=Sum('valor_nf')
     )
@@ -18860,6 +19858,12 @@ def consultar_planilha_rc(request):
     ).exclude(
         uso=''
     ).values_list('uso', flat=True).distinct().order_by('uso')
+    
+    classificacoes_unicas = ControleRCeNF.objects.exclude(
+        classificacao__isnull=True
+    ).exclude(
+        classificacao=''
+    ).values_list('classificacao', flat=True).distinct().order_by('classificacao')
     
     # Detectar duplicatas
     # Duplicatas são detectadas baseadas em combinações de campos chave
@@ -18956,14 +19960,17 @@ def consultar_planilha_rc(request):
         'solicitantes_unicos': solicitantes_unicos,
         'status_unicos': status_unicos,
         'usos_unicos': usos_unicos,
+        'filtro_id': filtro_id,
         'filtro_empresa': filtro_empresa,
         'filtro_solicitante': filtro_solicitante,
         'filtro_rc': filtro_rc,
         'filtro_os': filtro_os,
         'filtro_status': filtro_status,
         'filtro_uso': filtro_uso,
+        'filtro_classificacao': filtro_classificacao,
         'filtro_valor_min': filtro_valor_min,
         'filtro_valor_max': filtro_valor_max,
+        'classificacoes_unicas': classificacoes_unicas,
         'duplicatas_analise': duplicatas_analise,
     }
     

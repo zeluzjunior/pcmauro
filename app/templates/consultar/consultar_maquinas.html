@@ -5,15 +5,35 @@
 
 {% block extra_css %}
 <style>
+    .stat-card { transition: transform 0.2s; }
+    .stat-card:hover { transform: translateY(-5px); }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-warning { border-left-color: #ffc107; }
     .table-container {
-        max-height: 600px;
+        max-height: 70vh;
         overflow-y: auto;
+        overflow-x: auto;
+    }
+    .table {
+        width: 100%;
+        table-layout: auto;
     }
     .table thead th {
         position: sticky;
         top: 0;
         background-color: #f8f9fa;
         z-index: 10;
+        white-space: nowrap;
+        vertical-align: middle;
+        text-align: center;
+        padding: 12px 8px;
+    }
+    .table tbody td {
+        vertical-align: middle;
+        padding: 10px 8px;
     }
     .filter-input {
         width: 100%;
@@ -30,11 +50,23 @@
     }
     .filter-header {
         padding: 8px !important;
+        background-color: #e9ecef;
     }
     .filter-row th {
         background-color: #e9ecef;
         padding: 4px 8px !important;
+        position: sticky;
+        top: 48px;
+        z-index: 8;
     }
+    .col-codigo { min-width: 90px; text-align: center; }
+    .col-descricao { min-width: 180px; text-align: left; }
+    .col-setor { min-width: 120px; text-align: center; }
+    .col-gerenc { min-width: 140px; text-align: center; }
+    .col-manutentor { min-width: 160px; text-align: center; }
+    .col-acoes { min-width: 110px; text-align: center; white-space: nowrap; }
+    .col-acoes .btn-group-actions { display: inline-flex; flex-wrap: nowrap; gap: 2px; }
+    .col-acoes .btn-sm { padding: 0.2rem 0.4rem; font-size: 0.75rem; }
 </style>
 {% endblock %}
 
@@ -60,39 +92,63 @@
 
 <!-- Main Content -->
 <section class="py-5">
-    <div class="container">
+    <div class="container-fluid px-5">
 
         <!-- Statistics -->
         <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Total de Máquinas:</h5>
-                        <p class="card-text display-6">{{ total_count }}</p>
+            <div class="col-12">
+                <div class="row g-3">
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Total de Máquinas</h6>
+                                        <h4 class="mb-0 fw-bold">{{ total_count }}</h4>
+                                    </div>
+                                    <i class="fas fa-cogs fa-2x text-primary opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-info text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Mostrando na página: </h5>
-                        <p class="card-text display-6" id="visible-count">{{ maquinas|length }} máquinas</p>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Mostrando na página</h6>
+                                        <h4 class="mb-0 fw-bold" id="visible-count">{{ maquinas|length }} máquinas</h4>
+                                    </div>
+                                    <i class="fas fa-list fa-2x text-success opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-success text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Máquinas cadastradas em: </h5>
-                        <p class="card-text display-6">{{ setores_count }} setores</p>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Setores</h6>
+                                        <h4 class="mb-0 fw-bold">{{ setores_count }}</h4>
+                                    </div>
+                                    <i class="fas fa-building fa-2x text-info opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-warning text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Máquinas Principais</h5>
-                        <p class="card-text display-6">{{ maquinas_principais_count }} máquinas</p>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Máquinas Principais</h6>
+                                        <h4 class="mb-0 fw-bold">{{ maquinas_principais_count }}</h4>
+                                    </div>
+                                    <i class="fas fa-industry fa-2x text-warning opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -101,25 +157,18 @@
         <!-- Filters Accordion -->
         <div class="row mb-4">
             <div class="col-md-12">
-                <div class="accordion" id="filtersAccordion">
-                    <div class="accordion-item">
+                <div class="accordion filter-accordion" id="filtersAccordion">
+                    <div class="accordion-item shadow-sm border-0">
                         <h2 class="accordion-header" id="filtersHeading">
-                            <button class="accordion-button {% if not filter_codigo and not filter_descricao and not filter_setor and not filter_unidade and not filter_patrimonio and not filter_prioridade and not filter_gerenc and not search_query %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapse" aria-expanded="{% if filter_codigo or filter_descricao or filter_setor or filter_unidade or filter_patrimonio or filter_prioridade or filter_gerenc or search_query %}true{% else %}false{% endif %}" aria-controls="filtersCollapse">
+                            <button class="accordion-button {% if not filter_codigo and not filter_descricao and not filter_setor and not filter_gerenc and not search_query %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapse" aria-expanded="{% if filter_codigo or filter_descricao or filter_setor or filter_gerenc or search_query %}true{% else %}false{% endif %}" aria-controls="filtersCollapse">
                                 <i class="fas fa-filter me-2"></i>
                                 <strong>Filtros Avançados</strong>
-                                {% if filter_codigo or filter_descricao or filter_setor or filter_unidade or filter_patrimonio or filter_prioridade or filter_gerenc %}
-                                    <span class="badge bg-primary ms-2" id="activeFiltersBadge">
-                                        {% if filter_codigo %}{% if filter_descricao or filter_setor or filter_unidade or filter_patrimonio or filter_prioridade %}{% else %}1{% endif %}{% endif %}
-                                        {% if filter_descricao %}{% if filter_setor or filter_unidade or filter_patrimonio or filter_prioridade %}{% else %}1{% endif %}{% endif %}
-                                        {% if filter_setor %}{% if filter_unidade or filter_patrimonio or filter_prioridade %}{% else %}1{% endif %}{% endif %}
-                                        {% if filter_unidade %}{% if filter_patrimonio or filter_prioridade %}{% else %}1{% endif %}{% endif %}
-                                        {% if filter_patrimonio %}{% if filter_prioridade %}{% else %}1{% endif %}{% endif %}
-                                        {% if filter_prioridade %}1{% endif %}
-                                    </span>
+                                {% if filter_codigo or filter_descricao or filter_setor or filter_gerenc %}
+                                    <span class="badge bg-primary ms-2" id="activeFiltersBadge">Filtros ativos</span>
                                 {% endif %}
                             </button>
                         </h2>
-                        <div id="filtersCollapse" class="accordion-collapse collapse {% if filter_codigo or filter_descricao or filter_setor or filter_unidade or filter_patrimonio or filter_prioridade or filter_gerenc or search_query %}show{% endif %}" aria-labelledby="filtersHeading" data-bs-parent="#filtersAccordion">
+                        <div id="filtersCollapse" class="accordion-collapse collapse {% if filter_codigo or filter_descricao or filter_setor or filter_gerenc or search_query %}show{% endif %}" aria-labelledby="filtersHeading" data-bs-parent="#filtersAccordion">
                             <div class="accordion-body">
                                 <form method="get" action="{% url 'consultar_maquinas' %}" id="filtersForm">
                                     <!-- Master Search Field -->
@@ -170,18 +219,6 @@
                                         </div>
 
                                         <div class="col-md-4">
-                                            <label for="filter_patrimonio" class="form-label">
-                                                <i class="fas fa-barcode me-1"></i>Patrimônio
-                                            </label>
-                                            <input type="text" class="form-control" id="filter_patrimonio" name="filter_patrimonio" placeholder="Ex: PAT-123" value="{{ filter_patrimonio|default:'' }}">
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label for="filter_prioridade" class="form-label">
-                                                <i class="fas fa-star me-1"></i>Prioridade
-                                            </label>
-                                            <input type="text" class="form-control" id="filter_prioridade" name="filter_prioridade" placeholder="Ex: 1" value="{{ filter_prioridade|default:'' }}">
-                                        </div>
-                                        <div class="col-md-4">
                                             <label for="filter_gerenc" class="form-label">
                                                 <i class="fas fa-sitemap me-1"></i>Descrição Gerência
                                             </label>
@@ -224,80 +261,112 @@
         </div>
 
         <!-- Table -->
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">
-                    <i class="fas fa-list me-2"></i>Lista de Máquinas
-                </h5>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-container">
-                        <table class="table table-hover table-striped mb-0" id="maquinasTable">
-                            <thead>
-                                <tr>
-                                    <th>Código</th>
-                                    <th>Descrição</th>
-                                    <th>Setor</th>
-                                    <th>Unidade</th>
-                                    <th>Patrimônio</th>
-                                    <th>Prioridade</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                        <tbody>
-                            {% if maquinas %}
-                                {% for maquina in maquinas %}
-                                <tr>
-                                    <td><strong>{{ maquina.cd_maquina }}</strong></td>
-                                    <td>{{ maquina.descr_maquina|default:"-"|truncatewords:10 }}</td>
-                                    <td>
-                                        <span class="badge bg-secondary">{{ maquina.cd_setormanut|default:"-" }}</span>
-                                        {% if maquina.descr_setormanut %}
-                                            <br><small class="text-muted">{{ maquina.descr_setormanut|truncatewords:5 }}</small>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {{ maquina.nome_unid|default:"-" }}
-                                        {% if maquina.cd_unid %}
-                                            <br><small class="text-muted">({{ maquina.cd_unid }})</small>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ maquina.nro_patrimonio|default:"-" }}</td>
-                                    <td>
-                                        {% if maquina.cd_priomaqutv %}
-                                            <span class="badge bg-warning text-dark">{{ maquina.cd_priomaqutv }}</span>
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <div class="btn-group" role="group">
-                                            <a href="{% url 'visualizar_maquina' maquina.id %}" class="btn btn-sm btn-primary" title="Visualizar detalhes">
-                                                <i class="fas fa-eye me-1"></i>Visualizar
-                                            </a>
-                                            <a href="{% url 'editar_maquina' maquina.id %}" class="btn btn-sm btn-warning" title="Editar máquina">
-                                                <i class="fas fa-edit me-1"></i>Editar
-                                            </a>
-                                            <button type="button" class="btn btn-sm btn-danger" onclick="confirmarDelecao({{ maquina.id }}, '{{ maquina.cd_maquina }}', '{{ maquina.descr_maquina|default:"Sem descrição"|escapejs }}', '{% url "deletar_maquina" maquina.id %}')" title="Deletar máquina">
-                                                <i class="fas fa-trash me-1"></i>Deletar
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            {% else %}
-                                <tr>
-                                    <td colspan="7" class="text-center py-5">
-                                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                                        <p class="text-muted">Nenhuma máquina encontrada.</p>
-                                        <a href="{% url 'cadastrar_maquina' %}" class="btn btn-primary">
-                                            <i class="fas fa-plus-circle me-2"></i>Cadastrar Primeira Máquina
-                                        </a>
-                                    </td>
-                                </tr>
-                            {% endif %}
-                        </tbody>
-                    </table>
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list me-2"></i>Lista de Máquinas
+                            <small class="ms-2">({{ total_count }} registro{{ total_count|pluralize }})</small>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <form method="get" action="{% url 'consultar_maquinas' %}" id="tableFilterForm">
+                            <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                            <input type="hidden" name="include_inativas" value="{% if include_inativas %}on{% endif %}">
+                            <div class="table-container">
+                                <table class="table table-hover table-striped mb-0" id="maquinasTable">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-codigo">Código</th>
+                                            <th class="col-descricao">Descrição</th>
+                                            <th class="col-setor">Setor</th>
+                                            <th class="col-gerenc">Descrição Gerência</th>
+                                            <th class="col-manutentor">Manutentor(es)</th>
+                                            <th class="col-acoes">Ações</th>
+                                        </tr>
+                                        <tr class="filter-row">
+                                            <th>
+                                                <input type="text" name="filter_codigo" class="filter-input" value="{{ filter_codigo|default:'' }}" placeholder="Filtrar" onchange="document.getElementById('tableFilterForm').submit();">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filter_descricao" class="filter-input" value="{{ filter_descricao|default:'' }}" placeholder="Filtrar" onchange="document.getElementById('tableFilterForm').submit();">
+                                            </th>
+                                            <th>
+                                                <select name="filter_setor" class="filter-input" onchange="document.getElementById('tableFilterForm').submit();">
+                                                    <option value="">Todos</option>
+                                                    {% for setor in setor_choices %}
+                                                        <option value="{{ setor }}" {% if filter_setor == setor %}selected{% endif %}>{{ setor|truncatechars:30 }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </th>
+                                            <th>
+                                                <select name="filter_gerenc" class="filter-input" onchange="document.getElementById('tableFilterForm').submit();">
+                                                    <option value="">Todas</option>
+                                                    {% for gerenc in gerenc_choices %}
+                                                        <option value="{{ gerenc }}" {% if filter_gerenc == gerenc %}selected{% endif %}>{{ gerenc|truncatechars:30 }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </th>
+                                            <th></th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% if maquinas %}
+                                        {% for maquina in maquinas %}
+                                        <tr>
+                                            <td class="col-codigo"><strong>{{ maquina.cd_maquina }}</strong></td>
+                                            <td class="col-descricao">{{ maquina.descr_maquina|default:"-"|truncatewords:10 }}</td>
+                                            <td class="col-setor">
+                                                <span class="badge bg-secondary">{{ maquina.cd_setormanut|default:"-" }}</span>
+                                                {% if maquina.descr_setormanut %}
+                                                    <br><small class="text-muted">{{ maquina.descr_setormanut|truncatewords:5 }}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td class="col-gerenc">
+                                                {% if maquina.descr_gerenc %}
+                                                    <span class="badge bg-success">{{ maquina.descr_gerenc|truncatechars:25 }}</span>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td class="col-manutentor">
+                                                {% with manutentores=maquina.manutentores.all %}
+                                                    {% if manutentores %}
+                                                        {% for mm in manutentores %}
+                                                            <a href="{% url 'visualizar_manutentor' mm.manutentor.Matricula %}" class="badge bg-primary text-decoration-none me-1" title="{{ mm.manutentor.Nome|default:mm.manutentor.Matricula }}">{{ mm.manutentor.Nome|default:mm.manutentor.Matricula|truncatechars:20 }}</a>{% if not forloop.last %} {% endif %}
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        <span class="text-muted">-</span>
+                                                    {% endif %}
+                                                {% endwith %}
+                                            </td>
+                                            <td class="col-acoes">
+                                                <div class="btn-group-actions">
+                                                    <a href="{% url 'visualizar_maquina' maquina.id %}" class="btn btn-sm btn-outline-primary" title="Visualizar"><i class="fas fa-eye"></i></a>
+                                                    <a href="{% url 'editar_maquina' maquina.id %}" class="btn btn-sm btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="confirmarDelecao({{ maquina.id }}, '{{ maquina.cd_maquina }}', '{{ maquina.descr_maquina|default:"Sem descrição"|escapejs }}', '{% url "deletar_maquina" maquina.id %}')" title="Deletar"><i class="fas fa-trash"></i></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="6" class="text-center py-5">
+                                                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                                <p class="text-muted">Nenhuma máquina encontrada.</p>
+                                                <a href="{% url 'cadastrar_maquina' %}" class="btn btn-primary">
+                                                    <i class="fas fa-plus-circle me-2"></i>Cadastrar Primeira Máquina
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                                </table>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -310,10 +379,10 @@
                     <ul class="pagination justify-content-center">
                         {% if maquinas.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_codigo %}filter_codigo={{ filter_codigo }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor|urlencode }}&{% endif %}{% if filter_unidade %}filter_unidade={{ filter_unidade }}&{% endif %}{% if filter_patrimonio %}filter_patrimonio={{ filter_patrimonio }}&{% endif %}{% if filter_prioridade %}filter_prioridade={{ filter_prioridade }}&{% endif %}{% if filter_gerenc %}filter_gerenc={{ filter_gerenc|urlencode }}&{% endif %}page=1">Primeira</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_codigo %}filter_codigo={{ filter_codigo }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor|urlencode }}&{% endif %}{% if filter_gerenc %}filter_gerenc={{ filter_gerenc|urlencode }}&{% endif %}{% if include_inativas %}include_inativas=on&{% endif %}page=1">Primeira</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_codigo %}filter_codigo={{ filter_codigo }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor|urlencode }}&{% endif %}{% if filter_unidade %}filter_unidade={{ filter_unidade }}&{% endif %}{% if filter_patrimonio %}filter_patrimonio={{ filter_patrimonio }}&{% endif %}{% if filter_prioridade %}filter_prioridade={{ filter_prioridade }}&{% endif %}{% if filter_gerenc %}filter_gerenc={{ filter_gerenc|urlencode }}&{% endif %}page={{ maquinas.previous_page_number }}">Anterior</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_codigo %}filter_codigo={{ filter_codigo }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor|urlencode }}&{% endif %}{% if filter_gerenc %}filter_gerenc={{ filter_gerenc|urlencode }}&{% endif %}{% if include_inativas %}include_inativas=on&{% endif %}page={{ maquinas.previous_page_number }}">Anterior</a>
                             </li>
                         {% endif %}
                         
@@ -325,10 +394,10 @@
                         
                         {% if maquinas.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_codigo %}filter_codigo={{ filter_codigo }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor|urlencode }}&{% endif %}{% if filter_unidade %}filter_unidade={{ filter_unidade }}&{% endif %}{% if filter_patrimonio %}filter_patrimonio={{ filter_patrimonio }}&{% endif %}{% if filter_prioridade %}filter_prioridade={{ filter_prioridade }}&{% endif %}{% if filter_gerenc %}filter_gerenc={{ filter_gerenc|urlencode }}&{% endif %}page={{ maquinas.next_page_number }}">Próxima</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_codigo %}filter_codigo={{ filter_codigo }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor|urlencode }}&{% endif %}{% if filter_gerenc %}filter_gerenc={{ filter_gerenc|urlencode }}&{% endif %}{% if include_inativas %}include_inativas=on&{% endif %}page={{ maquinas.next_page_number }}">Próxima</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_codigo %}filter_codigo={{ filter_codigo }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor|urlencode }}&{% endif %}{% if filter_unidade %}filter_unidade={{ filter_unidade }}&{% endif %}{% if filter_patrimonio %}filter_patrimonio={{ filter_patrimonio }}&{% endif %}{% if filter_prioridade %}filter_prioridade={{ filter_prioridade }}&{% endif %}{% if filter_gerenc %}filter_gerenc={{ filter_gerenc|urlencode }}&{% endif %}page={{ maquinas.paginator.num_pages }}">Última</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if filter_codigo %}filter_codigo={{ filter_codigo }}&{% endif %}{% if filter_descricao %}filter_descricao={{ filter_descricao }}&{% endif %}{% if filter_setor %}filter_setor={{ filter_setor|urlencode }}&{% endif %}{% if filter_gerenc %}filter_gerenc={{ filter_gerenc|urlencode }}&{% endif %}{% if include_inativas %}include_inativas=on&{% endif %}page={{ maquinas.paginator.num_pages }}">Última</a>
                             </li>
                         {% endif %}
                     </ul>
@@ -430,25 +499,24 @@ function confirmarDelecao(maquinaId, cdMaquina, descrMaquina, baseUrl) {
     modal.show();
 }
 
-// Função para limpar todos os campos de filtro
+    // Função para limpar todos os campos de filtro
 function clearAllFilters() {
     const masterSearch = document.getElementById('master_search');
     if (masterSearch) masterSearch.value = '';
-    document.getElementById('filter_codigo').value = '';
-    document.getElementById('filter_descricao').value = '';
+    const filterCodigo = document.getElementById('filter_codigo');
+    if (filterCodigo) filterCodigo.value = '';
+    const filterDescricao = document.getElementById('filter_descricao');
+    if (filterDescricao) filterDescricao.value = '';
     const filterSetor = document.getElementById('filter_setor');
     if (filterSetor) filterSetor.value = '';
-    document.getElementById('filter_unidade').value = '';
-    document.getElementById('filter_patrimonio').value = '';
-    document.getElementById('filter_prioridade').value = '';
     const filterGerenc = document.getElementById('filter_gerenc');
     if (filterGerenc) filterGerenc.value = '';
 }
 
 // Atualizar contador de filtros ativos e garantir que o formulário funcione
 document.addEventListener('DOMContentLoaded', function() {
-    const filterInputs = ['filter_codigo', 'filter_descricao', 'filter_unidade', 'filter_patrimonio', 'filter_prioridade'];
-    const filterSelects = ['filter_gerenc', 'filter_setor'];
+    const filterInputs = ['filter_codigo', 'filter_descricao'];
+    const filterSelects = ['filter_setor', 'filter_gerenc'];
     const badge = document.getElementById('activeFiltersBadge');
     const filtersForm = document.getElementById('filtersForm');
     

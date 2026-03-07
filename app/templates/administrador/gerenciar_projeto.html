@@ -293,13 +293,13 @@
     </div>
 </div>
 
-<!-- Modal Limpar Requisições Almoxarifado por mês -->
+<!-- Modal Limpar Requisições Almoxarifado por mês e dias -->
 <div class="modal fade" id="modalLimparRequisicoesPorMes" tabindex="-1" aria-labelledby="modalLimparRequisicoesPorMesLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
                 <h5 class="modal-title" id="modalLimparRequisicoesPorMesLabel">
-                    <i class="fas fa-calendar-alt me-2"></i>Limpar por mês — Requisições Almoxarifado
+                    <i class="fas fa-calendar-alt me-2"></i>Limpar por mês/dias — Requisições Almoxarifado
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -307,7 +307,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="tabela" value="requisicao_almoxarifado">
                 <div class="modal-body">
-                    <p class="text-muted">O mês é determinado pelo campo <strong>Data da Requisição</strong> em cada registro. Selecione o ano e o(s) mês(es) que deseja excluir.</p>
+                    <p class="text-muted">O mês é determinado pelo campo <strong>Data da Requisição</strong>. Selecione ano, mês(es) e, opcionalmente, dias específicos. Se nenhum dia for selecionado, todo o mês será excluído.</p>
                     <div class="mb-3">
                         <label for="anoRequisicoes" class="form-label">Ano</label>
                         <select class="form-select" id="anoRequisicoes" name="ano_requisicoes" required>
@@ -327,9 +327,24 @@
                             {% endfor %}
                         </div>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">Dias a excluir <small class="text-muted">(opcional — deixe vazio para excluir o mês inteiro)</small></label>
+                        <div class="d-flex flex-wrap gap-1" id="diasRequisicoesContainer">
+                            {% for d in dias_mes %}
+                            <div class="form-check" style="min-width: 2.5rem;">
+                                <input class="form-check-input dia-requisicoes-cb" type="checkbox" name="dia_requisicoes" value="{{ d }}" id="diaRequisicoes{{ d }}">
+                                <label class="form-check-label" for="diaRequisicoes{{ d }}">{{ d }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosDiasRequisicoes()">Selecionar Todos</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosDiasRequisicoes()">Desmarcar Todos</button>
+                        </div>
+                    </div>
                     <div class="form-check mt-2">
                         <input class="form-check-input" type="checkbox" name="deletar_todos_requisicoes" id="deletarTodosRequisicoes">
-                        <label class="form-check-label text-danger fw-semibold" for="deletarTodosRequisicoes">Deletar TODOS os registros (ignora seleção de meses)</label>
+                        <label class="form-check-label text-danger fw-semibold" for="deletarTodosRequisicoes">Deletar TODOS os registros (ignora seleção de meses/dias)</label>
                     </div>
                     <div class="alert alert-warning mt-3 mb-0">
                         <i class="fas fa-exclamation-triangle me-2"></i><strong>Atenção:</strong> Esta ação é irreversível.
@@ -524,10 +539,18 @@
         });
     }
     
+    function selecionarTodosDiasRequisicoes() {
+        document.querySelectorAll('.dia-requisicoes-cb').forEach(cb => cb.checked = true);
+    }
+    function desmarcarTodosDiasRequisicoes() {
+        document.querySelectorAll('.dia-requisicoes-cb').forEach(cb => cb.checked = false);
+    }
+
     function abrirModalLimparPorMes(tabelaKey, tabelaNome) {
         if (tabelaKey === 'requisicao_almoxarifado') {
             document.getElementById('deletarTodosRequisicoes').checked = false;
             document.querySelectorAll('input[name="mes_requisicoes"]').forEach(cb => cb.checked = false);
+            document.querySelectorAll('.dia-requisicoes-cb').forEach(cb => cb.checked = false);
             new bootstrap.Modal(document.getElementById('modalLimparRequisicoesPorMes')).show();
         } else if (tabelaKey === 'nota_fiscal') {
             document.getElementById('deletarTodosNotas').checked = false;

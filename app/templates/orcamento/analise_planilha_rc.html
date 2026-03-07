@@ -6,6 +6,21 @@
 
 {% block extra_css %}
 <style>
+    /* Font size reduzido nos boxes/cards */
+    .stat-card .card-body h6 { font-size: 0.8rem; }
+    .stat-card .card-body h2 { font-size: 1.4rem; }
+    .stat-card .card-body small { font-size: 0.7rem; }
+    .stat-card .card-body .fa-3x { font-size: 2rem; }
+    .filter-card .card-header { font-size: 0.85rem; }
+    .filter-card .card-body .form-label { font-size: 0.75rem; }
+    .filter-card .card-body .form-select { font-size: 0.8rem; }
+    .filter-card .card-body .btn-sm { font-size: 0.75rem; }
+    .card .card-header h5 { font-size: 0.95rem; }
+    .tabela-status-mes-wrapper th,
+    .tabela-status-mes-wrapper td { font-size: 0.8rem; }
+    .tabela-status-mes-wrapper .label-base { font-size: 0.7rem; }
+    .table.table-hover td, .table.table-hover th { font-size: 0.85rem; }
+
     .stat-card {
         transition: transform 0.2s, box-shadow 0.2s;
     }
@@ -43,7 +58,7 @@
         background: transparent;
         border-bottom: 1px solid #e9ecef;
         font-weight: 600;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         padding: 0.5rem 1rem;
         color: #212529;
     }
@@ -87,7 +102,7 @@
         border-radius: 0.4rem;
         cursor: pointer;
         transition: all 0.2s ease;
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         font-weight: 500;
         border: 2px solid #e9ecef;
         background: #f8f9fa;

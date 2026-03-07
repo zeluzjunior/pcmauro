@@ -61,9 +61,8 @@
         z-index: 8;
     }
     .col-empresa { min-width: 120px; }
-    .col-os { min-width: 120px; }
     .col-solicitante { min-width: 150px; }
-    .col-descricao { min-width: 250px; }
+    .col-descricao { min-width: 300px; white-space: normal; word-wrap: break-word; }
     .col-valor { min-width: 120px; text-align: right; }
     .table thead th.col-valor { text-align: right; }
     .col-status { min-width: 220px; white-space: normal; }
@@ -105,6 +104,108 @@
                         <i class="fas fa-search"></i> Buscar
                     </button>
                 </form>
+            </div>
+        </div>
+
+        <!-- Filtros Avançados -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button {% if not filtro_id and not filtro_empresa and not filtro_solicitante and not filtro_rc and not filtro_os and not filtro_status and not filtro_uso and not filtro_classificacao and not filtro_valor_min and not filtro_valor_max %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if filtro_id or filtro_empresa or filtro_solicitante or filtro_rc or filtro_os or filtro_status or filtro_uso or filtro_classificacao or filtro_valor_min or filtro_valor_max %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                            <i class="fas fa-filter me-2"></i>
+                            <strong>Filtros Avançados</strong>
+                            {% if filtro_id or filtro_empresa or filtro_solicitante or filtro_rc or filtro_os or filtro_status or filtro_uso or filtro_classificacao or filtro_valor_min or filtro_valor_max %}
+                                <span class="badge bg-primary ms-2">Filtros ativos</span>
+                            {% endif %}
+                        </button>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if filtro_id or filtro_empresa or filtro_solicitante or filtro_rc or filtro_os or filtro_status or filtro_uso or filtro_classificacao or filtro_valor_min or filtro_valor_max %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'consultar_planilha_rc' %}" id="filtrosForm">
+                                    <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                                    <div class="row g-3">
+                                        <div class="col-md-6 col-lg-4">
+                                            <label for="filtro_id" class="form-label small">ID</label>
+                                            <input type="text" class="form-control form-control-sm" id="filtro_id" name="filtro_id" placeholder="Ex: 123" value="{{ filtro_id|default:'' }}">
+                                        </div>
+                                        <div class="col-md-6 col-lg-4">
+                                            <label for="filtro_empresa" class="form-label small">Empresa</label>
+                                            <select class="form-select form-select-sm" id="filtro_empresa" name="filtro_empresa">
+                                                <option value="">Todas</option>
+                                                {% for emp in empresas_unicas %}
+                                                    <option value="{{ emp }}" {% if filtro_empresa == emp %}selected{% endif %}>{{ emp|truncatechars:40 }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 col-lg-4">
+                                            <label for="filtro_solicitante" class="form-label small">Solicitante</label>
+                                            <select class="form-select form-select-sm" id="filtro_solicitante" name="filtro_solicitante">
+                                                <option value="">Todos</option>
+                                                {% for sol in solicitantes_unicos %}
+                                                    <option value="{{ sol }}" {% if filtro_solicitante == sol %}selected{% endif %}>{{ sol|truncatechars:40 }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 col-lg-4">
+                                            <label for="filtro_rc" class="form-label small">RC</label>
+                                            <input type="text" class="form-control form-control-sm" id="filtro_rc" name="filtro_rc" placeholder="Filtrar por RC..." value="{{ filtro_rc|default:'' }}">
+                                        </div>
+                                        <div class="col-md-6 col-lg-4">
+                                            <label for="filtro_os" class="form-label small">O.S</label>
+                                            <input type="text" class="form-control form-control-sm" id="filtro_os" name="filtro_os" placeholder="Filtrar por O.S..." value="{{ filtro_os|default:'' }}">
+                                        </div>
+                                        <div class="col-md-6 col-lg-4">
+                                            <label for="filtro_status" class="form-label small">Status</label>
+                                            <select class="form-select form-select-sm" id="filtro_status" name="filtro_status">
+                                                <option value="">Todos</option>
+                                                {% for st in status_unicos %}
+                                                    <option value="{{ st }}" {% if filtro_status == st %}selected{% endif %}>{{ st|truncatechars:50 }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 col-lg-4">
+                                            <label for="filtro_uso" class="form-label small">Uso</label>
+                                            <select class="form-select form-select-sm" id="filtro_uso" name="filtro_uso">
+                                                <option value="">Todos</option>
+                                                {% for u in usos_unicos %}
+                                                    <option value="{{ u }}" {% if filtro_uso == u %}selected{% endif %}>{{ u }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 col-lg-4">
+                                            <label for="filtro_classificacao" class="form-label small">Classificação</label>
+                                            <select class="form-select form-select-sm" id="filtro_classificacao" name="filtro_classificacao">
+                                                <option value="">Todas</option>
+                                                {% for c in classificacoes_unicas %}
+                                                    <option value="{{ c }}" {% if filtro_classificacao == c %}selected{% endif %}>{{ c }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 col-lg-4">
+                                            <label for="filtro_valor_min" class="form-label small">Valor Mín. (Pedido ou NF)</label>
+                                            <input type="text" class="form-control form-control-sm" id="filtro_valor_min" name="filtro_valor_min" placeholder="Ex: 1000" value="{{ filtro_valor_min|default:'' }}">
+                                        </div>
+                                        <div class="col-md-6 col-lg-4">
+                                            <label for="filtro_valor_max" class="form-label small">Valor Máx. (Pedido ou NF)</label>
+                                            <input type="text" class="form-control form-control-sm" id="filtro_valor_max" name="filtro_valor_max" placeholder="Ex: 50000" value="{{ filtro_valor_max|default:'' }}">
+                                        </div>
+                                        <div class="col-12">
+                                            <div class="d-flex gap-2">
+                                                <button type="submit" class="btn btn-primary btn-sm">
+                                                    <i class="fas fa-filter me-1"></i>Aplicar Filtros
+                                                </button>
+                                                <a href="{% url 'consultar_planilha_rc' %}{% if search_query %}?search={{ search_query }}{% endif %}" class="btn btn-outline-secondary btn-sm">
+                                                    <i class="fas fa-times me-1"></i>Limpar Filtros
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -180,8 +281,18 @@
                     </div>
                     <div class="card-body p-0">
                         <form method="get" action="{% url 'consultar_planilha_rc' %}" id="filterForm">
-                            <!-- Preservar busca geral -->
+                            <!-- Preservar busca geral e filtros do accordion -->
                             <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                            {% if filtro_id %}<input type="hidden" name="filtro_id" value="{{ filtro_id }}">{% endif %}
+                            {% if filtro_empresa %}<input type="hidden" name="filtro_empresa" value="{{ filtro_empresa }}">{% endif %}
+                            {% if filtro_solicitante %}<input type="hidden" name="filtro_solicitante" value="{{ filtro_solicitante }}">{% endif %}
+                            {% if filtro_rc %}<input type="hidden" name="filtro_rc" value="{{ filtro_rc }}">{% endif %}
+                            {% if filtro_os %}<input type="hidden" name="filtro_os" value="{{ filtro_os }}">{% endif %}
+                            {% if filtro_status %}<input type="hidden" name="filtro_status" value="{{ filtro_status }}">{% endif %}
+                            {% if filtro_uso %}<input type="hidden" name="filtro_uso" value="{{ filtro_uso }}">{% endif %}
+                            {% if filtro_classificacao %}<input type="hidden" name="filtro_classificacao" value="{{ filtro_classificacao }}">{% endif %}
+                            {% if filtro_valor_min %}<input type="hidden" name="filtro_valor_min" value="{{ filtro_valor_min }}">{% endif %}
+                            {% if filtro_valor_max %}<input type="hidden" name="filtro_valor_max" value="{{ filtro_valor_max }}">{% endif %}
                             
                             <div class="table-container">
                                 <table class="table table-hover table-striped mb-0">
@@ -189,7 +300,6 @@
                                         <tr>
                                             <th class="col-solicitante">Solicitante</th>
                                             <th class="col-empresa">Empresa</th>
-                                            <th class="col-os">O.S</th>
                                             <th class="col-descricao">Descrição Serviço</th>
                                             <th class="col-valor">Valor Pedido</th>
                                             <th class="col-status">Status</th>
@@ -209,9 +319,6 @@
                                             </th>
                                             <th class="filter-header">
                                                 <input type="text" name="filtro_empresa" class="filter-input" placeholder="Filtrar empresa..." value="{{ filtro_empresa|default:'' }}" onchange="document.getElementById('filterForm').submit();">
-                                            </th>
-                                            <th class="filter-header">
-                                                <input type="text" name="filtro_os" class="filter-input" placeholder="Filtrar O.S..." value="{{ filtro_os|default:'' }}" onchange="document.getElementById('filterForm').submit();">
                                             </th>
                                             <th class="filter-header"></th>
                                             <th class="filter-header"></th>
@@ -243,11 +350,8 @@
                                             <td class="col-empresa">
                                                 <strong>{{ controle.empresa|default:"-" }}</strong>
                                             </td>
-                                            <td class="col-os">
-                                                {{ controle.os|default:"-" }}
-                                            </td>
                                             <td class="col-descricao">
-                                                {{ controle.descricao_servico|default:"-"|truncatewords:10 }}
+                                                {{ controle.descricao_servico|default:"-" }}
                                             </td>
                                             <td class="col-valor">
                                                 {% if controle.valor_total_pedido %}
@@ -282,7 +386,7 @@
                                         </tr>
                                         {% empty %}
                                         <tr>
-                                            <td colspan="8" class="text-center text-muted py-4">
+                                            <td colspan="7" class="text-center text-muted py-4">
                                                 <i class="fas fa-inbox fa-2x mb-2"></i>
                                                 <p>Nenhum registro encontrado.</p>
                                             </td>
@@ -300,10 +404,10 @@
                             <ul class="pagination justify-content-center mb-0">
                                 {% if controles.has_previous %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_os %}&filtro_os={{ filtro_os }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">&laquo; Primeira</a>
+                                        <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_id %}&filtro_id={{ filtro_id }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_rc %}&filtro_rc={{ filtro_rc }}{% endif %}{% if filtro_os %}&filtro_os={{ filtro_os }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_classificacao %}&filtro_classificacao={{ filtro_classificacao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">&laquo; Primeira</a>
                                     </li>
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ controles.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_os %}&filtro_os={{ filtro_os }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Anterior</a>
+                                        <a class="page-link" href="?page={{ controles.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_id %}&filtro_id={{ filtro_id }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_rc %}&filtro_rc={{ filtro_rc }}{% endif %}{% if filtro_os %}&filtro_os={{ filtro_os }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_classificacao %}&filtro_classificacao={{ filtro_classificacao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Anterior</a>
                                     </li>
                                 {% endif %}
                                 
@@ -315,10 +419,10 @@
                                 
                                 {% if controles.has_next %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ controles.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_os %}&filtro_os={{ filtro_os }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Próxima</a>
+                                        <a class="page-link" href="?page={{ controles.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_id %}&filtro_id={{ filtro_id }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_rc %}&filtro_rc={{ filtro_rc }}{% endif %}{% if filtro_os %}&filtro_os={{ filtro_os }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_classificacao %}&filtro_classificacao={{ filtro_classificacao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Próxima</a>
                                     </li>
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ controles.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_os %}&filtro_os={{ filtro_os }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Última &raquo;</a>
+                                        <a class="page-link" href="?page={{ controles.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if filtro_id %}&filtro_id={{ filtro_id }}{% endif %}{% if filtro_empresa %}&filtro_empresa={{ filtro_empresa }}{% endif %}{% if filtro_solicitante %}&filtro_solicitante={{ filtro_solicitante }}{% endif %}{% if filtro_rc %}&filtro_rc={{ filtro_rc }}{% endif %}{% if filtro_os %}&filtro_os={{ filtro_os }}{% endif %}{% if filtro_status %}&filtro_status={{ filtro_status }}{% endif %}{% if filtro_uso %}&filtro_uso={{ filtro_uso }}{% endif %}{% if filtro_classificacao %}&filtro_classificacao={{ filtro_classificacao }}{% endif %}{% if filtro_valor_min %}&filtro_valor_min={{ filtro_valor_min }}{% endif %}{% if filtro_valor_max %}&filtro_valor_max={{ filtro_valor_max }}{% endif %}">Última &raquo;</a>
                                     </li>
                                 {% endif %}
                             </ul>

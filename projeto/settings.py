@@ -112,6 +112,7 @@ LANGUAGE_CODE = 'pt-br'
 TIME_ZONE = 'America/Sao_Paulo'
 USE_TZ = True
 USE_I18N = True
+USE_L10N = True  # Formato brasileiro para números e datas
 
 
 # Static files (CSS, JavaScript, Images)

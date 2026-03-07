@@ -21,7 +21,7 @@
     .kpi-info { border-left-color: #0dcaf0; }
     .kpi-warning { border-left-color: #ffc107; }
     .table-container {
-        max-height: 70vh;
+        max-height: 85vh;
         overflow-y: auto;
         overflow-x: auto;
     }
@@ -29,7 +29,7 @@
         width: 100%;
         table-layout: auto;
     }
-    .table thead th {
+    #paradasTable thead th {
         position: sticky;
         top: 0;
         background-color: #f8f9fa;
@@ -38,6 +38,25 @@
         vertical-align: middle;
         text-align: center;
         padding: 12px 8px;
+        box-shadow: 0 1px 0 #dee2e6;
+    }
+    #paradasTable .column-filters-row th {
+        position: sticky;
+        top: 42px;
+        background-color: #e9ecef !important;
+        z-index: 9;
+        padding: 6px 8px;
+        vertical-align: middle;
+        box-shadow: 0 1px 0 #dee2e6;
+    }
+    .column-filter {
+        font-size: 0.75rem;
+        padding: 4px 6px;
+        min-width: 60px;
+    }
+    .column-filter:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
     }
     .table tbody td {
         vertical-align: middle;
@@ -48,6 +67,15 @@
     .col-codigo { min-width: 100px; }
     .col-descricao { min-width: 250px; }
     .col-numero { min-width: 80px; text-align: right; }
+    .col-capacidade { min-width: 95px; text-align: center !important; }
+    .col-turno { min-width: 90px; text-align: center !important; }
+    #paradasTable tfoot td {
+        font-weight: 600;
+        background-color: #e9ecef !important;
+        border-top: 2px solid #dee2e6;
+        padding: 10px 8px;
+        vertical-align: middle;
+    }
 </style>
 {% endblock %}
 
@@ -89,8 +117,15 @@
                 <div id="collapseFilter" class="accordion-collapse collapse" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
                     <div class="accordion-body">
                         <form method="GET" class="row g-3 align-items-end" action="{% url 'consultar_paradas_maquina' %}">
-                            <!-- Preservar busca geral -->
+                            <!-- Preservar busca geral e filtros de coluna -->
                             <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                            {% if col_descr_recurso %}<input type="hidden" name="col_descr_recurso" value="{{ col_descr_recurso }}">{% endif %}
+                            {% if col_cod_parada %}<input type="hidden" name="col_cod_parada" value="{{ col_cod_parada }}">{% endif %}
+                            {% if col_descr_parada %}<input type="hidden" name="col_descr_parada" value="{{ col_descr_parada }}">{% endif %}
+                            {% if col_descr_linha %}<input type="hidden" name="col_descr_linha" value="{{ col_descr_linha }}">{% endif %}
+                            {% if col_turno %}<input type="hidden" name="col_turno" value="{{ col_turno }}">{% endif %}
+                            {% if col_motivo %}<input type="hidden" name="col_motivo" value="{{ col_motivo }}">{% endif %}
+                            {% if col_acao %}<input type="hidden" name="col_acao" value="{{ col_acao }}">{% endif %}
                             
                             <div class="col-md-2">
                                 <label for="ano_filtro" class="form-label">Ano:</label>
@@ -140,12 +175,18 @@
         <div class="row mb-4">
             <div class="col-12">
                 <form method="get" action="{% url 'consultar_paradas_maquina' %}" class="d-flex">
-                    <!-- Preservar filtros de data -->
+                    <!-- Preservar filtros de data e coluna -->
                     <input type="hidden" name="ano" value="{{ ano_filtro }}">
                     {% for mes in meses_filtro %}
                         <input type="hidden" name="mes" value="{{ mes }}">
                     {% endfor %}
-                    
+                    {% if col_descr_recurso %}<input type="hidden" name="col_descr_recurso" value="{{ col_descr_recurso }}">{% endif %}
+                    {% if col_cod_parada %}<input type="hidden" name="col_cod_parada" value="{{ col_cod_parada }}">{% endif %}
+                    {% if col_descr_parada %}<input type="hidden" name="col_descr_parada" value="{{ col_descr_parada }}">{% endif %}
+                    {% if col_descr_linha %}<input type="hidden" name="col_descr_linha" value="{{ col_descr_linha }}">{% endif %}
+                    {% if col_turno %}<input type="hidden" name="col_turno" value="{{ col_turno }}">{% endif %}
+                    {% if col_motivo %}<input type="hidden" name="col_motivo" value="{{ col_motivo }}">{% endif %}
+                    {% if col_acao %}<input type="hidden" name="col_acao" value="{{ col_acao }}">{% endif %}
                     <input type="text" name="search" class="form-control me-2" placeholder="Buscar por item, recurso, parada, motivo..." value="{{ search_query|default:'' }}">
                     <button type="submit" class="btn btn-outline-primary">
                         <i class="fas fa-search"></i> Buscar
@@ -218,34 +259,63 @@
         <div class="row">
             <div class="col-12">
                 <div class="card shadow-sm">
-                    <div class="card-header bg-secondary text-white">
+                    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h5 class="mb-0">
                             <i class="fas fa-table me-2"></i>Paradas de Máquina
                             <small class="ms-2">({{ paradas.paginator.count }} registro{{ paradas.paginator.count|pluralize }})</small>
                         </h5>
+                        <a href="{{ export_paradas_url }}" class="btn btn-light btn-sm" title="Exportar para Excel">
+                            <i class="fas fa-file-excel me-1"></i>Exportar Excel
+                        </a>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-container">
-                            <table class="table table-hover table-striped mb-0">
+                            <table class="table table-hover table-striped mb-0" id="paradasTable">
                                 <thead>
                                     <tr>
                                         <th class="col-data">Data</th>
                                         <th class="col-hora">Horário Inicial</th>
                                         <th class="col-hora">Horário Final</th>
-                                        <th class="col-numero">Dif. Hora</th>
-                                        <th class="col-codigo">Cód. Recurso</th>
                                         <th class="col-descricao">Descrição Recurso</th>
+                                        <th class="col-codigo">Máquina</th>
+                                        <th class="col-descricao">Nome Máquina</th>
                                         <th class="col-codigo">Cód. Parada</th>
                                         <th class="col-descricao">Descrição Parada</th>
-                                        <th class="col-codigo">Linha Produção</th>
                                         <th class="col-descricao">Descrição Linha</th>
-                                        <th class="col-codigo">Turno</th>
-                                        <th class="col-codigo">Cód. Item</th>
-                                        <th class="col-descricao">Descrição Item</th>
-                                        <th class="col-numero">Capacidade</th>
+                                        <th class="col-turno">Turno</th>
+                                        <th class="col-capacidade">Capacidade</th>
                                         <th class="col-descricao">Motivo</th>
                                         <th class="col-descricao">Ação</th>
+                                        <th class="col-codigo">OS</th>
                                         <th class="col-codigo" style="min-width: 90px;">Ações</th>
+                                    </tr>
+                                    <tr class="column-filters-row">
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="0"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="1"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="2"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="3" name="col_descr_recurso" form="columnFilterForm" value="{{ col_descr_recurso|default:'' }}"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="4"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="5"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="6" name="col_cod_parada" form="columnFilterForm" value="{{ col_cod_parada|default:'' }}"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="7" name="col_descr_parada" form="columnFilterForm" value="{{ col_descr_parada|default:'' }}"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="8" name="col_descr_linha" form="columnFilterForm" value="{{ col_descr_linha|default:'' }}"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="9" name="col_turno" form="columnFilterForm" value="{{ col_turno|default:'' }}"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="10"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="11" name="col_motivo" form="columnFilterForm" value="{{ col_motivo|default:'' }}"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="12" name="col_acao" form="columnFilterForm" value="{{ col_acao|default:'' }}"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="13"></th>
+                                        <th>
+                                            <form method="GET" action="{% url 'consultar_paradas_maquina' %}" id="columnFilterForm" class="d-inline">
+                                                <input type="hidden" name="ano" value="{{ ano_filtro }}">
+                                                {% for mes in meses_filtro %}
+                                                <input type="hidden" name="mes" value="{{ mes }}">
+                                                {% endfor %}
+                                                <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-primary" title="Aplicar filtros de coluna (total correto em todas as páginas)">
+                                                    <i class="fas fa-filter"></i> Aplicar
+                                                </button>
+                                            </form>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -254,35 +324,26 @@
                                         <td>{{ parada.data|date:"d/m/Y"|default:"-" }}</td>
                                         <td>{{ parada.horario_inicial|time:"H:i"|default:"-" }}</td>
                                         <td>{{ parada.horario_final|time:"H:i"|default:"-" }}</td>
-                                        <td class="text-end">
-                                            {% if parada.dif_hora %}
-                                                {{ parada.dif_hora|floatformat:2 }}h
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if parada.cod_recurso %}
-                                                <span class="badge bg-primary">{{ parada.cod_recurso }}</span>
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
                                         <td>{{ parada.descr_recurso|default:"-"|truncatewords:10 }}</td>
+                                        <td>
+                                            {% if parada.maquina_info %}
+                                                {% if parada.maquina_info.maquina_id %}
+                                                    <a href="{% url 'visualizar_maquina' parada.maquina_info.maquina_id %}" class="text-decoration-none" title="{{ parada.maquina_info.descr_maquina|default:'' }}">
+                                                        <span class="badge bg-secondary">{{ parada.maquina_info.cd_maquina }}</span>
+                                                    </a>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">{{ parada.maquina_info.cd_maquina }}</span>
+                                                {% endif %}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>{% if parada.maquina_info %}{{ parada.maquina_info.descr_maquina|default:"-"|truncatewords:12 }}{% else %}-{% endif %}</td>
                                         <td>{{ parada.cod_parada|default:"-" }}</td>
                                         <td>{{ parada.descr_parada|default:"-"|truncatewords:10 }}</td>
-                                        <td>
-                                            {% if parada.linha_producao %}
-                                                <span class="badge bg-info">{{ parada.linha_producao }}</span>
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
                                         <td>{{ parada.descr_linha_producao|default:"-"|truncatewords:10 }}</td>
-                                        <td>{{ parada.turno|default:"-" }}</td>
-                                        <td>{{ parada.cod_item|default:"-" }}</td>
-                                        <td>{{ parada.descr_item|default:"-"|truncatewords:10 }}</td>
-                                        <td class="text-end">
+                                        <td class="col-turno">{{ parada.turno|default:"-" }}</td>
+                                        <td class="col-capacidade" data-capacidade="{% if parada.capacidade %}{{ parada.capacidade }}{% else %}0{% endif %}">
                                             {% if parada.capacidade %}
                                                 {{ parada.capacidade|floatformat:3 }}
                                             {% else %}
@@ -292,6 +353,15 @@
                                         <td>{{ parada.motivo|default:"-"|truncatewords:15 }}</td>
                                         <td>{{ parada.acao|default:"-"|truncatewords:15 }}</td>
                                         <td>
+                                            {% if parada.os_list %}
+                                                {% for os_num in parada.os_list %}
+                                                    <span class="badge bg-dark me-1">{{ os_num }}</span>
+                                                {% endfor %}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
                                             <a href="{% url 'visualizar_parada_de_maquina' parada.id %}" class="btn btn-sm btn-outline-primary" title="Visualizar">
                                                 <i class="fas fa-eye"></i>
                                             </a>
@@ -299,13 +369,22 @@
                                     </tr>
                                     {% empty %}
                                     <tr>
-                                        <td colspan="17" class="text-center text-muted py-5">
+                                        <td colspan="15" class="text-center text-muted py-5">
                                             <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
                                             Nenhuma parada de máquina encontrada.
                                         </td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
+                                {% if paradas %}
+                                <tfoot>
+                                    <tr id="totalsRow" data-server-total-capacidade="{{ total_capacidade }}" {% if col_descr_recurso or col_cod_parada or col_descr_parada or col_descr_linha or col_turno or col_motivo or col_acao %}data-server-column-filters="1"{% endif %}>
+                                        <td colspan="10" class="text-end"><strong>Total</strong> <span id="totalsScope" class="text-muted small"></span></td>
+                                        <td class="col-capacidade" id="totalCapacidade">{{ total_capacidade|floatformat:3 }}</td>
+                                        <td colspan="5"></td>
+                                    </tr>
+                                </tfoot>
+                                {% endif %}
                             </table>
                         </div>
                     </div>
@@ -321,10 +400,10 @@
                     <ul class="pagination justify-content-center">
                         {% if paradas.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if ano_filtro %}ano={{ ano_filtro }}&{% endif %}{% for mes in meses_filtro %}mes={{ mes }}&{% endfor %}page=1">Primeira</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if ano_filtro %}ano={{ ano_filtro }}&{% endif %}{% for mes in meses_filtro %}mes={{ mes }}&{% endfor %}{% if col_descr_recurso %}col_descr_recurso={{ col_descr_recurso|urlencode }}&{% endif %}{% if col_cod_parada %}col_cod_parada={{ col_cod_parada|urlencode }}&{% endif %}{% if col_descr_parada %}col_descr_parada={{ col_descr_parada|urlencode }}&{% endif %}{% if col_descr_linha %}col_descr_linha={{ col_descr_linha|urlencode }}&{% endif %}{% if col_turno %}col_turno={{ col_turno|urlencode }}&{% endif %}{% if col_motivo %}col_motivo={{ col_motivo|urlencode }}&{% endif %}{% if col_acao %}col_acao={{ col_acao|urlencode }}&{% endif %}page=1">Primeira</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if ano_filtro %}ano={{ ano_filtro }}&{% endif %}{% for mes in meses_filtro %}mes={{ mes }}&{% endfor %}page={{ paradas.previous_page_number }}">Anterior</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if ano_filtro %}ano={{ ano_filtro }}&{% endif %}{% for mes in meses_filtro %}mes={{ mes }}&{% endfor %}{% if col_descr_recurso %}col_descr_recurso={{ col_descr_recurso|urlencode }}&{% endif %}{% if col_cod_parada %}col_cod_parada={{ col_cod_parada|urlencode }}&{% endif %}{% if col_descr_parada %}col_descr_parada={{ col_descr_parada|urlencode }}&{% endif %}{% if col_descr_linha %}col_descr_linha={{ col_descr_linha|urlencode }}&{% endif %}{% if col_turno %}col_turno={{ col_turno|urlencode }}&{% endif %}{% if col_motivo %}col_motivo={{ col_motivo|urlencode }}&{% endif %}{% if col_acao %}col_acao={{ col_acao|urlencode }}&{% endif %}page={{ paradas.previous_page_number }}">Anterior</a>
                             </li>
                         {% endif %}
                         
@@ -336,10 +415,10 @@
                         
                         {% if paradas.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if ano_filtro %}ano={{ ano_filtro }}&{% endif %}{% for mes in meses_filtro %}mes={{ mes }}&{% endfor %}page={{ paradas.next_page_number }}">Próxima</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if ano_filtro %}ano={{ ano_filtro }}&{% endif %}{% for mes in meses_filtro %}mes={{ mes }}&{% endfor %}{% if col_descr_recurso %}col_descr_recurso={{ col_descr_recurso|urlencode }}&{% endif %}{% if col_cod_parada %}col_cod_parada={{ col_cod_parada|urlencode }}&{% endif %}{% if col_descr_parada %}col_descr_parada={{ col_descr_parada|urlencode }}&{% endif %}{% if col_descr_linha %}col_descr_linha={{ col_descr_linha|urlencode }}&{% endif %}{% if col_turno %}col_turno={{ col_turno|urlencode }}&{% endif %}{% if col_motivo %}col_motivo={{ col_motivo|urlencode }}&{% endif %}{% if col_acao %}col_acao={{ col_acao|urlencode }}&{% endif %}page={{ paradas.next_page_number }}">Próxima</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if ano_filtro %}ano={{ ano_filtro }}&{% endif %}{% for mes in meses_filtro %}mes={{ mes }}&{% endfor %}page={{ paradas.paginator.num_pages }}">Última</a>
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if ano_filtro %}ano={{ ano_filtro }}&{% endif %}{% for mes in meses_filtro %}mes={{ mes }}&{% endfor %}{% if col_descr_recurso %}col_descr_recurso={{ col_descr_recurso|urlencode }}&{% endif %}{% if col_cod_parada %}col_cod_parada={{ col_cod_parada|urlencode }}&{% endif %}{% if col_descr_parada %}col_descr_parada={{ col_descr_parada|urlencode }}&{% endif %}{% if col_descr_linha %}col_descr_linha={{ col_descr_linha|urlencode }}&{% endif %}{% if col_turno %}col_turno={{ col_turno|urlencode }}&{% endif %}{% if col_motivo %}col_motivo={{ col_motivo|urlencode }}&{% endif %}{% if col_acao %}col_acao={{ col_acao|urlencode }}&{% endif %}page={{ paradas.paginator.num_pages }}">Última</a>
                             </li>
                         {% endif %}
                     </ul>
@@ -360,5 +439,118 @@ function toggleAllMonths(selectAll) {
         checkbox.checked = selectAll;
     });
 }
+
+// Column filters - filter table rows based on input values
+document.addEventListener('DOMContentLoaded', function() {
+    function getCellText(cell) {
+        return (cell.textContent || cell.innerText || '').trim().toLowerCase();
+    }
+
+    function setupTableFilters(tableId) {
+        const table = document.getElementById(tableId);
+        if (!table) return;
+        const filters = table.querySelectorAll('.column-filter');
+        const tbody = table.querySelector('tbody');
+        if (!tbody) return;
+
+        const totalCapEl = document.getElementById('totalCapacidade');
+        const totalsScopeEl = document.getElementById('totalsScope');
+        const totalsRow = document.getElementById('totalsRow');
+        const serverTotalCap = totalsRow ? parseFloat(String(totalsRow.getAttribute('data-server-total-capacidade') || '0').replace(',', '.')) || 0 : 0;
+        const serverColumnFiltersActive = totalsRow && totalsRow.getAttribute('data-server-column-filters') === '1';
+        const CAPACIDADE_COL = 10;
+        const CLIENT_ONLY_COLS = [0, 1, 2, 4, 5, 10, 13];
+
+        function parseCapacidade(val) {
+            if (val == null || val === '' || val === '-') return 0;
+            const s = String(val).replace(',', '.').trim();
+            const n = parseFloat(s);
+            return isNaN(n) ? 0 : n;
+        }
+
+        function updateTotals() {
+            if (!totalCapEl || !totalsScopeEl) return;
+            const filterValues = [];
+            filters.forEach(function(input) { filterValues.push((input.value || '').trim().toLowerCase()); });
+            const hasColumnFilter = filterValues.some(function(v) { return v.length > 0; });
+            const hasClientOnlyFilter = filterValues.some(function(v, i) { return v.length > 0 && CLIENT_ONLY_COLS.indexOf(i) >= 0; });
+
+            if (serverColumnFiltersActive && !hasClientOnlyFilter) {
+                totalCapEl.textContent = serverTotalCap.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+                totalsScopeEl.textContent = '(filtros aplicados no servidor)';
+                return;
+            }
+
+            const rows = tbody.querySelectorAll('tr');
+            let sumCap = 0;
+            let visibleCount = 0;
+            rows.forEach(function(row) {
+                if (row.querySelector('td[colspan]')) return;
+                let show = true;
+                const cells = row.querySelectorAll('td');
+                filterValues.forEach(function(val, colIndex) {
+                    if (!val) return;
+                    if (colIndex >= cells.length) return;
+                    if (getCellText(cells[colIndex]).indexOf(val) === -1) show = false;
+                });
+                if (show) {
+                    visibleCount++;
+                    const capCell = cells[CAPACIDADE_COL];
+                    if (capCell && capCell.getAttribute('data-capacidade')) {
+                        sumCap += parseCapacidade(capCell.getAttribute('data-capacidade'));
+                    }
+                }
+            });
+
+            if (hasColumnFilter) {
+                totalCapEl.textContent = sumCap.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+                totalsScopeEl.textContent = '(' + visibleCount + ' registros desta página)';
+            } else {
+                totalCapEl.textContent = serverTotalCap.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+                totalsScopeEl.textContent = '';
+            }
+        }
+
+        function applyFilters() {
+            const filterValues = [];
+            filters.forEach(function(input) {
+                filterValues.push((input.value || '').trim().toLowerCase());
+            });
+
+            const rows = tbody.querySelectorAll('tr');
+            rows.forEach(function(row) {
+                if (row.querySelector('td[colspan]')) return; // skip empty row
+                let show = true;
+                const cells = row.querySelectorAll('td');
+                filterValues.forEach(function(val, colIndex) {
+                    if (!val) return;
+                    if (colIndex >= cells.length) return;
+                    const cellText = getCellText(cells[colIndex]);
+                    if (cellText.indexOf(val) === -1) {
+                        show = false;
+                    }
+                });
+                row.style.display = show ? '' : 'none';
+                var detailRow = document.querySelector('[data-detail-for="' + row.id + '"]');
+                if (detailRow) detailRow.style.display = show ? '' : 'none';
+            });
+            updateTotals();
+        }
+
+        filters.forEach(function(input) {
+            input.addEventListener('input', applyFilters);
+            input.addEventListener('keyup', applyFilters);
+        });
+        if (document.getElementById('totalsRow')) {
+            updateTotals();
+        }
+    }
+
+    setupTableFilters('paradasTable');
+
+    // Initialize Bootstrap tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(function(el) { new bootstrap.Tooltip(el); });
+});
 </script>
 {% endblock %}

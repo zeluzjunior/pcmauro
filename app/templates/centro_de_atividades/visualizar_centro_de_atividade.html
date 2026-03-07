@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load form_extras %}
 
 {% block title %}Visualizar CA {{ ca.ca }}{% endblock %}
 
@@ -193,21 +194,6 @@
                     </div>
                 </div>
 
-                <!-- Gráfico: Ocorrência de OS Corretivas (por mês) -->
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-danger text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-line me-2"></i>Ocorrência de Ordens de Serviço Corretivas
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <p class="text-muted small mb-3">Quantidade de OS Corretivas por mês: <strong>Abertura (dt_abertura_solicita)</strong> e <strong>Encerramento (dt_encordmanu)</strong>.</p>
-                        <div style="height: 280px;">
-                            <canvas id="osCorretivasChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Linhas de Produção -->
                 {% if linhas_producao %}
                 <div class="card shadow-sm mb-4">
@@ -227,55 +213,335 @@
                 </div>
                 {% endif %}
 
-                <!-- Resumo de Manutenção -->
+                <!-- SEÇÃO 1: Manutenções Corretivas -->
                 <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-dark text-white">
+                    <div class="card-header bg-danger text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-tools me-2"></i>Resumo de Manutenção
+                            <i class="fas fa-wrench me-2"></i>Manutenções Corretivas
                         </h5>
                     </div>
                     <div class="card-body">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <h6 class="text-danger"><i class="fas fa-wrench me-1"></i>Ordens de Serviço Corretivas</h6>
-                                <p class="mb-0">Total registrado para este CA: <strong>{{ total_os_corretivas }}</strong></p>
+                        <div class="row mb-4">
+                            <div class="col-md-3">
+                                <div class="card bg-light border-danger h-100">
+                                    <div class="card-body text-center">
+                                        <h6 class="text-muted small">Total de OS</h6>
+                                        <h3 class="text-danger mb-0">{{ total_os_corretivas_sem_lub }}</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light h-100">
+                                    <div class="card-body text-center">
+                                        <h6 class="text-muted small">Tendência (últimos 2 meses)</h6>
+                                        {% if trend_corretivas.0 is not None %}
+                                            {% if trend_corretivas.0 > 0 %}
+                                                <h3 class="text-warning mb-0"><i class="fas fa-arrow-up"></i> +{{ trend_corretivas.0 }}</h3>
+                                                <small class="text-warning">+{{ trend_corretivas.1|number_br:0 }}%</small>
+                                            {% elif trend_corretivas.0 < 0 %}
+                                                <h3 class="text-success mb-0"><i class="fas fa-arrow-down"></i> {{ trend_corretivas.0 }}</h3>
+                                                <small class="text-success">{{ trend_corretivas.1|number_br:0 }}%</small>
+                                            {% else %}
+                                                <h3 class="text-secondary mb-0">—</h3>
+                                                <small>Estável</small>
+                                            {% endif %}
+                                        {% else %}
+                                            <h3 class="text-secondary mb-0">—</h3>
+                                            <small>Sem dados</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
                             </div>
                             <div class="col-md-6">
-                                <h6 class="text-success"><i class="fas fa-clipboard-check me-1"></i>Ordens de Serviço Preventivas</h6>
-                                <p class="mb-0">Total registrado para este CA: <strong>{{ total_os_preventivas }}</strong></p>
+                                <div class="bg-light rounded p-3 h-100">
+                                    <h6 class="text-muted small mb-2"><i class="fas fa-chart-bar me-1"></i>Análise</h6>
+                                    <p class="mb-0 small">
+                                        {% if total_os_corretivas_sem_lub > 0 %}
+                                            Este CA possui <strong>{{ total_os_corretivas_sem_lub }}</strong> ordens de serviço corretivas registradas (excl. lubrificação).
+                                            {% if top_maquinas_corretivas %}
+                                                A máquina com maior incidência é <strong>{{ top_maquinas_corretivas.0.descr_maquina|truncatewords:5|default:top_maquinas_corretivas.0.cd_maquina }}</strong> com {{ top_maquinas_corretivas.0.total }} OS.
+                                            {% endif %}
+                                        {% else %}
+                                            Nenhuma OS corretiva registrada para este CA no período.
+                                        {% endif %}
+                                    </p>
+                                </div>
                             </div>
                         </div>
                         <div class="row">
-                            {% if ultimas_os_corretivas %}
-                            <div class="col-md-6">
-                                <h6 class="text-muted small">Últimas 5 OS Corretivas</h6>
-                                <ul class="list-group list-group-flush small">
-                                    {% for os in ultimas_os_corretivas %}
-                                    <li class="list-group-item d-flex justify-content-between px-0">
-                                        <span>OS {{ os.cd_ordemserv }}</span>
-                                        <span class="text-muted">{{ os.descr_maquina|truncatewords:4 }}</span>
-                                    </li>
-                                    {% endfor %}
-                                </ul>
+                            <div class="col-lg-8 mb-3">
+                                <h6 class="text-muted small mb-2">Ocorrência por mês (Abertura vs Encerramento)</h6>
+                                <div style="height: 220px;">
+                                    <canvas id="chartCorretivas"></canvas>
+                                </div>
                             </div>
-                            {% endif %}
-                            {% if ultimas_os_preventivas %}
-                            <div class="col-md-6">
-                                <h6 class="text-muted small">Últimas 5 OS Preventivas</h6>
-                                <ul class="list-group list-group-flush small">
-                                    {% for os in ultimas_os_preventivas %}
-                                    <li class="list-group-item d-flex justify-content-between px-0">
-                                        <span>OS {{ os.cd_ordemserv }}</span>
-                                        <span class="text-muted">{{ os.descr_maquina|truncatewords:4 }}</span>
-                                    </li>
-                                    {% endfor %}
-                                </ul>
+                            <div class="col-lg-4 mb-3">
+                                <h6 class="text-muted small mb-2">Top 5 máquinas com mais OS</h6>
+                                {% if top_maquinas_corretivas %}
+                                <div style="height: 220px;">
+                                    <canvas id="chartCorretivasMaquinas"></canvas>
+                                </div>
+                                {% else %}
+                                <p class="text-muted small">Sem dados de máquinas.</p>
+                                {% endif %}
                             </div>
-                            {% endif %}
                         </div>
-                        {% if not ultimas_os_corretivas and not ultimas_os_preventivas %}
-                            <p class="text-muted mb-0 small">Nenhuma ordem de serviço recente listada para este CA.</p>
-                        {% endif %}
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <small class="text-muted">Manutenções realizadas após falhas ou quebras identificadas.</small>
+                            <a href="{% url 'consultar_corretivas_outros' %}" class="btn btn-outline-danger btn-sm">Consultar todas</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SEÇÃO 2: Manutenções Preventivas -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clipboard-check me-2"></i>Manutenções Preventivas
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-4">
+                            <div class="col-md-3">
+                                <div class="card bg-light border-success h-100">
+                                    <div class="card-body text-center">
+                                        <h6 class="text-muted small">Total de OS</h6>
+                                        <h3 class="text-success mb-0">{{ total_os_preventivas }}</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light h-100">
+                                    <div class="card-body text-center">
+                                        <h6 class="text-muted small">Tendência (últimos 2 meses)</h6>
+                                        {% if trend_preventivas.0 is not None %}
+                                            {% if trend_preventivas.0 > 0 %}
+                                                <h3 class="text-success mb-0"><i class="fas fa-arrow-up"></i> +{{ trend_preventivas.0 }}</h3>
+                                                <small class="text-success">+{{ trend_preventivas.1|number_br:0 }}%</small>
+                                            {% elif trend_preventivas.0 < 0 %}
+                                                <h3 class="text-warning mb-0"><i class="fas fa-arrow-down"></i> {{ trend_preventivas.0 }}</h3>
+                                                <small class="text-warning">{{ trend_preventivas.1|number_br:0 }}%</small>
+                                            {% else %}
+                                                <h3 class="text-secondary mb-0">—</h3>
+                                                <small>Estável</small>
+                                            {% endif %}
+                                        {% else %}
+                                            <h3 class="text-secondary mb-0">—</h3>
+                                            <small>Sem dados</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="bg-light rounded p-3 h-100">
+                                    <h6 class="text-muted small mb-2"><i class="fas fa-chart-bar me-1"></i>Análise</h6>
+                                    <p class="mb-0 small">
+                                        {% if total_os_preventivas > 0 %}
+                                            Total de <strong>{{ total_os_preventivas }}</strong> ordens preventivas planejadas.
+                                            {% if total_maquinas > 0 %}
+                                                Cobertura aproximada: <strong>{{ total_maquinas }}</strong> máquinas no CA.
+                                            {% endif %}
+                                            {% if top_maquinas_preventivas %}
+                                                A máquina com mais preventivas é <strong>{{ top_maquinas_preventivas.0.descr_maquina|truncatewords:5|default:top_maquinas_preventivas.0.cd_maquina }}</strong> ({{ top_maquinas_preventivas.0.total }} OS).
+                                            {% endif %}
+                                        {% else %}
+                                            Nenhuma OS preventiva registrada para este CA.
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-lg-8 mb-3">
+                                <h6 class="text-muted small mb-2">Ocorrência por mês (Abertura vs Encerramento)</h6>
+                                <div style="height: 220px;">
+                                    <canvas id="chartPreventivas"></canvas>
+                                </div>
+                            </div>
+                            <div class="col-lg-4 mb-3">
+                                <h6 class="text-muted small mb-2">Top 5 máquinas com mais OS</h6>
+                                {% if top_maquinas_preventivas %}
+                                <div style="height: 220px;">
+                                    <canvas id="chartPreventivasMaquinas"></canvas>
+                                </div>
+                                {% else %}
+                                <p class="text-muted small">Sem dados de máquinas.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <small class="text-muted">Manutenções planejadas para prevenir falhas e garantir disponibilidade.</small>
+                            <a href="{% url 'consultar_manutencoes_preventivas' %}" class="btn btn-outline-success btn-sm">Consultar todas</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SEÇÃO 3: Lubrificação -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-oil-can me-2"></i>Lubrificação
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-4">
+                            <div class="col-md-3">
+                                <div class="card bg-light border-info h-100">
+                                    <div class="card-body text-center">
+                                        <h6 class="text-muted small">Total de OS</h6>
+                                        <h3 class="text-info mb-0">{{ total_os_lubrificacao }}</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light h-100">
+                                    <div class="card-body text-center">
+                                        <h6 class="text-muted small">Tendência (últimos 2 meses)</h6>
+                                        {% if trend_lubrificacao.0 is not None %}
+                                            {% if trend_lubrificacao.0 > 0 %}
+                                                <h3 class="text-info mb-0"><i class="fas fa-arrow-up"></i> +{{ trend_lubrificacao.0 }}</h3>
+                                                <small class="text-info">+{{ trend_lubrificacao.1|number_br:0 }}%</small>
+                                            {% elif trend_lubrificacao.0 < 0 %}
+                                                <h3 class="text-secondary mb-0"><i class="fas fa-arrow-down"></i> {{ trend_lubrificacao.0 }}</h3>
+                                                <small>{{ trend_lubrificacao.1|number_br:0 }}%</small>
+                                            {% else %}
+                                                <h3 class="text-secondary mb-0">—</h3>
+                                                <small>Estável</small>
+                                            {% endif %}
+                                        {% else %}
+                                            <h3 class="text-secondary mb-0">—</h3>
+                                            <small>Sem dados</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="bg-light rounded p-3 h-100">
+                                    <h6 class="text-muted small mb-2"><i class="fas fa-chart-bar me-1"></i>Análise</h6>
+                                    <p class="mb-0 small">
+                                        {% if total_os_lubrificacao > 0 %}
+                                            <strong>{{ total_os_lubrificacao }}</strong> ordens de lubrificação registradas.
+                                            {% if total_os_corretivas > 0 %}
+                                                Representa {{ lubrificacao_pct }}% do total de corretivas (incl. lubrificação).
+                                            {% endif %}
+                                            {% if top_maquinas_lubrificacao %}
+                                                Equipamento com mais lubrificações: <strong>{{ top_maquinas_lubrificacao.0.descr_maquina|truncatewords:5|default:top_maquinas_lubrificacao.0.cd_maquina }}</strong> ({{ top_maquinas_lubrificacao.0.total }} OS).
+                                            {% endif %}
+                                        {% else %}
+                                            Nenhuma ordem de lubrificação para este CA.
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-lg-8 mb-3">
+                                <h6 class="text-muted small mb-2">Ocorrência por mês (Abertura vs Encerramento)</h6>
+                                <div style="height: 220px;">
+                                    <canvas id="chartLubrificacao"></canvas>
+                                </div>
+                            </div>
+                            <div class="col-lg-4 mb-3">
+                                <h6 class="text-muted small mb-2">Top 5 máquinas com mais OS</h6>
+                                {% if top_maquinas_lubrificacao %}
+                                <div style="height: 220px;">
+                                    <canvas id="chartLubrificacaoMaquinas"></canvas>
+                                </div>
+                                {% else %}
+                                <p class="text-muted small">Sem dados de máquinas.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <small class="text-muted">Manutenções de lubrificação para prolongar a vida útil dos equipamentos.</small>
+                            <a href="{% url 'consultar_ordens_lubrificacao' %}" class="btn btn-outline-info btn-sm">Consultar todas</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SEÇÃO: Orçamento (RequisicaoAlmoxarifado + ControleRCeNF) -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header text-white" style="background: linear-gradient(135deg, #6f42c1 0%, #563d7c 100%);">
+                        <h5 class="mb-0">
+                            <i class="fas fa-coins me-2"></i>Análise de Orçamento do Centro de Atividade (CA {{ ca.ca }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-4">
+                            <div class="col-md-3 mb-2">
+                                <div class="card bg-light border-0 h-100">
+                                    <div class="card-body text-center py-3">
+                                        <h6 class="text-muted small">Requisições Almoxarifado</h6>
+                                        <h4 class="text-primary mb-0">{{ total_valor_requisicoes|currency_br }}</h4>
+                                        <small class="text-muted">{{ total_requisicoes }} requisições</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <div class="card bg-light border-0 h-100">
+                                    <div class="card-body text-center py-3">
+                                        <h6 class="text-muted small">Controle RC/NF (Valor Pedido)</h6>
+                                        <h4 class="text-success mb-0">{{ total_valor_pedido_rc|currency_br }}</h4>
+                                        <small class="text-muted">{{ total_controle_rc }} registros</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <div class="card bg-light border-0 h-100">
+                                    <div class="card-body text-center py-3">
+                                        <h6 class="text-muted small">Controle RC/NF (Valor NF)</h6>
+                                        <h4 class="text-info mb-0">{{ total_valor_nf_rc|currency_br }}</h4>
+                                        <small class="text-muted">NFs lançadas</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <div class="card bg-light border-0 h-100">
+                                    <div class="card-body text-center py-3">
+                                        <h6 class="text-muted small">Total Orçamento</h6>
+                                        <h4 class="fw-bold mb-0" style="color:#6f42c1;">{{ total_orcamento_geral|currency_br }}</h4>
+                                        <small class="text-muted">Req. + NF RC</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-light rounded p-3 mb-4">
+                            <h6 class="text-muted small mb-2"><i class="fas fa-chart-bar me-1"></i>Análise</h6>
+                            <p class="mb-0 small">
+                                {% if total_requisicoes > 0 or total_controle_rc > 0 %}
+                                    O orçamento relacionado ao CA {{ ca.ca }} é composto por <strong>{{ total_requisicoes }}</strong> requisições de almoxarifado
+                                    (valor total {{ total_valor_requisicoes|currency_br }}, considerando cd_depo=1) e
+                                    <strong>{{ total_controle_rc }}</strong> registros no Controle RC e NF
+                                    (valor total pedidos {{ total_valor_pedido_rc|currency_br }}, valor NF {{ total_valor_nf_rc|currency_br }}).
+                                    {% if total_saldo_residual_rc > 0 %}
+                                        Saldo residual de pedidos: {{ total_saldo_residual_rc|currency_br }}.
+                                    {% endif %}
+                                {% else %}
+                                    Nenhum dado de orçamento encontrado para este Centro de Atividade nas tabelas RequisicaoAlmoxarifado e ControleRCeNF.
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="row">
+                            <div class="col-lg-6 mb-3">
+                                <h6 class="text-muted small mb-2">Requisições Almoxarifado por mês (valor)</h6>
+                                <div style="height: 220px;">
+                                    <canvas id="chartOrcamentoRequisicoes"></canvas>
+                                </div>
+                            </div>
+                            <div class="col-lg-6 mb-3">
+                                <h6 class="text-muted small mb-2">Controle RC/NF por mês (Valor Pedido vs Valor NF)</h6>
+                                <div style="height: 220px;">
+                                    <canvas id="chartOrcamentoRC"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+                            <small class="text-muted">Dados de RequisicaoAlmoxarifado (cd_centro_ativ) e ControleRCeNF (C.A/Rateio).</small>
+                            <div class="d-flex gap-2">
+                                <a href="{% url 'consultar_requisicoes_almoxarifado' %}?filter_centro={{ ca.ca }}" class="btn btn-outline-primary btn-sm">Consultar Requisições</a>
+                                <a href="{% url 'consultar_planilha_rc' %}" class="btn btn-outline-secondary btn-sm">Consultar Planilha RC</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -356,6 +622,62 @@
                         </div>
                     </div>
 
+                <!-- Lista Principal/Secundária (accordion) -->
+                {% if primarias_com_secundarias %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header text-white" style="background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list-alt me-2"></i>Lista de Máquinas: Relação Principal e Secundária (CA {{ ca.ca }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-4">Clique em uma máquina principal para expandir e ver as secundárias vinculadas.</p>
+                        <div class="accordion" id="accordionPrincipalSecundaria">
+                            {% for item in primarias_com_secundarias %}
+                            <div class="accordion-item border-primary">
+                                <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                                    <button class="accordion-button {% if not forloop.first %}collapsed{% endif %} py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse{{ forloop.counter }}">
+                                        <div class="d-flex align-items-center justify-content-between w-100 me-3">
+                                            <span>
+                                                <i class="fas fa-cog me-2 text-primary"></i>
+                                                <strong>{{ item.primaria.descr_maquina|default:"Sem descrição" }}</strong>
+                                                <small class="text-muted ms-2">Cód. {{ item.primaria.cd_maquina }}</small>
+                                            </span>
+                                            <span class="badge bg-primary">{{ item.secundarias|length }} secundária(s)</span>
+                                        </div>
+                                    </button>
+                                </h2>
+                                <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#accordionPrincipalSecundaria">
+                                    <div class="accordion-body pt-2">
+                                        <a href="{% url 'visualizar_maquina' item.primaria.id %}" class="btn btn-outline-primary btn-sm mb-3">
+                                            <i class="fas fa-external-link-alt me-1"></i>Ver máquina principal
+                                        </a>
+                                        {% if item.secundarias %}
+                                        <h6 class="text-muted small mb-2"><i class="fas fa-link me-1"></i>Máquinas Secundárias</h6>
+                                        <ul class="list-group list-group-flush">
+                                            {% for sec in item.secundarias %}
+                                            <li class="list-group-item d-flex align-items-center py-2 px-3 border-0 bg-transparent">
+                                                <span class="text-muted me-2">└</span>
+                                                <a href="{% url 'visualizar_maquina' sec.id %}" class="text-decoration-none flex-grow-1">
+                                                    <span class="text-dark">{{ sec.descr_maquina|default:"Sem descrição" }}</span>
+                                                    <small class="text-muted ms-1">({{ sec.cd_maquina }})</small>
+                                                </a>
+                                                <a href="{% url 'visualizar_maquina' sec.id %}" class="btn btn-sm btn-outline-secondary" title="Visualizar">Ver</a>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% else %}
+                                        <p class="text-muted small mb-0"><em>Nenhuma máquina secundária vinculada.</em></p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                     <!-- Informações do Sistema -->
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-secondary text-white">
@@ -407,63 +729,168 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-    // Gráfico de ocorrência de OS Corretivas por mês (Abertura e Encerramento)
-    (function() {
-        var el = document.getElementById('osCorretivasChart');
-        if (!el) return;
-        var labels = {{ meses_os_corretivas_labels|safe }};
-        var dataAbertura = {{ meses_os_corretivas_data_abertura|safe }};
-        var dataEncordmanu = {{ meses_os_corretivas_data_encordmanu|safe }};
+    // Formato brasileiro: 1.234,56 (milhares com ponto, decimais com vírgula)
+    function formatBrl(val) {
+        if (val == null || isNaN(val)) return 'R$ 0,00';
+        var n = Number(val);
+        var parts = n.toFixed(2).split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        return 'R$ ' + parts.join(',');
+    }
+
+    // Helper: criar gráfico de barras mensal (Abertura vs Encerramento)
+    function createMonthlyChart(canvasId, labels, dataAbertura, dataEncordmanu, colorAbertura, colorEncordmanu) {
+        var el = document.getElementById(canvasId);
+        if (!el || typeof Chart === 'undefined') return;
         if (!labels || labels.length === 0) {
             labels = ['Nenhum dado'];
             dataAbertura = [0];
             dataEncordmanu = [0];
         }
-        if (typeof Chart !== 'undefined') {
-            new Chart(el.getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Abertura (dt_abertura_solicita)',
-                            data: dataAbertura,
-                            backgroundColor: 'rgba(220, 53, 69, 0.7)',
-                            borderColor: 'rgb(220, 53, 69)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: 'Encerramento (dt_encordmanu)',
-                            data: dataEncordmanu,
-                            backgroundColor: 'rgba(40, 167, 69, 0.7)',
-                            borderColor: 'rgb(40, 167, 69)',
-                            borderWidth: 1
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: true, position: 'top' },
-                        tooltip: {
-                            callbacks: {
-                                label: function(ctx) { return ctx.dataset.label + ': ' + ctx.parsed.y; }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: { stepSize: 1 }
-                        },
-                        x: {
-                            ticks: { maxRotation: 45, minRotation: 35 }
+        new Chart(el.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Abertura', data: dataAbertura, backgroundColor: colorAbertura, borderWidth: 1 },
+                    { label: 'Encerramento', data: dataEncordmanu, backgroundColor: colorEncordmanu, borderWidth: 1 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: true, position: 'top' } },
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } }, x: { ticks: { maxRotation: 45 } } }
+            }
+        });
+    }
+
+    // Helper: criar gráfico de barras horizontal (top máquinas)
+    function createMachinesChart(canvasId, dataJson, barColor) {
+        var el = document.getElementById(canvasId);
+        if (!el || typeof Chart === 'undefined') return;
+        var data = typeof dataJson === 'string' ? JSON.parse(dataJson) : dataJson;
+        if (!data || data.length === 0) return;
+        var labels = data.map(function(d) { return d.label || ''; });
+        var values = data.map(function(d) { return d.total || 0; });
+        new Chart(el.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{ label: 'OS', data: values, backgroundColor: barColor, borderColor: barColor, borderWidth: 1 }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            }
+        });
+    }
+
+    // Corretivas: gráfico mensal
+    createMonthlyChart('chartCorretivas',
+        {{ meses_os_corretivas_labels|safe }},
+        {{ meses_os_corretivas_data_abertura|safe }},
+        {{ meses_os_corretivas_data_encordmanu|safe }},
+        'rgba(220, 53, 69, 0.7)', 'rgba(40, 167, 69, 0.7)');
+
+    // Corretivas: top máquinas
+    createMachinesChart('chartCorretivasMaquinas', '{{ top_maquinas_corretivas_json|escapejs }}', 'rgba(220, 53, 69, 0.8)');
+
+    // Preventivas: gráfico mensal
+    createMonthlyChart('chartPreventivas',
+        {{ meses_preventivas_labels|safe }},
+        {{ meses_preventivas_abertura|safe }},
+        {{ meses_preventivas_encordmanu|safe }},
+        'rgba(25, 135, 84, 0.7)', 'rgba(13, 110, 253, 0.7)');
+
+    // Preventivas: top máquinas
+    createMachinesChart('chartPreventivasMaquinas', '{{ top_maquinas_preventivas_json|escapejs }}', 'rgba(25, 135, 84, 0.8)');
+
+    // Lubrificação: gráfico mensal
+    createMonthlyChart('chartLubrificacao',
+        {{ meses_lubrificacao_labels|safe }},
+        {{ meses_lubrificacao_abertura|safe }},
+        {{ meses_lubrificacao_encordmanu|safe }},
+        'rgba(13, 202, 240, 0.7)', 'rgba(111, 66, 193, 0.7)');
+
+    // Lubrificação: top máquinas
+    createMachinesChart('chartLubrificacaoMaquinas', '{{ top_maquinas_lubrificacao_json|escapejs }}', 'rgba(13, 202, 240, 0.8)');
+
+    // Orçamento: Requisições Almoxarifado por mês
+    (function() {
+        var el = document.getElementById('chartOrcamentoRequisicoes');
+        if (!el || typeof Chart === 'undefined') return;
+        var labels = {{ orc_req_labels|safe }};
+        var valores = {{ orc_req_valores|safe }};
+        if (!labels || labels.length === 0) { labels = ['Sem dados']; valores = [0]; }
+        new Chart(el.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{ label: 'Valor', data: valores, backgroundColor: 'rgba(13, 110, 253, 0.7)', borderWidth: 1 }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) { return ctx.dataset.label + ': ' + formatBrl(ctx.parsed.y); }
                         }
                     }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: function(v) { return formatBrl(v); } }
+                    },
+                    x: { ticks: { maxRotation: 45 } }
                 }
-            });
-        }
+            }
+        });
+    })();
+
+    // Orçamento: Controle RC/NF por mês (Pedido vs NF) - com formato BR nos tooltips
+    (function() {
+        var el = document.getElementById('chartOrcamentoRC');
+        if (!el || typeof Chart === 'undefined') return;
+        var labels = {{ orc_rc_labels|safe }};
+        var pedidos = {{ orc_rc_pedidos|safe }};
+        var nfs = {{ orc_rc_nfs|safe }};
+        if (!labels || labels.length === 0) { labels = ['Sem dados']; pedidos = [0]; nfs = [0]; }
+        new Chart(el.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Valor Pedido', data: pedidos, backgroundColor: 'rgba(25, 135, 84, 0.7)', borderWidth: 1 },
+                    { label: 'Valor NF', data: nfs, backgroundColor: 'rgba(111, 66, 193, 0.7)', borderWidth: 1 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true, position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) { return ctx.dataset.label + ': ' + formatBrl(ctx.parsed.y); }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: function(v) { return formatBrl(v); } }
+                    },
+                    x: { ticks: { maxRotation: 45 } }
+                }
+            }
+        });
     })();
 
     // Função para carregar o script do OrgChartJS

@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load form_extras %}
 
 {% block title %}Análise Máquina por Parada (Ordem de Serviço){% endblock %}
 
@@ -34,6 +35,29 @@
         z-index: 1;
         box-shadow: 0 1px 0 #dee2e6;
     }
+    .table-container {
+        max-height: 70vh;
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+    .table-container thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        box-shadow: 0 1px 0 #dee2e6;
+    }
+    .table-container thead tr.table-success th,
+    .table-container thead tr.table-warning th {
+        background-color: inherit !important;
+    }
+    .table-container thead tr.column-filters-row th {
+        position: sticky;
+        top: 42px;
+        background: #f8f9fa !important;
+        z-index: 1;
+        box-shadow: 0 1px 0 #dee2e6;
+    }
+    .column-filter { font-size: 0.75rem; padding: 4px 6px; min-width: 60px; }
 </style>
 {% endblock %}
 
@@ -68,7 +92,7 @@
                 <div class="accordion filter-accordion" id="filtrosAccordion">
                     <div class="accordion-item shadow-sm border-0 rounded-3 overflow-hidden">
                         <h2 class="accordion-header" id="filtrosHeading">
-                            <button class="accordion-button {% if not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="false" aria-controls="filtrosCollapse">
                                 <i class="fas fa-sliders-h me-2 text-primary"></i>
                                 <strong>Filtros</strong>
                                 {% if meses_filtro or ano_filtro %}
@@ -86,7 +110,7 @@
                                 {% endif %}
                             </button>
                         </h2>
-                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                        <div id="filtrosCollapse" class="accordion-collapse collapse" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
                             <div class="accordion-body">
                                 <form method="get" action="{% url 'analise_maquina_por_parada' %}" class="row g-3">
                                     <div class="col-md-4">
@@ -114,6 +138,17 @@
                                             <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">Desmarcar Todos</button>
                                         </div>
                                     </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">Linha de Produção</label>
+                                        <select class="form-select" name="linha_filtro" id="linha_filtro">
+                                            <option value="">Todas</option>
+                                            {% for item in linhas_disponiveis %}
+                                                <option value="{{ item.linha_producao }}" {% if linha_filtro and linha_filtro|stringformat:"s" == item.linha_producao|stringformat:"s" %}selected{% endif %}>
+                                                    {{ item.linha_producao }} - {{ item.descr_linha_producao|default:"Sem descrição"|truncatewords:8 }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
                                     <div class="col-md-2 d-flex align-items-end">
                                         <button type="submit" class="btn btn-primary w-100">
                                             <i class="fas fa-search me-2"></i>Filtrar
@@ -129,262 +164,297 @@
 
         <div class="alert alert-light border mb-4">
             <i class="fas fa-info-circle me-2"></i>
-            Ordens de Serviço (OS) são detectadas nos campos <strong>motivo</strong> e <strong>ação</strong> da tabela ParadaMaquina como sequências de <strong>5 ou 6 dígitos</strong>. Marque as associações corretas e clique em <strong>Salvar confirmações</strong> para gravar no banco — assim os dados ficam disponíveis para outras análises.
-        </div>
-        {% if messages %}
-            {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            {% endfor %}
-        {% endif %}
-
-        <!-- KPIs -->
-        <div class="mb-5">
-            <div class="row mb-3">
-                <div class="col mb-3">
-                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Total de Paradas</h6>
-                                    <h2 class="mb-0 fw-bold">{{ total_registros }}</h2>
-                                    <small class="text-muted">período filtrado</small>
-                                </div>
-                                <i class="fas fa-stop-circle fa-3x text-primary opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col mb-3">
-                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Com OS detectada</h6>
-                                    <h2 class="mb-0 fw-bold">{{ qtd_com_os }}</h2>
-                                    <small class="text-muted">{% if total_registros > 0 %}{{ qtd_com_os }}/{{ total_registros }} ({% widthratio qtd_com_os total_registros 100 %}%){% else %}-{% endif %}</small>
-                                </div>
-                                <i class="fas fa-check-circle fa-3x text-success opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col mb-3">
-                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Sem OS detectada</h6>
-                                    <h2 class="mb-0 fw-bold">{{ qtd_sem_os }}</h2>
-                                    <small class="text-muted">sem sequência 5–6 dígitos</small>
-                                </div>
-                                <i class="fas fa-question-circle fa-3x text-warning opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col mb-3">
-                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">OS únicas encontradas</h6>
-                                    <h2 class="mb-0 fw-bold">{{ os_unicas_count }}</h2>
-                                    <small class="text-muted">nímeros distintos</small>
-                                </div>
-                                <i class="fas fa-list-ol fa-3x text-info opacity-25"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col mb-3">
-                    <div class="card stat-card kpi-card kpi-purple shadow-sm border-0 h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Associações confirmadas</h6>
-                                    <h2 class="mb-0 fw-bold">{{ qtd_confirmadas|default:0 }}</h2>
-                                    <small class="text-muted">salvas no banco</small>
-                                </div>
-                                <i class="fas fa-save fa-3x opacity-25" style="color: #6f42c1;"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            Para <strong>relacionar Paradas com Ordens de Serviço</strong> (detectar OS, confirmar associações e informar OS manualmente), acesse a página <a href="{% url 'relacionar_ordem_com_parada' %}">Relacionar Ordem com Parada</a>.
         </div>
 
-        <!-- Form único: confirmações + OS manuais -->
-        {% if registros_com_os or registros_sem_os %}
-        <form method="post" action="{% url 'analise_maquina_por_parada' %}">
-            {% csrf_token %}
-            <input type="hidden" name="ano" value="{{ ano_filtro }}">
-            {% for m in meses_filtro %}
-            <input type="hidden" name="mes" value="{{ m }}">
-            {% endfor %}
-            <input type="hidden" name="displayed_pairs" value="{{ displayed_pairs }}">
-            <input type="hidden" name="displayed_manual_ids" value="{{ displayed_manual_ids }}">
-        {% endif %}
-
-        <!-- Detalhamento: paradas com OS (com confirmação) -->
+        <!-- KPI Boxes -->
         <div class="row mb-4">
             <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Paradas com Ordem de Serviço detectada</h5>
-                        {% if registros_com_os %}
-                        <span class="badge bg-light text-dark">Marque as associações corretas</span>
-                        {% endif %}
-                    </div>
+                <h4 class="text-secondary mb-3"><i class="fas fa-chart-bar me-2"></i>Indicadores do Período</h4>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
                     <div class="card-body">
-                        {% if registros_com_os %}
-                            <div class="table-responsive table-scroll-wrapper">
-                                <table class="table table-hover table-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" id="selectAllConfirm" title="Selecionar todos">
-                                                    <label class="form-check-label small fw-semibold" for="selectAllConfirm">Selecionar todos</label>
-                                                </div>
-                                            </th>
-                                            <th>Data</th>
-                                            <th>Recurso</th>
-                                            <th>OS encontrada(s)</th>
-                                            <th>Motivo (preview)</th>
-                                            <th>Ação (preview)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for item in registros_com_os %}
-                                        <tr>
-                                            <td>
-                                                {% for os_num, confirmado in item.os_list_with_status %}
-                                                <div class="form-check form-check-inline mb-0">
-                                                    <input class="form-check-input confirm-os-cb" type="checkbox" name="confirm_{{ item.parada.id }}:{{ os_num }}" id="confirm_{{ item.parada.id }}_{{ os_num }}" {% if confirmado %}checked{% endif %}>
-                                                    <label class="form-check-label small" for="confirm_{{ item.parada.id }}_{{ os_num }}">{{ os_num }}</label>
-                                                </div>
-                                                {% endfor %}
-                                            </td>
-                                            <td>{{ item.parada.data|date:"d/m/Y"|default:"-" }}</td>
-                                            <td>{{ item.parada.descr_recurso|default:"-" }}</td>
-                                            <td>
-                                                {% for os_num, confirmado in item.os_list_with_status %}
-                                                <span class="badge {% if confirmado %}bg-success{% else %}bg-primary{% endif %} me-1">{{ os_num }}{% if confirmado %} ✓{% endif %}</span>
-                                                {% endfor %}
-                                            </td>
-                                            <td><small class="text-muted">{{ item.motivo_preview|truncatechars:80 }}</small></td>
-                                            <td><small class="text-muted">{{ item.acao_preview|truncatechars:80 }}</small></td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total de Paradas</h6>
+                                <h2 class="mb-0 fw-bold">{{ maquinas_totais.qtd_paradas|number_br:0 }}</h2>
+                                <small class="text-muted">período filtrado</small>
                             </div>
-                        {% else %}
-                        <p class="text-muted mb-0">Nenhum registro com OS detectada no período filtrado.</p>
-                        {% endif %}
+                            <i class="fas fa-stop-circle fa-3x text-primary opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total de Horas</h6>
+                                <h2 class="mb-0 fw-bold">{{ maquinas_totais.total_horas|number_br:2 }}h</h2>
+                                <small class="text-muted">soma dif_hora</small>
+                            </div>
+                            <i class="fas fa-clock fa-3x text-info opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-secondary shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Capacidade Total</h6>
+                                <h2 class="mb-0 fw-bold">{{ maquinas_totais.capacidade|number_br:3 }}</h2>
+                                <small class="text-muted">identificadas + sem máquina</small>
+                            </div>
+                            <i class="fas fa-chart-bar fa-3x text-secondary opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Capacidade (Máquinas Identificadas)</h6>
+                                <h2 class="mb-0 fw-bold">{{ maquinas_totais_identificadas.capacidade|number_br:3 }}</h2>
+                                <small class="text-muted">com OS associada</small>
+                            </div>
+                            <i class="fas fa-check-circle fa-3x text-success opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Capacidade (Sem Máquina)</h6>
+                                <h2 class="mb-0 fw-bold">{% if paradas_sem_maquina %}{{ paradas_sem_maquina.capacidade|number_br:3 }}{% else %}0{% endif %}</h2>
+                                <small class="text-muted">sem associação</small>
+                            </div>
+                            <i class="fas fa-exclamation-triangle fa-3x text-warning opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Máquinas Identificadas</h6>
+                                <h2 class="mb-0 fw-bold">{{ maquinas_related|length|number_br:0 }}</h2>
+                                <small class="text-muted">recursos distintos</small>
+                            </div>
+                            <i class="fas fa-cogs fa-3x text-success opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Paradas sem Máquina</h6>
+                                <h2 class="mb-0 fw-bold">{% if paradas_sem_maquina %}{{ paradas_sem_maquina.qtd_paradas|number_br:0 }}{% else %}0{% endif %}</h2>
+                                <small class="text-muted">a relacionar</small>
+                            </div>
+                            <i class="fas fa-question-circle fa-3x text-warning opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card {% if taxa_identificacao is not None and taxa_identificacao >= 90 %}kpi-success{% elif taxa_identificacao is not None and taxa_identificacao >= 70 %}kpi-warning{% else %}kpi-danger{% endif %} shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Taxa de Identificação</h6>
+                                <h2 class="mb-0 fw-bold {% if taxa_identificacao is not None and taxa_identificacao >= 90 %}text-success{% elif taxa_identificacao is not None and taxa_identificacao >= 70 %}text-warning{% elif taxa_identificacao is not None %}text-danger{% endif %}">{% if taxa_identificacao is not None %}{{ taxa_identificacao|number_br:1 }}%{% else %}-{% endif %}</h2>
+                                <small class="text-muted">paradas com máquina</small>
+                            </div>
+                            <i class="fas fa-percent fa-3x {% if taxa_identificacao is not None and taxa_identificacao >= 90 %}text-success{% elif taxa_identificacao is not None and taxa_identificacao >= 70 %}text-warning{% elif taxa_identificacao is not None %}text-danger{% else %}text-muted{% endif %} opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Paradas sem OS detectada (informar manualmente) -->
-        <div class="row mb-4">
+        <!-- Máquinas relacionadas às Paradas de Máquina -->
+        <div class="row mt-5">
             <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-question-circle me-2"></i>Paradas sem Ordem de Serviço associada</h5>
-                        {% if registros_sem_os %}
-                        <span class="badge bg-dark">Informe a OS manualmente (5 ou 6 dígitos)</span>
-                        {% endif %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center flex-wrap">
+                        <div>
+                            <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Máquinas relacionadas às Paradas de Máquina</h5>
+                            <small class="opacity-90">Apenas paradas da seção <strong>Indústria</strong> – Capacidade alinhada ao gráfico Paradas por Máquina</small>
+                            <span class="badge bg-light text-dark ms-2" title="Soma de capacidade das paradas Indústria (recursos configurados) – deve coincidir com a página Análise">Total esperado: {{ soma_capacidade_esperada|number_br:3 }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <a href="{{ export_maquinas_url }}" class="btn btn-sm btn-success" title="Exportar tabelas para Excel">
+                                <i class="fas fa-file-excel me-1"></i>Exportar Excel
+                            </a>
+                            <form method="get" action="{% url 'analise_maquina_por_parada' %}" class="d-flex align-items-center gap-2" id="linhaFilterForm">
+                                <input type="hidden" name="ano" value="{{ ano_filtro }}">
+                                {% for mes in meses_filtro %}
+                                    <input type="hidden" name="mes" value="{{ mes }}">
+                                {% endfor %}
+                                {% if linha_filtro %}<input type="hidden" name="linha_filtro" value="{{ linha_filtro }}">{% endif %}
+                                <label for="linha_filtro_maq" class="form-label mb-0 small text-white">Linha de Produção:</label>
+                                <select name="linha_filtro_maq" id="linha_filtro_maq" class="form-select form-select-sm" style="max-width: 280px;" onchange="this.form.submit()">
+                                    <option value="">Todas as linhas</option>
+                                    {% for item in linhas_disponiveis_maq %}
+                                        <option value="{{ item.linha_producao }}" {% if linha_filtro_maq and linha_filtro_maq|stringformat:"s" == item.linha_producao|stringformat:"s" %}selected{% endif %}>
+                                            {{ item.linha_producao }} - {{ item.descr_linha_producao|default:"Sem descrição"|truncatewords:8 }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </form>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        {% if registros_sem_os %}
-                        <div class="table-responsive table-scroll-wrapper">
-                            <table class="table table-hover table-sm">
+                </div>
+
+                <!-- Tabela 1: Máquinas identificadas -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white py-3">
+                        <h5 class="mb-1"><i class="fas fa-check-circle me-2"></i>Máquinas identificadas</h5>
+                        <small class="opacity-90">Paradas associadas a Ordens de Serviço com máquina identificada</small>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-container">
+                            <table class="table table-hover table-striped mb-0" id="maquinasTable">
                                 <thead>
+                                    <tr class="table-success">
+                                        <th>Cód. Máquina</th>
+                                        <th>Descrição Máquina</th>
+                                        <th>Linhas de Produção</th>
+                                        <th class="text-end">Qtd. Paradas</th>
+                                        <th class="text-end">Total Horas</th>
+                                        <th class="text-end sortable-capacidade" data-sort-col="5" title="Clique para ordenar (maior → menor ou menor → maior)" style="cursor: pointer; user-select: none;"><span>Capacidade</span> <i class="fas fa-sort text-muted ms-1 sort-icon"></i></th>
+                                        <th style="min-width: 90px;">Ações</th>
+                                    </tr>
+                                    <tr class="column-filters-row">
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="0"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="1"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="2"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="3"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="4"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="5"></th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for m in maquinas_related %}
                                     <tr>
-                                        <th style="min-width: 140px;">OS manual</th>
+                                        <td><span class="badge bg-secondary">{{ m.cd_maquina }}</span></td>
+                                        <td>{{ m.descr_maquina|truncatewords:12 }}</td>
+                                        <td><small class="text-muted">{{ m.linhas|truncatewords:15 }}</small></td>
+                                        <td class="text-end">{{ m.qtd_paradas|number_br:0 }}</td>
+                                        <td class="text-end">{{ m.total_horas|number_br:2 }}h</td>
+                                        <td class="text-end">{{ m.capacidade|number_br:3 }}</td>
+                                        <td>
+                                            {% if m.maquina_id %}
+                                                <a href="{% url 'visualizar_maquina' m.maquina_id %}" class="btn btn-sm btn-outline-primary" title="Visualizar máquina"><i class="fas fa-eye"></i></a>
+                                            {% else %}
+                                                <span class="text-muted small">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted py-5">
+                                            <i class="fas fa-cogs fa-3x mb-3 d-block opacity-25"></i>
+                                            Nenhuma máquina encontrada relacionada às paradas. Associe paradas a Ordens de Serviço na tabela acima.
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-success fw-bold">
+                                        <td colspan="3" class="text-end">Total (máquinas identificadas):</td>
+                                        <td class="text-end">{{ maquinas_totais_identificadas.qtd_paradas|number_br:0 }}</td>
+                                        <td class="text-end">{{ maquinas_totais_identificadas.total_horas|number_br:2 }}h</td>
+                                        <td class="text-end">{{ maquinas_totais_identificadas.capacidade|number_br:3 }}</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabela 2: Paradas sem máquina associada -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark py-3">
+                        <h5 class="mb-1"><i class="fas fa-exclamation-triangle me-2"></i>Paradas sem máquina identificada</h5>
+                        <small class="opacity-90">Paradas sem associação ParadaMaquinaOS ou sem número de OS em motivo/ação/nro/descr_parada</small>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-container">
+                            <table class="table table-hover table-striped mb-0" id="paradasSemMaqTable">
+                                <thead>
+                                    <tr class="table-warning">
                                         <th>Data</th>
                                         <th>Recurso</th>
+                                        <th>Parada</th>
                                         <th>Linha de Produção</th>
-                                        <th>Motivo (preview)</th>
-                                        <th>Ação (preview)</th>
+                                        <th>Ordem de Serviço</th>
+                                        <th class="text-end sortable-capacidade" data-sort-col="5" title="Clique para ordenar (maior → menor ou menor → maior)" style="cursor: pointer; user-select: none;"><span>Capacidade</span> <i class="fas fa-sort text-muted ms-1 sort-icon"></i></th>
+                                        <th class="text-end">Horas</th>
+                                        <th style="min-width: 80px;">Ações</th>
+                                    </tr>
+                                    <tr class="column-filters-row">
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="0"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="1"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="2"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="3"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="4"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="5"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="6"></th>
+                                        <th></th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for item in registros_sem_os_with_manual %}
+                                    {% if paradas_sem_maquina %}
+                                        {% for pd in paradas_sem_maquina.paradas_detalhe %}
+                                        <tr>
+                                            <td>{{ pd.data }}</td>
+                                            <td>{{ pd.recurso|truncatewords:8 }}</td>
+                                            <td>{{ pd.parada|truncatewords:12 }}</td>
+                                            <td>{{ pd.linha|truncatewords:8 }}</td>
+                                            <td>{% if pd.os != '-' %}<span class="badge bg-secondary">{{ pd.os }}</span>{% else %}-{% endif %}</td>
+                                            <td class="text-end">{{ pd.capacidade|number_br:3 }}</td>
+                                            <td class="text-end">{{ pd.horas|number_br:2 }}h</td>
+                                            <td><a href="{% url 'visualizar_parada_de_maquina' pd.id %}" class="btn btn-sm btn-outline-secondary" title="Visualizar parada"><i class="fas fa-eye"></i></a></td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
                                     <tr>
-                                        <td>
-                                            <input type="text" 
-                                                   class="form-control form-control-sm" 
-                                                   name="manual_os_{{ item.parada.id }}" 
-                                                   placeholder="Ex: 12345" 
-                                                   value="{{ item.manual_os_str }}"
-                                                   maxlength="50"
-                                                   title="Informe 5 ou 6 dígitos (vários separados por vírgula)">
+                                        <td colspan="8" class="text-center text-muted py-5">
+                                            <i class="fas fa-check-circle fa-3x mb-3 d-block opacity-25 text-success"></i>
+                                            Todas as paradas possuem máquina identificada.
                                         </td>
-                                        <td>{{ item.parada.data|date:"d/m/Y"|default:"-" }}</td>
-                                        <td>{{ item.parada.descr_recurso|default:"-" }}</td>
-                                        <td>{{ item.parada.descr_linha_producao|default:"-" }}</td>
-                                        <td><small class="text-muted">{{ item.parada.motivo|truncatechars:80|default:"-" }}</small></td>
-                                        <td><small class="text-muted">{{ item.parada.acao|truncatechars:80|default:"-" }}</small></td>
                                     </tr>
-                                    {% endfor %}
+                                    {% endif %}
                                 </tbody>
+                                {% if paradas_sem_maquina %}
+                                <tfoot>
+                                    <tr class="table-warning fw-bold">
+                                        <td colspan="5" class="text-end">Total (paradas sem máquina):</td>
+                                        <td class="text-end">{{ paradas_sem_maquina.capacidade|number_br:3 }}</td>
+                                        <td class="text-end">{{ paradas_sem_maquina.total_horas|number_br:2 }}h</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                                {% endif %}
                             </table>
                         </div>
-                        {% else %}
-                        <p class="text-muted mb-0">Todos os registros do período possuem OS detectada.</p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {% if registros_com_os or registros_sem_os %}
-        <div class="row mb-4">
-            <div class="col-12">
-                <button type="submit" class="btn btn-success">
-                    <i class="fas fa-save me-2"></i>Salvar confirmações e associações
-                </button>
-            </div>
-        </div>
-        </form>
-        {% endif %}
-
-        <!-- Resumo: OS por quantidade de paradas -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="fas fa-list-ol me-2"></i>Ordens de Serviço encontradas (por quantidade de paradas)</h5>
-                    </div>
-                    <div class="card-body">
-                        {% if os_resumo %}
-                        <div class="table-responsive table-scroll-wrapper">
-                            <table class="table table-hover table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>OS</th>
-                                        <th class="text-center">Qtd. Paradas</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in os_resumo %}
-                                    <tr>
-                                        <td><strong>{{ item.os_num }}</strong></td>
-                                        <td class="text-center">{{ item.qtd_paradas }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                        {% else %}
-                        <p class="text-muted mb-0">Nenhuma OS detectada nos registros filtrados.</p>
-                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -417,6 +487,81 @@ document.addEventListener('DOMContentLoaded', function() {
         var allChecked = Array.prototype.every.call(confirmCbs, function(c) { return c.checked; });
         selectAll.checked = allChecked;
     }
+    // Column filters for maquinas table
+    function setupTableFilters(tableId) {
+        var table = document.getElementById(tableId);
+        if (!table) return;
+        var filters = table.querySelectorAll('.column-filter');
+        var tbody = table.querySelector('tbody');
+        if (!tbody) return;
+        function getCellText(cell) { return (cell.textContent || cell.innerText || '').trim().toLowerCase(); }
+        function applyFilters() {
+            var filterValues = [];
+            filters.forEach(function(input) { filterValues.push((input.value || '').trim().toLowerCase()); });
+            var rows = tbody.querySelectorAll('tr');
+            rows.forEach(function(row) {
+                if (row.querySelector('td[colspan]')) return;
+                var show = true;
+                var cells = row.querySelectorAll('td');
+                filterValues.forEach(function(val, colIndex) {
+                    if (!val) return;
+                    if (colIndex >= cells.length) return;
+                    if (getCellText(cells[colIndex]).indexOf(val) === -1) show = false;
+                });
+                row.style.display = show ? '' : 'none';
+                var detailRow = document.querySelector('[data-detail-for="' + row.id + '"]');
+                if (detailRow) detailRow.style.display = show ? '' : 'none';
+            });
+        }
+        filters.forEach(function(input) {
+            input.addEventListener('input', applyFilters);
+            input.addEventListener('keyup', applyFilters);
+        });
+    }
+    setupTableFilters('maquinasTable');
+    setupTableFilters('paradasSemMaqTable');
+
+    // Sort Capacidade column (Brazilian number format: 1.234,56)
+    function parseBrNumber(str) {
+        if (!str || typeof str !== 'string') return 0;
+        var s = (str || '').trim().replace(/\s/g, '');
+        if (!s || s === '-') return 0;
+        s = s.replace(/\./g, '').replace(',', '.');
+        var n = parseFloat(s);
+        return isNaN(n) ? 0 : n;
+    }
+    function setupCapacitySort(tableId) {
+        var table = document.getElementById(tableId);
+        if (!table) return;
+        var th = table.querySelector('th.sortable-capacidade');
+        if (!th) return;
+        var tbody = table.querySelector('tbody');
+        var col = parseInt(th.getAttribute('data-sort-col'), 10) || 5;
+        var direction = -1; // -1 = first click will give desc; 1 = asc. Toggle on each click.
+        th.addEventListener('click', function() {
+            direction = -direction; // 1 = desc (high to low), -1 = asc (low to high)
+            var icon = th.querySelector('.sort-icon');
+            if (icon) {
+                icon.className = 'fas ms-1 sort-icon ' + (direction === 1 ? 'fa-sort-amount-down text-primary' : 'fa-sort-amount-up text-primary');
+            }
+            var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+            rows = rows.filter(function(r) { return !r.querySelector('td[colspan]'); });
+            rows.sort(function(a, b) {
+                var cellA = a.cells[col];
+                var cellB = b.cells[col];
+                if (!cellA || !cellB) return 0;
+                var valA = parseBrNumber(cellA.textContent || cellA.innerText);
+                var valB = parseBrNumber(cellB.textContent || cellB.innerText);
+                return direction * (valB - valA);
+            });
+            rows.forEach(function(r) { tbody.appendChild(r); });
+        });
+    }
+    setupCapacitySort('maquinasTable');
+    setupCapacitySort('paradasSemMaqTable');
+
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(function(el) { new bootstrap.Tooltip(el); });
 });
 </script>
 {% endblock %}

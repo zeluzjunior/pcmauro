@@ -1656,3 +1656,30 @@ class ProducaoDiaria(models.Model):
 
     def __str__(self):
         return f"{self.ano}/{self.mes:02d}/{self.dia:02d} – Suínos: {self.suinos_abatidos or '-'} | Indústria: {self.producao_industria or '-'}"
+
+class Evento(models.Model):
+    """Modelo para armazenar eventos com descrição, data, responsável e arquivo anexo"""
+    descricao = models.TextField('Descrição', blank=True, null=True)
+    data = models.DateField('Data', blank=True, null=True)
+    responsavel = models.CharField('Responsável', max_length=255, blank=True, null=True)
+    arquivo = models.FileField(
+        'Arquivo',
+        upload_to='eventos/arquivos/',
+        blank=True,
+        null=True,
+        help_text='Upload de arquivo relacionado ao evento'
+    )
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Evento'
+        verbose_name_plural = 'Eventos'
+        ordering = ['-data', '-created_at']
+        indexes = [
+            models.Index(fields=['data']),
+            models.Index(fields=['responsavel']),
+        ]
+
+    def __str__(self):
+        return f"{self.descricao[:50] if self.descricao else 'Sem descrição'} - {self.data.strftime('%d/%m/%Y') if self.data else 'Sem data'}"
