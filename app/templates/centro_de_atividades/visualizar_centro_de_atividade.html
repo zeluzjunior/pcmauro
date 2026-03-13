@@ -213,6 +213,13 @@
                 </div>
                 {% endif %}
 
+                <div class="border-top" style="margin-top: 12rem; padding-top: 3rem;">
+                    <h4 class="mb-4">
+                        <i class="fas fa-chart-bar me-2 text-primary"></i>Informações Sobre Ordens de Serviço:
+                    </h4>
+                </div>
+
+
                 <!-- SEÇÃO 1: Manutenções Corretivas -->
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-danger text-white">
@@ -459,6 +466,12 @@
                     </div>
                 </div>
 
+                <div class="border-top" style="margin-top: 12rem; padding-top: 3rem;">
+                    <h4 class="mb-4">
+                        <i class="fas fa-chart-bar me-2 text-primary"></i>Informações Sobre Gastos, Orçamentos e Notas Fiscais:
+                    </h4>
+                </div>
+
                 <!-- SEÇÃO: Orçamento (RequisicaoAlmoxarifado + ControleRCeNF) -->
                 <div class="card shadow-sm mb-4">
                     <div class="card-header text-white" style="background: linear-gradient(135deg, #6f42c1 0%, #563d7c 100%);">
@@ -573,56 +586,120 @@
                 </div>
                 {% endif %}
 
-                <!-- Hierarquia de Máquinas -->
+                <!-- Seção: Análise de Máquinas do Centro de Atividades -->
+                {% if primarias_com_secundarias or has_maquinas %}
+                <div class="border-top" style="margin-top: 12rem; padding-top: 3rem;">
+                    <h4 class="mb-4">
+                        <i class="fas fa-chart-bar me-2 text-primary"></i>Análise de Máquinas do Centro de Atividades:
+                    </h4>
+                </div>
+
+                <!-- Ajustes necessários nos Cadastros de Máquinas -->
                 <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-success text-white">
+                    <div class="card-header text-white" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
                         <h5 class="mb-0">
-                            <i class="fas fa-sitemap me-2"></i>Hierarquia de Máquinas do Centro de Atividade (CA {{ ca.ca }})
+                            <i class="fas fa-tools me-2"></i>Ajustes necessários nos Cadastros de Máquinas:
                         </h5>
                     </div>
                     <div class="card-body">
-                        {% if has_maquinas %}
-                            <!-- Statistics -->
-                            <div class="row mb-3">
-                            <div class="col-md-4">
-                                <div class="card bg-primary text-white">
-                                    <div class="card-body p-2">
-                                        <h6 class="card-title mb-1">Máquinas Primárias</h6>
-                                        <p class="card-text mb-0 h4">{{ total_primarias }}</p>
+                        <p class="text-muted small mb-4">Problemas identificados nos cadastros de máquinas deste Centro de Atividade que precisam de atenção. Clique para expandir cada seção.</p>
+
+                        <div class="accordion" id="accordionAjustesMaquinas">
+                            <!-- Máquinas classificadas como Outros -->
+                            <div class="accordion-item border-warning">
+                                <h2 class="accordion-header" id="headingAjustesOutros">
+                                    <button class="accordion-button {% if not maquinas_outros %}collapsed{% endif %} py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAjustesOutros" aria-expanded="{% if maquinas_outros %}true{% else %}false{% endif %}" aria-controls="collapseAjustesOutros">
+                                        <div class="d-flex align-items-center justify-content-between w-100 me-3">
+                                            <span>
+                                                <i class="fas fa-question-circle me-2 text-warning"></i>
+                                                <strong>Máquinas classificadas como Outros</strong>
+                                            </span>
+                                            <span class="badge bg-warning text-dark">{{ maquinas_outros|length }}</span>
+                                        </div>
+                                    </button>
+                                </h2>
+                                <div id="collapseAjustesOutros" class="accordion-collapse collapse {% if maquinas_outros %}show{% endif %}" aria-labelledby="headingAjustesOutros" data-bs-parent="#accordionAjustesMaquinas">
+                                    <div class="accordion-body">
+                                        <p class="text-muted small mb-3">Máquinas que ainda não foram classificadas corretamente (Principal ou Secundária).</p>
+                                        {% if maquinas_outros %}
+                                            <ul class="list-group list-group-flush mb-0">
+                                                {% for maq in maquinas_outros %}
+                                                <li class="list-group-item d-flex align-items-center py-2 px-3 border-0 bg-transparent">
+                                                    <a href="{% url 'visualizar_maquina' maq.id %}" class="text-decoration-none flex-grow-1">
+                                                        <span class="text-dark">{{ maq.descr_maquina|default:"Sem descrição" }}</span>
+                                                        <small class="text-muted ms-1">({{ maq.cd_maquina }})</small>
+                                                    </a>
+                                                    <a href="{% url 'visualizar_maquina' maq.id %}" class="btn btn-sm btn-outline-secondary" title="Visualizar">Ver</a>
+                                                </li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% else %}
+                                            <small class="text-muted"><em>Nenhuma máquina classificada como OUTROS neste Centro de Atividade.</em></small>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                <div class="card bg-info text-white">
-                                    <div class="card-body p-2">
-                                        <h6 class="card-title mb-1">Relacionamentos</h6>
-                                        <p class="card-text mb-0 h4">{{ total_relacionamentos }}</p>
+
+                            <!-- Máquinas com dados importados em colunas erradas -->
+                            <div class="accordion-item border-warning">
+                                <h2 class="accordion-header" id="headingAjustesColunas">
+                                    <button class="accordion-button collapsed py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAjustesColunas" aria-expanded="false" aria-controls="collapseAjustesColunas">
+                                        <div class="d-flex align-items-center justify-content-between w-100 me-3">
+                                            <span>
+                                                <i class="fas fa-columns me-2 text-warning"></i>
+                                                <strong>Máquinas com dados importados em colunas erradas</strong>
+                                            </span>
+                                            <span class="badge bg-secondary">0</span>
+                                        </div>
+                                    </button>
+                                </h2>
+                                <div id="collapseAjustesColunas" class="accordion-collapse collapse" aria-labelledby="headingAjustesColunas" data-bs-parent="#accordionAjustesMaquinas">
+                                    <div class="accordion-body">
+                                        <p class="text-muted small mb-3">Máquinas que tiveram dados importados em colunas incorretas.</p>
+                                        <small class="text-muted"><em>Nenhum dado carregado — placeholder</em></small>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                <div class="card bg-secondary text-white">
-                                    <div class="card-body p-2">
-                                        <h6 class="card-title mb-1">Total de Máquinas</h6>
-                                        <p class="card-text mb-0 h4">{{ total_maquinas }}</p>
+
+                            <!-- Máquinas Secundárias sem vínculo a Máquina Principal -->
+                            <div class="accordion-item border-warning">
+                                <h2 class="accordion-header" id="headingAjustesSecundarias">
+                                    <button class="accordion-button {% if not maquinas_secundarias_sem_vinculo %}collapsed{% endif %} py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAjustesSecundarias" aria-expanded="{% if maquinas_secundarias_sem_vinculo %}true{% else %}false{% endif %}" aria-controls="collapseAjustesSecundarias">
+                                        <div class="d-flex align-items-center justify-content-between w-100 me-3">
+                                            <span>
+                                                <i class="fas fa-unlink me-2 text-warning"></i>
+                                                <strong>Máquinas Secundárias sem vínculo a Máquina Principal</strong>
+                                            </span>
+                                            <span class="badge bg-warning text-dark">{{ maquinas_secundarias_sem_vinculo|length }}</span>
+                                        </div>
+                                    </button>
+                                </h2>
+                                <div id="collapseAjustesSecundarias" class="accordion-collapse collapse {% if maquinas_secundarias_sem_vinculo %}show{% endif %}" aria-labelledby="headingAjustesSecundarias" data-bs-parent="#accordionAjustesMaquinas">
+                                    <div class="accordion-body">
+                                        <p class="text-muted small mb-3">Máquinas classificadas como MÁQUINA SECUNDÁRIA (descr_gerenc) que não possuem vínculo com uma máquina principal na tabela MaquinaPrimariaSecundaria.</p>
+                                        {% if maquinas_secundarias_sem_vinculo %}
+                                            <ul class="list-group list-group-flush mb-0">
+                                                {% for maq in maquinas_secundarias_sem_vinculo %}
+                                                <li class="list-group-item d-flex align-items-center py-2 px-3 border-0 bg-transparent">
+                                                    <a href="{% url 'visualizar_maquina' maq.id %}" class="text-decoration-none flex-grow-1">
+                                                        <span class="text-dark">{{ maq.descr_maquina|default:"Sem descrição" }}</span>
+                                                        <small class="text-muted ms-1">({{ maq.cd_maquina }})</small>
+                                                    </a>
+                                                    <a href="{% url 'visualizar_maquina' maq.id %}" class="btn btn-sm btn-outline-secondary" title="Visualizar">Ver</a>
+                                                </li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% else %}
+                                            <small class="text-muted"><em>Nenhuma máquina secundária sem vínculo neste Centro de Atividade.</em></small>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
-                            </div>
-                            
-                            <!-- Chart Container -->
-                            <div id="tree-maquinas"></div>
-                        {% else %}
-                            <div class="alert alert-info mb-0">
-                                <i class="fas fa-info-circle me-2"></i>
-                                Nenhuma máquina encontrada relacionada a este Centro de Atividade (CA {{ ca.ca }}).
-                                <br><small>As máquinas precisam estar associadas a um Local do Centro de Atividade relacionado a este CA.</small>
-                            </div>
-                        {% endif %}
                         </div>
                     </div>
+                </div>
 
-                <!-- Lista Principal/Secundária (accordion) -->
+                <!-- Lista de Máquinas: Relação Principal e Secundária (primeiro) -->
                 {% if primarias_com_secundarias %}
                 <div class="card shadow-sm mb-4">
                     <div class="card-header text-white" style="background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);">
@@ -678,7 +755,63 @@
                 </div>
                 {% endif %}
 
+                <!-- Hierarquia de Máquinas (gráfico) - abaixo da Lista, dentro da seção Análise de Máquinas -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-sitemap me-2"></i>Hierarquia de Máquinas do Centro de Atividade (CA {{ ca.ca }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if has_maquinas %}
+                            <!-- Statistics -->
+                            <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="card bg-primary text-white">
+                                    <div class="card-body p-2">
+                                        <h6 class="card-title mb-1">Máquinas Primárias</h6>
+                                        <p class="card-text mb-0 h4">{{ total_primarias }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-info text-white">
+                                    <div class="card-body p-2">
+                                        <h6 class="card-title mb-1">Relacionamentos</h6>
+                                        <p class="card-text mb-0 h4">{{ total_relacionamentos }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-secondary text-white">
+                                    <div class="card-body p-2">
+                                        <h6 class="card-title mb-1">Total de Máquinas</h6>
+                                        <p class="card-text mb-0 h4">{{ total_maquinas }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            </div>
+                            
+                            <!-- Chart Container -->
+                            <div id="tree-maquinas"></div>
+                        {% else %}
+                            <div class="alert alert-info mb-0">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Nenhuma máquina encontrada relacionada a este Centro de Atividade (CA {{ ca.ca }}).
+                                <br><small>As máquinas precisam estar associadas a um Local do Centro de Atividade relacionado a este CA.</small>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
                     <!-- Informações do Sistema -->
+                <div class="border-top" style="margin-top: 12rem; padding-top: 3rem;">
+                    <h4 class="mb-4">
+                        <i class="fas fa-chart-bar me-2 text-primary"></i>Informações adicinais sobre o Centro de Atividade:
+                    </h4>
+                </div>
+
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-secondary text-white">
                         <h5 class="mb-0">

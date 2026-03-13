@@ -1067,7 +1067,16 @@ class RequisicaoAlmoxarifado(models.Model):
             vlr_abs = abs(self.vlr_movto_estoq)
             return qtd_abs * vlr_abs
         return Decimal('0.00')
-    
+
+    @property
+    def valor_contribuicao_custo(self):
+        """Valor que contribui para o custo/gasto real.
+        Na tabela: vlr_movto_estoq negativo = saída (gasto), positivo = devolução (retorno ao estoque).
+        Para custo: gastos somam, devoluções subtraem. Retorna -vlr_movto_estoq."""
+        from decimal import Decimal
+        v = self.vlr_movto_estoq or Decimal('0')
+        return -v
+
     def __str__(self):
         return f"Requisição {self.cd_item} - {self.data_requisicao}"
 

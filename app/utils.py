@@ -2041,6 +2041,111 @@ def _safe_str(value, max_length=None, default=''):
     return str_value
 
 
+def _classify_value_type(value):
+    """
+    Classifica um valor (string ou outro) em: 'integer', 'float', 'date', 'text', 'empty'.
+    Usado para análise de padrões em colunas importadas.
+    """
+    import re
+    from datetime import datetime
+    if value is None:
+        return 'empty'
+    s = str(value).strip()
+    if not s:
+        return 'empty'
+    # Integer: apenas dígitos, opcionalmente com sinal
+    if re.match(r'^-?\d+$', s):
+        return 'integer'
+    # Float: dígitos com ponto ou vírgula decimal
+    if re.match(r'^-?\d+[.,]\d+$', s) or re.match(r'^-?\d{1,3}(\.\d{3})*,\d+$', s):
+        return 'float'
+    # Date: formatos comuns dd/mm/yyyy, dd-mm-yyyy, yyyy-mm-dd, etc.
+    date_patterns = [
+        r'^\d{1,2}/\d{1,2}/\d{2,4}$',
+        r'^\d{1,2}-\d{1,2}-\d{2,4}$',
+        r'^\d{4}-\d{2}-\d{2}$',
+        r'^\d{1,2}\.\d{1,2}\.\d{2,4}$',
+        r'^\d{2}/\d{2}/\d{4}\s+\d{1,2}:\d{2}',
+        r'^\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}',
+    ]
+    for pat in date_patterns:
+        if re.match(pat, s):
+            return 'date'
+    # Tentar parse explícito de data
+    for fmt in ('%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', '%d/%m/%y', '%d.%m.%Y'):
+        try:
+            datetime.strptime(s[:10], fmt)
+            return 'date'
+        except (ValueError, TypeError):
+            continue
+    return 'text'
+
+
+def analyze_maquinas_column_patterns(maquinas_queryset, columns_config):
+    """
+    Analisa padrões de dados nas colunas de máquinas importadas.
+    Detecta inconsistências: ex. maioria inteiros mas alguns textos, ou datas em coluna numérica.
+
+    columns_config: dict { field_name: {'expected': 'integer'|'text'|'date', 'label': 'Nome exibido'} }
+    Retorna lista de dicts com: field, label, expected, total, type_counts, has_problem, problem_desc, sample_problematic
+    """
+    from collections import Counter
+    fields = list(columns_config.keys())
+    if not fields:
+        return []
+    # Uma única query para todos os campos
+    rows = list(maquinas_queryset.values(*fields))
+    results = []
+    for field_name, config in columns_config.items():
+        expected = config.get('expected', 'text')
+        label = config.get('label', field_name)
+        type_counts = Counter()
+        problematic_values = []
+        for row in rows:
+            val = row.get(field_name)
+            if val is not None and not isinstance(val, str):
+                val = str(val)
+            classified = _classify_value_type(val)
+            type_counts[classified] += 1
+            if expected == 'integer' and classified not in ('integer', 'empty'):
+                problematic_values.append((str(val)[:80] if val is not None else 'NULL', classified))
+            elif expected == 'date' and classified not in ('date', 'empty'):
+                problematic_values.append((str(val)[:80] if val is not None else 'NULL', classified))
+            elif expected == 'text' and classified == 'date':
+                problematic_values.append((str(val)[:80] if val is not None else 'NULL', classified))
+        total = len(rows)
+        non_empty = total - type_counts.get('empty', 0)
+        has_problem = False
+        problem_desc = ''
+        if total > 0 and non_empty > 0:
+            sorted_types = [t for t, _ in type_counts.most_common() if t != 'empty']
+            majority_type = sorted_types[0] if sorted_types else 'empty'
+            majority_count = type_counts.get(majority_type, 0)
+            minority_total = non_empty - majority_count
+            if minority_total > 0 and (minority_total / non_empty) > 0.05:
+                has_problem = True
+                minority_types = [t for t, c in type_counts.items() if t != majority_type and t != 'empty' and c > 0]
+                problem_desc = f"Maioria é '{majority_type}' ({majority_count}), mas {minority_total} valor(es) com tipo diferente: {', '.join(minority_types)}"
+            if expected == 'integer' and (type_counts.get('date', 0) > 0 or type_counts.get('text', 0) > 0):
+                has_problem = True
+                if not problem_desc:
+                    problem_desc = f"Coluna esperada como numérica, mas contém datas ({type_counts.get('date', 0)}) ou texto ({type_counts.get('text', 0)})"
+            elif expected == 'date' and type_counts.get('integer', 0) > 0 and type_counts.get('date', 0) == 0:
+                has_problem = True
+                problem_desc = "Coluna esperada como data, mas a maioria dos valores são numéricos (possível coluna trocada)"
+        results.append({
+            'field': field_name,
+            'label': label,
+            'expected': expected,
+            'total': total,
+            'type_counts': dict(type_counts),
+            'has_problem': has_problem,
+            'problem_desc': problem_desc,
+            'sample_problematic': problematic_values[:10],
+        })
+    return results
+
+
 def _safe_decimal(value, default=None):
     """Converte valor para Decimal de forma segura
     

@@ -417,18 +417,6 @@
 
 
                         <li class="border-top my-3"></li>
-                        <!-- Planejamento de Manutenção -->
-                        <li class="mb-1">
-                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#planejamento-manutencao-collapse" aria-expanded="false">
-                                <i class="fas fa-calendar-alt me-2"></i>
-                                <span class="btn-toggle-text">Planejamento de Manutenção</span>
-                            </button>
-                            <div class="collapse" id="planejamento-manutencao-collapse">
-                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="{% url 'centros_de_atividade' %}" class="link-dark rounded"><i class="fas fa-building me-2"></i>Centros de Atividade</a></li>
-                                </ul>
-                            </div>
-                        </li>
             
                         <!-- Configurar Plano De Preventiva PCM -->
                         <li class="mb-1">
@@ -649,16 +637,15 @@
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <!-- Level 2: Análise -->
                                     <li>
-                                        <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#maquinas-analise-collapse" aria-expanded="false">
-                                            <i class="fas fa-chart-bar"></i>
-                                            Análise
-                                        </button>
-                                        <div class="collapse" id="maquinas-analise-collapse">
-                                            <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
-                                                <li><a href="{% url 'analise_maquinas' %}" class="link-dark rounded"><i class="bi bi-bar-chart me-2"></i>Análise Geral</a></li>
-                                                <li><a href="{% url 'analise_maquinas_importadas' %}" class="link-dark rounded"><i class="bi bi-download me-2"></i>Análise de Importadas</a></li>
-                                            </ul>
-                                        </div>
+                                        <li><a href="{% url 'analise_maquinas' %}" class="link-dark rounded"><i class="bi bi-bar-chart me-2"></i>Análise Geral</a></li>
+
+                                    </li>
+                                    <!-- Level 2: Consultas -->
+                                    <li>
+                                        <a href="{% url 'consultar_maquinas' %}" class="link-dark rounded">
+                                            <i class="fas fa-search me-2"></i>
+                                            Consultar Máquinas
+                                        </a>
                                     </li>
                                     <!-- Level 2: Configurações das Máquinas -->
                                     <li>
@@ -670,16 +657,11 @@
                                             <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
                                                 <li><a href="{% url 'maquina_primaria_secundaria' %}" class="link-dark rounded"><i class="bi bi-diagram-3 me-2"></i>Agrupar Máquinas Primárias e Secundárias</a></li>
                                                 <li><a href="{% url 'ajustar_maquinas_outros' %}" class="link-dark rounded"><i class="bi bi-sliders me-2"></i>Ajustar Máquinas OUTROS</a></li>
+                                                <li><a href="{% url 'analise_maquinas_importadas' %}" class="link-dark rounded"><i class="bi bi-download me-2"></i>Análise de Importadas</a></li>
                                             </ul>
                                         </div>
                                     </li>
-                                    <!-- Level 2: Consultas -->
-                                    <li>
-                                        <a href="{% url 'consultar_maquinas' %}" class="link-dark rounded">
-                                            <i class="fas fa-search me-2"></i>
-                                            Consultar Máquinas
-                                        </a>
-                                    </li>
+
                                 </ul>
                             </div>
                         </li>
@@ -700,6 +682,20 @@
                                         </li>
                                     <li><a href="{% url 'consultar_manutentores' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Manutentores</a></li>
                                     <li><a href="{% url 'configuracao_manutentores' %}" class="link-dark rounded"><i class="bi bi-wrench me-2"></i>Configuração</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
+                        <!-- Associação Manutentor e Máquina -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#associacao-manutentor-maquina-collapse" aria-expanded="false">
+                                <i class="fas fa-link me-2"></i>
+                                <span class="btn-toggle-text">Associação Manutentor e Máquina</span>
+                            </button>
+                            <div class="collapse" id="associacao-manutentor-maquina-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'associar_manutentor_maquina' %}" class="link-dark rounded"><i class="fas fa-link me-2"></i>Associar Manutentor e Máquina</a></li>
+                                    <li><a href="{% url 'consultar_associacao_manutentor_maquina' %}" class="link-dark rounded"><i class="fas fa-list-alt me-2"></i>Consultar Associações</a></li>
                                 </ul>
                             </div>
                         </li>

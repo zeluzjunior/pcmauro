@@ -35,23 +35,9 @@
         min-height: 38px;
     }
     
-    /* Estilo para o select de máquinas */
-    #maquinaSelect {
-        min-height: 200px;
-        max-height: 400px;
-        overflow-y: auto;
-    }
+    /* Select2 para máquinas usa tema bootstrap-5 */
     
-    #maquinaSelect option {
-        padding: 8px;
-        white-space: normal;
-    }
-    
-    #maquinaSelect option:hover {
-        background-color: #f0f0f0;
-    }
-    
-    /* Preview do Cronograma */
+    /* Preview do Cronograma - estilo visual aprimorado */
     .preview-month {
         margin-bottom: 20px;
     }
@@ -69,25 +55,51 @@
         padding: 15px;
         background: #f8f9fa;
     }
-    .preview-date-item {
-        display: inline-block;
-        margin: 5px;
-        padding: 8px 12px;
-        background: #fff;
-        border: 1px solid #dee2e6;
-        border-radius: 5px;
-        font-size: 0.9rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    .preview-calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 4px;
+        font-size: 0.75rem;
     }
-    .preview-date-item:hover {
-        background: #e7f3ff;
-        border-color: #0d6efd;
+    .preview-calendar-weekday {
+        text-align: center;
+        padding: 4px 0;
+        color: #6c757d;
+        font-weight: 600;
+    }
+    .preview-calendar-day {
+        aspect-ratio: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        font-weight: 500;
+        min-height: 28px;
+    }
+    .preview-calendar-day.empty {
+        background: transparent;
+        color: transparent;
+    }
+    .preview-calendar-day.scheduled {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .preview-calendar-day.scheduled:hover {
+        transform: scale(1.1);
+        box-shadow: 0 3px 8px rgba(102, 126, 234, 0.4);
+    }
+    .preview-calendar-day.other {
+        color: #adb5bd;
+        background: #e9ecef;
     }
     .preview-stats {
-        background: #e7f3ff;
-        padding: 10px;
-        border-radius: 5px;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        padding: 12px 15px;
+        border-radius: 8px;
         margin-bottom: 15px;
+        border: 1px solid rgba(102, 126, 234, 0.2);
     }
     .preview-empty {
         text-align: center;
@@ -132,14 +144,14 @@
             <div class="card-body">
                 {% csrf_token %}
                 <form method="get" action="{% url 'criar_cronograma_planejado_preventiva' %}" id="selectionForm">
+                    <!-- Linha 1: Opções de seleção -->
                     <div class="row mb-3">
-                        <div class="col-md-12">
+                        <div class="col-12">
                             <div class="btn-group" role="group" aria-label="Tipo de seleção">
                                 <input type="radio" class="btn-check" name="selection_type" id="selection_maquina" value="maquina" {% if selected_maquina_id %}checked{% endif %}>
                                 <label class="btn btn-outline-primary" for="selection_maquina">
                                     <i class="fas fa-cogs me-2"></i>Selecionar Máquina
                                 </label>
-                                
                                 <input type="radio" class="btn-check" name="selection_type" id="selection_plano" value="plano" {% if selected_plano_id %}checked{% endif %}>
                                 <label class="btn btn-outline-success" for="selection_plano">
                                     <i class="fas fa-clipboard-list me-2"></i>Selecionar Plano Preventiva
@@ -148,10 +160,10 @@
                         </div>
                     </div>
                     
-                    <!-- Seção de Seleção de Máquina -->
+                    <!-- Linha 2: Seção de Seleção de Máquina (exibida quando "Selecionar Máquina" está ativo) -->
                     <div id="maquinaSelectionSection" style="display: {% if selected_maquina_id or not selected_plano_id %}block{% else %}none{% endif %};">
-                        <div class="row mb-3">
-                            <div class="col-md-4">
+                        <div class="row mb-2">
+                            <div class="col-md-3">
                                 <label for="setorFilter" class="form-label">Filtrar por Setor</label>
                                 <select class="form-select" id="setorFilter">
                                     <option value="">Todos os Setores</option>
@@ -159,38 +171,46 @@
                                         <option value="{{ setor }}">{{ setor }}</option>
                                     {% endfor %}
                                 </select>
-                                <small class="form-text text-muted">Selecione um setor para filtrar as máquinas</small>
                             </div>
-                            <div class="col-md-8">
-                                <label for="maquinaSelect" class="form-label">Selecionar Máquinas (Múltipla Seleção)</label>
-                                <select class="form-select" id="maquinaSelect" name="maquina_id" multiple size="10" style="width: 100%; overflow-y: auto;">
-                                    {% for maquina in todas_maquinas %}
-                                        <option value="{{ maquina.id }}" data-setor="{{ maquina.cd_setormanut|default:'' }}">
-                                            {{ maquina.cd_maquina }} - {{ maquina.descr_maquina|default:"" }}
-                                            {% if maquina.cd_setormanut %} | Setor: {{ maquina.cd_setormanut }}{% endif %}
-                                            {% if maquina.nome_unid %} | Unidade: {{ maquina.nome_unid }}{% endif %}
-                                        </option>
-                                    {% endfor %}
+                            <div class="col-md-3">
+                                <label for="classificacaoFilter" class="form-label">Filtrar por Classificação</label>
+                                <select class="form-select" id="classificacaoFilter">
+                                    <option value="">Todas as máquinas</option>
+                                    <option value="principal">Máquina Principal</option>
+                                    <option value="secundaria">Máquina Secundária</option>
+                                    <option value="edificio">Edifício</option>
                                 </select>
-                                <small class="form-text text-muted">Selecione múltiplas máquinas (use Ctrl/Cmd + clique para múltipla seleção)</small>
+                            </div>
+                            <div class="col-md-6 d-flex align-items-end">
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="addMaquinaToList">
+                                        <i class="fas fa-plus me-1"></i>Adicionar à Lista
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="limparFiltros">
+                                        <i class="fas fa-filter me-1"></i>Limpar Filtros
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <div class="row mb-3">
-                            <div class="col-md-12">
-                                <button type="button" class="btn btn-sm btn-outline-primary" id="addMaquinaToList">
-                                    <i class="fas fa-plus me-2"></i>Adicionar Máquinas Selecionadas à Lista
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="limparFiltroSetor">
-                                    <i class="fas fa-filter me-2"></i>Limpar Filtro de Setor
-                                </button>
+                            <div class="col-12">
+                                <label for="maquinaSelect" class="form-label">Selecionar Máquinas (Múltipla Seleção)</label>
+                                <select class="form-select" id="maquinaSelect" name="maquina_id" multiple style="width: 100%;">
+                                    {% for maquina in todas_maquinas %}
+                                        <option value="{{ maquina.id }}" data-setor="{{ maquina.cd_setormanut|default:'' }}" data-classificacao="{% if maquina.descr_gerenc %}{% if 'PRINCIPAL' in maquina.descr_gerenc|upper %}principal{% elif 'SECUND' in maquina.descr_gerenc|upper %}secundaria{% elif 'EDIFIC' in maquina.descr_gerenc|upper %}edificio{% endif %}{% endif %}">
+                                            {{ maquina.descr_maquina|default:maquina.cd_maquina }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">Digite para buscar ou selecione múltiplas máquinas</small>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Seção de Seleção de Plano -->
+                    <!-- Linha 2: Seção de Seleção de Plano (exibida quando "Selecionar Plano Preventiva" está ativo) -->
                     <div id="planoSelectionSection" style="display: {% if selected_plano_id %}block{% else %}none{% endif %};">
-                        <div class="row mb-3">
-                            <div class="col-md-12">
+                        <div class="row mb-2">
+                            <div class="col-md-10">
                                 <label for="planoSelect" class="form-label">Selecionar Planos Preventiva (Múltipla Seleção)</label>
                                 <select class="form-select" id="planoSelect" name="plano_id" multiple style="width: 100%;">
                                     {% for plano in todos_planos %}
@@ -200,13 +220,11 @@
                                         </option>
                                     {% endfor %}
                                 </select>
-                                <small class="form-text text-muted">Selecione múltiplos planos ou digite para buscar</small>
+                                <small class="form-text text-muted">Digite para buscar ou selecione múltiplos planos</small>
                             </div>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col-md-12">
-                                <button type="button" class="btn btn-sm btn-outline-success" id="addPlanoToList">
-                                    <i class="fas fa-plus me-2"></i>Adicionar Planos Selecionados à Lista
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="button" class="btn btn-sm btn-outline-success w-100" id="addPlanoToList">
+                                    <i class="fas fa-plus me-1"></i>Adicionar à Lista
                                 </button>
                             </div>
                         </div>
@@ -233,50 +251,6 @@
                         </div>
                     </div>
                     
-                    <!-- Preview do Cronograma -->
-                    <div class="row mb-3">
-                        <div class="col-md-12">
-                            <div class="card border-warning" id="previewScheduleCard" style="display: none;">
-                                <div class="card-header bg-warning text-dark">
-                                    <h6 class="mb-0">
-                                        <i class="fas fa-calendar-check me-2"></i>Preview do Cronograma Anual
-                                        <span class="badge bg-dark text-white ms-2" id="previewTotalDates">0</span>
-                                    </h6>
-                                </div>
-                                <div class="card-body">
-                                    <div id="previewScheduleContent">
-                                        <p class="text-muted mb-3">
-                                            <i class="fas fa-info-circle me-2"></i>
-                                            Configure a data planejada e periodicidade acima para visualizar o cronograma.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Preview do Cronograma -->
-                    <div class="row mb-3">
-                        <div class="col-md-12">
-                            <div class="card border-warning" id="previewScheduleCard" style="display: none;">
-                                <div class="card-header bg-warning text-dark">
-                                    <h6 class="mb-0">
-                                        <i class="fas fa-calendar-check me-2"></i>Preview do Cronograma Anual
-                                        <span class="badge bg-dark text-white ms-2" id="previewTotalDates">0</span>
-                                    </h6>
-                                </div>
-                                <div class="card-body">
-                                    <div id="previewScheduleContent">
-                                        <p class="text-muted mb-3">
-                                            <i class="fas fa-info-circle me-2"></i>
-                                            Configure a data planejada e periodicidade acima para visualizar o cronograma.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
                     <!-- Campos de Nome do Grupo, Data e Periodicidade -->
                     <div class="row mb-3">
                         <div class="col-md-12">
@@ -288,12 +262,12 @@
                     <div class="row mb-3">
                         <div class="col-md-4">
                             <label for="dataPlanejada" class="form-label">Data Planejada para Execução</label>
-                            <input type="date" class="form-control" id="dataPlanejada" name="data_planejada" required>
+                            <input type="date" class="form-control" id="dataPlanejada" name="data_planejada" required onchange="window.refreshPreviewCronograma && window.refreshPreviewCronograma()" oninput="window.refreshPreviewCronograma && window.refreshPreviewCronograma()">
                             <small class="form-text text-muted">Data inicial para associar todos os itens selecionados</small>
                         </div>
                         <div class="col-md-4">
                             <label for="periodicidade" class="form-label">Periodicidade (dias)</label>
-                            <input type="number" class="form-control" id="periodicidade" name="periodicidade" min="1" placeholder="Ex: 30 para mensal, 7 para semanal">
+                            <input type="number" class="form-control" id="periodicidade" name="periodicidade" min="1" placeholder="Ex: 30 para mensal, 7 para semanal" onchange="window.refreshPreviewCronograma && window.refreshPreviewCronograma()" oninput="window.refreshPreviewCronograma && window.refreshPreviewCronograma()">
                             <small class="form-text text-muted">Número de dias entre cada repetição até o final do ano (deixe em branco para agendamento único)</small>
                         </div>
                         <div class="col-md-4">
@@ -310,6 +284,28 @@
                             <div class="alert alert-info">
                                 <strong><i class="fas fa-info-circle me-2"></i>Preview de Repetições:</strong>
                                 <div id="previewDates" class="mt-2"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Preview do Cronograma Anual (atualiza ao alterar Data e Periodicidade) -->
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <div class="card border-warning" id="previewScheduleCard" style="display: none;">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-calendar-check me-2"></i>Preview do Cronograma Anual
+                                        <span class="badge bg-dark text-white ms-2" id="previewTotalDates">0</span>
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="previewScheduleContent">
+                                        <p class="text-muted mb-3">
+                                            <i class="fas fa-info-circle me-2"></i>
+                                            Adicione itens à lista, informe a data planejada e a periodicidade acima para visualizar o cronograma.
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -720,56 +716,40 @@ document.addEventListener('DOMContentLoaded', function() {
     // Lista de itens selecionados
     let selectedItems = [];
     
-    // Função para atualizar visibilidade das máquinas (considera setor e máquinas já selecionadas)
+    // Função para atualizar visibilidade das máquinas (para native select; Select2 usa matcher)
     function updateMaquinasVisibility() {
-        const setorFilter = document.getElementById('setorFilter');
         const maquinaSelect = document.getElementById('maquinaSelect');
-        
-        if (!setorFilter || !maquinaSelect) return;
-        
-        const selectedSetor = setorFilter.value;
+        if (!maquinaSelect || $(maquinaSelect).hasClass('select2-hidden-accessible')) return;
+        const setorFilter = document.getElementById('setorFilter');
+        const classificacaoFilter = document.getElementById('classificacaoFilter');
+        const selectedSetor = setorFilter ? setorFilter.value : '';
+        const selectedClassificacao = classificacaoFilter ? classificacaoFilter.value : '';
+        const selectedMaquinaIds = selectedItems.filter(i => i.tipo === 'maquina').map(i => i.id.toString());
         const options = maquinaSelect.querySelectorAll('option');
-        
-        // Obter IDs das máquinas já selecionadas
-        const selectedMaquinaIds = selectedItems
-            .filter(item => item.tipo === 'maquina')
-            .map(item => item.id.toString());
-        
         let visibleCount = 0;
         options.forEach(function(option) {
-            if (option.value === '') {
-                // Manter option vazio sempre visível se existir
-                return;
-            }
-            
-            const optionSetor = option.getAttribute('data-setor') || '';
-            const maquinaId = option.value;
-            
-            // Verificar se a máquina já foi selecionada
-            const jaSelecionada = selectedMaquinaIds.includes(maquinaId);
-            
-            // Verificar se passa no filtro de setor
-            const passaFiltroSetor = !selectedSetor || optionSetor === selectedSetor;
-            
-            // Mostrar apenas se não foi selecionada E passa no filtro de setor
-            if (!jaSelecionada && passaFiltroSetor) {
+            if (!option.value) return;
+            const passaSetor = !selectedSetor || (option.getAttribute('data-setor') || '') === selectedSetor;
+            const passaClass = !selectedClassificacao || (option.getAttribute('data-classificacao') || '') === selectedClassificacao;
+            const naoSelecionada = !selectedMaquinaIds.includes(option.value);
+            if (naoSelecionada && passaSetor && passaClass) {
                 option.style.display = '';
                 visibleCount++;
             } else {
                 option.style.display = 'none';
-                // Desmarcar opções ocultas
                 option.selected = false;
             }
         });
-        
-        // Atualizar mensagem de ajuda
         const helpText = maquinaSelect.nextElementSibling;
         if (helpText && helpText.classList.contains('form-text')) {
-            if (selectedSetor) {
-                helpText.textContent = `${visibleCount} máquina(s) disponível(is) no setor "${selectedSetor}". Use Ctrl/Cmd + clique para múltipla seleção.`;
-            } else {
-                helpText.textContent = `${visibleCount} máquina(s) disponível(is). Use Ctrl/Cmd + clique para múltipla seleção.`;
+            let msg = `${visibleCount} máquina(s) disponível(is)`;
+            if (selectedSetor) msg += ` no setor "${selectedSetor}"`;
+            if (selectedClassificacao) {
+                const labels = { principal: 'Máquina Principal', secundaria: 'Máquina Secundária', edificio: 'Edifício' };
+                msg += (selectedSetor ? ' e' : '') + ` com classificação "${labels[selectedClassificacao] || selectedClassificacao}"`;
             }
+            msg += '. Digite para buscar ou use Ctrl/Cmd + clique.';
+            helpText.textContent = msg;
         }
     }
     
@@ -778,22 +758,58 @@ document.addEventListener('DOMContentLoaded', function() {
         updateMaquinasVisibility();
     }
     
-    // Event listener para filtro de setor
+    // Event listeners para filtros
     const setorFilter = document.getElementById('setorFilter');
+    const classificacaoFilter = document.getElementById('classificacaoFilter');
     if (setorFilter) {
         setorFilter.addEventListener('change', filterMaquinasBySetor);
     }
+    if (classificacaoFilter) {
+        classificacaoFilter.addEventListener('change', filterMaquinasBySetor);
+    }
     
-    // Botão para limpar filtro de setor
-    const limparFiltroSetor = document.getElementById('limparFiltroSetor');
-    if (limparFiltroSetor) {
-        limparFiltroSetor.addEventListener('click', function() {
-            if (setorFilter) {
-                setorFilter.value = '';
-                filterMaquinasBySetor();
+    // Botão para limpar filtros
+    const limparFiltrosBtn = document.getElementById('limparFiltros');
+    if (limparFiltrosBtn) {
+        limparFiltrosBtn.addEventListener('click', function() {
+            if (setorFilter) setorFilter.value = '';
+            if (classificacaoFilter) classificacaoFilter.value = '';
+            filterMaquinasBySetor();
+        });
+    }
+    
+    // Inicializar Select2 para Máquina (múltipla seleção com busca)
+    function initMaquinaSelect2() {
+        if (!maquinaSelect || $(maquinaSelect).hasClass('select2-hidden-accessible')) return;
+        $(maquinaSelect).select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Digite para buscar máquinas...',
+            allowClear: true,
+            multiple: true,
+            language: {
+                noResults: function() { return "Nenhuma máquina encontrada"; },
+                searching: function() { return "Buscando..."; }
+            },
+            matcher: function(params, data) {
+                const $opt = $(data.element);
+                const setorFilter = document.getElementById('setorFilter');
+                const classificacaoFilter = document.getElementById('classificacaoFilter');
+                const selectedSetor = setorFilter ? setorFilter.value : '';
+                const selectedClassificacao = classificacaoFilter ? classificacaoFilter.value : '';
+                const optionSetor = $opt.attr('data-setor') || '';
+                const optionClassificacao = $opt.attr('data-classificacao') || '';
+                const selectedIds = selectedItems.filter(i => i.tipo === 'maquina').map(i => i.id.toString());
+                if (selectedIds.includes(String(data.id))) return null;
+                if (selectedSetor && optionSetor !== selectedSetor) return null;
+                if (selectedClassificacao && optionClassificacao !== selectedClassificacao) return null;
+                if (!params.term || params.term.trim() === '') return data;
+                const term = params.term.toLowerCase();
+                const text = (data.text || '').toLowerCase();
+                return text.indexOf(term) >= 0 ? data : null;
             }
         });
     }
+    if (maquinaSelect) initMaquinaSelect2();
     
     // Inicializar Select2 para Plano (múltipla seleção)
     if (planoSelect) {
@@ -882,29 +898,23 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Adicionar máquinas selecionadas à lista
     document.getElementById('addMaquinaToList')?.addEventListener('click', function() {
-        const selectedOptions = Array.from(maquinaSelect.selectedOptions);
-        if (!selectedOptions || selectedOptions.length === 0) {
+        const selectedIds = $(maquinaSelect).val();
+        if (!selectedIds || selectedIds.length === 0) {
             alert('Por favor, selecione pelo menos uma máquina.');
             return;
         }
         
-        selectedOptions.forEach(function(option) {
-            const maquinaId = option.value;
-            const texto = option.textContent;
-            // Verificar se já não está na lista
-            if (!selectedItems.some(item => item.id === maquinaId && item.tipo === 'maquina')) {
-                selectedItems.push({
-                    tipo: 'maquina',
-                    id: maquinaId,
-                    texto: texto
-                });
+        selectedIds.forEach(function(maquinaId) {
+            const id = typeof maquinaId === 'string' ? maquinaId : String(maquinaId);
+            const opt = maquinaSelect.querySelector('option[value="' + id + '"]');
+            const texto = opt ? opt.textContent : id;
+            if (!selectedItems.some(item => item.id === id && item.tipo === 'maquina')) {
+                selectedItems.push({ tipo: 'maquina', id: id, texto: texto });
             }
         });
         
         updateSelectedItemsList();
-        // Limpar seleção mantendo o filtro
-        Array.from(maquinaSelect.options).forEach(opt => opt.selected = false);
-        // Atualizar visibilidade para esconder máquinas adicionadas
+        $(maquinaSelect).val(null).trigger('change');
         updateMaquinasVisibility();
     });
     
@@ -986,12 +996,16 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Função para atualizar o preview completo do cronograma
     function updateSchedulePreview() {
-        const dataPlanejada = document.getElementById('dataPlanejada').value;
-        const periodicidade = parseInt(document.getElementById('periodicidade').value) || null;
-        const nomeGrupo = document.getElementById('nomeGrupo').value.trim();
+        const dataPlanejadaEl = document.getElementById('dataPlanejada');
+        const periodicidadeEl = document.getElementById('periodicidade');
+        const dataPlanejada = dataPlanejadaEl ? dataPlanejadaEl.value : '';
+        const periodicidade = periodicidadeEl ? (parseInt(periodicidadeEl.value) || null) : null;
+        const ngEl = document.getElementById('nomeGrupo');
+        const nomeGrupo = ngEl ? ngEl.value.trim() : '';
         const previewCard = document.getElementById('previewScheduleCard');
         const previewContent = document.getElementById('previewScheduleContent');
         const previewTotalDates = document.getElementById('previewTotalDates');
+        if (!previewCard || !previewContent) return;
         
         // Verificar se há condições mínimas para mostrar o preview
         if (!dataPlanejada || selectedItems.length === 0) {
@@ -1035,8 +1049,12 @@ document.addEventListener('DOMContentLoaded', function() {
             datasPorMes[chaveMes].push(data);
         });
         
-        // Ordenar meses
-        const mesesOrdenados = Object.keys(datasPorMes).sort();
+        // Ordenar meses (ano, depois mês) para exibir em ordem cronológica
+        const mesesOrdenados = Object.keys(datasPorMes).sort(function(a, b) {
+            const [anoA, mesA] = a.split('-').map(Number);
+            const [anoB, mesB] = b.split('-').map(Number);
+            return anoA !== anoB ? anoA - anoB : mesA - mesB;
+        });
         
         // Gerar HTML do preview
         let html = '';
@@ -1065,13 +1083,30 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
         
-        // Preview por mês
+        // Preview por mês - mini calendário em grid
         if (mesesOrdenados.length > 0) {
             html += '<div class="row">';
+            const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
             mesesOrdenados.forEach(function(chaveMes) {
                 const [ano, mes] = chaveMes.split('-').map(Number);
                 const datasMes = datasPorMes[chaveMes].sort((a, b) => a - b);
-                
+                const diasAgendados = new Set(datasMes.map(d => d.getDate()));
+                const primeiroDia = new Date(ano, mes, 1);
+                const ultimoDia = new Date(ano, mes + 1, 0);
+                const diaInicioSemana = primeiroDia.getDay();
+                const totalDias = ultimoDia.getDate();
+                let gridHtml = '<div class="preview-calendar-grid">';
+                diasSemana.forEach(d => { gridHtml += '<div class="preview-calendar-weekday">' + d + '</div>'; });
+                for (let i = 0; i < diaInicioSemana; i++) {
+                    gridHtml += '<div class="preview-calendar-day empty"></div>';
+                }
+                for (let dia = 1; dia <= totalDias; dia++) {
+                    const isScheduled = diasAgendados.has(dia);
+                    const dataObj = new Date(ano, mes, dia);
+                    const titulo = dataObj.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                    gridHtml += '<div class="preview-calendar-day ' + (isScheduled ? 'scheduled' : 'other') + '" title="' + titulo + '">' + dia + '</div>';
+                }
+                gridHtml += '</div>';
                 html += `
                     <div class="col-md-6 col-lg-4 preview-month">
                         <div class="preview-month-header">
@@ -1079,14 +1114,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <span class="badge bg-light text-dark ms-2">${datasMes.length} data(s)</span>
                         </div>
                         <div class="preview-month-body">
-                            ${datasMes.map(function(data) {
-                                const diaSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][data.getDay()];
-                                return `
-                                    <span class="preview-date-item" title="${data.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}">
-                                        <strong>${data.getDate()}</strong> (${diaSemana})
-                                    </span>
-                                `;
-                            }).join('')}
+                            ${gridHtml}
                         </div>
                     </div>
                 `;
@@ -1117,19 +1145,33 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         
         previewContent.innerHTML = html;
-        previewTotalDates.textContent = totalAgendamentos;
+        if (previewTotalDates) previewTotalDates.textContent = totalAgendamentos;
         previewCard.style.display = 'block';
     }
     
-    // Event listeners para atualizar preview
-    document.getElementById('dataPlanejada')?.addEventListener('change', function() {
-        updatePeriodicidadePreview();
-        updateSchedulePreview();
-    });
-    document.getElementById('periodicidade')?.addEventListener('input', function() {
-        updatePeriodicidadePreview();
-        updateSchedulePreview();
-    });
+    // Event listeners para atualizar preview (Data e Periodicidade)
+    function refreshPreview() {
+        setTimeout(function() {
+            updatePeriodicidadePreview();
+            updateSchedulePreview();
+        }, 0);
+    }
+    window.refreshPreviewCronograma = refreshPreview;
+    function handlePreviewUpdate(e) {
+        const id = e.target && e.target.id;
+        if (id === 'dataPlanejada' || id === 'periodicidade') {
+            refreshPreview();
+        }
+    }
+    var formEl = document.getElementById('selectionForm');
+    if (formEl) {
+        formEl.addEventListener('change', handlePreviewUpdate);
+        formEl.addEventListener('input', handlePreviewUpdate);
+    }
+    document.addEventListener('change', handlePreviewUpdate);
+    document.addEventListener('input', handlePreviewUpdate);
+    document.addEventListener('blur', handlePreviewUpdate, true);
+    document.addEventListener('keyup', handlePreviewUpdate);
     document.getElementById('nomeGrupo')?.addEventListener('input', updateSchedulePreview);
     
     // Atualizar preview quando a lista de itens mudar
@@ -1249,7 +1291,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 maquinaSection.style.display = 'none';
                 planoSection.style.display = 'block';
                 if (maquinaSelect) {
-                    Array.from(maquinaSelect.options).forEach(opt => opt.selected = false);
+                    $(maquinaSelect).val(null).trigger('change');
                 }
             }
         });

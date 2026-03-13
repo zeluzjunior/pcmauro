@@ -260,11 +260,14 @@
                                 <i class="fas fa-info-circle ms-1" 
                                    data-bs-toggle="tooltip" 
                                    data-bs-placement="top" 
-                                   title="Soma dos valores das requisições que geram custo (cd_depo = 1)"></i>
+                                   title="Gasto líquido: soma dos valores que geram custo (cd_depo 1, 2 ou NULL), deduzindo devoluções. Itens reutilizados (cd_depo=3) não entram."></i>
                             </h6>
                             <h3 class="mb-1 fw-bold">{{ valor_total|currency_br }}</h3>
                             <small class="text-muted">
                                 Período filtrado
+                                {% if valor_total_bruto and valor_total_bruto != valor_total %}
+                                <br><span title="Soma dos gastos sem deduzir devoluções">Bruto: {{ valor_total_bruto|currency_br }}</span>
+                                {% endif %}
                             </small>
                         </div>
                     </div>
@@ -533,6 +536,7 @@
                         <h5 class="mb-0">
                             <i class="fas fa-user-chart me-2"></i>Top 10 Usuários que Criaram Requisições
                         </h5>
+                        <small class="opacity-75">Apenas classificação CONSUMO NA MANUTENCAO</small>
                     </div>
                     <div class="card-body">
                         <div class="chart-container-large">

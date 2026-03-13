@@ -89,9 +89,10 @@ def home(request):
         data_requisicao__lte=data_fim_mes
     )
     total_requisicoes_semana = requisicoes_mes.count()
-    valor_total_semana = requisicoes_mes.aggregate(
+    # vlr_movto_estoq: negativo = gasto, positivo = devolução. Custo = -sum(vlr)
+    valor_total_semana = -(requisicoes_mes.aggregate(
         total=Sum('vlr_movto_estoq')
-    )['total'] or Decimal('0')
+    )['total'] or Decimal('0'))
     
     # 4. Máquinas e Manutentores (total geral)
     total_maquinas = Maquina.objects.count()
@@ -246,8 +247,7 @@ def home(request):
     requisicoes_sem_nf = requisicoes_ano.exclude(obs_rm__icontains=mensagem_nf_requisicao)
     valor_total_requisicoes_sem_nf = Decimal('0.00')
     for req in requisicoes_sem_nf.filter(cd_depo=1):
-        if req.vlr_movto_estoq:
-            valor_total_requisicoes_sem_nf += abs(req.vlr_movto_estoq)
+        valor_total_requisicoes_sem_nf += req.valor_contribuicao_custo
     todas_notas_lancadas = NotaFiscal.objects.filter(
         Q(situacao__icontains='LANÇADA') | Q(situacao__icontains='LANCADA')
     ).filter(uso_contabil='242')
@@ -292,7 +292,7 @@ def home(request):
         'manutencoes_corretivas': manutencoes_corretivas,
         'manutencoes_preventivas': manutencoes_preventivas,
         'total_requisicoes_semana': total_requisicoes_semana,
-        'valor_total_semana': abs(valor_total_semana),  # Usar valor absoluto
+        'valor_total_semana': max(Decimal('0'), valor_total_semana),  # Custo líquido (gastos - devoluções)
         'total_maquinas': total_maquinas,
         'total_manutentores': total_manutentores,
         # Dados do gráfico de ordens fechadas
@@ -677,38 +677,39 @@ def analise_requisicoes(request):
         cd_centro_ativ__isnull=True
     ).values('cd_centro_ativ').distinct().count()
     
-    # Calcular valor total (vlr_movto_estoq já é o valor total da linha, não precisa multiplicar por quantidade)
-    # IMPORTANTE: Apenas considerar cd_depo == 1 para custos (itens novos que geram gasto)
-    # cd_depo == 3 são itens reutilizados que não geram custo
+    # Calcular valor total: vlr_movto_estoq negativo = gasto, positivo = devolução. Custo = -vlr
+    # cd_depo == 3 são itens reutilizados (não geram custo). cd_depo 1, 2 e NULL geram custo.
     valor_total = Decimal('0.00')
     valor_total_reused = Decimal('0.00')  # Valor dos itens reutilizados (cd_depo == 3)
+    valor_total_bruto = Decimal('0.00')   # Soma dos gastos (apenas vlr negativo) sem deduzir devoluções
     quantidade_total = Decimal('0.00')
-    
+
     valor_total_nf = Decimal('0.00')
     valor_total_reused_nf = Decimal('0.00')
     quantidade_total_nf = Decimal('0.00')
-    
+
     valor_total_normal = Decimal('0.00')
     valor_total_reused_normal = Decimal('0.00')
     quantidade_total_normal = Decimal('0.00')
-    
+
     for req in queryset_base:
         if req.vlr_movto_estoq:
-            # vlr_movto_estoq já representa o valor total da transação (pode ser negativo para saídas)
-            if req.cd_depo == 1:
-                # Apenas cd_depo == 1 gera custo
-                valor_total += abs(req.vlr_movto_estoq)
-                if mensagem_nf in (req.obs_rm or ''):
-                    valor_total_nf += abs(req.vlr_movto_estoq)
-                else:
-                    valor_total_normal += abs(req.vlr_movto_estoq)
-            elif req.cd_depo == 3:
+            if req.cd_depo == 3:
                 # cd_depo == 3 são itens reutilizados (não geram custo, mas vamos rastrear)
                 valor_total_reused += abs(req.vlr_movto_estoq)
                 if mensagem_nf in (req.obs_rm or ''):
                     valor_total_reused_nf += abs(req.vlr_movto_estoq)
                 else:
                     valor_total_reused_normal += abs(req.vlr_movto_estoq)
+            else:
+                # cd_depo 1, 2 ou NULL: gera custo (valor_contribuicao_custo = -vlr: negativo soma, positivo subtrai)
+                valor_total += req.valor_contribuicao_custo
+                if req.vlr_movto_estoq < 0:
+                    valor_total_bruto += abs(req.vlr_movto_estoq)
+                if mensagem_nf in (req.obs_rm or ''):
+                    valor_total_nf += req.valor_contribuicao_custo
+                else:
+                    valor_total_normal += req.valor_contribuicao_custo
         if req.qtde_movto_estoq:
             quantidade_total += abs(req.qtde_movto_estoq)
             if mensagem_nf in (req.obs_rm or ''):
@@ -786,13 +787,12 @@ def analise_requisicoes(request):
             data_requisicao__gte=data_atual,
             data_requisicao__lte=fim_mes
         ):
-            if req.vlr_movto_estoq and req.cd_depo == 1:
-                # Apenas considerar cd_depo == 1 para custos
-                valor_mes += abs(req.vlr_movto_estoq)
+            if req.vlr_movto_estoq and req.cd_depo != 3:
+                valor_mes += req.valor_contribuicao_custo
                 if mensagem_nf in (req.obs_rm or ''):
-                    valor_mes_nf += abs(req.vlr_movto_estoq)
+                    valor_mes_nf += req.valor_contribuicao_custo
                 else:
-                    valor_mes_normal += abs(req.vlr_movto_estoq)
+                    valor_mes_normal += req.valor_contribuicao_custo
         
         meses_labels.append(data_atual.strftime('%b/%Y'))
         meses_data.append(count)
@@ -876,14 +876,12 @@ def analise_requisicoes(request):
     itens_valor_dict_normal = defaultdict(lambda: Decimal('0.00'))
     
     for req in queryset_base.exclude(vlr_movto_estoq__isnull=True):
-        if req.vlr_movto_estoq and req.cd_depo == 1:
-            # Apenas considerar cd_depo == 1 para custos
-            # vlr_movto_estoq já representa o valor total da transação
-            itens_valor_dict[req.cd_item] += abs(req.vlr_movto_estoq)
+        if req.vlr_movto_estoq and req.cd_depo != 3:
+            itens_valor_dict[req.cd_item] += req.valor_contribuicao_custo
             if mensagem_nf in (req.obs_rm or ''):
-                itens_valor_dict_nf[req.cd_item] += abs(req.vlr_movto_estoq)
+                itens_valor_dict_nf[req.cd_item] += req.valor_contribuicao_custo
             else:
-                itens_valor_dict_normal[req.cd_item] += abs(req.vlr_movto_estoq)
+                itens_valor_dict_normal[req.cd_item] += req.valor_contribuicao_custo
     
     # Ordenar e pegar top 10 - Geral
     sorted_itens = sorted(itens_valor_dict.items(), key=lambda x: x[1], reverse=True)[:10]
@@ -929,10 +927,8 @@ def analise_requisicoes(request):
     
     for req in queryset_base.exclude(cd_centro_ativ__isnull=True):
         centros_dict[req.cd_centro_ativ]['count'] += 1
-        if req.vlr_movto_estoq and req.cd_depo == 1:
-            # Apenas considerar cd_depo == 1 para custos
-            # vlr_movto_estoq já representa o valor total da transação
-            centros_dict[req.cd_centro_ativ]['valor'] += abs(req.vlr_movto_estoq)
+        if req.vlr_movto_estoq and req.cd_depo != 3:
+            centros_dict[req.cd_centro_ativ]['valor'] += req.valor_contribuicao_custo
     
     sorted_centros = sorted(centros_dict.items(), key=lambda x: x[1]['valor'], reverse=True)[:10]
     
@@ -949,10 +945,8 @@ def analise_requisicoes(request):
     
     for req in queryset_base.exclude(descr_operacao__isnull=True).exclude(descr_operacao=''):
         operacoes_dict[req.descr_operacao]['count'] += 1
-        if req.vlr_movto_estoq and req.cd_depo == 1:
-            # Apenas considerar cd_depo == 1 para custos
-            # vlr_movto_estoq já representa o valor total da transação
-            operacoes_dict[req.descr_operacao]['valor'] += abs(req.vlr_movto_estoq)
+        if req.vlr_movto_estoq and req.cd_depo != 3:
+            operacoes_dict[req.descr_operacao]['valor'] += req.valor_contribuicao_custo
     
     sorted_operacoes = sorted(operacoes_dict.items(), key=lambda x: x[1]['count'], reverse=True)[:10]
     
@@ -976,14 +970,15 @@ def analise_requisicoes(request):
     except (ValueError, TypeError):
         requisicoes_nf_page = paginator_nf.page(1)
     
-    # Top 10 usuários que criaram requisições
+    # Top 10 usuários que criaram requisições (apenas classificação CONSUMO NA MANUTENCAO)
     usuarios_dict = defaultdict(lambda: {'count': 0, 'valor': Decimal('0.00')})
+    classificacao_manutencao = 'CONSUMO NA MANUTENCAO'
+    queryset_usuarios = queryset_base.filter(descr_operacao__iexact=classificacao_manutencao).exclude(cd_usu_criou__isnull=True).exclude(cd_usu_criou='')
     
-    for req in queryset_base.exclude(cd_usu_criou__isnull=True).exclude(cd_usu_criou=''):
+    for req in queryset_usuarios:
         usuarios_dict[req.cd_usu_criou]['count'] += 1
-        if req.vlr_movto_estoq and req.cd_depo == 1:
-            # Apenas considerar cd_depo == 1 para custos
-            usuarios_dict[req.cd_usu_criou]['valor'] += abs(req.vlr_movto_estoq)
+        if req.vlr_movto_estoq and req.cd_depo != 3:
+            usuarios_dict[req.cd_usu_criou]['valor'] += req.valor_contribuicao_custo
     
     sorted_usuarios = sorted(usuarios_dict.items(), key=lambda x: x[1]['count'], reverse=True)[:10]
     
@@ -1043,17 +1038,14 @@ def analise_requisicoes(request):
         
         for req in queryset_base.filter(data_requisicao=data_dia):
             if req.vlr_movto_estoq:
-                # vlr_movto_estoq já representa o valor total da transação
-                if req.cd_depo == 1:
-                    # Apenas cd_depo == 1 gera custo
-                    valor_dia += abs(req.vlr_movto_estoq)
-                    if mensagem_nf in (req.obs_rm or ''):
-                        valor_dia_nf += abs(req.vlr_movto_estoq)
-                    else:
-                        valor_dia_normal += abs(req.vlr_movto_estoq)
-                elif req.cd_depo == 3:
-                    # cd_depo == 3 são itens reutilizados (não geram custo, mas vamos rastrear)
+                if req.cd_depo == 3:
                     valor_dia_reused += abs(req.vlr_movto_estoq)
+                else:
+                    valor_dia += req.valor_contribuicao_custo
+                    if mensagem_nf in (req.obs_rm or ''):
+                        valor_dia_nf += req.valor_contribuicao_custo
+                    else:
+                        valor_dia_normal += req.valor_contribuicao_custo
         
         dias_labels.append(data_dia.strftime('%d/%m'))
         dias_data.append(count)
@@ -1091,6 +1083,7 @@ def analise_requisicoes(request):
         'itens_unicos': itens_unicos,
         'centros_unicos': centros_unicos,
         'valor_total': valor_total,
+        'valor_total_bruto': valor_total_bruto,
         'quantidade_total': quantidade_total,
         'valor_medio': valor_medio,
         'meses_labels': json.dumps(meses_labels),
@@ -1228,7 +1221,7 @@ def api_dados_diarios_requisicoes(request):
         
         dias_labels = []
         dias_data = []  # Requisições
-        dias_valor = []  # Valor das requisições (apenas cd_depo == 1)
+        dias_valor = []  # Valor das requisições (cd_depo 1, 2, NULL; exclui 3)
         dias_valor_reused = []  # Valor dos itens reutilizados (cd_depo == 3)
         dias_data_nf = []  # Requisições NF
         dias_valor_nf = []  # Valor das requisições NF
@@ -1258,16 +1251,14 @@ def api_dados_diarios_requisicoes(request):
             
             for req in queryset_dia:
                 if req.vlr_movto_estoq:
-                    if req.cd_depo == 1:
-                        # Apenas cd_depo == 1 gera custo
-                        valor_dia += abs(req.vlr_movto_estoq)
-                        if mensagem_nf in (req.obs_rm or ''):
-                            valor_dia_nf += abs(req.vlr_movto_estoq)
-                        else:
-                            valor_dia_normal += abs(req.vlr_movto_estoq)
-                    elif req.cd_depo == 3:
-                        # cd_depo == 3 são itens reutilizados (não geram custo, mas vamos rastrear)
+                    if req.cd_depo == 3:
                         valor_dia_reused += abs(req.vlr_movto_estoq)
+                    else:
+                        valor_dia += req.valor_contribuicao_custo
+                        if mensagem_nf in (req.obs_rm or ''):
+                            valor_dia_nf += req.valor_contribuicao_custo
+                        else:
+                            valor_dia_normal += req.valor_contribuicao_custo
             
             # Manutenções Terceiro (filtrar por data, que é DateTimeField)
             manutencao_count = ManutencaoTerceiro.objects.filter(
@@ -4178,6 +4169,19 @@ def visualizar_centro_de_atividade(request, ca_id):
         descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
     ).order_by('cd_maquina')
 
+    # Máquinas classificadas como OUTROS (para seção "Ajustes necessários")
+    maquinas_outros = maquinas_do_ca.filter(
+        descr_gerenc__iexact='OUTROS'
+    ).order_by('cd_maquina')
+
+    # Máquinas Secundárias sem vínculo a Máquina Principal (descr_gerenc = MÁQUINA SECUNDÁRIA mas sem MaquinaPrimariaSecundaria)
+    ids_secundarias_com_vinculo = MaquinaPrimariaSecundaria.objects.values_list('maquina_secundaria_id', flat=True)
+    maquinas_secundarias_sem_vinculo = maquinas_do_ca.filter(
+        descr_gerenc__icontains='SECUNDÁRIA'
+    ).exclude(
+        id__in=ids_secundarias_com_vinculo
+    ).order_by('cd_maquina')
+
     # Relacionamentos primária-secundária
     relacionamentos = MaquinaPrimariaSecundaria.objects.filter(
         maquina_primaria__in=maquinas_primarias
@@ -4384,8 +4388,9 @@ def visualizar_centro_de_atividade(request, ca_id):
     qs_requisicoes = RequisicaoAlmoxarifado.objects.filter(cd_centro_ativ=ca_num)
     qs_requisicoes_custo = qs_requisicoes.filter(cd_depo=1)
     total_requisicoes = qs_requisicoes.count()
-    total_valor_requisicoes = qs_requisicoes_custo.aggregate(s=Sum('vlr_movto_estoq'))['s'] or Decimal('0')
-    total_valor_requisicoes = abs(total_valor_requisicoes)
+    # vlr_movto_estoq: negativo = gasto, positivo = devolução. Custo = -sum(vlr)
+    total_valor_requisicoes = -(qs_requisicoes_custo.aggregate(s=Sum('vlr_movto_estoq'))['s'] or Decimal('0'))
+    total_valor_requisicoes = max(Decimal('0'), total_valor_requisicoes)
 
     # ControleRCeNF: ca_rateio pode ser "4120", "CA 4120", "CA4120", etc.
     q_controle = (
@@ -4413,7 +4418,7 @@ def visualizar_centro_de_atividade(request, ca_id):
         key = (req.data_requisicao.year, req.data_requisicao.month)
         if key not in req_por_mes:
             req_por_mes[key] = {'valor': Decimal('0'), 'count': 0}
-        req_por_mes[key]['valor'] += abs(req.vlr_movto_estoq or 0)
+        req_por_mes[key]['valor'] += -(req.vlr_movto_estoq or 0)
         req_por_mes[key]['count'] += 1
     meses_req = sorted(req_por_mes.keys())
     if len(meses_req) > 12:
@@ -4455,6 +4460,8 @@ def visualizar_centro_de_atividade(request, ca_id):
         'has_maquinas': maquinas_do_ca.exists(),
         'has_primarias': maquinas_primarias.exists(),
         'primarias_com_secundarias': primarias_com_secundarias,
+        'maquinas_outros': maquinas_outros,
+        'maquinas_secundarias_sem_vinculo': maquinas_secundarias_sem_vinculo,
         'total_os_corretivas': total_os_corretivas,
         'total_os_preventivas': total_os_preventivas,
         'total_os_lubrificacao': total_os_lubrificacao,
@@ -4868,6 +4875,22 @@ def analise_maquinas(request):
         maquinas_por_setor_principal.values(),
         key=lambda x: x['cd_setormanut']
     )
+
+    # Máquinas importadas agrupadas por gerência (descr_gerenc)
+    maquinas_por_gerencia = defaultdict(list)
+    maquinas_importadas_gerencia = Maquina.objects.filter(
+        ativo=True
+    ).exclude(
+        created_at__isnull=True
+    ).exclude(
+        descr_gerenc__isnull=True
+    ).exclude(
+        descr_gerenc=''
+    ).order_by('descr_gerenc', 'cd_maquina')
+    for maquina in maquinas_importadas_gerencia:
+        gerencia = maquina.descr_gerenc or 'Sem Classificação'
+        maquinas_por_gerencia[gerencia].append(maquina)
+    maquinas_por_gerencia_list = sorted(maquinas_por_gerencia.items(), key=lambda x: x[0])
     
     # Buscar Centros de Atividade filtrados por local (INDÚSTRIA ou FRIGORÍFICO)
     from app.models import CentroAtividade
@@ -4969,6 +4992,7 @@ def analise_maquinas(request):
         'maquinas_por_setor': maquinas_por_setor,
         'maquinas_por_unidade': maquinas_por_unidade,
         'maquinas_principais_por_setor': maquinas_principais_por_setor,
+        'maquinas_por_gerencia': maquinas_por_gerencia_list,
         'centros_industria': centros_industria,
         'centros_frigorifico': centros_frigorifico,
         # Dados para organograma
@@ -4980,125 +5004,44 @@ def analise_maquinas(request):
 
 
 def analise_maquinas_importadas(request):
-    """Página de análise de máquinas importadas com gráficos e estatísticas"""
+    """Análise de máquinas importadas — detecta problemas de dados por padrão nas colunas"""
     from app.models import Maquina
-    from django.db.models import Count
-    from datetime import datetime, timedelta
-    from collections import defaultdict
-    import json
-    
-    # Estatísticas básicas - apenas máquinas importadas (com created_at) e ativas
-    total_importadas = Maquina.objects.filter(ativo=True).exclude(created_at__isnull=True).count()
-    total_geral = Maquina.objects.filter(ativo=True).count()
-    percentual_importadas = (total_importadas / total_geral * 100) if total_geral > 0 else 0
-    
-    # Máquinas importadas recentes (últimas 30 dias) - apenas ativas
-    data_30_dias_atras = datetime.now() - timedelta(days=30)
-    importadas_recentes = Maquina.objects.filter(
-        ativo=True,
-        created_at__gte=data_30_dias_atras
-    ).exclude(created_at__isnull=True).count()
-    
-    # Máquinas importadas do mês atual - apenas ativas
-    mes_atual = datetime.now().replace(day=1)
-    importadas_mes_atual = Maquina.objects.filter(
-        ativo=True,
-        created_at__gte=mes_atual
-    ).exclude(created_at__isnull=True).count()
-    
-    # Máquinas importadas por setor - apenas ativas
-    maquinas_importadas_por_setor = Maquina.objects.filter(
-        ativo=True
-    ).exclude(
-        created_at__isnull=True
-    ).exclude(
-        cd_setormanut__isnull=True
-    ).exclude(
-        cd_setormanut=''
-    ).values('cd_setormanut').annotate(
-        total=Count('id')
-    ).order_by('-total')[:10]
-    
-    setores_labels = [str(item['cd_setormanut']) for item in maquinas_importadas_por_setor]
-    setores_data = [item['total'] for item in maquinas_importadas_por_setor]
-    
-    # Máquinas importadas por unidade (top 10) - apenas ativas
-    maquinas_importadas_por_unidade = Maquina.objects.filter(
-        ativo=True
-    ).exclude(
-        created_at__isnull=True
-    ).exclude(
-        nome_unid__isnull=True
-    ).exclude(
-        nome_unid=''
-    ).values('nome_unid').annotate(
-        total=Count('id')
-    ).order_by('-total')[:10]
-    
-    unidades_labels = [item['nome_unid'][:30] for item in maquinas_importadas_por_unidade]
-    unidades_data = [item['total'] for item in maquinas_importadas_por_unidade]
-    
-    # Máquinas importadas por mês (últimos 12 meses) - apenas ativas
-    maquinas_importadas_por_mes = defaultdict(int)
-    maquinas_importadas = Maquina.objects.filter(
-        ativo=True
-    ).exclude(created_at__isnull=True).order_by('created_at')
-    for maquina in maquinas_importadas:
-        if maquina.created_at:
-            mes_ano = maquina.created_at.strftime('%Y-%m')
-            maquinas_importadas_por_mes[mes_ano] += 1
-    
-    # Ordenar por data e pegar últimos 12 meses
-    meses_ordenados = sorted(maquinas_importadas_por_mes.keys())[-12:]
-    meses_labels = [datetime.strptime(m, '%Y-%m').strftime('%b/%Y') for m in meses_ordenados]
-    meses_data = [maquinas_importadas_por_mes[m] for m in meses_ordenados]
-    
-    # Máquinas importadas recentes para exibir na tabela - apenas ativas
-    maquinas_importadas_recentes = Maquina.objects.filter(
-        ativo=True
-    ).exclude(
-        created_at__isnull=True
-    ).order_by('-created_at')[:50]
-    
-    # Agrupar máquinas importadas por descr_gerenc - apenas ativas
-    from collections import defaultdict
-    maquinas_por_gerencia = defaultdict(list)
-    maquinas_importadas_gerencia = Maquina.objects.filter(
-        ativo=True
-    ).exclude(
-        created_at__isnull=True
-    ).exclude(
-        descr_gerenc__isnull=True
-    ).exclude(
-        descr_gerenc=''
-    ).order_by('descr_gerenc', 'cd_maquina')
-    
-    for maquina in maquinas_importadas_gerencia:
-        gerencia = maquina.descr_gerenc or 'Sem Classificação'
-        maquinas_por_gerencia[gerencia].append(maquina)
-    
-    # Converter para lista ordenada por nome da gerência
-    maquinas_por_gerencia_list = sorted(
-        maquinas_por_gerencia.items(),
-        key=lambda x: x[0]
-    )
-    
+    from app.utils import analyze_maquinas_column_patterns
+
+    maquinas_qs = Maquina.objects.all()
+    total_maquinas = maquinas_qs.count()
+
+    # Colunas importadas e tipo esperado (integer, text, date)
+    columns_config = {
+        'cd_unid': {'expected': 'integer', 'label': 'Código Unidade (cd_unid)'},
+        'nome_unid': {'expected': 'text', 'label': 'Nome Unidade (nome_unid)'},
+        'cs_tt_maquina': {'expected': 'integer', 'label': 'Código Total Máquina (cs_tt_maquina)'},
+        'cd_maquina': {'expected': 'integer', 'label': 'Código Máquina (cd_maquina)'},
+        'descr_maquina': {'expected': 'text', 'label': 'Descrição Máquina (descr_maquina)'},
+        'cd_setormanut': {'expected': 'text', 'label': 'Código Setor Manutenção (cd_setormanut)'},
+        'descr_setormanut': {'expected': 'text', 'label': 'Descrição Setor Manutenção (descr_setormanut)'},
+        'cd_priomaqutv': {'expected': 'integer', 'label': 'Código Prioridade (cd_priomaqutv)'},
+        'nro_patrimonio': {'expected': 'text', 'label': 'Número Patrimônio (nro_patrimonio)'},
+        'cd_modelo': {'expected': 'integer', 'label': 'Código Modelo (cd_modelo)'},
+        'cd_grupo': {'expected': 'integer', 'label': 'Código Grupo (cd_grupo)'},
+        'cd_tpcentativ': {'expected': 'integer', 'label': 'Código Tipo Centro Atividade (cd_tpcentativ)'},
+        'descr_gerenc': {'expected': 'text', 'label': 'Descrição Gerência (descr_gerenc)'},
+    }
+
+    column_analysis = []
+    if total_maquinas > 0:
+        column_analysis = analyze_maquinas_column_patterns(maquinas_qs, columns_config)
+
+    colunas_com_problema = [c for c in column_analysis if c['has_problem']]
+    colunas_ok = [c for c in column_analysis if not c['has_problem']]
+
     context = {
         'page_title': 'Análise de Máquinas Importadas',
         'active_page': 'analise_maquinas_importadas',
-        'total_importadas': total_importadas,
-        'importadas_recentes': importadas_recentes,
-        'importadas_mes_atual': importadas_mes_atual,
-        'percentual_importadas': round(percentual_importadas, 1),
-        'maquinas_importadas_recentes': maquinas_importadas_recentes,
-        'maquinas_por_gerencia': maquinas_por_gerencia_list,
-        # Dados para gráficos (JSON)
-        'setores_labels': json.dumps(setores_labels),
-        'setores_data': json.dumps(setores_data),
-        'unidades_labels': json.dumps(unidades_labels),
-        'unidades_data': json.dumps(unidades_data),
-        'meses_labels': json.dumps(meses_labels),
-        'meses_data': json.dumps(meses_data),
+        'total_maquinas': total_maquinas,
+        'column_analysis': column_analysis,
+        'colunas_com_problema': colunas_com_problema,
+        'colunas_ok': colunas_ok,
     }
     return render(request, 'maquinas/analise_maquinas_importadas.html', context)
 
@@ -5735,12 +5678,11 @@ def consultar_requisicoes_almoxarifado(request):
     
     # Calcular valor total dos dados filtrados
     # vlr_movto_estoq já representa o valor total da linha (não é valor unitário)
-    # IMPORTANTE: Apenas considerar cd_depo == 1 para custos (itens novos que geram gasto)
-    # cd_depo == 3 são itens reutilizados que não geram custo
+    # cd_depo == 3 são itens reutilizados (não geram custo). cd_depo 1, 2 e NULL geram custo.
     valor_total = Decimal('0.00')
     for req in requisicoes_list:
-        if req.vlr_movto_estoq and req.cd_depo == 1:
-            valor_total += abs(req.vlr_movto_estoq)
+        if req.vlr_movto_estoq and req.cd_depo != 3:
+            valor_total += req.valor_contribuicao_custo
     
     # Paginação (após calcular estatísticas)
     paginator = Paginator(requisicoes_list, 100)  # 100 itens por página
@@ -8087,11 +8029,9 @@ def api_dados_diarios_paradas(request):
         
         dias_labels = []
         dias_data = []
-        dias_horas = []
         dias_data_frig = []
-        dias_horas_frig = []
+        dias_capacidade_frig = []
         dias_data_ind = []
-        dias_horas_ind = []
         dias_capacidade_ind = []
         
         for dia in range(1, ultimo_dia.day + 1):
@@ -8099,32 +8039,22 @@ def api_dados_diarios_paradas(request):
             
             qs_dia = ParadaMaquina.objects.filter(data=data_dia)
             count = qs_dia.count()
-            horas_dia = Decimal('0.00')
-            for parada in qs_dia:
-                if parada.dif_hora:
-                    horas_dia += Decimal(str(parada.dif_hora))
-            
             count_frig = qs_dia.filter(descr_linha_producao__in=recursos_frigorifico).count() if recursos_frigorifico else 0
-            horas_frig = Decimal('0.00')
+            cap_frig = Decimal('0.00')
             for parada in qs_dia.filter(descr_linha_producao__in=recursos_frigorifico) if recursos_frigorifico else []:
-                if parada.dif_hora:
-                    horas_frig += Decimal(str(parada.dif_hora))
+                if parada.capacidade is not None:
+                    cap_frig += Decimal(str(parada.capacidade))
             count_ind = qs_dia.filter(descr_linha_producao__in=recursos_industria).count() if recursos_industria else 0
-            horas_ind = Decimal('0.00')
             cap_ind = Decimal('0.00')
             for parada in qs_dia.filter(descr_linha_producao__in=recursos_industria) if recursos_industria else []:
-                if parada.dif_hora:
-                    horas_ind += Decimal(str(parada.dif_hora))
                 if parada.capacidade is not None:
                     cap_ind += Decimal(str(parada.capacidade))
             
             dias_labels.append(data_dia.strftime('%d/%m'))
             dias_data.append(count)
-            dias_horas.append(float(horas_dia))
             dias_data_frig.append(count_frig)
-            dias_horas_frig.append(float(horas_frig))
+            dias_capacidade_frig.append(float(cap_frig))
             dias_data_ind.append(count_ind)
-            dias_horas_ind.append(float(horas_ind))
             dias_capacidade_ind.append(float(cap_ind))
         
         secao = request.GET.get('secao', '').strip().lower()
@@ -8132,22 +8062,21 @@ def api_dados_diarios_paradas(request):
             return JsonResponse({
                 'labels': dias_labels,
                 'data': dias_data_frig,
-                'horas': dias_horas_frig
+                'capacidade': dias_capacidade_frig
             })
         if secao == 'industria':
             return JsonResponse({
                 'labels': dias_labels,
-                'data': dias_capacidade_ind,
-                'horas': dias_horas_ind
+                'data': dias_data_ind,
+                'capacidade': dias_capacidade_ind
             })
         return JsonResponse({
             'labels': dias_labels,
             'data': dias_data,
-            'horas': dias_horas,
             'data_frig': dias_data_frig,
-            'horas_frig': dias_horas_frig,
-            'data_ind': dias_capacidade_ind,
-            'horas_ind': dias_horas_ind
+            'capacidade_frig': dias_capacidade_frig,
+            'data_ind': dias_data_ind,
+            'capacidade_ind': dias_capacidade_ind
         })
         
     except (ValueError, TypeError) as e:
@@ -14416,7 +14345,157 @@ def cadastrar_manutentor(request):
         'form': form,
         'maquinas_disponiveis': maquinas_disponiveis
     }
-    return render(request, 'cadastrar/cadastrar_manutentor.html', context)
+    return render(request, 'manutentor/cadastrar_manutentor.html', context)
+
+
+def associar_manutentor_maquina(request):
+    """Associar Manutentor com Máquina - selecionar manutentor, máquina e salvar relação"""
+    from app.models import Manutentor, Maquina, ManutentorMaquina, MaquinaPrimariaSecundaria
+    from django.db import IntegrityError
+    from django.db.models import Q
+    import json
+
+    manutentores = Manutentor.objects.all().order_by('Nome', 'Matricula')
+    maquinas = Maquina.objects.all().order_by('cd_maquina')
+
+    # Filtros por descr_gerenc e descr_setormanut (GET)
+    filter_gerenc = request.GET.get('descr_gerenc', '').strip() or None
+    filter_setormanut = request.GET.get('descr_setormanut', '').strip() or None
+    if filter_gerenc:
+        maquinas = maquinas.filter(descr_gerenc=filter_gerenc)
+    if filter_setormanut:
+        maquinas = maquinas.filter(descr_setormanut=filter_setormanut)
+
+    # Excluir máquinas que já têm associação com qualquer manutentor
+    maquinas_ids_ja_associadas = ManutentorMaquina.objects.values_list('maquina_id', flat=True).distinct()
+    maquinas = maquinas.exclude(id__in=maquinas_ids_ja_associadas)
+
+    # Opções para os filtros (valores distintos, excluindo vazios)
+    opcoes_gerenc = Maquina.objects.exclude(
+        Q(descr_gerenc__isnull=True) | Q(descr_gerenc='')
+    ).values_list('descr_gerenc', flat=True).distinct().order_by('descr_gerenc')
+    opcoes_setormanut = Maquina.objects.exclude(
+        Q(descr_setormanut__isnull=True) | Q(descr_setormanut='')
+    ).values_list('descr_setormanut', flat=True).distinct().order_by('descr_setormanut')
+
+    # Máquinas secundárias por máquina principal (para checkbox e preview)
+    maquina_ids = list(maquinas.values_list('id', flat=True))
+    secundarias_por_principal = {}
+    if maquina_ids:
+        for rel in MaquinaPrimariaSecundaria.objects.select_related(
+            'maquina_primaria', 'maquina_secundaria'
+        ).filter(maquina_primaria_id__in=maquina_ids):
+            pid = rel.maquina_primaria_id
+            if pid not in secundarias_por_principal:
+                secundarias_por_principal[pid] = []
+            secundarias_por_principal[pid].append({
+                'id': rel.maquina_secundaria.id,
+                'cd_maquina': rel.maquina_secundaria.cd_maquina,
+                'descr_maquina': rel.maquina_secundaria.descr_maquina or 'Sem descrição',
+            })
+
+    if request.method == 'POST':
+        manutentor_matricula = request.POST.get('manutentor')
+        maquinas_ids = request.POST.getlist('maquinas')
+        observacoes = request.POST.get('observacoes', '').strip() or None
+        associar_secundarias = request.POST.get('associar_secundarias') == '1'
+
+        if not manutentor_matricula:
+            messages.error(request, 'Por favor, selecione o Manutentor.')
+        elif not maquinas_ids or all(not mid for mid in maquinas_ids):
+            messages.error(request, 'Por favor, selecione pelo menos uma máquina.')
+        else:
+            try:
+                manutentor = Manutentor.objects.get(Matricula=manutentor_matricula)
+                maquinas_a_associar = []
+                for mid in maquinas_ids:
+                    if mid:
+                        try:
+                            maq = Maquina.objects.get(id=mid)
+                            maquinas_a_associar.append(maq)
+                        except Maquina.DoesNotExist:
+                            pass
+
+                # Se marcado, adicionar máquinas secundárias das principais selecionadas
+                if associar_secundarias and maquinas_a_associar:
+                    ids_principais = [m.id for m in maquinas_a_associar]
+                    secundarias_ids = set(
+                        MaquinaPrimariaSecundaria.objects.filter(
+                            maquina_primaria_id__in=ids_principais
+                        ).values_list('maquina_secundaria_id', flat=True)
+                    )
+                    for sid in secundarias_ids:
+                        try:
+                            maq_sec = Maquina.objects.get(id=sid)
+                            if maq_sec not in maquinas_a_associar:
+                                maquinas_a_associar.append(maq_sec)
+                        except Maquina.DoesNotExist:
+                            pass
+
+                if not maquinas_a_associar:
+                    messages.error(request, 'Nenhuma máquina válida foi selecionada.')
+                else:
+                    criadas = []
+                    ja_existentes = []
+                    for maq in maquinas_a_associar:
+                        # Verificar se máquina já está associada a qualquer manutentor
+                        assoc_existente = ManutentorMaquina.objects.filter(maquina=maq).first()
+                        if assoc_existente:
+                            ja_existentes.append(f"{maq.cd_maquina} - {maq.descr_maquina or 'Sem descrição'}")
+                        else:
+                            ManutentorMaquina.objects.create(
+                                manutentor=manutentor,
+                                maquina=maq,
+                                observacoes=observacoes
+                            )
+                            criadas.append(f"{maq.cd_maquina} - {maq.descr_maquina or 'Sem descrição'}")
+
+                    if criadas:
+                        msg = f'Associação criada: {manutentor.Matricula} - {manutentor.Nome or "Sem nome"} ↔ {", ".join(criadas)}'
+                        if ja_existentes:
+                            msg += f' (já associadas a outro manutentor: {", ".join(ja_existentes)})'
+                        messages.success(request, msg)
+                    elif ja_existentes:
+                        messages.warning(request, f'Todas as máquinas selecionadas já estão associadas a outro manutentor.')
+            except Manutentor.DoesNotExist:
+                messages.error(request, 'Manutentor não encontrado.')
+            except Maquina.DoesNotExist:
+                messages.error(request, 'Máquina não encontrada.')
+            except IntegrityError:
+                messages.warning(request, 'Esta associação já existe.')
+            except Exception as e:
+                messages.error(request, f'Erro ao salvar: {str(e)}')
+
+        # Preservar filtros na URL ao redirecionar (form action inclui query params quando há filtros)
+        from django.urls import reverse
+        from urllib.parse import urlencode
+        params = {}
+        if request.GET.get('descr_gerenc'):
+            params['descr_gerenc'] = request.GET.get('descr_gerenc')
+        if request.GET.get('descr_setormanut'):
+            params['descr_setormanut'] = request.GET.get('descr_setormanut')
+        url = reverse('associar_manutentor_maquina')
+        if params:
+            url += '?' + urlencode(params)
+        return redirect(url)
+
+    # Dados para preview (JSON) - usar estrutura simples para evitar erros no template
+    manutentores_json = {str(m.Matricula): m.Nome or 'Sem nome' for m in manutentores}
+    maquinas_json = {str(m.id): {'cd_maquina': str(m.cd_maquina), 'descr_maquina': (m.descr_maquina or 'Sem descrição')} for m in maquinas}
+    ids_principais_com_secundarias = set(secundarias_por_principal.keys())
+
+    context = {
+        'page_title': 'Associar Manutentor e Máquina',
+        'active_page': 'associar_manutentor_maquina',
+        'manutentores': manutentores,
+        'maquinas': maquinas,
+        'opcoes_gerenc': opcoes_gerenc,
+        'opcoes_setormanut': opcoes_setormanut,
+        'filter_gerenc': filter_gerenc,
+        'filter_setormanut': filter_setormanut,
+        'ids_principais_com_secundarias': ids_principais_com_secundarias,
+    }
+    return render(request, 'manutentor/associar_manutentor_maquina.html', context)
 
 
 def analise_manutentores(request):
@@ -14570,6 +14649,45 @@ def analise_manutentores(request):
 def configuracao_manutentores(request):
     """Página de configuração de manutentores"""
     return render(request, 'manutentor/configuracao_manutentores.html')
+
+
+def consultar_associacao_manutentor_maquina(request):
+    """Consultar associações Manutentor-Máquina - mostra apenas máquinas com descr_gerenc=MÁQUINAS PRINCIPAL"""
+    from app.models import ManutentorMaquina
+
+    associacoes = ManutentorMaquina.objects.select_related(
+        'manutentor', 'maquina'
+    ).order_by('manutentor__Nome', 'manutentor__Matricula', 'maquina__cd_maquina')
+
+    # Agrupar por manutentor
+    por_manutentor = {}
+    for assoc in associacoes:
+        m = assoc.manutentor
+        key = (m.Matricula, m.Nome or '')
+        if key not in por_manutentor:
+            por_manutentor[key] = {'manutentor': m, 'associacoes': [], 'maquina_ids': set()}
+        por_manutentor[key]['associacoes'].append(assoc)
+        por_manutentor[key]['maquina_ids'].add(assoc.maquina_id)
+
+    # Mostrar apenas máquinas com classificação "MÁQUINAS PRINCIPAL" (descr_gerenc)
+    for key, data in por_manutentor.items():
+        principais = []
+        for assoc in data['associacoes']:
+            descr_gerenc = (assoc.maquina.descr_gerenc or '').strip().upper()
+            if descr_gerenc == 'MÁQUINAS PRINCIPAL':
+                principais.append(assoc)
+        data['maquinas_principais'] = principais
+
+    # Ordenar por nome do manutentor
+    lista_manutentores = sorted(por_manutentor.values(), key=lambda x: (x['manutentor'].Nome or '', x['manutentor'].Matricula))
+
+    context = {
+        'page_title': 'Consultar Associações Manutentor-Máquina',
+        'active_page': 'maquinas',
+        'lista_manutentores': lista_manutentores,
+        'total_associacoes': ManutentorMaquina.objects.count(),
+    }
+    return render(request, 'maquinas/consultar_associacao_manutentor_maquina.html', context)
 
 
 def visualizar_manutentor(request, matricula):
@@ -16746,13 +16864,11 @@ def analise_geral_orcamento(request):
         data_requisicao__month__in=meses_para_mostrar
     )
     total_requisicoes = requisicoes_filtradas.count()
-    # IMPORTANTE: Apenas considerar cd_depo == 1 para custos (itens novos que geram gasto)
-    # cd_depo == 3 são itens reutilizados que não geram custo
+    # cd_depo == 3 são itens reutilizados (não geram custo). cd_depo 1, 2 e NULL geram custo.
     valor_total_requisicoes = Decimal('0.00')
-    for req in requisicoes_filtradas.filter(cd_depo=1):
+    for req in requisicoes_filtradas.exclude(cd_depo=3):
         if req.vlr_movto_estoq:
-            # vlr_movto_estoq já representa o valor total da transação (pode ser negativo para saídas)
-            valor_total_requisicoes += abs(req.vlr_movto_estoq)
+            valor_total_requisicoes += req.valor_contribuicao_custo
     
     # Valor total de requisições para o card (já filtrado por ano/mês)
     valor_total_requisicoes_filtrado = valor_total_requisicoes
@@ -16762,17 +16878,17 @@ def analise_geral_orcamento(request):
     requisicoes_com_nf = requisicoes_filtradas.filter(obs_rm__icontains=mensagem_nf_requisicao)
     total_requisicoes_com_nf = requisicoes_com_nf.count()
     valor_total_requisicoes_com_nf = Decimal('0.00')
-    for req in requisicoes_com_nf.filter(cd_depo=1):
+    for req in requisicoes_com_nf.exclude(cd_depo=3):
         if req.vlr_movto_estoq:
-            valor_total_requisicoes_com_nf += abs(req.vlr_movto_estoq)
+            valor_total_requisicoes_com_nf += req.valor_contribuicao_custo
 
     # Requisições sem associação a Nota Fiscal (excluir as que têm a mensagem NF)
     requisicoes_sem_nf = requisicoes_filtradas.exclude(obs_rm__icontains=mensagem_nf_requisicao)
     total_requisicoes_sem_nf = requisicoes_sem_nf.count()
     valor_total_requisicoes_sem_nf = Decimal('0.00')
-    for req in requisicoes_sem_nf.filter(cd_depo=1):
+    for req in requisicoes_sem_nf.exclude(cd_depo=3):
         if req.vlr_movto_estoq:
-            valor_total_requisicoes_sem_nf += abs(req.vlr_movto_estoq)
+            valor_total_requisicoes_sem_nf += req.valor_contribuicao_custo
 
     # Percentual que Requisições sem NF representam sobre o orçamento total (para o último box)
     percentual_requisicoes_sem_nf_sobre_orcamento = 0
@@ -16843,16 +16959,15 @@ def analise_geral_orcamento(request):
             dias_orcamento.append(float(orc_dia))
             
             # Requisições do dia (RequisicaoAlmoxarifado) - valor do dia
-            # IMPORTANTE: Apenas considerar cd_depo == 1 para custos (itens novos que geram gasto)
+            # cd_depo == 3 são reutilizados (não geram custo). cd_depo 1, 2 e NULL geram custo.
             req_dia = Decimal('0.00')
             for req in RequisicaoAlmoxarifado.objects.filter(
                 data_requisicao__year=ano_filtro,
                 data_requisicao__month=mes,
-                data_requisicao__day=dia,
-                cd_depo=1  # Apenas itens que geram custo
-            ):
+                data_requisicao__day=dia
+            ).exclude(cd_depo=3):
                 if req.vlr_movto_estoq:
-                    req_dia += abs(req.vlr_movto_estoq)
+                    req_dia += req.valor_contribuicao_custo
             # Acumular
             req_acumulado += req_dia
             dias_requisicoes.append(float(req_acumulado))
