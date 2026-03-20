@@ -1,0 +1,393 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Cálculo de Mão de Obra{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(13, 110, 253, 0.5), rgba(13, 110, 253, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise de Mão de Obra</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Cálculo de Mão de Obra</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="bi bi-calculator me-2"></i>Cálculo de Mão de Obra
+                </h1>
+                <p class="lead">Defina o tempo necessário para execução — filtre por Setor e Máquina e visualize as Ordens de Serviço</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <!-- Filtro -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-funnel me-2"></i>Filtrar Ordem de Serviço e Período</h5>
+            </div>
+            <div class="card-body">
+                <form method="get" action="{% url 'calculo_mao_de_obra' %}" id="form-filtro-calculo">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Setor</label>
+                            <select name="filtro_setor" id="filtro-setor-calculo" class="form-select">
+                                <option value="">-- Todos os setores --</option>
+                                {% for cd, descr in setores_opcoes %}
+                                <option value="{{ cd }}" {% if filtro_setor == cd %}selected{% endif %}>{{ descr|default:cd }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Período — Mês</label>
+                            <div class="input-group">
+                                <select name="filtro_mes" class="form-select">
+                                    <option value="">-- Mês --</option>
+                                    {% for num, nome in meses_opcoes %}
+                                    <option value="{{ num }}" {% if filtro_mes == num|stringformat:"s" %}selected{% endif %}>{{ nome }}</option>
+                                    {% endfor %}
+                                </select>
+                                <select name="filtro_ano" class="form-select">
+                                    <option value="">-- Ano --</option>
+                                    {% for a in anos_opcoes %}
+                                    <option value="{{ a }}" {% if filtro_ano == a|stringformat:"s" %}selected{% endif %}>{{ a }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <small class="text-muted">ou use o intervalo abaixo</small>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Período — Intervalo</label>
+                            <div class="input-group">
+                                <input type="date" name="filtro_data_inicio" class="form-control" value="{{ filtro_data_inicio }}" placeholder="De">
+                                <input type="date" name="filtro_data_fim" class="form-control" value="{{ filtro_data_fim }}" placeholder="Até">
+                            </div>
+                            <small class="text-muted">Data de entrada da OS</small>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary me-2">
+                                <i class="bi bi-search me-1"></i>Filtrar
+                            </button>
+                            <a href="{% url 'calculo_mao_de_obra' %}" class="btn btn-outline-secondary">Limpar</a>
+                        </div>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-cpu me-2"></i>Máquinas <span class="text-muted fw-normal">(marque uma ou mais)</span>
+                        </label>
+                        <p class="text-muted small mb-2">Se nenhuma máquina for selecionada, todas serão consideradas.</p>
+                        <div class="border rounded p-3 bg-light" style="max-height: 320px; overflow-y: auto; min-height: 100px;">
+                            {% if maquinas_opcoes %}
+                            <div class="input-group mb-3">
+                                <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                                <input type="text" class="form-control" id="busca-maquinas-calculo" placeholder="Buscar por código ou descrição da máquina..." autocomplete="off">
+                            </div>
+                            <div class="row g-2" id="lista-maquinas-calculo">
+                                {% for cd, descr, setores in maquinas_opcoes %}
+                                <div class="col-12 maquina-item-calculo" data-busca="{{ cd }} {{ descr|default:'' }}" data-setores="{% for s in setores %}{{ s }}{% if not forloop.last %},{% endif %}{% endfor %}">
+                                    <div class="form-check">
+                                        <input class="form-check-input flex-shrink-0" type="checkbox" name="filtro_maquina" value="{{ cd }}" id="maq_calc_{{ cd }}" {% if cd|stringformat:"s" in filtro_maquinas %}checked{% endif %}>
+                                        <label class="form-check-label text-break" for="maq_calc_{{ cd }}" style="word-wrap: break-word;">
+                                            {{ cd }} — {{ descr }}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <small class="text-muted d-block mt-2" id="contador-maquinas-calculo">{{ maquinas_opcoes|length }} máquina(s) disponível(is)</small>
+                            {% else %}
+                            <div class="alert alert-warning mb-0">Nenhuma máquina com Ordens de Serviço encontrada.</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Resumo de Ordens -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">
+                            <i class="bi bi-clipboard-data me-2"></i>Resumo das Ordens de Serviço
+                            {% if filtro_aplicado %}
+                            <span class="badge bg-info ms-2">Filtro aplicado</span>
+                            {% endif %}
+                        </h5>
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <div class="card bg-light h-100">
+                                    <div class="card-body text-center">
+                                        <h3 class="text-primary mb-0">{{ total_ordens }}</h3>
+                                        <small class="text-muted">Total de Ordens</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light h-100">
+                                    <div class="card-body text-center">
+                                        <h3 class="text-success mb-0">{{ ordens_fechadas }}</h3>
+                                        <small class="text-muted">Ordens Fechadas</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light h-100">
+                                    <div class="card-body text-center">
+                                        <h3 class="text-warning mb-0">{{ ordens_abertas }}</h3>
+                                        <small class="text-muted">Ordens Abertas</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light h-100">
+                                    <div class="card-body text-center">
+                                        <h3 class="text-secondary mb-0">{{ por_tipo_os|length|add:por_tipo_manutencao|length|add:por_situacao|length }}</h3>
+                                        <small class="text-muted">Categorias distintas</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% if filtro_aplicado or total_ordens > 0 %}
+                        <div class="mt-3 pt-3 border-top">
+                            <p class="mb-0 text-muted small">
+                                <i class="bi bi-clock-history me-1"></i>Total estimado para execução das ordens nas seções abaixo:
+                                <strong class="text-primary" id="resumo-total-tempo">—</strong>
+                            </p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if filtro_aplicado or total_ordens > 0 %}
+        <!-- Uma seção por Tipo de Ordem de Serviço -->
+        <div class="mb-4">
+            <h5 class="mb-3"><i class="bi bi-collection me-2"></i>Seções por Tipo de Ordem de Serviço</h5>
+        </div>
+        {% for secao in secoes_por_tipo %}
+        <div class="card shadow-sm mb-4 border-start border-4 border-primary" data-secao-id="{{ forloop.counter }}">
+            <div class="card-header d-flex justify-content-between align-items-center py-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <h6 class="mb-0 fw-bold">
+                    <i class="bi bi-tag-fill me-2"></i>{{ secao.tipo|default:"Sem tipo" }}
+                </h6>
+                <span class="badge bg-light text-dark fs-6">{{ secao.total }} ordem(ns)</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card bg-light h-100">
+                            <div class="card-header py-2 bg-info text-white">
+                                <small class="fw-semibold"><i class="bi bi-wrench me-1"></i>Tipo de Manutenção</small>
+                            </div>
+                            <div class="card-body p-2">
+                                <div class="table-responsive" style="max-height: 220px; overflow-y: auto;">
+                                    <table class="table table-sm table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr><th class="small">Tipo</th><th class="text-end small">Qtd</th><th class="text-end small">Tempo</th></tr>
+                                        </thead>
+                                        <tbody>
+                                        {% for r in secao.por_tipo_manutencao %}
+                                        <tr class="row-tempo-secao" data-secao-id="{{ forloop.parentloop.counter }}" data-count="{{ r.total }}">
+                                            <td class="small">{{ r.descr_tpmanuttv|truncatewords:6 }}</td>
+                                            <td class="text-end"><span class="badge bg-info">{{ r.total }}</span></td>
+                                            <td class="text-end small"><span class="tempo-calculado">—</span></td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr><td colspan="3" class="small text-muted text-center">—</td></tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light h-100">
+                            <div class="card-header py-2 bg-warning text-dark">
+                                <small class="fw-semibold"><i class="bi bi-flag me-1"></i>Situação</small>
+                            </div>
+                            <div class="card-body p-2">
+                                <div class="table-responsive" style="max-height: 220px; overflow-y: auto;">
+                                    <table class="table table-sm table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr><th class="small">Situação</th><th class="text-end small">Qtd</th><th class="text-end small">Tempo</th></tr>
+                                        </thead>
+                                        <tbody>
+                                        {% for r in secao.por_situacao_completo %}
+                                        <tr class="row-tempo-secao" data-secao-id="{{ forloop.parentloop.counter }}" data-count="{{ r.total }}">
+                                            <td class="small">{{ r.descr_sitordsetv|truncatewords:8 }}</td>
+                                            <td class="text-end"><span class="badge bg-warning text-dark">{{ r.total }}</span></td>
+                                            <td class="text-end small"><span class="tempo-calculado">—</span></td>
+                                        </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light h-100">
+                            <div class="card-header py-2 bg-success text-white">
+                                <small class="fw-semibold"><i class="bi bi-diagram-3 me-1"></i>Centro de Atividade</small>
+                            </div>
+                            <div class="card-body p-2">
+                                <div class="table-responsive" style="max-height: 180px; overflow-y: auto;">
+                                    <table class="table table-sm table-hover mb-0">
+                                        {% for r in secao.por_centro_atividade %}
+                                        <tr>
+                                            <td class="small">{{ r.descr_abrev_tpcentativ|truncatewords:6 }}</td>
+                                            <td class="text-end"><span class="badge bg-success">{{ r.total }}</span></td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr><td colspan="2" class="small text-muted text-center">—</td></tr>
+                                        {% endfor %}
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 pt-3 border-top">
+                    <div class="row align-items-end g-3">
+                        <div class="col-md-5">
+                            <label for="minutos_tipo_{{ forloop.counter }}" class="form-label small fw-semibold">
+                                Total de minutos necessários para conclusão da Ordem de Serviço
+                            </label>
+                            <div class="input-group">
+                                <input type="number" min="0" step="1" class="form-control minutos-por-tipo" id="minutos_tipo_{{ forloop.counter }}"
+                                    data-qtd-ordens="{{ secao.total }}" data-tipo="{{ secao.tipo|default:'' }}"
+                                    placeholder="Ex: 60">
+                                <span class="input-group-text">min/OS</span>
+                            </div>
+                            <small class="text-muted">Minutos por ordem de serviço deste tipo</small>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-primary bg-opacity-10 border-primary h-100">
+                                <div class="card-body py-2">
+                                    <small class="text-muted d-block">Total de horas estimadas</small>
+                                    <span class="fs-5 fw-bold text-primary" id="horas_tipo_{{ forloop.counter }}">—</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>Nenhum Tipo de Ordem de Serviço encontrado nos dados filtrados.
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>Selecione um <strong>Setor</strong> e/ou uma <strong>Máquina</strong> e clique em Filtrar para ver a contagem de Ordens de Serviço.
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<script>
+// Filtro Máquinas dependente do Setor + busca em tempo real
+(function() {
+    var filtroSetor = document.getElementById('filtro-setor-calculo');
+    var busca = document.getElementById('busca-maquinas-calculo');
+    var lista = document.getElementById('lista-maquinas-calculo');
+    var contador = document.getElementById('contador-maquinas-calculo');
+
+    function atualizarListaMaquinas() {
+        var setorSelecionado = filtroSetor ? filtroSetor.value : '';
+        var termoBusca = busca ? busca.value.trim().toLowerCase() : '';
+        var itens = lista ? lista.querySelectorAll('.maquina-item-calculo') : [];
+        var visiveis = 0;
+        itens.forEach(function(el) {
+            var setores = (el.getAttribute('data-setores') || '').split(',').filter(Boolean);
+            var pertenceSetor = !setorSelecionado || setores.indexOf(setorSelecionado) >= 0;
+            if (setorSelecionado && !pertenceSetor) {
+                var cb = el.querySelector('input[type="checkbox"]');
+                if (cb) cb.checked = false;
+            }
+            var texto = (el.getAttribute('data-busca') || '').toLowerCase();
+            var matchBusca = !termoBusca || texto.indexOf(termoBusca) >= 0;
+            var mostrar = pertenceSetor && matchBusca;
+            el.style.display = mostrar ? '' : 'none';
+            if (mostrar) visiveis++;
+        });
+        if (contador) {
+            var totalFiltroSetor = setorSelecionado
+                ? Array.from(itens).filter(function(el) {
+                    var setores = (el.getAttribute('data-setores') || '').split(',').filter(Boolean);
+                    return setores.indexOf(setorSelecionado) >= 0;
+                }).length
+                : itens.length;
+            if (termoBusca) {
+                contador.textContent = visiveis + ' de ' + totalFiltroSetor + ' máquina(s)';
+            } else {
+                contador.textContent = totalFiltroSetor + ' máquina(s) disponível(is)' + (setorSelecionado ? ' neste setor' : '');
+            }
+        }
+    }
+
+    if (filtroSetor) filtroSetor.addEventListener('change', atualizarListaMaquinas);
+    if (busca && lista) {
+        busca.addEventListener('input', atualizarListaMaquinas);
+    }
+    // Aplicar filtro inicial (Setor pode estar pré-selecionado)
+    atualizarListaMaquinas();
+})();
+
+// Cálculo de horas: exibe em "X horas e Y minutos"
+(function() {
+    function formatarHorasMin(totalMinutos) {
+        if (!totalMinutos || totalMinutos <= 0) return '—';
+        var h = Math.floor(totalMinutos / 60);
+        var m = Math.round(totalMinutos % 60);
+        if (h > 0 && m > 0) return h + ' hora' + (h !== 1 ? 's' : '') + ' e ' + m + ' minuto' + (m !== 1 ? 's' : '');
+        if (h > 0) return h + ' hora' + (h !== 1 ? 's' : '');
+        return m + ' minuto' + (m !== 1 ? 's' : '');
+    }
+    function atualizarTemposSecao(secaoId, minutos) {
+        var rows = document.querySelectorAll('.row-tempo-secao[data-secao-id="' + secaoId + '"]');
+        rows.forEach(function(row) {
+            var count = parseInt(row.getAttribute('data-count') || 0, 10);
+            var span = row.querySelector('.tempo-calculado');
+            if (span) span.textContent = formatarHorasMin(minutos * count);
+        });
+    }
+    document.querySelectorAll('.minutos-por-tipo').forEach(function(input) {
+        input.addEventListener('input', function() {
+            var qtd = parseInt(this.getAttribute('data-qtd-ordens') || 0, 10);
+            var minutos = parseFloat(this.value) || 0;
+            var secaoId = this.id.replace('minutos_tipo_', '');
+            var id = 'horas_tipo_' + secaoId;
+            var span = document.getElementById(id);
+            if (span) {
+                var totalMinutos = minutos * qtd;
+                span.textContent = formatarHorasMin(totalMinutos);
+            }
+            atualizarTemposSecao(secaoId, minutos);
+            atualizarResumoTotal();
+        });
+    });
+    function atualizarResumoTotal() {
+        var totalMin = 0;
+        document.querySelectorAll('.minutos-por-tipo').forEach(function(input) {
+            var qtd = parseInt(input.getAttribute('data-qtd-ordens') || 0, 10);
+            var minutos = parseFloat(input.value) || 0;
+            totalMin += minutos * qtd;
+        });
+        var span = document.getElementById('resumo-total-tempo');
+        if (span) span.textContent = formatarHorasMin(totalMin);
+    }
+    atualizarResumoTotal();
+})();
+</script>
+{% endblock %}

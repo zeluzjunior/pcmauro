@@ -422,6 +422,7 @@ class ManutentorForm(forms.ModelForm):
             'tempo_trabalho',
             'turno',
             'local_trab',
+            'ativo',
         ]
         widgets = {
             'Matricula': forms.TextInput(attrs={
@@ -460,6 +461,9 @@ class ManutentorForm(forms.ModelForm):
             'local_trab': forms.Select(attrs={
                 'class': 'form-select',
             }),
+            'ativo': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+            }),
         }
         labels = {
             'Matricula': 'Matrícula *',
@@ -470,6 +474,7 @@ class ManutentorForm(forms.ModelForm):
             'tempo_trabalho': 'Tempo de Trabalho',
             'turno': 'Turno',
             'local_trab': 'Local de Trabalho',
+            'ativo': 'Ativo',
         }
 
     def __init__(self, *args, **kwargs):

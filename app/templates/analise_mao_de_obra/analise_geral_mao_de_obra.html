@@ -1,0 +1,587 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Análise Geral de Mão de Obra{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .chart-container { position: relative; height: 300px; margin-bottom: 30px; }
+    .chart-container-large { position: relative; height: 400px; margin-bottom: 30px; }
+    .stat-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
+        height: 100%;
+        min-height: 110px;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .stat-card.border-primary { border-left-color: #0d6efd; }
+    .stat-card.border-success { border-left-color: #198754; }
+    .stat-card.border-info { border-left-color: #0dcaf0; }
+    .stat-card.border-warning { border-left-color: #ffc107; }
+    .stat-card.border-danger { border-left-color: #dc3545; }
+    .stat-card.border-secondary { border-left-color: #6c757d; }
+    .stat-card.border-purple { border-left-color: #6f42c1; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(13, 110, 253, 0.5), rgba(13, 110, 253, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise de Mão de Obra</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise Geral</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="bi bi-clock-history me-2"></i>Análise Geral de Mão de Obra
+                </h1>
+                <p class="lead">Relação Ordens de Serviço x Manutentores — tempo de execução e produtividade</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <!-- Filtro de Ano e Mês (igual ordens-de-servico: dt_abertura_solicita) -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion filter-accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button {% if not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                                <i class="fas fa-filter me-2"></i>
+                                <strong>Filtros</strong>
+                                {% if meses_filtro or ano_filtro %}
+                                    <span class="badge bg-info ms-2">
+                                        {% if meses_filtro %}
+                                            {% if meses_filtro|length == 1 %}
+                                                {{ meses_nomes|get_item:meses_filtro.0 }} de {{ ano_filtro }}
+                                            {% else %}
+                                                {{ meses_filtro|length }} meses de {{ ano_filtro }}
+                                            {% endif %}
+                                        {% else %}
+                                            Todos os meses de {{ ano_filtro }}
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'analise_geral_mao_de_obra' %}" class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="ano" class="form-label">Ano</label>
+                                        <select class="form-select" id="ano" name="ano" required>
+                                            {% for ano in anos_disponiveis %}
+                                                <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Meses (Selecione múltiplos meses ou deixe todos desmarcados para todos os meses)</label>
+                                        <div class="row g-2">
+                                            {% for i in "123456789012" %}
+                                                {% with mes_num=forloop.counter %}
+                                                    <div class="col-md-3 col-sm-4 col-6">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="mes" value="{{ mes_num }}" id="mes{{ mes_num }}" {% if mes_num in meses_filtro %}checked{% endif %}>
+                                                            <label class="form-check-label" for="mes{{ mes_num }}">{{ meses_nomes|get_item:mes_num }}</label>
+                                                        </div>
+                                                    </div>
+                                                {% endwith %}
+                                            {% endfor %}
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosMeses()">Selecionar Todos</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">Desmarcar Todos</button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end gap-2">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-search me-2"></i>Filtrar
+                                        </button>
+                                        <a href="{% url 'analise_geral_mao_de_obra' %}" class="btn btn-outline-secondary">Limpar</a>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="row mb-4">
+            <div class="col-md-2 mb-3 d-flex">
+                <div class="card stat-card border-primary shadow-sm border-0 w-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Total Fichas</h6>
+                        <h2 class="mb-0 fw-bold">{{ total_fichas|number_br:0 }}</h2>
+                        <small class="text-muted">com tempo registrado</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 mb-3 d-flex">
+                <div class="card stat-card border-success shadow-sm border-0 w-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Tempo Total</h6>
+                        <h2 class="mb-0 fw-bold">{{ total_tempo_horas|number_br:1 }}</h2>
+                        <small class="text-muted">horas</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 mb-3 d-flex">
+                <div class="card stat-card border-info shadow-sm border-0 w-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Tempo Médio</h6>
+                        <h2 class="mb-0 fw-bold">{{ tempo_medio_geral_min|number_br:1 }}</h2>
+                        <small class="text-muted">min/ficha</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 mb-3 d-flex">
+                <div class="card stat-card border-warning shadow-sm border-0 w-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Lead Time Médio</h6>
+                        <h2 class="mb-0 fw-bold">{{ lead_medio_geral_horas|number_br:1 }}</h2>
+                        <small class="text-muted">horas (entrada→encerramento)</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 mb-3 d-flex">
+                <div class="card stat-card border-danger shadow-sm border-0 w-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">OS com Lead</h6>
+                        <h2 class="mb-0 fw-bold">{{ total_ordens_com_lead|number_br:0 }}</h2>
+                        <small class="text-muted">ordens</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2 mb-3 d-flex">
+                <div class="card stat-card border-purple shadow-sm border-0 w-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Manutentores</h6>
+                        <h2 class="mb-0 fw-bold">{{ manutentores_ativos|number_br:0 }}</h2>
+                        <small class="text-muted">com execuções</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Análise: Ordens Fechadas (dados reais) e Abertas (tempo estimado) -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="bi bi-pie-chart me-2"></i>Análise por Status — Fechadas (dados reais) e Abertas (tempo estimado)</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <!-- Ordens Fechadas: análise com dados que temos -->
+                    <div class="col-md-6">
+                        <div class="card border-success h-100">
+                            <div class="card-header bg-success text-white py-2">
+                                <h6 class="mb-0"><i class="bi bi-check-circle me-2"></i>Ordens Fechadas — Dados Reais</h6>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted small mb-3">Análise baseada nas fichas de execução registradas.</p>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <div class="p-2 bg-light rounded">
+                                            <small class="text-muted d-block">Quantidade</small>
+                                            <strong>{{ ordens_fechadas_count|number_br:0 }}</strong> ordens
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="p-2 bg-light rounded">
+                                            <small class="text-muted d-block">Tempo total executado</small>
+                                            <strong>{{ tempo_total_fechadas_horas|number_br:1 }}</strong> horas
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="p-2 bg-light rounded">
+                                            <small class="text-muted d-block">Tempo médio por ordem (fichas)</small>
+                                            <strong>{{ tempo_medio_por_ordem_fechada_horas|number_br:1 }}</strong> h
+                                            <span class="text-muted">({{ tempo_medio_por_ordem_fechada_min|number_br:1 }} min)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Ordens Abertas: tempo estimado para execução -->
+                    <div class="col-md-6">
+                        <div class="card border-warning h-100">
+                            <div class="card-header bg-warning text-dark py-2">
+                                <h6 class="mb-0"><i class="bi bi-hourglass-split me-2"></i>Ordens Abertas — Tempo Estimado</h6>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted small mb-3">Estimativa baseada no tempo médio das ordens fechadas ({{ tempo_medio_por_ordem_fechada_min|number_br:1 }} min/ordem).</p>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <div class="p-2 bg-light rounded">
+                                            <small class="text-muted d-block">Quantidade</small>
+                                            <strong>{{ ordens_abertas_count|number_br:0 }}</strong> ordens
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="p-2 bg-light rounded">
+                                            <small class="text-muted d-block">Tempo estimado para execução</small>
+                                            <strong>{{ tempo_estimado_abertas_horas|number_br:1 }}</strong> horas
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="p-2 bg-warning bg-opacity-25 rounded">
+                                            <small class="text-muted d-block">Total estimado (minutos)</small>
+                                            <strong>{{ tempo_estimado_abertas_min|number_br:1 }}</strong> min
+                                            {% if ordens_fechadas_count == 0 and ordens_abertas_count > 0 %}
+                                            <br><small class="text-muted">Sem ordens fechadas para referência — use o Cálculo de Mão de Obra para estimar.</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção: Ordens de Serviço Abertas e Fechadas -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0"><i class="bi bi-clipboard2-pulse me-2"></i>Análise de Ordens de Serviço — Abertas e Fechadas</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <div class="card border-warning h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-2">Ordens Abertas</h6>
+                                <h3 class="mb-0 fw-bold text-warning">{{ ordens_abertas_count|number_br:0 }}</h3>
+                                <small class="text-muted">aguardando conclusão</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-success h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-2">Ordens Fechadas</h6>
+                                <h3 class="mb-0 fw-bold text-success">{{ ordens_fechadas_count|number_br:0 }}</h3>
+                                <small class="text-muted">concluídas no período</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-info h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-2">Tempo Total (todas)</h6>
+                                <h3 class="mb-0 fw-bold text-info">{{ tempo_total_todas_horas|number_br:1 }}</h3>
+                                <small class="text-muted">horas de execução (fichas)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-primary h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-2">Tempo nas Fechadas</h6>
+                                <h3 class="mb-0 fw-bold text-primary">{{ tempo_total_fechadas_horas|number_br:1 }}</h3>
+                                <small class="text-muted">horas gastas nas OS concluídas</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Links rápidos -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body py-2">
+                        <a href="{% url 'analise_manutentores' %}" class="btn btn-outline-primary btn-sm me-2">
+                            <i class="bi bi-person-lines-fill me-1"></i>Análise de Manutentores
+                        </a>
+                        <a href="{% url 'consultar_manutentores' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-search me-1"></i>Consultar Manutentores
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 1 -->
+        <div class="row mb-5">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Top 10 Manutentores — Tempo Total (horas)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="topTempoChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Top 10 Manutentores — Quantidade de OS</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="topQtdChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 2 -->
+        <div class="row mb-5">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Top 10 Tempo Médio por Ficha (min) — min. 5 fichas</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="topMedioChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Top 10 Lead Time Médio (horas) — entrada até encerramento</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="topLeadChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Histograma e Evolução -->
+        <div class="row mb-5">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Distribuição do Tempo de Execução (fichas)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="histChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Evolução Mensal — Qtd Fichas e Tempo Médio</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="evolChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela detalhada -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-table me-2"></i>Ranking Completo — Manutentores x Tempo e OS</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Manutentor</th>
+                                        <th class="text-end">Qtd Fichas</th>
+                                        <th class="text-end">Qtd Ordens</th>
+                                        <th class="text-end">Tempo Total (h)</th>
+                                        <th class="text-end">Tempo Médio (min)</th>
+                                        <th class="text-end">Lead Médio (h)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for m in lista_manutentores %}
+                                    <tr>
+                                        <td><strong>{{ forloop.counter }}</strong></td>
+                                        <td>{{ m.nome }}</td>
+                                        <td class="text-end">{{ m.qtd_fichas|number_br:0 }}</td>
+                                        <td class="text-end">{{ m.qtd_ordens|number_br:0 }}</td>
+                                        <td class="text-end">{{ m.tempo_total_horas|number_br:1 }}</td>
+                                        <td class="text-end">{{ m.tempo_medio_min|number_br:1 }}</td>
+                                        <td class="text-end">{{ m.lead_medio_horas|number_br:1 }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted py-4">Nenhum dado disponível. Verifique se há fichas e ordens com datas e executores preenchidos.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    Chart.defaults.locale = 'pt-BR';
+    const colors = {
+        primary: 'rgba(13, 110, 253, 0.8)',
+        success: 'rgba(25, 135, 84, 0.8)',
+        info: 'rgba(13, 202, 240, 0.8)',
+        warning: 'rgba(255, 193, 7, 0.8)',
+        danger: 'rgba(220, 53, 69, 0.8)',
+        secondary: 'rgba(108, 117, 125, 0.8)',
+    };
+
+    // Top Tempo
+    new Chart(document.getElementById('topTempoChart'), {
+        type: 'bar',
+        data: {
+            labels: {{ top_tempo_labels|safe }},
+            datasets: [{ label: 'Horas', data: {{ top_tempo_data|safe }}, backgroundColor: colors.primary }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { beginAtZero: true, title: { display: true, text: 'Horas' } },
+                y: { ticks: { maxRotation: 0, autoSkip: false } }
+            }
+        }
+    });
+
+    // Top Qtd
+    new Chart(document.getElementById('topQtdChart'), {
+        type: 'bar',
+        data: {
+            labels: {{ top_qtd_labels|safe }},
+            datasets: [{ label: 'OS', data: {{ top_qtd_data|safe }}, backgroundColor: colors.success }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { beginAtZero: true },
+                y: { ticks: { maxRotation: 0, autoSkip: false } }
+            }
+        }
+    });
+
+    // Top Médio
+    new Chart(document.getElementById('topMedioChart'), {
+        type: 'bar',
+        data: {
+            labels: {{ top_medio_labels|safe }},
+            datasets: [{ label: 'Min', data: {{ top_medio_data|safe }}, backgroundColor: colors.info }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { beginAtZero: true, title: { display: true, text: 'Minutos' } },
+                y: { ticks: { maxRotation: 0, autoSkip: false } }
+            }
+        }
+    });
+
+    // Top Lead
+    new Chart(document.getElementById('topLeadChart'), {
+        type: 'bar',
+        data: {
+            labels: {{ top_lead_labels|safe }},
+            datasets: [{ label: 'Horas', data: {{ top_lead_data|safe }}, backgroundColor: colors.warning }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { beginAtZero: true, title: { display: true, text: 'Horas' } },
+                y: { ticks: { maxRotation: 0, autoSkip: false } }
+            }
+        }
+    });
+
+    // Histograma
+    new Chart(document.getElementById('histChart'), {
+        type: 'bar',
+        data: {
+            labels: {{ hist_labels|safe }},
+            datasets: [{ label: 'Fichas', data: {{ hist_data|safe }}, backgroundColor: colors.secondary }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true },
+                x: { ticks: { maxRotation: 45 } }
+            }
+        }
+    });
+
+    // Evolução
+    new Chart(document.getElementById('evolChart'), {
+        type: 'line',
+        data: {
+            labels: {{ evol_meses_labels|safe }},
+            datasets: [
+                { label: 'Qtd Fichas', data: {{ evol_qtd|safe }}, borderColor: colors.primary, backgroundColor: 'rgba(13, 110, 253, 0.1)', fill: true, yAxisID: 'y' },
+                { label: 'Tempo Médio (min)', data: {{ evol_tempo_medio|safe }}, borderColor: colors.danger, backgroundColor: 'rgba(220, 53, 69, 0.1)', fill: true, yAxisID: 'y1' }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                y: { type: 'linear', display: true, position: 'left', beginAtZero: true },
+                y1: { type: 'linear', display: true, position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } }
+            }
+        }
+    });
+});
+
+function selecionarTodosMeses() {
+    document.querySelectorAll('input[name="mes"]').forEach(cb => cb.checked = true);
+}
+function desmarcarTodosMeses() {
+    document.querySelectorAll('input[name="mes"]').forEach(cb => cb.checked = false);
+}
+</script>
+{% endblock %}

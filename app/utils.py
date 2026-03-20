@@ -678,6 +678,146 @@ def upload_ordens_preventivas_from_file(file, update_existing=False) -> Tuple[in
         return 0, 0, errors
 
 
+def upload_ordens_lubrificacao_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:
+    """
+    Faz upload de ordens de serviço de lubrificação a partir de arquivo CSV ou Excel.
+    Aceita lubrificacao_aberta.csv e lubrificacao_fechada.csv (mesma estrutura).
+    Ordem -> OrdemServicoLubrificacao; Ficha/Apontamento -> OrdemServicoLubrificacaoFicha.
+    """
+    from app.models import OrdemServicoLubrificacao, OrdemServicoLubrificacaoFicha
+
+    errors = []
+    created_count = 0
+    updated_count = 0
+    file_name = file.name.lower()
+
+    try:
+        if file_name.endswith(('.xlsx', '.xls', '.xlsm')):
+            data = read_excel_file(file)
+        elif file_name.endswith('.csv'):
+            data = None
+            for enc in ['latin-1', 'iso-8859-1', 'utf-8', 'cp1252']:
+                try:
+                    file.seek(0)
+                    data = read_csv_file(file, encoding=enc, delimiter=';')
+                    break
+                except (UnicodeDecodeError, ValidationError):
+                    if enc == 'cp1252':
+                        raise ValidationError("Erro ao ler CSV: não foi possível decodificar.")
+                    continue
+            if data is None:
+                raise ValidationError("Erro ao ler arquivo CSV.")
+        else:
+            raise ValidationError("Formato não suportado. Use .xlsx, .xls, .xlsm ou .csv")
+
+        if not data:
+            raise ValidationError("Arquivo vazio ou sem dados válidos")
+
+        def _g(d, *keys):
+            for k in keys:
+                v = d.get(k) or d.get(k.lower()) or d.get(k.replace('_', ' '))
+                if v is not None and str(v).strip():
+                    return v
+            return None
+
+        with transaction.atomic():
+            for row_num, row_data in enumerate(data, start=2):
+                try:
+                    if not any(str(v).strip() if v else '' for v in row_data.values()):
+                        continue
+
+                    cd_ordemserv = _safe_int(_g(row_data, 'CD_ORDEMSERV', 'cd_ordemserv'))
+                    if not cd_ordemserv:
+                        errors.append(f"Linha {row_num}: CD_ORDEMSERV é obrigatório")
+                        continue
+
+                    ordem_data = {
+                        'cd_unid': _safe_int(_g(row_data, 'CD_UNID')),
+                        'nome_unid': _safe_str(_g(row_data, 'NOME_UNID'), 255),
+                        'cd_unid_exec': _safe_int(_g(row_data, 'CD_UNID_EXEC')),
+                        'nome_unid_exec': _safe_str(_g(row_data, 'NOME_UNID_EXEC'), 255),
+                        'cd_setormanut': _safe_str(_g(row_data, 'CD_SETORMANUT'), 50),
+                        'descr_setormanut': _safe_str(_g(row_data, 'DESCR_SETORMANUT'), 255),
+                        'cd_tpcentativ': _safe_int(_g(row_data, 'CD_TPCENTATIV')),
+                        'descr_abrev_tpcentativ': _safe_str(_g(row_data, 'DESCR_ABREV_TPCENTATIV'), 255),
+                        'cd_maquina': _safe_int(_g(row_data, 'CD_MAQUINA')),
+                        'descr_maquina': _safe_str(_g(row_data, 'DESCR_MAQUINA'), 500),
+                        'cd_ordemserv': cd_ordemserv,
+                    }
+                    for fld, key in [
+                        ('dt_entrada', 'DT_ENTRADA'), ('dt_abertura_solicita', 'DT_ABERTURA_SOLICITA'),
+                        ('cd_func_solic_os', 'CD_FUNC_SOLIC_OS'), ('nm_func_solic_os', 'NM_FUNC_SOLIC_OS'),
+                        ('descr_queixa', 'DESCR_QUEIXA'), ('exec_tarefas', 'EXEC_TAREFAS'),
+                        ('cd_func_exec', 'CD_FUNC_EXEC'), ('nm_func_exec', 'NM_FUNC_EXEC'),
+                        ('descr_obsordserv', 'DESCR_OBSORDSERV'), ('dt_encordmanu', 'DT_ENCORDMANU'),
+                        ('dt_aberordser', 'DT_ABERORDSER'), ('dt_iniparmanu', 'DT_INIPARMANU'),
+                        ('dt_fimparmanu', 'DT_FIMPARMANU'), ('dt_prev_exec', 'DT_PREV_EXEC'),
+                        ('cd_tpordservtv', 'CD_TPORDSERTV'), ('descr_tpordservtv', 'DESCR_TPORDSERTV'),
+                        ('descr_sitordsetv', 'DESCR_SITORDSETV'), ('descr_recomenos', 'DESCR_RECOMENOS'),
+                        ('descr_seqplamanu', 'DESCR_SEQPLAMANU'), ('cd_tpmanuttv', 'CD_TPMANUTTV'),
+                        ('descr_tpmanuttv', 'DESCR_TPMANUTTV'), ('cd_clasorigos', 'CD_CLASORIGOS'),
+                        ('descr_clasorigos', 'DESCR_CLASORIGOS'),
+                    ]:
+                        v = _g(row_data, key)
+                        if v is not None:
+                            if fld.startswith('cd_') and fld != 'cd_ordemserv':
+                                ordem_data[fld] = _safe_int(v)
+                            elif fld.startswith('dt_'):
+                                ordem_data[fld] = _safe_str(v, 50)
+                            else:
+                                ordem_data[fld] = _safe_str(v, 500 if 'descr_queixa' in fld or 'exec' in fld else 255)
+
+                    if update_existing:
+                        ordem_obj, created = OrdemServicoLubrificacao.objects.update_or_create(
+                            cd_ordemserv=cd_ordemserv, defaults=ordem_data
+                        )
+                        if created:
+                            created_count += 1
+                        else:
+                            updated_count += 1
+                    else:
+                        ordem_obj, created = OrdemServicoLubrificacao.objects.get_or_create(
+                            cd_ordemserv=cd_ordemserv, defaults=ordem_data
+                        )
+                        if created:
+                            created_count += 1
+
+                    cd_func_exec_os = _safe_str(_g(row_data, 'CD_FUNC_EXEC_OS'), 100)
+                    nm_func_exec_os = _safe_str(_g(row_data, 'NM_FUNC_EXEC_OS'), 255)
+                    dt_ficapomanu = _safe_str(_g(row_data, 'DT_FICAPOMANU'), 50)
+                    dt_inic_iteficmanu = _safe_str(_g(row_data, 'DT_INIC_ITEFICMANU'), 50)
+                    dt_fim_iteficmanu = _safe_str(_g(row_data, 'DT_FIM_ITEFICMANU'), 50)
+
+                    if cd_func_exec_os or nm_func_exec_os or dt_ficapomanu or dt_inic_iteficmanu or dt_fim_iteficmanu:
+                        ficha_data = {'ordem_servico': ordem_obj}
+                        if cd_func_exec_os:
+                            ficha_data['cd_func_exec_os'] = cd_func_exec_os
+                        if nm_func_exec_os:
+                            ficha_data['nm_func_exec_os'] = nm_func_exec_os
+                        if dt_ficapomanu:
+                            ficha_data['dt_ficapomanu'] = dt_ficapomanu
+                        if dt_inic_iteficmanu:
+                            ficha_data['dt_inic_iteficmanu'] = dt_inic_iteficmanu
+                        if dt_fim_iteficmanu:
+                            ficha_data['dt_fim_iteficmanu'] = dt_fim_iteficmanu
+                        try:
+                            OrdemServicoLubrificacaoFicha.objects.create(**ficha_data)
+                        except Exception as e:
+                            errors.append(f"Linha {row_num}: Erro ao criar ficha - {str(e)}")
+
+                except Exception as e:
+                    errors.append(f"Linha {row_num}: {str(e)}")
+
+        return created_count, updated_count, errors
+
+    except ValidationError as e:
+        errors.append(str(e))
+        return 0, 0, errors
+    except Exception as e:
+        errors.append(f"Erro geral: {str(e)}")
+        return 0, 0, errors
+
+
 def upload_maquinas_from_file(file, update_existing=False, update_fields=None) -> Tuple[int, int, List[str], List]:
     """
     Faz upload de mÃ¡quinas a partir de um arquivo CSV ou Excel
@@ -2041,6 +2181,41 @@ def _safe_str(value, max_length=None, default=''):
     return str_value
 
 
+def _get_row_value(row_data, *keys, default=''):
+    """Obtém valor do row_data tentando múltiplas chaves possíveis (suporta encoding variants)."""
+    for key in keys:
+        if key is None:
+            continue
+        if key in row_data:
+            val = row_data.get(key)
+            if val is not None and str(val).strip() != '':
+                return val
+    return default
+
+
+def _get_row_value_by_normalized_key(row_data, *target_names, default=''):
+    """
+    Obtém valor do row_data buscando chave por nome normalizado (remove acentos, lowercase).
+    Útil para CSVs com encoding variado (ex: PLANO_PREVENTIVA_DELIMITADO_DADOS.csv).
+    target_names: ex. ('unidade', 'nome_unidade') - usa o primeiro match exato.
+    """
+    import unicodedata
+    for k, v in row_data.items():
+        if v is None or str(v).strip() == '':
+            continue
+        k_norm = unicodedata.normalize('NFKD', str(k)).encode('ascii', 'ignore').decode().lower()
+        k_norm = k_norm.replace(' ', '_').replace('-', '_')
+        for target in target_names:
+            t = str(target).lower().replace(' ', '_')
+            if not t:
+                continue
+            if k_norm == t:
+                return v
+            if len(k_norm) >= len(t) and (k_norm.startswith(t + '_') or k_norm.startswith(t + ' ') or k_norm == t):
+                return v
+    return default
+
+
 def _classify_value_type(value):
     """
     Classifica um valor (string ou outro) em: 'integer', 'float', 'date', 'text', 'empty'.
@@ -2336,17 +2511,23 @@ def _safe_date(value, default=None):
 
 def _fix_funcionario_columns(row_data):
     """
-    Corrige deslocamento de colunas para 'FuncionÃ¡rio' e 'Nome FuncionÃ¡rio'
-    Se 'FuncionÃ¡rio' estiver vazio, assume que os dados corretos estÃ£o na prÃ³xima coluna
+    Corrige deslocamento de colunas para 'Funcionário' e 'Nome Funcionário'
+    Se 'Funcionário' estiver vazio, assume que os dados corretos estão na próxima coluna
+    Suporta encoding variants (FuncionÃ¡rio, Funcionário, etc.)
     """
+    import unicodedata
     funcionario_key = None
     nome_funcionario_key = None
-    
+
+    def _norm(s):
+        return unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().lower()
+
     # Encontrar as chaves corretas
     for key in row_data.keys():
         key_lower = str(key).lower().strip()
-        if 'funcionÃ¡rio' in key_lower or 'funcionario' in key_lower:
-            if 'nome' in key_lower:
+        key_norm = _norm(key)
+        if 'funcionario' in key_norm or 'funcionÃ¡rio' in key_lower or 'funcionário' in key_lower:
+            if 'nome' in key_norm or 'nome' in key_lower:
                 nome_funcionario_key = key
             else:
                 funcionario_key = key
@@ -2467,62 +2648,67 @@ def upload_plano_preventiva_from_file(file, update_existing=False) -> Tuple[int,
                     if not any(str(v).strip() if v else '' for v in row_data.values()):
                         continue
                     
-                    # Corrigir deslocamento de colunas para FuncionÃ¡rio
+                    # Corrigir deslocamento de colunas para Funcionário
                     row_data = _fix_funcionario_columns(row_data)
                     
                     # Mapear colunas do CSV para campos do modelo
-                    # O CSV tem: CD_UNID;NOME_UNID;NUMERO_PLANO;DESCR_PLANO;CD_MAQUINA;DESCR_MAQUINA;...
+                    # Suporta: (1) CD_UNID, NUMERO_PLANO, etc. e (2) PLANO_PREVENTIVA_DELIMITADO_DADOS.csv
+                    # (Unidade, Nome Unidade, Setor, Máquina, Plano, Sequência Manutenção, Data Execução, etc.)
+                    
+                    def _v(*keys):
+                        return _get_row_value(row_data, *keys)
+                    
+                    def _v_norm(*norm_keys):
+                        return _get_row_value_by_normalized_key(row_data, *norm_keys)
                     
                     # Unidade
-                    cd_unid = _safe_int(row_data.get('CD_UNID') or row_data.get('cd_unid') or row_data.get('Cd_Unid'))
-                    nome_unid = _safe_str(row_data.get('NOME_UNID') or row_data.get('nome_unid') or row_data.get('Nome_Unid'), max_length=255)
+                    cd_unid = _safe_int(_v('CD_UNID', 'cd_unid', 'Unidade') or _v_norm('unidade'))
+                    nome_unid = _safe_str(_v('NOME_UNID', 'nome_unid', 'Nome Unidade') or _v_norm('nome_unidade'), max_length=255)
+                    
+                    # Setor e Atividade (PLANO_PREVENTIVA_DELIMITADO_DADOS.csv)
+                    cd_setor = _safe_str(_v('CD_SETOR', 'cd_setor', 'Setor') or _v_norm('setor'), max_length=50)
+                    descr_setor = _safe_str(_v('DESCR_SETOR', 'descr_setor', 'Descrição Setor', 'Descricao Setor') or _v_norm('descricao_setor', 'descr_setor'), max_length=255)
+                    cd_atividade = _safe_int(_v('CD_ATIVIDADE', 'cd_atividade', 'Atividade') or _v_norm('atividade'))
                     
                     # Plano
-                    numero_plano = _safe_int(row_data.get('NUMERO_PLANO') or row_data.get('numero_plano') or row_data.get('Numero_Plano'))
-                    descr_plano = _safe_str(row_data.get('DESCR_PLANO') or row_data.get('descr_plano') or row_data.get('Descr_Plano'), max_length=255)
+                    numero_plano = _safe_int(_v('NUMERO_PLANO', 'numero_plano', 'Plano') or _v_norm('plano'))
+                    descr_plano = _safe_str(_v('DESCR_PLANO', 'descr_plano', 'Descrição Plano', 'Descricao Plano') or _v_norm('descricao_plano', 'descr_plano'), max_length=255)
                     
-                    # MÃ¡quina
-                    cd_maquina = _safe_int(row_data.get('CD_MAQUINA') or row_data.get('cd_maquina') or row_data.get('Cd_Maquina'))
-                    descr_maquina = _safe_str(row_data.get('DESCR_MAQUINA') or row_data.get('descr_maquina') or row_data.get('Descr_Maquina'), max_length=500)
+                    # Máquina
+                    cd_maquina = _safe_int(_v('CD_MAQUINA', 'cd_maquina', 'Máquina', 'Maquina') or _v_norm('maquina'))
+                    descr_maquina = _safe_str(_v('DESCR_MAQUINA', 'descr_maquina', 'Descrição Máquina', 'Descricao Maquina') or _v_norm('descricao_maquina', 'descr_maquina'), max_length=500)
+                    nro_patrimonio = _safe_str(_v('NRO_PATRIMONIO', 'nro_patrimonio', 'Nº Patrimônio', 'N Patrimonio', 'Patrimonio') or _v_norm('patrimonio', 'nro_patrimonio'), max_length=100)
                     
-                    # SequÃªncias
-                    sequencia_tarefa = _safe_int(row_data.get('SEQUENCIA_TAREFA') or row_data.get('sequencia_tarefa') or row_data.get('Sequencia_Tarefa'))
-                    sequencia_manutencao = _safe_int(row_data.get('SEQUENCIA_MANUTENCAO') or row_data.get('sequencia_manutencao') or row_data.get('Sequencia_Manutencao'))
+                    # Sequências
+                    sequencia_tarefa = _safe_int(_v('SEQUENCIA_TAREFA', 'sequencia_tarefa', 'Sequência Tarefa', 'Sequencia Tarefa') or _v_norm('sequencia_tarefa'))
+                    sequencia_manutencao = _safe_int(_v('SEQUENCIA_MANUTENCAO', 'sequencia_manutencao', 'Sequência Manutenção', 'Sequencia Manutencao') or _v_norm('sequencia_manutencao'))
                     
                     # Tarefa
-                    descr_tarefa = _safe_str(row_data.get('DESCR_TAREFA') or row_data.get('descr_tarefa') or row_data.get('Descr_Tarefa'))
+                    descr_tarefa = _safe_str(_v('DESCR_TAREFA', 'descr_tarefa', 'Descrição Tarefa', 'Descricao Tarefa') or _v_norm('descricao_tarefa', 'descr_tarefa'))
                     
-                    # FuncionÃ¡rio
-                    funcionario = _safe_str(row_data.get('FUNCIONÃRIO') or row_data.get('FUNCIONARIO') or row_data.get('FuncionÃ¡rio') or row_data.get('Funcionario') or row_data.get('funcionÃ¡rio') or row_data.get('funcionario'), max_length=100)
-                    nome_funcionario = _safe_str(row_data.get('NOME_FUNCIONÃRIO') or row_data.get('NOME_FUNCIONARIO') or row_data.get('Nome_FuncionÃ¡rio') or row_data.get('Nome_Funcionario') or row_data.get('nome_funcionÃ¡rio') or row_data.get('nome_funcionario'), max_length=255)
+                    # Quantidade Período (PLANO_PREVENTIVA_DELIMITADO_DADOS.csv)
+                    quantidade_periodo = _safe_int(_v('QUANTIDADE_PERIODO', 'quantidade_periodo', 'Quantidade Período', 'Quantidade Periodo') or _v_norm('quantidade_periodo'))
                     
-                    # Data ExecuÃ§Ã£o
-                    data_execucao_str = row_data.get('DATA_EXECUCAO') or row_data.get('data_execucao') or row_data.get('Data_Execucao')
-                    data_execucao = None
-                    if data_execucao_str:
-                        try:
-                            from datetime import datetime
-                            # Tentar diferentes formatos de data
-                            data_execucao = datetime.strptime(str(data_execucao_str).strip(), '%d/%m/%Y').date()
-                        except ValueError:
-                            try:
-                                data_execucao = datetime.strptime(str(data_execucao_str).strip(), '%Y-%m-%d').date()
-                            except ValueError:
-                                pass  # Data Ã© opcional
+                    # Funcionário
+                    cd_funcionario = _safe_str(_v('FUNCIONARIO', 'FUNCIONÁRIO', 'Funcionário', 'Funcionario', 'CD_FUNCIONARIO', 'cd_funcionario') or _v_norm('funcionario'), max_length=100)
+                    nome_funcionario = _safe_str(_v('NOME_FUNCIONARIO', 'NOME_FUNCIONÁRIO', 'Nome Funcionário', 'Nome Funcionario') or _v_norm('nome_funcionario'), max_length=255)
                     
-                    # Validar campos obrigatÃ³rios
+                    # Data Execução - PlanoPreventiva usa dt_execucao (CharField DD/MM/YYYY)
+                    data_execucao_str = _v('DATA_EXECUCAO', 'data_execucao', 'Data Execução', 'Data Execucao') or _v_norm('data_execucao')
+                    dt_execucao = _safe_str(data_execucao_str, max_length=50) if data_execucao_str else None
+                    
+                    # Validar campos obrigatórios (Plano e Máquina para identificar unicamente)
                     if not numero_plano:
-                        errors.append(f"Linha {row_num}: Campo 'NUMERO_PLANO' Ã© obrigatÃ³rio")
+                        errors.append(f"Linha {row_num}: Campo 'Plano' ou 'NUMERO_PLANO' é obrigatório")
                         continue
                     
                     if not cd_maquina:
-                        errors.append(f"Linha {row_num}: Campo 'CD_MAQUINA' Ã© obrigatÃ³rio")
+                        errors.append(f"Linha {row_num}: Campo 'Máquina' ou 'CD_MAQUINA' é obrigatório")
                         continue
                     
-                    # Tentar encontrar mÃ¡quina relacionada
+                    # Tentar encontrar máquina relacionada (opcional - importa mesmo se não existir)
                     maquina = None
                     if cd_maquina:
-                        # Verificar cache primeiro
                         if cd_maquina in maquinas_cache:
                             maquina = maquinas_cache[cd_maquina]
                         else:
@@ -2530,23 +2716,27 @@ def upload_plano_preventiva_from_file(file, update_existing=False) -> Tuple[int,
                                 maquina = Maquina.objects.get(cd_maquina=cd_maquina)
                                 maquinas_cache[cd_maquina] = maquina
                             except Maquina.DoesNotExist:
-                                errors.append(f"Linha {row_num}: MÃ¡quina com cÃ³digo {cd_maquina} nÃ£o encontrada")
-                                continue
+                                maquina = None  # Importa sem vínculo com Maquina
                     
-                    # Preparar dados para criaÃ§Ã£o/atualizaÃ§Ã£o
+                    # Preparar dados para criação/atualização (PlanoPreventiva model fields)
                     plano_data = {
                         'cd_unid': cd_unid,
                         'nome_unid': nome_unid,
+                        'cd_setor': cd_setor,
+                        'descr_setor': descr_setor,
+                        'cd_atividade': cd_atividade,
                         'descr_plano': descr_plano,
                         'maquina': maquina,
                         'cd_maquina': cd_maquina,
                         'descr_maquina': descr_maquina,
+                        'nro_patrimonio': nro_patrimonio,
                         'sequencia_tarefa': sequencia_tarefa,
                         'sequencia_manutencao': sequencia_manutencao,
                         'descr_tarefa': descr_tarefa,
-                        'funcionario': funcionario,
+                        'quantidade_periodo': quantidade_periodo,
+                        'cd_funcionario': cd_funcionario,
                         'nome_funcionario': nome_funcionario,
-                        'data_execucao': data_execucao,
+                        'dt_execucao': dt_execucao,
                     }
                     
                     # Criar ou atualizar registro

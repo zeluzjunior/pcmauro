@@ -26,6 +26,30 @@
 <!-- Main Content -->
 <section class="py-5">
     <div class="container">
+        <!-- Caixa de erros de importação (no topo, permanece até fechar manualmente) -->
+        {% if import_errors %}
+        <div class="row mb-4" id="importErrorsBox">
+            <div class="col-12">
+                <div class="card border-danger shadow-sm">
+                    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Erros de Importação ({{ import_errors|length }})
+                        </h5>
+                        <button type="button" class="btn btn-light btn-sm" id="closeErrorsBtn" aria-label="Fechar">
+                            <i class="fas fa-times me-1"></i>Fechar
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <textarea class="form-control border-0 rounded-0 font-monospace small" 
+                                  rows="12" readonly 
+                                  style="resize: vertical; min-height: 200px;">{% for err in import_errors %}{{ err }}{% if not forloop.last %}
+{% endif %}{% endfor %}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Upload Section -->
         <div class="row mb-5">
             <div class="col-lg-8 mx-auto">
@@ -189,6 +213,8 @@
                             </table>
                         </div>
                         <hr>
+                        <h6 class="fw-bold">Arquivo Recomendado</h6>
+                        <p>O formato ideal é o arquivo <strong>PLANO_PREVENTIVA_DELIMITADO_DADOS.csv</strong>, com colunas em português (Unidade, Nome Unidade, Setor, Máquina, Plano, etc.) e delimitador ponto e vírgula.</p>
                         <h6 class="fw-bold">Formato Aceito</h6>
                         <ul>
                             <li><strong>CSV:</strong> Arquivo delimitado por ponto e vírgula (<code>;</code>) com encoding <code>latin-1</code> ou <code>utf-8</code></li>
@@ -282,6 +308,15 @@ window.addEventListener('load', function() {
             console.log('File ready for upload:', fileInput.files[0].name, 'Size:', fileInput.files[0].size);
         }
     });
+
+    // Fechar caixa de erros manualmente
+    const closeErrorsBtn = document.getElementById('closeErrorsBtn');
+    const importErrorsBox = document.getElementById('importErrorsBox');
+    if (closeErrorsBtn && importErrorsBox) {
+        closeErrorsBtn.addEventListener('click', function() {
+            importErrorsBox.style.display = 'none';
+        });
+    }
 });
 </script>
 {% endblock %}

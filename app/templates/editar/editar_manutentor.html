@@ -159,6 +159,20 @@
                                     {% endif %}
                                     <div class="form-text">Local de trabalho{% if not form.local_trab|is_required %} <span class="text-muted">(opcional)</span>{% else %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
                                 </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check mt-4">
+                                        {{ form.ativo }}
+                                        <label for="{{ form.ativo.id_for_label }}" class="form-check-label">
+                                            {{ form.ativo.label }}
+                                        </label>
+                                    </div>
+                                    {% if form.ativo.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.ativo.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Indica se o manutentor faz parte da equipe</div>
+                                </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="{{ form.tempo_trabalho.id_for_label }}" class="form-label">
                                         {{ form.tempo_trabalho.label }}

@@ -129,9 +129,10 @@
                 <div class="accordion filter-accordion" id="filterAccordion">
                     <div class="accordion-item shadow-sm border-0">
                         <h2 class="accordion-header" id="headingFilter">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="false" aria-controls="collapseFilter">
+                            <button class="accordion-button {% if mostrar_todos or ano_selecionado or meses_selecionados or setores_selecionados or uso_contabil_filtro %}{% else %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if mostrar_todos or ano_selecionado or meses_selecionados or setores_selecionados or uso_contabil_filtro %}true{% else %}false{% endif %}" aria-controls="collapseFilter">
                                 <i class="fas fa-sliders-h me-2"></i>Filtros de Análise
-                                {% if ano_selecionado or meses_selecionados or setores_selecionados or uso_contabil_filtro %}
+                                {% if mostrar_todos or ano_selecionado or meses_selecionados or setores_selecionados or uso_contabil_filtro %}
+                                    {% if mostrar_todos %}<span class="badge bg-success ms-2">Todos os registros</span>{% endif %}
                                     <span class="badge bg-light text-dark ms-2">{% if meses_selecionados %}{{ meses_selecionados|length }}{% else %}12{% endif %} mês(es)</span>
                                     {% if setores_selecionados %}
                                     <span class="badge bg-light text-dark ms-1">{{ setores_selecionados|length }} setor(es)</span>
@@ -139,12 +140,21 @@
                                 {% endif %}
                             </button>
                         </h2>
-                        <div id="collapseFilter" class="accordion-collapse collapse" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
+                        <div id="collapseFilter" class="accordion-collapse collapse {% if mostrar_todos or ano_selecionado or meses_selecionados or setores_selecionados or uso_contabil_filtro %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
                             <div class="accordion-body">
                                 <form method="GET" action="{% url 'analise_projecao_gastos' %}">
+                                    <!-- Mostrar todos (sem filtros de ano/mês) -->
+                                    <div class="mb-3">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="mostrar_todos" name="mostrar_todos" value="true" {% if mostrar_todos %}checked{% endif %} onchange="this.form.submit()">
+                                            <label class="form-check-label" for="mostrar_todos">
+                                                <strong>Mostrar todos os registros (sem filtros de ano/mês)</strong> — inclui todos os setores como "7. AUTOMAÇÃO"
+                                            </label>
+                                        </div>
+                                    </div>
                                     <!-- Row 1: Ano+Uso Contábil (juntos) | Setor (maior) | Botões -->
                                     <div class="row g-3 mb-4">
-                                        <div class="col-md-4">
+                                        <div class="col-md-4" {% if mostrar_todos %}style="opacity: 0.6;"{% endif %}>
                                             <div class="filter-group h-100 d-flex flex-column gap-2">
                                                 <div>
                                                     <div class="filter-group-label"><i class="fas fa-calendar-alt"></i>Ano</div>
@@ -324,33 +334,6 @@
             </div>
         </div>
 
-        <!-- Accordion: Visualizar projeções por setor (9 setores) -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="accordion shadow-sm" id="accordionPorSetor">
-                    <div class="accordion-item border-0">
-                        <h2 class="accordion-header" id="headingPorSetor">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePorSetor" aria-expanded="false" aria-controls="collapsePorSetor">
-                                <i class="fas fa-layer-group me-2"></i><strong>Visualizar projeções por setor</strong>
-                            </button>
-                        </h2>
-                        <div id="collapsePorSetor" class="accordion-collapse collapse" aria-labelledby="headingPorSetor" data-bs-parent="#accordionPorSetor">
-                            <div class="accordion-body">
-                                <p class="text-muted mb-3">Selecione um setor para ver todas as projeções de gastos daquele setor.</p>
-                                <div class="d-flex flex-wrap gap-2">
-                                    {% for setor in setores_para_links %}
-                                        <a href="{% url 'visualizar_projecoes_gastos_por_setor' %}?setor={{ setor|urlencode }}" class="btn btn-outline-primary">{{ setor }}</a>
-                                    {% empty %}
-                                        <span class="text-muted">Nenhum setor disponível.</span>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Gastos por Previsão de Execução (previsao_execucao) — por ano, 3 barras: Total, SIM, NÃO -->
         <div class="row mb-5">
             <div class="col-12">
@@ -391,6 +374,25 @@
                     <div class="card-body">
                         <div class="chart-container-large">
                             <canvas id="valorPorSetorChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfico Projeções por Setor e Status (Serviço Concluído) -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header text-white" style="background-color: #0d6efd;">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Projeções por Setor e Status (Serviço Concluído)
+                        </h5>
+                        <small class="opacity-90">Valor total (R$) por setor: SIM, NÃO, INDEFINIDO e Não informado</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="setorStatusChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -1021,6 +1023,57 @@
                         y: {
                             beginAtZero: true,
                             title: { display: true, text: 'Valor (R$)' },
+                            ticks: {
+                                callback: function(v) { return 'R$ ' + formatarMoedaBR(v).replace('R$ ', ''); },
+                                font: { size: 11 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Gráfico Projeções por Setor e Status (Serviço Concluído): 4 colunas por setor (SIM, NÃO, INDEFINIDO, Não informado)
+        const setorStatusCtx = document.getElementById('setorStatusChart');
+        if (setorStatusCtx) {
+            const setorStatusLabels = {{ tabela_setor_servico_chart_labels_json|safe }};
+            const setorStatusSim = {{ tabela_setor_servico_chart_sim_json|safe }};
+            const setorStatusNao = {{ tabela_setor_servico_chart_nao_json|safe }};
+            const setorStatusIndefinido = {{ tabela_setor_servico_chart_indefinido_json|safe }};
+            const setorStatusNaoInformado = {{ tabela_setor_servico_chart_nao_informado_json|safe }};
+            new Chart(setorStatusCtx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: setorStatusLabels,
+                    datasets: [
+                        { label: 'SIM', data: setorStatusSim, backgroundColor: 'rgba(25, 135, 84, 0.7)', borderColor: '#198754', borderWidth: 1 },
+                        { label: 'NÃO', data: setorStatusNao, backgroundColor: 'rgba(220, 53, 69, 0.7)', borderColor: '#dc3545', borderWidth: 1 },
+                        { label: 'INDEFINIDO', data: setorStatusIndefinido, backgroundColor: 'rgba(255, 193, 7, 0.7)', borderColor: '#ffc107', borderWidth: 1 },
+                        { label: 'Não informado', data: setorStatusNaoInformado, backgroundColor: 'rgba(108, 117, 125, 0.7)', borderColor: '#6c757d', borderWidth: 1 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { padding: 12, font: { size: 11 }, usePointStyle: true, pointStyle: 'rect' } },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.parsed.y || 0;
+                                    return context.dataset.label + ': R$ ' + formatarMoedaBR(value).replace('R$ ', '');
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Setor', font: { size: 12, weight: 'bold' } },
+                            ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 45 }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Valor (R$)', font: { size: 12, weight: 'bold' } },
                             ticks: {
                                 callback: function(v) { return 'R$ ' + formatarMoedaBR(v).replace('R$ ', ''); },
                                 font: { size: 11 }

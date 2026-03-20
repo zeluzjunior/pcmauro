@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Configurações de Mão de Obra{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(13, 110, 253, 0.5), rgba(13, 110, 253, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise de Mão de Obra</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Configurações</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="bi bi-gear me-2"></i>Configurações de Mão de Obra
+                </h1>
+                <p class="lead">Configurações e parâmetros de mão de obra</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <p class="text-muted mb-0">Conteúdo em desenvolvimento.</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

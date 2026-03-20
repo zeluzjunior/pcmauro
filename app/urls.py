@@ -20,6 +20,7 @@ urlpatterns = [
     path('importar/manutentores/', views.importar_manutentores, name="importar_manutentores"),
     path('importar/ordens-corretivas-e-outros/', views.importar_ordens_corretivas_e_outros, name="importar_ordens_corretivas_e_outros"),
     path('importar/ordens-preventivas/', views.importar_ordens_preventivas, name="importar_ordens_preventivas"),
+    path('importar/ordens-lubrificacao/', views.importar_ordens_lubrificacao, name="importar_ordens_lubrificacao"),
     path('importar/plano-preventiva/', views.importar_plano_preventiva, name="importar_plano_preventiva"),
     path('importar/roteiro-preventiva/', views.importar_roteiro_preventiva, name="importar_roteiro_preventiva"),
     path('importar/52-semanas/', views.importar_52_semanas, name="importar_52_semanas"),
@@ -44,6 +45,7 @@ urlpatterns = [
     
     # Manutenções Preventivas
     path('manutencoes-preventivas/consultar/', views.consultar_manutencoes_preventivas, name="consultar_manutencoes_preventivas"),
+    path('plano-preventiva/consultar/', views.consultar_plano_preventiva, name="consultar_plano_preventiva"),
     path('meus-planos-preventiva/consultar/', views.consultar_meu_plano, name="consultar_meu_plano"),
     path('consultar/52-semanas/', views.consultar_52_semanas, name="consultar_52_semanas"),
     path('consultar/requisicoes-almoxarifado/', views.consultar_requisicoes_almoxarifado, name="consultar_requisicoes_almoxarifado"),
@@ -131,6 +133,7 @@ urlpatterns = [
     # Lubrificações
     path('lubrificacao/analise/', views.analise_lubrificacao, name="analise_lubrificacao"),
     path('lubrificacao/consultar-ordens/', views.consultar_ordens_lubrificacao, name="consultar_ordens_lubrificacao"),
+    path('lubrificacao/visualizar/<int:ordem_id>/', views.visualizar_lubrificacao, name="visualizar_lubrificacao"),
     
     # Calibrações
     path('calibracao/analise/', views.analise_calibracao, name="analise_calibracao"),
@@ -147,6 +150,13 @@ urlpatterns = [
     path('manutencao-corretiva/consultar/', views.consultar_corretivas_outros, name="consultar_corretivas_outros"),
     path('manutencao-corretiva/visualizar/<int:ordem_id>/', views.visualizar_corretiva_outros, name="visualizar_corretiva_outros"),
    
+    # Análise de Mão de Obra
+    path('analise-mao-de-obra/geral/', views.analise_geral_mao_de_obra, name="analise_geral_mao_de_obra"),
+    path('analise-mao-de-obra/ordens/', views.analise_mao_de_obra_e_ordens, name="analise_mao_de_obra_e_ordens"),
+    path('analise-mao-de-obra/preventiva/', views.analise_mao_de_obra_preventiva, name="analise_mao_de_obra_preventiva"),
+    path('analise-mao-de-obra/calculo/', views.calculo_mao_de_obra, name="calculo_mao_de_obra"),
+    path('analise-mao-de-obra/configuracoes/', views.configuracoes_mao_de_obra, name="configuracoes_mao_de_obra"),
+
     # Manutentores
     path('manutentor/analise/', views.analise_manutentores, name="analise_manutentores"),
     path('manutentor/cadastrar/', views.cadastrar_manutentor, name="cadastrar_manutentor"),

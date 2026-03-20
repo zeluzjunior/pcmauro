@@ -139,6 +139,7 @@
         <div class="row mb-4">
             <div class="col-md-12">
                 <form method="get" action="{% url 'consultar_manutentores' %}" class="d-flex">
+                    <input type="hidden" name="filtro_ativo" value="{{ filtro_ativo }}">
                     <input type="text" name="search" class="form-control me-2" placeholder="Buscar por cadastro, nome, cargo, tipo, turno ou local..." value="{{ request.GET.search }}">
                     <button type="submit" class="btn btn-outline-primary">
                         <i class="fas fa-search"></i> Buscar
@@ -152,20 +153,30 @@
             <div class="col-12">
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-secondary text-white">
-                        <button class="btn btn-link text-white text-decoration-none p-0 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="false" aria-controls="filtrosCollapse">
+                        <button class="btn btn-link text-white text-decoration-none p-0 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="true" aria-controls="filtrosCollapse">
                             <h5 class="mb-0">
                                 <i class="fas fa-filter me-2"></i>Filtros Avançados
                                 <i class="fas fa-chevron-down float-end"></i>
                             </h5>
                         </button>
                     </div>
-                    <div class="collapse" id="filtrosCollapse">
+                    <div class="collapse show" id="filtrosCollapse">
                         <div class="card-body">
                             <form method="get" id="filtrosForm">
                                 <!-- Preservar busca geral -->
                                 <input type="hidden" name="search" value="{{ request.GET.search }}">
                                 
                                 <div class="row g-3">
+                                    
+                                    <!-- Filtro por Ativo -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_ativo" class="form-label">Ativo</label>
+                                        <select class="form-select" id="filtro_ativo" name="filtro_ativo">
+                                            <option value="1" {% if filtro_ativo == '1' %}selected{% endif %}>Sim — Faz parte da equipe</option>
+                                            <option value="0" {% if filtro_ativo == '0' %}selected{% endif %}>Não — Não faz parte da equipe</option>
+                                            <option value="" {% if filtro_ativo == '' %}selected{% endif %}>Todos</option>
+                                        </select>
+                                    </div>
                                     
                                     <!-- Filtro por Turno -->
                                     <div class="col-md-3">

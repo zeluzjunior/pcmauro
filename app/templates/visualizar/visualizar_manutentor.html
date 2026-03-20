@@ -61,6 +61,16 @@
                                 <label class="form-label fw-bold">Cargo</label>
                                 <p class="form-control-plaintext">{{ manutentor.Cargo|default:"Não informado" }}</p>
                             </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Ativo</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutentor.ativo %}
+                                        <span class="badge bg-success">Sim — Faz parte da equipe</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Não — Não faz parte da equipe</span>
+                                    {% endif %}
+                                </p>
+                            </div>
                         </div>
                             </div>
                         </div>

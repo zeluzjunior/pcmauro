@@ -262,7 +262,7 @@
                     <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h5 class="mb-0">
                             <i class="fas fa-table me-2"></i>Paradas de Máquina
-                            <small class="ms-2">({{ paradas.paginator.count }} registro{{ paradas.paginator.count|pluralize }})</small>
+                            <small class="ms-2">({{ total_count }} registro{{ total_count|pluralize }})</small>
                         </h5>
                         <a href="{{ export_paradas_url }}" class="btn btn-light btn-sm" title="Exportar para Excel">
                             <i class="fas fa-file-excel me-1"></i>Exportar Excel
@@ -392,40 +392,6 @@
             </div>
         </div>
 
-        <!-- Pagination -->
-        {% if paradas.has_other_pages %}
-        <div class="row mt-4">
-            <div class="col-12">
-                <nav aria-label="Page navigation">
-                    <ul class="pagination justify-content-center">
-                        {% if paradas.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if ano_filtro %}ano={{ ano_filtro }}&{% endif %}{% for mes in meses_filtro %}mes={{ mes }}&{% endfor %}{% if col_descr_recurso %}col_descr_recurso={{ col_descr_recurso|urlencode }}&{% endif %}{% if col_cod_parada %}col_cod_parada={{ col_cod_parada|urlencode }}&{% endif %}{% if col_descr_parada %}col_descr_parada={{ col_descr_parada|urlencode }}&{% endif %}{% if col_descr_linha %}col_descr_linha={{ col_descr_linha|urlencode }}&{% endif %}{% if col_turno %}col_turno={{ col_turno|urlencode }}&{% endif %}{% if col_motivo %}col_motivo={{ col_motivo|urlencode }}&{% endif %}{% if col_acao %}col_acao={{ col_acao|urlencode }}&{% endif %}page=1">Primeira</a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if ano_filtro %}ano={{ ano_filtro }}&{% endif %}{% for mes in meses_filtro %}mes={{ mes }}&{% endfor %}{% if col_descr_recurso %}col_descr_recurso={{ col_descr_recurso|urlencode }}&{% endif %}{% if col_cod_parada %}col_cod_parada={{ col_cod_parada|urlencode }}&{% endif %}{% if col_descr_parada %}col_descr_parada={{ col_descr_parada|urlencode }}&{% endif %}{% if col_descr_linha %}col_descr_linha={{ col_descr_linha|urlencode }}&{% endif %}{% if col_turno %}col_turno={{ col_turno|urlencode }}&{% endif %}{% if col_motivo %}col_motivo={{ col_motivo|urlencode }}&{% endif %}{% if col_acao %}col_acao={{ col_acao|urlencode }}&{% endif %}page={{ paradas.previous_page_number }}">Anterior</a>
-                            </li>
-                        {% endif %}
-                        
-                        <li class="page-item active">
-                            <span class="page-link">
-                                Página {{ paradas.number }} de {{ paradas.paginator.num_pages }}
-                            </span>
-                        </li>
-                        
-                        {% if paradas.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if ano_filtro %}ano={{ ano_filtro }}&{% endif %}{% for mes in meses_filtro %}mes={{ mes }}&{% endfor %}{% if col_descr_recurso %}col_descr_recurso={{ col_descr_recurso|urlencode }}&{% endif %}{% if col_cod_parada %}col_cod_parada={{ col_cod_parada|urlencode }}&{% endif %}{% if col_descr_parada %}col_descr_parada={{ col_descr_parada|urlencode }}&{% endif %}{% if col_descr_linha %}col_descr_linha={{ col_descr_linha|urlencode }}&{% endif %}{% if col_turno %}col_turno={{ col_turno|urlencode }}&{% endif %}{% if col_motivo %}col_motivo={{ col_motivo|urlencode }}&{% endif %}{% if col_acao %}col_acao={{ col_acao|urlencode }}&{% endif %}page={{ paradas.next_page_number }}">Próxima</a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if ano_filtro %}ano={{ ano_filtro }}&{% endif %}{% for mes in meses_filtro %}mes={{ mes }}&{% endfor %}{% if col_descr_recurso %}col_descr_recurso={{ col_descr_recurso|urlencode }}&{% endif %}{% if col_cod_parada %}col_cod_parada={{ col_cod_parada|urlencode }}&{% endif %}{% if col_descr_parada %}col_descr_parada={{ col_descr_parada|urlencode }}&{% endif %}{% if col_descr_linha %}col_descr_linha={{ col_descr_linha|urlencode }}&{% endif %}{% if col_turno %}col_turno={{ col_turno|urlencode }}&{% endif %}{% if col_motivo %}col_motivo={{ col_motivo|urlencode }}&{% endif %}{% if col_acao %}col_acao={{ col_acao|urlencode }}&{% endif %}page={{ paradas.paginator.num_pages }}">Última</a>
-                            </li>
-                        {% endif %}
-                    </ul>
-                </nav>
-            </div>
-        </div>
-        {% endif %}
     </div>
 </section>
 {% endblock %}

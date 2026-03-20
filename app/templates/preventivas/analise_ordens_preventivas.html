@@ -1,0 +1,607 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Análise de Ordens Preventivas{% endblock %}
+
+{% block extra_css %}
+<!-- Chart.js CSS -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 30px;
+    }
+    .chart-container-large {
+        position: relative;
+        height: 400px;
+        margin-bottom: 30px;
+    }
+    .stat-card {
+        transition: transform 0.2s;
+        border-left: 4px solid;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Ordens de Serviço</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise Preventivas</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3"><i class="bi bi-tools me-2"></i>Análise de Ordens Preventivas</h1>
+                <p class="lead">Dashboard com análises e estatísticas das ordens de serviço preventivas</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Filtro de Ano e Mês (Accordion) -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion filter-accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button {% if meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                                <i class="fas fa-filter me-2"></i>
+                                <strong>Filtros</strong>
+                                {% if meses_filtro or ano_filtro %}
+                                    <span class="badge bg-info ms-2">
+                                        {% if meses_filtro %}
+                                            {% if meses_filtro|length == 1 %}
+                                                {% if meses_filtro.0 == 1 %}Janeiro
+                                                {% elif meses_filtro.0 == 2 %}Fevereiro
+                                                {% elif meses_filtro.0 == 3 %}Março
+                                                {% elif meses_filtro.0 == 4 %}Abril
+                                                {% elif meses_filtro.0 == 5 %}Maio
+                                                {% elif meses_filtro.0 == 6 %}Junho
+                                                {% elif meses_filtro.0 == 7 %}Julho
+                                                {% elif meses_filtro.0 == 8 %}Agosto
+                                                {% elif meses_filtro.0 == 9 %}Setembro
+                                                {% elif meses_filtro.0 == 10 %}Outubro
+                                                {% elif meses_filtro.0 == 11 %}Novembro
+                                                {% elif meses_filtro.0 == 12 %}Dezembro
+                                                {% endif %} de {{ ano_filtro }}
+                                            {% else %}
+                                                {{ meses_filtro|length }} meses de {{ ano_filtro }}
+                                            {% endif %}
+                                        {% else %}
+                                            Todos os meses de {{ ano_filtro }}
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'analise_ordens_preventivas' %}" class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="ano" class="form-label">Ano</label>
+                                        <select class="form-select" id="ano" name="ano" required>
+                                            {% for ano in anos_disponiveis %}
+                                                <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Meses (Selecione múltiplos meses ou deixe todos desmarcados para todos os meses)</label>
+                                        <div class="row g-2">
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="1" id="mes1" {% if 1 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes1">Janeiro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="2" id="mes2" {% if 2 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes2">Fevereiro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="3" id="mes3" {% if 3 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes3">Março</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="4" id="mes4" {% if 4 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes4">Abril</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="5" id="mes5" {% if 5 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes5">Maio</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="6" id="mes6" {% if 6 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes6">Junho</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="7" id="mes7" {% if 7 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes7">Julho</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="8" id="mes8" {% if 8 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes8">Agosto</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="9" id="mes9" {% if 9 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes9">Setembro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="10" id="mes10" {% if 10 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes10">Outubro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="11" id="mes11" {% if 11 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes11">Novembro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 col-sm-4 col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="12" id="mes12" {% if 12 in meses_filtro %}checked{% endif %}>
+                                                    <label class="form-check-label" for="mes12">Dezembro</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosMeses()">Selecionar Todos</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">Desmarcar Todos</button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="fas fa-search me-2"></i>Filtrar
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-primary h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total de Ordens</h6>
+                                <h2 class="mb-0">{{ total_count }}</h2>
+                            </div>
+                            <div class="text-primary" style="font-size: 2.5rem;">
+                                <i class="bi bi-tools"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-success h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Taxa de Fechamento</h6>
+                                <h2 class="mb-0">{{ taxa_fechamento }}%</h2>
+                                <small class="text-muted">{{ ordens_fechadas }} fechadas</small>
+                            </div>
+                            <div class="text-success" style="font-size: 2.5rem;">
+                                <i class="bi bi-check-circle"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-warning h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Ordens Abertas</h6>
+                                <h2 class="mb-0">{{ ordens_abertas }}</h2>
+                                <small class="text-muted">Pendentes</small>
+                            </div>
+                            <div class="text-warning" style="font-size: 2.5rem;">
+                                <i class="bi bi-clock-history"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-info h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Máquinas Únicas</h6>
+                                <h2 class="mb-0">{{ maquinas_count }}</h2>
+                                <small class="text-muted">{{ setores_count }} setores</small>
+                            </div>
+                            <div class="text-info" style="font-size: 2.5rem;">
+                                <i class="bi bi-gear"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 1: Monthly Trends -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Evolução Mensal de Ordens Preventivas</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="mesesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 2: Comparative and Top Machines -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Ordens Abertas vs Fechadas</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="comparativoChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="bi bi-gear-wide me-2"></i>Top 10 Máquinas com Mais Ordens Preventivas</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="maquinasChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 3: Sectors -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="bi bi-building me-2"></i>Top 10 Setores</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="setoresChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 4: Executors -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="bi bi-people me-2"></i>Top 10 Executores de Ordens Preventivas</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="funcionariosChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Machines Table -->
+        {% if top_maquinas %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="bi bi-list-ol me-2"></i>Ranking de Máquinas</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Posição</th>
+                                        <th>Código</th>
+                                        <th>Descrição</th>
+                                        <th>Total de Ordens</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for maquina in top_maquinas %}
+                                    <tr>
+                                        <td><span class="badge bg-primary">#{{ forloop.counter }}</span></td>
+                                        <td><strong>{{ maquina.cd_maquina }}</strong></td>
+                                        <td>{{ maquina.descr_maquina|truncatewords:10 }}</td>
+                                        <td><span class="badge bg-info">{{ maquina.total }}</span></td>
+                                        <td>
+                                            {% if maquina.total >= 20 %}
+                                                <span class="badge bg-danger">Alta Frequência</span>
+                                            {% elif maquina.total >= 10 %}
+                                                <span class="badge bg-warning">Média Frequência</span>
+                                            {% else %}
+                                                <span class="badge bg-success">Normal</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Action Buttons -->
+        <div class="row">
+            <div class="col-12 text-center">
+                <a href="{% url 'consultar_manutencoes_preventivas' %}" class="btn btn-primary btn-lg">
+                    <i class="bi bi-search me-2"></i>Consultar Todas as Ordens
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Funções para selecionar/deselecionar todos os meses
+function selecionarTodosMeses() {
+    document.querySelectorAll('input[name="mes"]').forEach(cb => cb.checked = true);
+}
+
+function desmarcarTodosMeses() {
+    document.querySelectorAll('input[name="mes"]').forEach(cb => cb.checked = false);
+}
+
+// Gráfico de Evolução Mensal
+const mesesCtx = document.getElementById('mesesChart');
+if (mesesCtx) {
+    new Chart(mesesCtx, {
+        type: 'line',
+        data: {
+            labels: {{ meses_labels|safe }},
+            datasets: [{
+                label: 'Ordens Preventivas',
+                data: {{ meses_data|safe }},
+                borderColor: 'rgb(13, 110, 253)',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Gráfico Comparativo (Abertas vs Fechadas)
+const comparativoCtx = document.getElementById('comparativoChart');
+if (comparativoCtx) {
+    new Chart(comparativoCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ comparativo_labels|safe }},
+            datasets: [
+                {
+                    label: 'Ordens Abertas',
+                    data: {{ comparativo_abertas_data|safe }},
+                    backgroundColor: 'rgba(255, 193, 7, 0.8)',
+                    borderColor: 'rgb(255, 193, 7)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Ordens Fechadas',
+                    data: {{ comparativo_fechadas_data|safe }},
+                    backgroundColor: 'rgba(25, 135, 84, 0.8)',
+                    borderColor: 'rgb(25, 135, 84)',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Gráfico de Top Máquinas
+const maquinasCtx = document.getElementById('maquinasChart');
+if (maquinasCtx) {
+    new Chart(maquinasCtx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ maquinas_labels|safe }},
+            datasets: [{
+                data: {{ maquinas_data|safe }},
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.8)',
+                    'rgba(54, 162, 235, 0.8)',
+                    'rgba(255, 206, 86, 0.8)',
+                    'rgba(75, 192, 192, 0.8)',
+                    'rgba(153, 102, 255, 0.8)',
+                    'rgba(255, 159, 64, 0.8)',
+                    'rgba(199, 199, 199, 0.8)',
+                    'rgba(83, 102, 255, 0.8)',
+                    'rgba(255, 99, 255, 0.8)',
+                    'rgba(99, 255, 132, 0.8)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'right'
+                }
+            }
+        }
+    });
+}
+
+// Gráfico de Top Setores
+const setoresCtx = document.getElementById('setoresChart');
+if (setoresCtx) {
+    new Chart(setoresCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ setores_labels|safe }},
+            datasets: [{
+                label: 'Ordens por Setor',
+                data: {{ setores_data|safe }},
+                backgroundColor: 'rgba(13, 202, 240, 0.8)',
+                borderColor: 'rgb(13, 202, 240)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Gráfico de Top Executores
+const funcionariosCtx = document.getElementById('funcionariosChart');
+if (funcionariosCtx) {
+    new Chart(funcionariosCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ funcionarios_labels|safe }},
+            datasets: [{
+                label: 'Ordens Executadas',
+                data: {{ funcionarios_data|safe }},
+                backgroundColor: 'rgba(108, 117, 125, 0.8)',
+                borderColor: 'rgb(108, 117, 125)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

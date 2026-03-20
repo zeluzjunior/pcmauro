@@ -5,6 +5,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.core.paginator import Paginator
 from django.db.models import Q
+from functools import lru_cache
 import os
 
 
@@ -1366,7 +1367,7 @@ def analise_plano_preventiva(request):
         'page_title': 'Análise de Plano Preventiva',
         'active_page': 'analise_plano_preventiva'
     }
-    return render(request, 'analise/analise_plano_preventiva.html', context)
+    return render(request, 'preventivas/analise_plano_preventiva.html', context)
 
 
 def analise_roteiro_plano_preventiva(request):
@@ -2719,8 +2720,52 @@ def importar_ordens_preventivas(request):
     return render(request, 'importar/importar_ordens_preventivas.html', context)
 
 
+def importar_ordens_lubrificacao(request):
+    """Importar Ordens de Lubrificação (lubrificacao_aberta.csv ou lubrificacao_fechada.csv)"""
+    if request.method == 'POST':
+        if 'file' not in request.FILES:
+            messages.error(request, 'Por favor, selecione um arquivo para importar.')
+            context = {'page_title': 'Importar Ordens de Lubrificação', 'active_page': 'importar_ordens_lubrificacao'}
+            return render(request, 'lubrificacao/importar_ordem_lubrificacao.html', context)
+
+        file = request.FILES['file']
+        allowed_extensions = ['.xlsx', '.xls', '.xlsm', '.csv']
+        file_extension = '.' + file.name.split('.')[-1].lower()
+        if file_extension not in allowed_extensions:
+            messages.error(request, f'Formato não suportado. Use: {", ".join(allowed_extensions)}')
+            context = {'page_title': 'Importar Ordens de Lubrificação', 'active_page': 'importar_ordens_lubrificacao'}
+            return render(request, 'lubrificacao/importar_ordem_lubrificacao.html', context)
+
+        update_existing = request.POST.get('update_existing', 'off') == 'on'
+        try:
+            from app.utils import upload_ordens_lubrificacao_from_file
+            created_count, updated_count, errors = upload_ordens_lubrificacao_from_file(file, update_existing=update_existing)
+
+            if errors:
+                for error in errors[:10]:
+                    messages.warning(request, error)
+                if len(errors) > 10:
+                    messages.warning(request, f'... e mais {len(errors) - 10} erro(s).')
+
+            if created_count > 0 or updated_count > 0:
+                msg = f'Importação concluída! {created_count} criado(s), {updated_count} atualizado(s).'
+                messages.success(request, msg)
+            elif not errors:
+                messages.info(request, 'Nenhum registro importado.')
+            else:
+                messages.warning(request, 'Importação concluída com erros.')
+
+            return redirect('importar_ordens_lubrificacao')
+        except Exception as e:
+            messages.error(request, f'Erro ao processar arquivo: {str(e)}')
+
+    context = {'page_title': 'Importar Ordens de Lubrificação', 'active_page': 'importar_ordens_lubrificacao'}
+    return render(request, 'lubrificacao/importar_ordem_lubrificacao.html', context)
+
+
 def importar_plano_preventiva(request):
     """Importar Plano Preventiva page view"""
+    context_extra = {}
     if request.method == 'POST':
         # Verificar se há arquivo enviado
         if 'file' not in request.FILES:
@@ -2767,12 +2812,10 @@ def importar_plano_preventiva(request):
                 update_existing=update_existing
             )
             
-            # Preparar mensagens
+            # Erros: guardar em session para garantir exibição (e em context_extra)
             if errors:
-                for error in errors[:10]:  # Mostrar apenas os primeiros 10 erros
-                    messages.warning(request, error)
-                if len(errors) > 10:
-                    messages.warning(request, f'... e mais {len(errors) - 10} erros.')
+                request.session['import_plano_preventiva_errors'] = errors
+                context_extra = {'import_errors': errors}
             
             if created_count > 0:
                 messages.success(request, f'{created_count} registro(s) de plano preventiva criado(s) com sucesso!')
@@ -2784,9 +2827,13 @@ def importar_plano_preventiva(request):
         except Exception as e:
             messages.error(request, f'Erro ao importar arquivo: {str(e)}')
     
+    # Obter erros: context_extra (mesmo request) ou session (após redirect)
+    import_errors = context_extra.get('import_errors') or request.session.pop('import_plano_preventiva_errors', None) or []
+    
     context = {
         'page_title': 'Importar Plano Preventiva',
-        'active_page': 'importar_plano_preventiva'
+        'active_page': 'importar_plano_preventiva',
+        'import_errors': import_errors
     }
     return render(request, 'importar/importar_plano_preventiva.html', context)
 
@@ -4144,6 +4191,7 @@ def visualizar_centro_de_atividade(request, ca_id):
         MaquinaPrimariaSecundaria,
         OrdemServicoCorretiva,
         OrdemServicoPreventiva,
+        OrdemServicoLubrificacao,
         ConfigLinhaProducaoCentroAtividade,
         ManutentorMaquina,
         RequisicaoAlmoxarifado,
@@ -4265,20 +4313,23 @@ def visualizar_centro_de_atividade(request, ca_id):
     ultimas_os_corretivas = qs_os_corretivas.order_by('-cd_ordemserv')[:5]
     ultimas_os_preventivas = qs_os_preventivas.order_by('-cd_ordemserv')[:5]
 
-    # Corretivas excluindo lubrificação (para a aba Corretivas)
+    # Corretivas (excluindo lubrificação - lubrificação agora é tabela separada)
     qs_os_corretivas_sem_lub = qs_os_corretivas.exclude(descr_tpordservtv__icontains='LUBRIFICAÇÃO')
     ultimas_os_corretivas_sem_lub = qs_os_corretivas_sem_lub.order_by('-cd_ordemserv')[:5]
+    total_os_corretivas_sem_lub = qs_os_corretivas_sem_lub.count()
 
-    # Lubrificação: subset de OS Corretivas com tipo LUBRIFICAÇÃO
-    qs_os_lubrificacao = qs_os_corretivas.filter(descr_tpordservtv__icontains='LUBRIFICAÇÃO')
+    # Lubrificação: tabela dedicada OrdemServicoLubrificacao
+    if setores_do_ca:
+        qs_os_lubrificacao = OrdemServicoLubrificacao.objects.filter(cd_setormanut__in=setores_do_ca)
+    else:
+        qs_os_lubrificacao = OrdemServicoLubrificacao.objects.filter(cd_tpcentativ=centro_atividade.ca)
     total_os_lubrificacao = qs_os_lubrificacao.count()
     ultimas_os_lubrificacao = qs_os_lubrificacao.order_by('-cd_ordemserv')[:5]
-    total_os_corretivas_sem_lub = total_os_corretivas - total_os_lubrificacao
 
     # Top 5 máquinas com mais OS corretivas (excluindo lubrificação)
     from django.db.models import Count
     top_maquinas_corretivas = (
-        qs_os_corretivas.exclude(descr_tpordservtv__icontains='LUBRIFICAÇÃO')
+        qs_os_corretivas_sem_lub
         .exclude(cd_maquina__isnull=True)
         .values('cd_maquina', 'descr_maquina')
         .annotate(total=Count('id'))
@@ -5334,6 +5385,197 @@ def consultar_manutencoes_preventivas(request):
     return render(request, 'consultar/consultar_manutencoes_preventivas.html', context)
 
 
+def consultar_plano_preventiva(request):
+    """Consultar/listar PlanoPreventiva (tabela PlanoPreventiva) com filtro de ano/mês por dt_execucao"""
+    from app.models import PlanoPreventiva
+    from django.core.paginator import Paginator
+    from django.db.models import Q
+    from datetime import datetime as dt
+
+    # Filtros ano e mês (igual analise-mao-de-obra/geral)
+    ano_filtro = request.GET.get('ano', None)
+    meses_filtro = request.GET.getlist('mes')
+    hoje = dt.now()
+    if not ano_filtro:
+        ano_filtro = str(hoje.year)
+    try:
+        ano_filtro = int(ano_filtro)
+    except (ValueError, TypeError):
+        ano_filtro = hoje.year
+    meses_filtro_int = []
+    if meses_filtro:
+        for mes in meses_filtro:
+            try:
+                mes_int = int(mes)
+                if 1 <= mes_int <= 12:
+                    meses_filtro_int.append(mes_int)
+            except (ValueError, TypeError):
+                continue
+        meses_filtro_int = sorted(list(set(meses_filtro_int)))
+    if not meses_filtro_int:
+        meses_filtro_int = list(range(1, 13))
+
+    # Buscar PlanoPreventiva
+    planos_list = PlanoPreventiva.objects.all().select_related('maquina', 'roteiro_preventiva')
+
+    # Filtro por dt_execucao (CharField DD/MM/YYYY) - ano e meses
+    if meses_filtro_int:
+        q_data = Q()
+        for mes in meses_filtro_int:
+            padrao = f'/{mes:02d}/{ano_filtro}'
+            q_data |= Q(dt_execucao__icontains=padrao)
+        planos_list = planos_list.filter(q_data)
+
+    # Filtro de busca geral
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        search_conditions = Q()
+        try:
+            search_num = int(float(search_query))
+            search_conditions |= Q(cd_maquina=search_num) | Q(numero_plano=search_num) | Q(sequencia_manutencao=search_num) | Q(sequencia_tarefa=search_num)
+        except (ValueError, TypeError):
+            pass
+        search_conditions |= (
+            Q(descr_maquina__icontains=search_query) |
+            Q(descr_tarefa__icontains=search_query) |
+            Q(nome_funcionario__icontains=search_query) |
+            Q(cd_funcionario__icontains=search_query) |
+            Q(cd_setor__icontains=search_query) |
+            Q(descr_setor__icontains=search_query) |
+            Q(nome_unid__icontains=search_query) |
+            Q(descr_plano__icontains=search_query) |
+            Q(descr_seqplamanu__icontains=search_query)
+        )
+        planos_list = planos_list.filter(search_conditions)
+
+    # Filtros por coluna
+    filter_maquina = request.GET.get('filter_maquina', '').strip()
+    if filter_maquina:
+        try:
+            maquina_num = int(float(filter_maquina))
+            planos_list = planos_list.filter(cd_maquina=maquina_num)
+        except (ValueError, TypeError):
+            planos_list = planos_list.filter(Q(cd_maquina__icontains=filter_maquina) | Q(descr_maquina__icontains=filter_maquina))
+
+    filter_plano = request.GET.get('filter_plano', '').strip()
+    if filter_plano:
+        try:
+            plano_num = int(float(filter_plano))
+            planos_list = planos_list.filter(numero_plano=plano_num)
+        except (ValueError, TypeError):
+            planos_list = planos_list.filter(Q(numero_plano__icontains=filter_plano) | Q(descr_plano__icontains=filter_plano))
+
+    filter_seq_manutencao = request.GET.get('filter_seq_manutencao', '').strip()
+    if filter_seq_manutencao:
+        try:
+            seq_num = int(float(filter_seq_manutencao))
+            planos_list = planos_list.filter(sequencia_manutencao=seq_num)
+        except (ValueError, TypeError):
+            planos_list = planos_list.filter(sequencia_manutencao__icontains=filter_seq_manutencao)
+
+    filter_data = request.GET.get('filter_data', '').strip()
+    if filter_data:
+        planos_list = planos_list.filter(dt_execucao__icontains=filter_data)
+
+    filter_periodo = request.GET.get('filter_periodo', '').strip()
+    if filter_periodo:
+        try:
+            periodo_num = int(float(filter_periodo))
+            planos_list = planos_list.filter(quantidade_periodo=periodo_num)
+        except (ValueError, TypeError):
+            planos_list = planos_list.filter(quantidade_periodo__icontains=filter_periodo)
+
+    filter_seq_tarefa = request.GET.get('filter_seq_tarefa', '').strip()
+    if filter_seq_tarefa:
+        try:
+            seq_tarefa_num = int(float(filter_seq_tarefa))
+            planos_list = planos_list.filter(sequencia_tarefa=seq_tarefa_num)
+        except (ValueError, TypeError):
+            planos_list = planos_list.filter(sequencia_tarefa__icontains=filter_seq_tarefa)
+
+    filter_tarefa = request.GET.get('filter_tarefa', '').strip()
+    if filter_tarefa:
+        planos_list = planos_list.filter(descr_tarefa__icontains=filter_tarefa)
+
+    filter_descr_seqplamanu = request.GET.get('filter_descr_seqplamanu', '').strip()
+    if filter_descr_seqplamanu:
+        planos_list = planos_list.filter(descr_seqplamanu__icontains=filter_descr_seqplamanu)
+
+    filter_funcionario = request.GET.get('filter_funcionario', '').strip()
+    if filter_funcionario:
+        planos_list = planos_list.filter(Q(nome_funcionario__icontains=filter_funcionario) | Q(cd_funcionario__icontains=filter_funcionario))
+
+    filter_setor = request.GET.get('filter_setor', '').strip()
+    if filter_setor:
+        planos_list = planos_list.filter(Q(cd_setor__icontains=filter_setor) | Q(descr_setor__icontains=filter_setor))
+
+    filter_unidade = request.GET.get('filter_unidade', '').strip()
+    if filter_unidade:
+        try:
+            unidade_num = int(float(filter_unidade))
+            planos_list = planos_list.filter(cd_unid=unidade_num)
+        except (ValueError, TypeError):
+            planos_list = planos_list.filter(nome_unid__icontains=filter_unidade)
+
+    planos_list = planos_list.order_by('cd_maquina', 'numero_plano', 'sequencia_manutencao', 'sequencia_tarefa')
+
+    # Paginação
+    paginator = Paginator(planos_list, 100)
+    page_number = request.GET.get('page', 1)
+    planos = paginator.get_page(page_number)
+
+    # Anos disponíveis a partir de dt_execucao (formato DD/MM/YYYY)
+    anos_disponiveis = set()
+    for val in PlanoPreventiva.objects.exclude(dt_execucao__isnull=True).exclude(dt_execucao='').values_list('dt_execucao', flat=True).distinct()[:2000]:
+        s = str(val or '').strip()
+        if '/' in s:
+            parts = s.split('/')
+            if len(parts) >= 3:
+                try:
+                    yr = parts[2]
+                    ano = int(yr) if len(yr) == 4 else (2000 + int(yr)) if len(yr) == 2 else None
+                    if ano and 2010 <= ano <= 2040:
+                        anos_disponiveis.add(ano)
+                except (ValueError, TypeError):
+                    pass
+    anos_disponiveis = sorted(anos_disponiveis, reverse=True) if anos_disponiveis else [hoje.year]
+
+    meses_nomes = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 5: 'Maio', 6: 'Junho',
+        7: 'Julho', 8: 'Agosto', 9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+
+    total_count = PlanoPreventiva.objects.count()
+    maquinas_count = planos_list.values('cd_maquina').exclude(cd_maquina__isnull=True).distinct().count()
+    setores_count = planos_list.values('cd_setor').exclude(cd_setor__isnull=True).exclude(cd_setor='').distinct().count()
+
+    context = {
+        'page_title': 'Consultar Plano Preventiva',
+        'active_page': 'consultar_plano_preventiva',
+        'planos': planos,
+        'total_count': total_count,
+        'maquinas_count': maquinas_count or 0,
+        'setores_count': setores_count,
+        'ano_filtro': ano_filtro,
+        'meses_filtro': meses_filtro_int,
+        'meses_nomes': meses_nomes,
+        'anos_disponiveis': anos_disponiveis,
+        'search_query': search_query,
+        'filter_maquina': filter_maquina,
+        'filter_plano': filter_plano,
+        'filter_seq_manutencao': filter_seq_manutencao,
+        'filter_data': filter_data,
+        'filter_periodo': filter_periodo,
+        'filter_seq_tarefa': filter_seq_tarefa,
+        'filter_tarefa': filter_tarefa,
+        'filter_descr_seqplamanu': filter_descr_seqplamanu,
+        'filter_funcionario': filter_funcionario,
+        'filter_setor': filter_setor,
+        'filter_unidade': filter_unidade,
+    }
+    return render(request, 'preventivas/consultar_plano_preventiva.html', context)
+
+
 def consultar_meu_plano(request):
     """Consultar/listar Meus Planos Preventiva (MeuPlanoPreventiva)"""
     from app.models import MeuPlanoPreventiva
@@ -5763,24 +6005,21 @@ def consultar_paradas_maquina(request):
     from app.models import ParadaMaquina, ParadaMaquinaOS, OrdemServicoCorretiva, Maquina
     from datetime import datetime
     from django.db.models import Q
-    from django.core.paginator import Paginator
     
     # Obter filtros de ano e meses (múltiplos)
     ano_filtro = request.GET.get('ano', None)
     meses_filtro = request.GET.getlist('mes')  # getlist para múltiplos valores
     
-    # Valores padrão: ano atual e todos os meses (None)
+    # Valores padrão: ano e mês atuais (quando não há parâmetros na URL)
     hoje = datetime.now()
     if not ano_filtro:
         ano_filtro = str(hoje.year)
     
-    # Converter para inteiro
     try:
         ano_filtro = int(ano_filtro)
     except (ValueError, TypeError):
         ano_filtro = hoje.year
     
-    # Converter meses para inteiros e validar
     meses_filtro_int = []
     if meses_filtro:
         for mes in meses_filtro:
@@ -5790,11 +6029,12 @@ def consultar_paradas_maquina(request):
                     meses_filtro_int.append(mes_int)
             except (ValueError, TypeError):
                 continue
-        # Remover duplicatas e ordenar
         meses_filtro_int = sorted(list(set(meses_filtro_int)))
     
-    # Se não há meses selecionados, usar todos os meses
-    meses_para_mostrar = meses_filtro_int if meses_filtro_int else list(range(1, 13))
+    # Se não há meses selecionados, usar apenas o mês atual
+    if not meses_filtro_int:
+        meses_filtro_int = [hoje.month]
+    meses_para_mostrar = meses_filtro_int
     
     # Busca geral
     search_query = request.GET.get('search', '').strip()
@@ -5898,11 +6138,39 @@ def consultar_paradas_maquina(request):
         os_numeros_export = []
         for nums in parada_os_map_export.values():
             os_numeros_export.extend(nums)
-        os_numeros_export = list(set(int(n) for n in os_numeros_export if n.isdigit()))
+        import re as _re
+        def _extract_os_export(text):
+            if not text or not isinstance(text, str):
+                return []
+            found = set()
+            found.update(_re.compile(r'\b\d{5,6}\b').findall(text))
+            found.update(_re.compile(r'(?:OS|ordem|n[°º]|#|ref|numero|número)(?:\s*:?\s*)?(\d{5,6})\b', _re.IGNORECASE).findall(text))
+            return [int(x) for x in found if len(x) in (5, 6) and x.isdigit()]
+        parada_os_inferred_export = {}
+        for p in paradas_export:
+            first_os = (parada_os_map_export.get(p.id) or [None])[0]
+            if first_os and str(first_os).isdigit():
+                continue
+            texto = ' '.join(filter(None, [str(p.motivo or ''), str(p.acao or ''), str(p.nro or ''), str(p.descr_parada or '')]))
+            for os_num in _extract_os_export(texto):
+                parada_os_inferred_export[p.id] = os_num
+                break
+        os_from_confirmed = [int(n) for n in os_numeros_export if n and str(n).strip().isdigit() and len(str(n).strip()) in (5, 6)]
+        os_numeros_export = list(set(os_from_confirmed + list(parada_os_inferred_export.values())))
         os_to_maquina_export = {}
         if os_numeros_export:
             for o in OrdemServicoCorretiva.objects.filter(cd_ordemserv__in=os_numeros_export).values('cd_ordemserv', 'cd_maquina', 'descr_maquina'):
                 os_to_maquina_export[o['cd_ordemserv']] = {'cd_maquina': o['cd_maquina'], 'descr_maquina': o.get('descr_maquina') or ''}
+            cd_maquinas_export = [m['cd_maquina'] for m in os_to_maquina_export.values() if m['cd_maquina'] is not None]
+            maquina_descr_export = {m['cd_maquina']: (m['descr_maquina'] or '') for m in Maquina.objects.filter(cd_maquina__in=cd_maquinas_export).values('cd_maquina', 'descr_maquina')}
+            for os_num, info in os_to_maquina_export.items():
+                if info['cd_maquina'] and info['cd_maquina'] in maquina_descr_export:
+                    info['descr_maquina'] = maquina_descr_export[info['cd_maquina']] or info.get('descr_maquina') or ''
+        cod_recursos_export = [p.cod_recurso for p in paradas_export if p.cod_recurso is not None]
+        cod_recurso_to_maquina_export = {}
+        if cod_recursos_export:
+            for m in Maquina.objects.filter(cd_maquina__in=cod_recursos_export).values('cd_maquina', 'descr_maquina'):
+                cod_recurso_to_maquina_export[m['cd_maquina']] = {'cd_maquina': m['cd_maquina'], 'descr_maquina': m['descr_maquina'] or ''}
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = 'Paradas de Máquina'
@@ -5912,7 +6180,11 @@ def consultar_paradas_maquina(request):
         for row_idx, parada in enumerate(paradas_export, 2):
             first_os = (parada_os_map_export.get(parada.id) or [None])[0]
             os_int = int(first_os) if first_os and str(first_os).isdigit() else None
+            if not os_int:
+                os_int = parada_os_inferred_export.get(parada.id)
             info = os_to_maquina_export.get(os_int, {}) if os_int else {}
+            if not info and parada.cod_recurso is not None:
+                info = cod_recurso_to_maquina_export.get(parada.cod_recurso, {})
             cd_maq = info.get('cd_maquina', '') or ''
             descr_maq = info.get('descr_maquina', '') or ''
             os_str = ', '.join(parada_os_map_export.get(parada.id, [])) or ''
@@ -5938,30 +6210,66 @@ def consultar_paradas_maquina(request):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
     
-    # Paginação (após calcular estatísticas)
-    paginator = Paginator(paradas_list, 200)  # 200 itens por página
-    page_number = request.GET.get('page', 1)
-    paradas = paginator.get_page(page_number)
+    # Sem paginação: exibir todos os registros filtrados
+    paradas = list(paradas_list)
     
-    # Obter Máquina relacionada via ParadaMaquinaOS -> OrdemServicoCorretiva (evitar N+1)
+    # Obter Máquina relacionada (cd_maquina e descr_maquina da tabela Maquina):
+    # 1) ParadaMaquinaOS -> OrdemServicoCorretiva -> Maquina
+    # 2) Extrair OS de motivo/acao/nro/descr_parada -> OrdemServicoCorretiva -> Maquina
+    # 3) cod_recurso -> Maquina.cd_maquina (se cod_recurso = cd_maquina no seu ERP)
+    import re
+
+    def _extract_os_from_text(text):
+        if not text or not isinstance(text, str):
+            return []
+        found = set()
+        found.update(re.compile(r'\b\d{5,6}\b').findall(text))
+        found.update(re.compile(r'(?:OS|ordem|n[°º]|#|ref|numero|número)(?:\s*:?\s*)?(\d{5,6})\b', re.IGNORECASE).findall(text))
+        found.update(re.findall(r'[\s\-_\.\/\(]\s*(\d{5,6})(?=[\s\-_\.\/\)]|$)', text))
+        return [int(x) for x in found if len(x) in (5, 6) and x.isdigit()]
+
     os_numeros = []
-    parada_os_map = {}  # parada_id -> os_numero (primeira OS confirmada)
+    parada_os_map = {}
     for parada in paradas:
         first_os = next((pmo for pmo in parada.os_confirmadas.all() if pmo.os_numero), None)
         if first_os and str(first_os.os_numero).strip().isdigit():
             os_num = int(str(first_os.os_numero).strip())
             os_numeros.append(os_num)
             parada_os_map[parada.id] = os_num
+    # Também extrair OS de paradas sem ParadaMaquinaOS (motivo/acao/nro/descr_parada)
+    parada_os_inferred = {}
+    for parada in paradas:
+        if parada.id in parada_os_map:
+            continue
+        texto = ' '.join(filter(None, [
+            str(parada.motivo or ''), str(parada.acao or ''),
+            str(parada.nro or ''), str(parada.descr_parada or '')
+        ]))
+        for os_num in _extract_os_from_text(texto):
+            parada_os_inferred[parada.id] = os_num
+            break
+    all_os_numeros = list(set(os_numeros + list(parada_os_inferred.values())))
     os_to_maquina = {}
-    if os_numeros:
-        for os_obj in OrdemServicoCorretiva.objects.filter(cd_ordemserv__in=os_numeros).values('cd_ordemserv', 'cd_maquina', 'descr_maquina'):
+    if all_os_numeros:
+        for os_obj in OrdemServicoCorretiva.objects.filter(cd_ordemserv__in=all_os_numeros).values('cd_ordemserv', 'cd_maquina', 'descr_maquina'):
             os_to_maquina[os_obj['cd_ordemserv']] = {'cd_maquina': os_obj['cd_maquina'], 'descr_maquina': os_obj['descr_maquina']}
         cd_maquinas = [m['cd_maquina'] for m in os_to_maquina.values() if m['cd_maquina'] is not None]
-        maquina_ids = {m['cd_maquina']: m['id'] for m in Maquina.objects.filter(cd_maquina__in=cd_maquinas).values('id', 'cd_maquina')}
+        maquina_data = {m['cd_maquina']: {'id': m['id'], 'descr_maquina': m['descr_maquina']} for m in Maquina.objects.filter(cd_maquina__in=cd_maquinas).values('id', 'cd_maquina', 'descr_maquina')}
         for os_num, info in os_to_maquina.items():
-            info['maquina_id'] = maquina_ids.get(info['cd_maquina'])
+            maq = maquina_data.get(info['cd_maquina']) if info['cd_maquina'] else None
+            if maq:
+                info['maquina_id'] = maq['id']
+                info['descr_maquina'] = maq['descr_maquina'] or info.get('descr_maquina') or ''
+            else:
+                info['maquina_id'] = None
+                info['descr_maquina'] = info.get('descr_maquina') or ''
+    cod_recursos = [p.cod_recurso for p in paradas if p.cod_recurso is not None]
+    cod_recurso_to_maquina = {}
+    if cod_recursos:
+        for m in Maquina.objects.filter(cd_maquina__in=cod_recursos).values('id', 'cd_maquina', 'descr_maquina'):
+            cod_recurso_to_maquina[m['cd_maquina']] = {'id': m['id'], 'cd_maquina': m['cd_maquina'], 'descr_maquina': m['descr_maquina'] or ''}
     for parada in paradas:
-        os_num = parada_os_map.get(parada.id)
+        os_num = parada_os_map.get(parada.id) or parada_os_inferred.get(parada.id)
         if os_num and os_num in os_to_maquina:
             info = os_to_maquina[os_num]
             parada.maquina_info = {
@@ -5969,9 +6277,15 @@ def consultar_paradas_maquina(request):
                 'descr_maquina': info.get('descr_maquina') or '',
                 'maquina_id': info.get('maquina_id'),
             }
+        elif parada.cod_recurso is not None and parada.cod_recurso in cod_recurso_to_maquina:
+            maq = cod_recurso_to_maquina[parada.cod_recurso]
+            parada.maquina_info = {
+                'cd_maquina': maq['cd_maquina'],
+                'descr_maquina': maq.get('descr_maquina') or '',
+                'maquina_id': maq.get('id'),
+            }
         else:
             parada.maquina_info = None
-        # Lista de OS confirmadas para exibir na coluna OS
         parada.os_list = [pmo.os_numero for pmo in parada.os_confirmadas.all() if pmo.os_numero]
     
     # Meses para o template
@@ -6565,6 +6879,55 @@ def _analise_paradas_maquina_impl(request, template_name):
         indicador_atual_frig = (Decimal(str(soma_capacidade_frig)) / Decimal(str(soma_suinos_abatidos_frig))) * Decimal(str(fator_eficiencia_frig))
     else:
         indicador_atual_frig = None
+    
+    # Projeção do Indicador Atual para o restante do mês (média diária aplicada aos dias restantes)
+    # Usa o último mês do período como referência
+    projecao_indicador_frig = None
+    projecao_indicador_industria = None
+    projecao_dias_corridos = None
+    projecao_dias_restantes = None
+    projecao_avg_perda_frig_dia = None
+    projecao_avg_perda_ind_dia = None
+    projecao_indicador_frig_val = None
+    projecao_indicador_ind_val = None
+    if meses_para_iterar and periodo_fim:
+        ref_ano, ref_mes_num = periodo_fim.year, periodo_fim.month
+        ultimo_dia_ref = monthrange(ref_ano, ref_mes_num)[1]
+        dias_corridos = periodo_fim.day
+        dias_restantes = max(0, ultimo_dia_ref - dias_corridos)
+        if dias_corridos > 0 and dias_restantes >= 0:
+            projecao_dias_corridos = dias_corridos
+            projecao_dias_restantes = dias_restantes
+            # Frigorífico: dados do mês de referência
+            qs_frig_ref = qs_frigorifico.filter(data__year=ref_ano, data__month=ref_mes_num, data__lte=periodo_fim)
+            soma_cap_frig_ref = qs_frig_ref.aggregate(c=Sum('capacidade'))['c']
+            soma_cap_frig_ref = Decimal(str(soma_cap_frig_ref)) if soma_cap_frig_ref is not None else Decimal('0')
+            soma_suinos_ref = ProducaoDiaria.objects.filter(ano=ref_ano, mes=ref_mes_num, dia__lte=periodo_fim.day).aggregate(s=Sum('suinos_abatidos'))['s']
+            soma_suinos_ref = int(soma_suinos_ref or 0)
+            if soma_suinos_ref > 0 and fator_eficiencia_frig is not None:
+                avg_perda_frig_dia = soma_cap_frig_ref / Decimal(str(dias_corridos))
+                avg_suinos_dia = Decimal(str(soma_suinos_ref)) / Decimal(str(dias_corridos))
+                projecao_avg_perda_frig_dia = float(avg_perda_frig_dia)
+                perda_projetada_frig = soma_cap_frig_ref + (avg_perda_frig_dia * Decimal(str(dias_restantes)))
+                suinos_projetado_frig = Decimal(str(soma_suinos_ref)) + (avg_suinos_dia * Decimal(str(dias_restantes)))
+                if suinos_projetado_frig and suinos_projetado_frig > 0:
+                    projecao_indicador_frig_val = float((perda_projetada_frig / suinos_projetado_frig) * Decimal(str(fator_eficiencia_frig)))
+                    projecao_indicador_frig = projecao_indicador_frig_val
+            # Indústria: dados do mês de referência
+            qs_ind_ref = qs_industria.filter(data__year=ref_ano, data__month=ref_mes_num, data__lte=periodo_fim)
+            soma_cap_ind_ref = qs_ind_ref.aggregate(c=Sum('capacidade'))['c']
+            soma_cap_ind_ref = Decimal(str(soma_cap_ind_ref)) if soma_cap_ind_ref is not None else Decimal('0')
+            soma_prod_ref = ProducaoDiaria.objects.filter(ano=ref_ano, mes=ref_mes_num, dia__lte=periodo_fim.day).aggregate(s=Sum('producao_industria'))['s']
+            soma_prod_ref = Decimal(str(soma_prod_ref)) if soma_prod_ref is not None else Decimal('0')
+            if soma_prod_ref and soma_prod_ref > 0 and fator_eficiencia_industria is not None:
+                avg_perda_ind_dia = soma_cap_ind_ref / Decimal(str(dias_corridos))
+                avg_prod_dia = soma_prod_ref / Decimal(str(dias_corridos))
+                projecao_avg_perda_ind_dia = float(avg_perda_ind_dia)
+                perda_projetada_ind = soma_cap_ind_ref + (avg_perda_ind_dia * Decimal(str(dias_restantes)))
+                prod_projetada_ind = soma_prod_ref + (avg_prod_dia * Decimal(str(dias_restantes)))
+                if prod_projetada_ind and prod_projetada_ind > 0:
+                    projecao_indicador_ind_val = float((perda_projetada_ind / prod_projetada_ind) * Decimal(str(fator_eficiencia_industria)))
+                    projecao_indicador_industria = projecao_indicador_ind_val
     
     # Gerar meses do período — contagens diretas para garantir alinhamento com o filtro (apenas meses selecionados)
     for data_atual in meses_para_iterar:
@@ -7215,6 +7578,12 @@ def _analise_paradas_maquina_impl(request, template_name):
         'fator_eficiencia_frig': fator_eficiencia_frig,
         'indicador_sem_fator_frig': indicador_sem_fator_frig,
         'indicador_atual_frig': indicador_atual_frig,
+        'projecao_indicador_frig': projecao_indicador_frig,
+        'projecao_indicador_industria': projecao_indicador_industria,
+        'projecao_dias_corridos': projecao_dias_corridos,
+        'projecao_dias_restantes': projecao_dias_restantes,
+        'projecao_avg_perda_frig_dia': projecao_avg_perda_frig_dia,
+        'projecao_avg_perda_ind_dia': projecao_avg_perda_ind_dia,
         'dias_uteis_total_frig': dias_uteis_total_frig,
         'dias_uteis_total_industria': dias_uteis_total_industria,
         'total_producao_planejada_industria': total_producao_planejada_industria,
@@ -8353,12 +8722,15 @@ def consultar_notas_fiscais(request):
     notas_list = NotaFiscal.objects.all()
     
     # Filtrar por ano e mês usando somente data_emissao da NotaFiscal
+    # Incluir também notas com situacao PENDENTE sem data_emissao (não apareciam antes)
     notas_filtradas_por_data = []
     for nota in notas_list:
         data_emissao = parse_date(nota.data_emissao)
         if data_emissao and data_emissao.year == ano_filtro:
             if not meses_filtro_int or data_emissao.month in meses_filtro_int:
                 notas_filtradas_por_data.append(nota.id)
+        elif not data_emissao and nota.situacao and 'PENDENTE' in (nota.situacao or '').upper():
+            notas_filtradas_por_data.append(nota.id)
     
     if notas_filtradas_por_data:
         notas_list = notas_list.filter(id__in=notas_filtradas_por_data)
@@ -11067,7 +11439,7 @@ def visualizar_manutencao_preventiva(request, plano_id):
         'plano': plano,
         'documentos': documentos,
     }
-    return render(request, 'visualizar/visualizar_plano_preventiva.html', context)
+    return render(request, 'preventivas/visualizar_plano_preventiva.html', context)
 
 
 def visualizar_plano_pcm(request, plano_id):
@@ -12237,12 +12609,13 @@ def consultar_corretivas_outros(request):
     if filtro_solicitante:
         ordens_list = ordens_list.filter(nm_func_solic_os__icontains=filtro_solicitante)
     
-    # Filtro por Funcionário Executor
+    # Filtro por Funcionário Executor (ordem ou fichas)
     filtro_executor = request.GET.get('filtro_executor', '')
     if filtro_executor:
         ordens_list = ordens_list.filter(
-            Q(nm_func_exec__icontains=filtro_executor)
-        )
+            Q(nm_func_exec__icontains=filtro_executor) |
+            Q(fichas__nm_func_exec_os__icontains=filtro_executor)
+        ).distinct()
     
     # Filtro por Código da Máquina
     filtro_maquina = request.GET.get('filtro_maquina', '')
@@ -13121,12 +13494,12 @@ def analise_ordens_preventivas(request):
         'meses_filtro': meses_filtro_int,
         'anos_disponiveis': anos_disponiveis,
     }
-    return render(request, 'ordens_de_servico/analise_ordens_preventivas.html', context)
+    return render(request, 'preventivas/analise_ordens_preventivas.html', context)
 
 
 def analise_lubrificacao(request):
     """Página de análise de lubrificações com gráficos e estatísticas"""
-    from app.models import OrdemServicoCorretiva, Maquina
+    from app.models import OrdemServicoLubrificacao, Maquina
     from django.db.models import Count, Q
     from datetime import datetime, timedelta
     from collections import defaultdict
@@ -13258,9 +13631,7 @@ def analise_lubrificacao(request):
         return ordens_filtradas
     
     # Obter todas as ordens de lubrificação e filtrar
-    todas_ordens = OrdemServicoCorretiva.objects.filter(
-        descr_tpordservtv__icontains='LUBRIFICAÇÃO'
-    )
+    todas_ordens = OrdemServicoLubrificacao.objects.all()
     ordens_filtradas = filtrar_ordens_por_data(todas_ordens, ano_filtro, meses_filtro_int if meses_filtro_int else None)
     
     # Estatísticas básicas (filtradas)
@@ -13458,13 +13829,11 @@ def analise_lubrificacao(request):
 
 def consultar_ordens_lubrificacao(request):
     """Consultar/listar ordens de lubrificação cadastradas com filtros avançados"""
-    from app.models import OrdemServicoCorretiva
+    from app.models import OrdemServicoLubrificacao
     from datetime import datetime
     
-    # Buscar apenas ordens de lubrificação
-    ordens_list = OrdemServicoCorretiva.objects.filter(
-        descr_tpordservtv__icontains='LUBRIFICAÇÃO'
-    )
+    # Buscar ordens de lubrificação (tabela dedicada)
+    ordens_list = OrdemServicoLubrificacao.objects.all()
     
     # Filtro de busca geral (texto)
     search_query = request.GET.get('search', '').strip()
@@ -13480,18 +13849,19 @@ def consultar_ordens_lubrificacao(request):
         except (ValueError, TypeError):
             pass
         
-        # Para campos de texto, usar icontains
+        # Para campos de texto, usar icontains (incluindo executor em fichas)
         search_conditions |= (
             Q(descr_maquina__icontains=search_query) |
             Q(cd_setormanut__icontains=search_query) |
             Q(descr_setormanut__icontains=search_query) |
             Q(nm_func_solic_os__icontains=search_query) |
             Q(nm_func_exec__icontains=search_query) |
+            Q(fichas__nm_func_exec_os__icontains=search_query) |
             Q(descr_queixa__icontains=search_query) |
             Q(exec_tarefas__icontains=search_query)
         )
         
-        ordens_list = ordens_list.filter(search_conditions)
+        ordens_list = ordens_list.filter(search_conditions).distinct()
     
     # Filtros específicos
     # Filtro por Setor de Manutenção
@@ -13519,12 +13889,13 @@ def consultar_ordens_lubrificacao(request):
     if filtro_solicitante:
         ordens_list = ordens_list.filter(nm_func_solic_os__icontains=filtro_solicitante)
     
-    # Filtro por Funcionário Executor
+    # Filtro por Funcionário Executor (ordem ou fichas)
     filtro_executor = request.GET.get('filtro_executor', '')
     if filtro_executor:
         ordens_list = ordens_list.filter(
-            Q(nm_func_exec__icontains=filtro_executor)
-        )
+            Q(nm_func_exec__icontains=filtro_executor) |
+            Q(fichas__nm_func_exec_os__icontains=filtro_executor)
+        ).distinct()
     
     # Filtro por Código da Máquina
     filtro_maquina = request.GET.get('filtro_maquina', '')
@@ -13575,46 +13946,38 @@ def consultar_ordens_lubrificacao(request):
     # Se nenhum está marcado, mostra todas (não aplicar filtro)
     
     # Ordenar por código da ordem de serviço (mais recente primeiro)
-    ordens_list = ordens_list.order_by('-cd_ordemserv')
+    ordens_list = ordens_list.prefetch_related('fichas').order_by('-cd_ordemserv')
     
     # Paginação
     paginator = Paginator(ordens_list, 50)  # 50 itens por página
     page_number = request.GET.get('page', 1)
     ordens = paginator.get_page(page_number)
     
-    # Estatísticas (apenas para ordens de lubrificação)
-    total_count = OrdemServicoCorretiva.objects.filter(descr_tpordservtv__icontains='LUBRIFICAÇÃO').count()
-    setores_count = OrdemServicoCorretiva.objects.filter(descr_tpordservtv__icontains='LUBRIFICAÇÃO').exclude(cd_setormanut__isnull=True).exclude(cd_setormanut='').values('cd_setormanut').distinct().count()
-    unidades_count = OrdemServicoCorretiva.objects.filter(descr_tpordservtv__icontains='LUBRIFICAÇÃO').exclude(nome_unid__isnull=True).exclude(nome_unid='').values('nome_unid').distinct().count()
+    # Estatísticas
+    total_count = OrdemServicoLubrificacao.objects.count()
+    setores_count = OrdemServicoLubrificacao.objects.exclude(cd_setormanut__isnull=True).exclude(cd_setormanut='').values('cd_setormanut').distinct().count()
+    unidades_count = OrdemServicoLubrificacao.objects.exclude(nome_unid__isnull=True).exclude(nome_unid='').values('nome_unid').distinct().count()
     
-    # Obter valores únicos para os dropdowns de filtros (apenas para ordens de lubrificação)
-    setores_unicos = OrdemServicoCorretiva.objects.filter(
-        descr_tpordservtv__icontains='LUBRIFICAÇÃO'
-    ).exclude(
+    # Obter valores únicos para os dropdowns de filtros
+    setores_unicos = OrdemServicoLubrificacao.objects.exclude(
         descr_setormanut__isnull=True
     ).exclude(
         descr_setormanut=''
     ).values_list('descr_setormanut', flat=True).distinct().order_by('descr_setormanut')
     
-    unidades_unicas = OrdemServicoCorretiva.objects.filter(
-        descr_tpordservtv__icontains='LUBRIFICAÇÃO'
-    ).exclude(
+    unidades_unicas = OrdemServicoLubrificacao.objects.exclude(
         nome_unid__isnull=True
     ).exclude(
         nome_unid=''
     ).values_list('nome_unid', flat=True).distinct().order_by('nome_unid')
     
-    tipos_os_unicos = OrdemServicoCorretiva.objects.filter(
-        descr_tpordservtv__icontains='LUBRIFICAÇÃO'
-    ).exclude(
+    tipos_os_unicos = OrdemServicoLubrificacao.objects.exclude(
         descr_tpordservtv__isnull=True
     ).exclude(
         descr_tpordservtv=''
     ).values_list('descr_tpordservtv', flat=True).distinct().order_by('descr_tpordservtv')
     
-    situacoes_unicas = OrdemServicoCorretiva.objects.filter(
-        descr_tpordservtv__icontains='LUBRIFICAÇÃO'
-    ).exclude(
+    situacoes_unicas = OrdemServicoLubrificacao.objects.exclude(
         descr_sitordsetv__isnull=True
     ).exclude(
         descr_sitordsetv=''
@@ -13646,6 +14009,35 @@ def consultar_ordens_lubrificacao(request):
         'filtro_ordens_fechadas': '1' if filtro_ordens_fechadas else '',
     }
     return render(request, 'consultar/consultar_ordens_lubrificacao.html', context)
+
+
+def visualizar_lubrificacao(request, ordem_id):
+    """Visualizar detalhes de uma ordem de lubrificação específica"""
+    from app.models import OrdemServicoLubrificacao, Maquina
+
+    try:
+        ordem = OrdemServicoLubrificacao.objects.prefetch_related('fichas').get(id=ordem_id)
+    except OrdemServicoLubrificacao.DoesNotExist:
+        messages.error(request, 'Ordem de lubrificação não encontrada.')
+        return redirect('consultar_ordens_lubrificacao')
+
+    maquina = None
+    if ordem.cd_maquina:
+        try:
+            maquina = Maquina.objects.get(cd_maquina=ordem.cd_maquina)
+        except Maquina.DoesNotExist:
+            maquina = None
+
+    fichas = ordem.fichas.all().order_by('-created_at')
+
+    context = {
+        'page_title': f'Visualizar OS {ordem.cd_ordemserv}',
+        'active_page': 'consultar_ordens_lubrificacao',
+        'ordem': ordem,
+        'maquina': maquina,
+        'fichas': fichas,
+    }
+    return render(request, 'lubrificacao/visualizar_lubrificacao.html', context)
 
 
 def analise_corretiva_outros_com_parada(request):
@@ -14498,6 +14890,1081 @@ def associar_manutentor_maquina(request):
     return render(request, 'manutentor/associar_manutentor_maquina.html', context)
 
 
+def _parse_datetime_os(val):
+    """Parse date/time strings from OS models. Returns datetime or None. Uses cache."""
+    if not val or not isinstance(val, str):
+        return None
+    val = val.strip()
+    if not val:
+        return None
+    return _parse_datetime_os_cached(val)
+
+
+def _parse_datetime_os_impl(val):
+    from datetime import datetime
+    for fmt in ['%d/%m/%Y %H:%M', '%d/%m/%Y %H:%M:%S', '%d/%m/%Y', '%H:%M', '%H:%M:%S']:
+        try:
+            return datetime.strptime(val, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+_parse_datetime_os_cached = lru_cache(maxsize=8192)(_parse_datetime_os_impl)
+
+
+def _minutes_between(dt1, dt2):
+    """Return minutes between two datetimes. Time-only (year 1900) gets date from the other."""
+    if not dt1 or not dt2:
+        return None
+    if dt1.year == 1900 and dt2.year != 1900:
+        dt1 = dt1.replace(year=dt2.year, month=dt2.month, day=dt2.day)
+    elif dt2.year == 1900 and dt1.year != 1900:
+        dt2 = dt2.replace(year=dt1.year, month=dt1.month, day=dt1.day)
+    try:
+        delta = dt2 - dt1
+        return delta.total_seconds() / 60
+    except Exception:
+        return None
+
+
+def _parse_dt_abertura_solicita(date_str):
+    """Parse dt_abertura_solicita (mesmo formato usado em ordens-de-servico)."""
+    if not date_str:
+        return None
+    date_str = str(date_str).strip()
+    if not date_str:
+        return None
+    if ' ' in date_str:
+        date_part = date_str.split(' ')[0]
+    else:
+        date_part = date_str
+    from datetime import datetime
+    for fmt in ['%d/%m/%Y', '%d-%m-%Y', '%d.%m.%Y', '%Y-%m-%d', '%Y/%m/%d', '%d/%m/%y', '%d-%m-%y']:
+        try:
+            return datetime.strptime(date_part, fmt)
+        except (ValueError, TypeError):
+            continue
+    if '/' in date_part:
+        parts = date_part.split('/')
+        if len(parts) == 3:
+            try:
+                day, month, year = parts
+                if len(year) == 2:
+                    year = '20' + year
+                return datetime(int(year), int(month), int(day))
+            except (ValueError, TypeError):
+                pass
+    return None
+
+
+def analise_geral_mao_de_obra(request):
+    """Análise Geral de Mão de Obra - Relação Ordens de Serviço x Manutentores (tempo de execução).
+    Filtro de data igual ao ordens-de-servico: ano + meses (dt_abertura_solicita)."""
+    from app.models import Manutentor, OrdemServicoCorretiva, OrdemServicoCorretivaFicha
+    from django.db.models import Q
+    from collections import defaultdict
+    import json
+    from datetime import datetime as dt
+
+    # Filtros: ano e meses (mesmo formato que ordens-de-servico)
+    ano_filtro = request.GET.get('ano', None)
+    meses_filtro = request.GET.getlist('mes')
+    hoje = dt.now()
+    if not ano_filtro:
+        ano_filtro = str(hoje.year)
+    try:
+        ano_filtro = int(ano_filtro)
+    except (ValueError, TypeError):
+        ano_filtro = hoje.year
+    meses_filtro_int = []
+    if meses_filtro:
+        for mes in meses_filtro:
+            try:
+                mes_int = int(mes)
+                if 1 <= mes_int <= 12:
+                    meses_filtro_int.append(mes_int)
+            except (ValueError, TypeError):
+                continue
+        meses_filtro_int = sorted(list(set(meses_filtro_int)))
+    if not meses_filtro_int:
+        meses_filtro_int = list(range(1, 13))
+
+    def data_dentro_periodo(d):
+        """Retorna True se a data está no ano e meses selecionados (dt_abertura_solicita)."""
+        if not d:
+            return False
+        data = d.date() if hasattr(d, 'date') else d
+        return data.year == ano_filtro and data.month in meses_filtro_int
+
+    # Carregar ordens e filtrar por dt_abertura_solicita (igual ordens-de-servico)
+    ordem_qs = OrdemServicoCorretiva.objects.only(
+        'dt_entrada', 'dt_encordmanu', 'dt_abertura_solicita', 'nm_func_exec', 'id'
+    )
+    ordem_ids_in_period = set()
+    ordem_lead_times = []
+    ordens_abertas_count = 0
+    ordens_fechadas_count = 0
+    closed_ordem_ids = set()
+    for o in ordem_qs.iterator(chunk_size=2000):
+        data_abert = _parse_dt_abertura_solicita(o.dt_abertura_solicita)
+        if not data_abert or not data_dentro_periodo(data_abert):
+            continue
+        ordem_ids_in_period.add(o.id)
+        dt_enc = _parse_datetime_os(o.dt_encordmanu)
+        if dt_enc:
+            ordens_fechadas_count += 1
+            closed_ordem_ids.add(o.id)
+            dt_ent = _parse_datetime_os(o.dt_entrada)
+            if dt_ent:
+                mins = _minutes_between(dt_ent, dt_enc)
+                if mins is not None and mins >= 0 and mins < 24 * 60 * 30:
+                    nome = (o.nm_func_exec or '').strip()
+                    if nome:
+                        ordem_lead_times.append((nome, mins, o.id))
+        else:
+            ordens_abertas_count += 1
+
+    # Fichas: apenas das ordens no período (ordem_ids_in_period)
+    ficha_qs = OrdemServicoCorretivaFicha.objects.only(
+        'dt_ficapomanu', 'dt_inic_iteficmanu', 'dt_fim_iteficmanu', 'nm_func_exec_os', 'ordem_servico_id'
+    )
+    if ordem_ids_in_period:
+        ficha_qs = ficha_qs.filter(ordem_servico_id__in=ordem_ids_in_period)
+
+    # --- Parse execution times from Fichas (uma única passagem + meses_map + tempo nas fechadas) ---
+    ficha_tempos = []
+    meses_map = defaultdict(lambda: {'qtd': 0, 'tempo_total': 0})
+    tempo_total_fechadas_min = 0
+    for f in ficha_qs.iterator(chunk_size=2000):
+        dt_fic = _parse_datetime_os(f.dt_ficapomanu)
+        dt_inic = _parse_datetime_os(f.dt_inic_iteficmanu)
+        dt_fim = _parse_datetime_os(f.dt_fim_iteficmanu)
+        if not dt_inic or not dt_fim:
+            continue
+        if dt_inic.year == 1900 and dt_fic:
+            dt_inic = dt_inic.replace(year=dt_fic.year, month=dt_fic.month, day=dt_fic.day)
+        if dt_fim.year == 1900 and dt_fic:
+            dt_fim = dt_fim.replace(year=dt_fic.year, month=dt_fic.month, day=dt_fic.day)
+        mins = _minutes_between(dt_inic, dt_fim)
+        if mins is not None and mins >= 0 and mins < 24 * 60 * 2:
+            if f.ordem_servico_id in closed_ordem_ids:
+                tempo_total_fechadas_min += mins
+            nome = (f.nm_func_exec_os or '').strip()
+            if nome:
+                ficha_tempos.append((nome, mins, f.ordem_servico_id))
+            if dt_fic and dt_fic.year != 1900 and dt_fic.year == ano_filtro and dt_fic.month in meses_filtro_int:
+                key = dt_fic.strftime('%Y-%m')
+                meses_map[key]['qtd'] += 1
+                meses_map[key]['tempo_total'] += mins
+
+    # --- Aggregate by manutentor (match by name, longest first to avoid "JOAO" before "JOAO SILVA") ---
+    manutentores_nomes = sorted(
+        Manutentor.objects.exclude(Nome__isnull=True).exclude(Nome='').values_list('Nome', flat=True),
+        key=lambda n: len(n or ''),
+        reverse=True
+    )
+    stats = defaultdict(lambda: {'tempo_total': 0, 'qtd_fichas': 0, 'qtd_ordens': 0, 'lead_times': []})
+    # Cache: nome_exec -> manutentor (evita O(n*m) - muitos executores repetidos)
+    exec_to_manut = {}
+
+    def _match_manutentor(nome_exec):
+        if nome_exec not in exec_to_manut:
+            for mn in manutentores_nomes:
+                if mn and mn.upper() in nome_exec.upper():
+                    exec_to_manut[nome_exec] = mn
+                    return mn
+            exec_to_manut[nome_exec] = None
+        return exec_to_manut[nome_exec]
+
+    for nome_exec, mins, _ in ficha_tempos:
+        mn = _match_manutentor(nome_exec)
+        if mn:
+            stats[mn]['tempo_total'] += mins
+            stats[mn]['qtd_fichas'] += 1
+
+    for nome_exec, mins, _ in ordem_lead_times:
+        mn = _match_manutentor(nome_exec)
+        if mn:
+            stats[mn]['qtd_ordens'] += 1
+            stats[mn]['lead_times'].append(mins)
+
+    # --- Build per-manutentor list ---
+    lista_manutentores = []
+    for nome, d in stats.items():
+        tempo_medio = (d['tempo_total'] / d['qtd_fichas']) if d['qtd_fichas'] > 0 else 0
+        lead_medio = sum(d['lead_times']) / len(d['lead_times']) if d['lead_times'] else 0
+        lista_manutentores.append({
+            'nome': nome,
+            'tempo_total_min': d['tempo_total'],
+            'tempo_total_horas': round(d['tempo_total'] / 60, 1),
+            'qtd_fichas': d['qtd_fichas'],
+            'qtd_ordens': d['qtd_ordens'],
+            'tempo_medio_min': round(tempo_medio, 1),
+            'lead_medio_min': round(lead_medio, 1),
+            'lead_medio_horas': round(lead_medio / 60, 1),
+        })
+    lista_manutentores.sort(key=lambda x: x['tempo_total_min'], reverse=True)
+
+    # --- Top 10 por tempo total ---
+    top_tempo = lista_manutentores[:10]
+    top_tempo_labels = json.dumps([m['nome'][:20] for m in top_tempo])
+    top_tempo_data = json.dumps([m['tempo_total_horas'] for m in top_tempo])
+
+    # --- Top 10 por quantidade de OS ---
+    top_qtd = sorted(lista_manutentores, key=lambda x: x['qtd_ordens'] + x['qtd_fichas'], reverse=True)[:10]
+    top_qtd_labels = json.dumps([m['nome'][:20] for m in top_qtd])
+    top_qtd_data = json.dumps([m['qtd_ordens'] + m['qtd_fichas'] for m in top_qtd])
+
+    # --- Top 10 tempo médio (com pelo menos 5 fichas) ---
+    com_min_fichas = [m for m in lista_manutentores if m['qtd_fichas'] >= 5]
+    top_medio = sorted(com_min_fichas, key=lambda x: x['tempo_medio_min'], reverse=True)[:10]
+    top_medio_labels = json.dumps([m['nome'][:20] for m in top_medio])
+    top_medio_data = json.dumps([m['tempo_medio_min'] for m in top_medio])
+
+    # --- Histograma: distribuição de tempo de execução (fichas) ---
+    bins = [0, 15, 30, 60, 120, 240, 480, 1440]  # 0-15min, 15-30, 30-60, 1-2h, 2-4h, 4-8h, 8-24h
+    hist_labels = ['0-15 min', '15-30 min', '30-60 min', '1-2 h', '2-4 h', '4-8 h', '8-24 h']
+    hist_data = [0] * 7
+    for _, mins, _ in ficha_tempos:
+        for i, lim in enumerate(bins[1:]):
+            if mins <= lim:
+                hist_data[i] += 1
+                break
+        else:
+            if mins <= 1440:
+                hist_data[6] += 1
+
+    # --- Lead time médio por manutentor (top 10) ---
+    top_lead = sorted([m for m in lista_manutentores if m['lead_medio_min'] > 0], key=lambda x: x['lead_medio_min'], reverse=True)[:10]
+    top_lead_labels = json.dumps([m['nome'][:20] for m in top_lead])
+    top_lead_data = json.dumps([m['lead_medio_horas'] for m in top_lead])
+
+    # --- Evolução mensal (já calculado em meses_map no loop acima) ---
+    meses_ordenados = sorted(meses_map.keys())
+    meses_exibir = meses_ordenados[-12:] if len(meses_ordenados) > 12 else (meses_ordenados or [''])
+    evol_meses_labels = json.dumps(meses_exibir)
+    evol_qtd = json.dumps([meses_map.get(k, {}).get('qtd', 0) for k in meses_exibir])
+    evol_tempo_medio = json.dumps([
+        round(meses_map[k]['tempo_total'] / meses_map[k]['qtd'], 1) if meses_map.get(k, {}).get('qtd', 0) > 0 else 0
+        for k in meses_exibir
+    ])
+
+    # --- KPIs ---
+    total_fichas = len(ficha_tempos)
+    total_tempo_horas = sum(m[1] for m in ficha_tempos) / 60
+    tempo_medio_geral = (total_tempo_horas * 60 / total_fichas) if total_fichas > 0 else 0
+    total_ordens_com_lead = len(ordem_lead_times)
+    lead_medio_geral = sum(m[1] for m in ordem_lead_times) / total_ordens_com_lead / 60 if total_ordens_com_lead > 0 else 0
+
+    # --- Análise Fechadas vs Abertas (para seção acima de "Abertas e Fechadas") ---
+    # Fechadas: dados reais (tempo das fichas)
+    tempo_medio_por_ordem_fechada_min = (tempo_total_fechadas_min / ordens_fechadas_count) if ordens_fechadas_count > 0 else 0
+    # Abertas: tempo estimado = qtd abertas × tempo médio por ordem fechada (proxy)
+    tempo_estimado_abertas_min = ordens_abertas_count * tempo_medio_por_ordem_fechada_min
+    tempo_estimado_abertas_horas = round(tempo_estimado_abertas_min / 60, 1)
+    tempo_medio_por_ordem_fechada_horas = round(tempo_medio_por_ordem_fechada_min / 60, 1)
+
+    # anos_disponiveis e meses_nomes (igual ordens-de-servico)
+    anos_disponiveis = set()
+    for o in OrdemServicoCorretiva.objects.only('dt_abertura_solicita').iterator(chunk_size=2000):
+        data_abert = _parse_dt_abertura_solicita(o.dt_abertura_solicita)
+        if data_abert:
+            anos_disponiveis.add(data_abert.year)
+    anos_disponiveis = sorted(anos_disponiveis, reverse=True)
+    if not anos_disponiveis:
+        anos_disponiveis = [hoje.year]
+    meses_nomes = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 5: 'Maio', 6: 'Junho',
+        7: 'Julho', 8: 'Agosto', 9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+
+    context = {
+        'page_title': 'Análise Geral de Mão de Obra',
+        'active_page': 'analise_geral_mao_de_obra',
+        'ano_filtro': ano_filtro,
+        'meses_filtro': meses_filtro_int,
+        'meses_nomes': meses_nomes,
+        'anos_disponiveis': anos_disponiveis,
+        'filtro_periodo_aplicado': True,
+        'total_fichas': total_fichas,
+        'total_tempo_horas': round(total_tempo_horas, 1),
+        'tempo_medio_geral_min': round(tempo_medio_geral, 1),
+        'total_ordens_com_lead': total_ordens_com_lead,
+        'lead_medio_geral_horas': round(lead_medio_geral, 1),
+        'manutentores_ativos': len(lista_manutentores),
+        'top_tempo_labels': top_tempo_labels,
+        'top_tempo_data': top_tempo_data,
+        'top_qtd_labels': top_qtd_labels,
+        'top_qtd_data': top_qtd_data,
+        'top_medio_labels': top_medio_labels,
+        'top_medio_data': top_medio_data,
+        'top_lead_labels': top_lead_labels,
+        'top_lead_data': top_lead_data,
+        'hist_labels': json.dumps(hist_labels),
+        'hist_data': json.dumps(hist_data),
+        'evol_meses_labels': evol_meses_labels,
+        'evol_qtd': evol_qtd,
+        'evol_tempo_medio': evol_tempo_medio,
+        'lista_manutentores': lista_manutentores[:50],
+        # Análise Fechadas (dados reais) e Abertas (tempo estimado)
+        'tempo_medio_por_ordem_fechada_min': round(tempo_medio_por_ordem_fechada_min, 1),
+        'tempo_medio_por_ordem_fechada_horas': tempo_medio_por_ordem_fechada_horas,
+        'tempo_estimado_abertas_min': round(tempo_estimado_abertas_min, 1),
+        'tempo_estimado_abertas_horas': tempo_estimado_abertas_horas,
+        # Seção OS Abertas/Fechadas
+        'ordens_abertas_count': ordens_abertas_count,
+        'ordens_fechadas_count': ordens_fechadas_count,
+        'tempo_total_todas_horas': round(total_tempo_horas, 1),
+        'tempo_total_fechadas_horas': round(tempo_total_fechadas_min / 60, 1),
+    }
+    return render(request, 'analise_mao_de_obra/analise_geral_mao_de_obra.html', context)
+
+
+def calculo_mao_de_obra(request):
+    """Cálculo de Mão de Obra - Filtro por Setor ou Máquina, exibe contagem de Ordens de Serviço"""
+    from app.models import OrdemServicoCorretiva
+    from django.db.models import Count, Q
+
+    # Opções para filtros (Setores e Máquinas com OS)
+    setores_opcoes = list(
+        OrdemServicoCorretiva.objects
+        .exclude(descr_setormanut__isnull=True)
+        .exclude(descr_setormanut='')
+        .values_list('cd_setormanut', 'descr_setormanut')
+        .distinct()
+        .order_by('descr_setormanut')
+    )
+    # Máquinas com seus setores (para filtro dependente: Máquinas = f(Setor))
+    maq_setor_raw = OrdemServicoCorretiva.objects.exclude(cd_maquina__isnull=True).values_list(
+        'cd_maquina', 'descr_maquina', 'cd_setormanut'
+    ).distinct()
+    # Agrupar por (cd_maquina, descr): setores onde a máquina tem OS
+    maq_to_setores = {}  # cd_maquina -> (descr, set(setores))
+    for cd, descr, setor in maq_setor_raw:
+        if cd not in maq_to_setores:
+            maq_to_setores[cd] = [(descr or f'Máquina {cd}')[:80], set()]
+        if setor:
+            maq_to_setores[cd][1].add(setor)
+    maquinas_unicas = [(cd, descr, sorted(setores)) for cd, (descr, setores) in sorted(maq_to_setores.items(), key=lambda x: (x[1][0] or ''))]
+
+    filtro_setor = request.GET.get('filtro_setor', '')
+    filtro_maquinas = request.GET.getlist('filtro_maquina')  # múltiplas máquinas
+    filtro_mes = request.GET.get('filtro_mes', '')
+    filtro_ano = request.GET.get('filtro_ano', '')
+    filtro_data_inicio = request.GET.get('filtro_data_inicio', '')
+    filtro_data_fim = request.GET.get('filtro_data_fim', '')
+
+    ordens_qs = OrdemServicoCorretiva.objects.all()
+
+    if filtro_setor:
+        ordens_qs = ordens_qs.filter(cd_setormanut=filtro_setor)
+    if filtro_maquinas:
+        cd_maq_list = []
+        for v in filtro_maquinas:
+            try:
+                cd_maq_list.append(int(v))
+            except (ValueError, TypeError):
+                pass
+        if cd_maq_list:
+            ordens_qs = ordens_qs.filter(cd_maquina__in=cd_maq_list)
+
+    # Filtro por período: mês ou intervalo de datas (usa dt_entrada)
+    from datetime import datetime as dt
+    if filtro_mes and filtro_ano:
+        try:
+            mes = int(filtro_mes)
+            ano = int(filtro_ano)
+            pad = '/%02d/%d' % (mes, ano)
+            ordens_qs = ordens_qs.filter(dt_entrada__icontains=pad)
+        except (ValueError, TypeError):
+            pass
+    elif filtro_data_inicio and filtro_data_fim:
+        try:
+            d_inicio = dt.strptime(filtro_data_inicio, '%Y-%m-%d').date()
+            d_fim = dt.strptime(filtro_data_fim, '%Y-%m-%d').date()
+            if d_inicio <= d_fim:
+                ids_ok = []
+                for o in ordens_qs.only('id', 'dt_entrada'):
+                    dt = _parse_datetime_os(o.dt_entrada)
+                    if dt and d_inicio <= dt.date() <= d_fim:
+                        ids_ok.append(o.id)
+                ordens_qs = ordens_qs.filter(id__in=ids_ok)
+        except (ValueError, TypeError):
+            pass
+
+    total_ordens = ordens_qs.count()
+
+    # Contagens por tipo e configurações
+    por_tipo_os = list(
+        ordens_qs.exclude(descr_tpordservtv__isnull=True).exclude(descr_tpordservtv='')
+        .values('descr_tpordservtv')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+    por_tipo_manutencao = list(
+        ordens_qs.exclude(descr_tpmanuttv__isnull=True).exclude(descr_tpmanuttv='')
+        .values('descr_tpmanuttv')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+    por_situacao = list(
+        ordens_qs.exclude(descr_sitordsetv__isnull=True).exclude(descr_sitordsetv='')
+        .values('descr_sitordsetv')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+    por_centro_atividade = list(
+        ordens_qs.exclude(descr_abrev_tpcentativ__isnull=True).exclude(descr_abrev_tpcentativ='')
+        .values('descr_abrev_tpcentativ')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+
+    # Situações fixas para Ordens de Serviço (sempre exibir todas)
+    SITUACOES_FIXAS = [
+        'ORDEM DE SERVIÇO FECHADA',
+        'ORDEM DE SERVIÇO EM EXECUÇÃO',
+        'SOLICITAÇÃO ABERTA',
+        'SOLICITAÇÃO SERVIÇO CANCELADA',
+        'ORDEM DE SERVIÇO CANCELADA',
+    ]
+
+    # Uma seção por Tipo de Ordem de Serviço (com breakdown interno)
+    secoes_por_tipo = []
+    for row in por_tipo_os:
+        tipo_nome = row['descr_tpordservtv']
+        qs_tipo = ordens_qs.filter(descr_tpordservtv=tipo_nome)
+        sit_counts = list(
+            qs_tipo.exclude(descr_sitordsetv__isnull=True).exclude(descr_sitordsetv='')
+            .values('descr_sitordsetv').annotate(c=Count('id'))
+        )
+        sit_lookup = {((s['descr_sitordsetv'] or '').strip().upper()): s['c'] for s in sit_counts}
+        por_situacao_completo = []
+        for sit_label in SITUACOES_FIXAS:
+            count = sit_lookup.get(sit_label.upper(), 0)
+            if count == 0:
+                for k, v in sit_lookup.items():
+                    if k and (sit_label.upper() in k or k in sit_label.upper()):
+                        count = v
+                        break
+            por_situacao_completo.append({'descr_sitordsetv': sit_label, 'total': count})
+        secoes_por_tipo.append({
+            'tipo': tipo_nome,
+            'total': row['total'],
+            'por_tipo_manutencao': list(
+                qs_tipo.exclude(descr_tpmanuttv__isnull=True).exclude(descr_tpmanuttv='')
+                .values('descr_tpmanuttv').annotate(total=Count('id')).order_by('-total')
+            ),
+            'por_situacao': list(
+                qs_tipo.exclude(descr_sitordsetv__isnull=True).exclude(descr_sitordsetv='')
+                .values('descr_sitordsetv').annotate(total=Count('id')).order_by('-total')
+            ),
+            'por_situacao_completo': por_situacao_completo,
+            'por_centro_atividade': list(
+                qs_tipo.exclude(descr_abrev_tpcentativ__isnull=True).exclude(descr_abrev_tpcentativ='')
+                .values('descr_abrev_tpcentativ').annotate(total=Count('id')).order_by('-total')
+            ),
+        })
+
+    # Ordens com e sem data de encerramento
+    ordens_fechadas = ordens_qs.exclude(Q(dt_encordmanu__isnull=True) | Q(dt_encordmanu='')).count()
+    ordens_abertas = ordens_qs.filter(Q(dt_encordmanu__isnull=True) | Q(dt_encordmanu='')).count()
+
+    # Anos e meses para dropdown de período
+    ano_atual = dt.now().year
+    anos_opcoes = list(range(ano_atual, ano_atual - 10, -1))
+    meses_opcoes = [(i, ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][i - 1]) for i in range(1, 13)]
+
+    context = {
+        'page_title': 'Cálculo de Mão de Obra',
+        'active_page': 'calculo_mao_de_obra',
+        'setores_opcoes': setores_opcoes,
+        'maquinas_opcoes': maquinas_unicas,
+        'anos_opcoes': anos_opcoes,
+        'meses_opcoes': meses_opcoes,
+        'filtro_setor': filtro_setor,
+        'filtro_maquinas': filtro_maquinas,
+        'filtro_mes': filtro_mes,
+        'filtro_ano': filtro_ano,
+        'filtro_data_inicio': filtro_data_inicio,
+        'filtro_data_fim': filtro_data_fim,
+        'total_ordens': total_ordens,
+        'ordens_fechadas': ordens_fechadas,
+        'ordens_abertas': ordens_abertas,
+        'por_tipo_os': por_tipo_os,
+        'por_tipo_manutencao': por_tipo_manutencao,
+        'por_situacao': por_situacao,
+        'por_centro_atividade': por_centro_atividade,
+        'secoes_por_tipo': secoes_por_tipo,
+        'filtro_aplicado': bool(filtro_setor or filtro_maquinas or filtro_mes or filtro_ano or filtro_data_inicio or filtro_data_fim),
+    }
+    return render(request, 'analise_mao_de_obra/calculo_mao_de_obra.html', context)
+
+
+def analise_mao_de_obra_e_ordens(request):
+    """Análise de Mão de Obra e Ordens — todas as ordens (Corretiva, Preventiva, Lubrificação)"""
+    import json
+    from django.db.models import Q
+    from app.models import (
+        OrdemServicoCorretiva, OrdemServicoCorretivaFicha,
+        OrdemServicoPreventiva, OrdemServicoPreventivaFicha,
+        OrdemServicoLubrificacao, OrdemServicoLubrificacaoFicha,
+        CentroAtividade, Manutentor,
+    )
+    from datetime import datetime as dt
+
+    # Filtros: ano e meses (igual analise_geral_mao_de_obra)
+    ano_filtro = request.GET.get('ano', None)
+    meses_filtro = request.GET.getlist('mes')
+    hoje = dt.now()
+    if not ano_filtro:
+        ano_filtro = str(hoje.year)
+    try:
+        ano_filtro = int(ano_filtro)
+    except (ValueError, TypeError):
+        ano_filtro = hoje.year
+    meses_filtro_int = []
+    if meses_filtro:
+        for mes in meses_filtro:
+            try:
+                mes_int = int(mes)
+                if 1 <= mes_int <= 12:
+                    meses_filtro_int.append(mes_int)
+            except (ValueError, TypeError):
+                continue
+        meses_filtro_int = sorted(list(set(meses_filtro_int)))
+    if not meses_filtro_int:
+        meses_filtro_int = list(range(1, 13))
+
+    def data_dentro_periodo(d):
+        if not d:
+            return False
+        data = d.date() if hasattr(d, 'date') else d
+        return data.year == ano_filtro and data.month in meses_filtro_int
+
+    def processar_ordens(modelo_ordem, modelo_ficha):
+        """Retorna (total_ordens, fechadas, abertas, total_fichas, ids_fechadas_periodo)."""
+        total = fechadas = abertas = 0
+        ids_periodo = set()
+        ids_fechadas = set()
+        for o in modelo_ordem.objects.only('dt_abertura_solicita', 'dt_encordmanu', 'id').iterator(chunk_size=2000):
+            data_abert = _parse_dt_abertura_solicita(o.dt_abertura_solicita)
+            if not data_abert or not data_dentro_periodo(data_abert):
+                continue
+            total += 1
+            ids_periodo.add(o.id)
+            dt_enc = _parse_datetime_os(o.dt_encordmanu)
+            if dt_enc:
+                fechadas += 1
+                ids_fechadas.add(o.id)
+            else:
+                abertas += 1
+        total_fichas = modelo_ficha.objects.filter(ordem_servico_id__in=ids_periodo).count() if ids_periodo else 0
+        return total, fechadas, abertas, total_fichas, ids_fechadas
+
+    def duracao_por_ordem_fichas(modelo_ficha, ids_fechadas):
+        """
+        Para cada ordem: duração = do primeiro início ao último fim (múltiplas fichas = manutentores em paralelo).
+        Retorna (total_horas_soma_duracao_ordens, set de ordem_ids).
+        """
+        if not ids_fechadas:
+            return 0, set()
+        # ordem_id -> [(dt_inic, dt_fim), ...]
+        ordem_intervals = {}
+        for f in modelo_ficha.objects.filter(ordem_servico_id__in=ids_fechadas).only(
+            'dt_ficapomanu', 'dt_inic_iteficmanu', 'dt_fim_iteficmanu', 'ordem_servico_id'
+        ).iterator(chunk_size=2000):
+            if f.ordem_servico_id not in ids_fechadas:
+                continue
+            dt_fic = _parse_datetime_os(f.dt_ficapomanu)
+            dt_inic = _parse_datetime_os(f.dt_inic_iteficmanu)
+            dt_fim = _parse_datetime_os(f.dt_fim_iteficmanu)
+            if not dt_inic or not dt_fim:
+                continue
+            if dt_inic.year == 1900 and dt_fic:
+                dt_inic = dt_inic.replace(year=dt_fic.year, month=dt_fic.month, day=dt_fic.day)
+            if dt_fim.year == 1900 and dt_fic:
+                dt_fim = dt_fim.replace(year=dt_fic.year, month=dt_fic.month, day=dt_fic.day)
+            mins = _minutes_between(dt_inic, dt_fim)
+            if mins is not None and mins >= 0 and mins < 24 * 60 * 2:
+                if f.ordem_servico_id not in ordem_intervals:
+                    ordem_intervals[f.ordem_servico_id] = []
+                ordem_intervals[f.ordem_servico_id].append((dt_inic, dt_fim))
+        total_min = 0
+        for ordem_id, intervals in ordem_intervals.items():
+            if not intervals:
+                continue
+            dt_prim = min(i[0] for i in intervals)
+            dt_ult = max(i[1] for i in intervals)
+            mins = _minutes_between(dt_prim, dt_ult)
+            if mins is not None and mins >= 0 and mins < 24 * 60 * 2:
+                total_min += mins
+        return total_min / 60, set(ordem_intervals.keys())
+
+    # Processar os três tipos de ordens
+    tot_c, fech_c, ab_c, fich_c, ids_fech_c = processar_ordens(OrdemServicoCorretiva, OrdemServicoCorretivaFicha)
+    tot_p, fech_p, ab_p, fich_p, ids_fech_p = processar_ordens(OrdemServicoPreventiva, OrdemServicoPreventivaFicha)
+    tot_l, fech_l, ab_l, fich_l, ids_fech_l = processar_ordens(OrdemServicoLubrificacao, OrdemServicoLubrificacaoFicha)
+
+    total_ordens = tot_c + tot_p + tot_l
+    total_fichas = fich_c + fich_p + fich_l
+    total_fechadas = fech_c + fech_p + fech_l
+    total_abertas = ab_c + ab_p + ab_l
+
+    hrs_c, ords_c = duracao_por_ordem_fichas(OrdemServicoCorretivaFicha, ids_fech_c)
+    hrs_p, ords_p = duracao_por_ordem_fichas(OrdemServicoPreventivaFicha, ids_fech_p)
+    hrs_l, ords_l = duracao_por_ordem_fichas(OrdemServicoLubrificacaoFicha, ids_fech_l)
+    total_horas_fechadas = hrs_c + hrs_p + hrs_l
+    ordens_com_ficha_valida = len(ords_c) + len(ords_p) + len(ords_l)
+
+    # Tempo médio = horas apontadas / ordens com ficha válida (não total fechadas)
+    tempo_medio_executar_min = (total_horas_fechadas * 60 / ordens_com_ficha_valida) if ordens_com_ficha_valida > 0 else 0
+    tempo_medio_executar_horas = total_horas_fechadas / ordens_com_ficha_valida if ordens_com_ficha_valida > 0 else 0
+    # Horas estimadas para concluir Ordens Abertas (20 min por OS)
+    horas_estimadas_abertas_20min = (total_abertas * 20) / 60
+
+    # anos_disponiveis (de todos os tipos)
+    anos_disponiveis = set()
+    for modelo in [OrdemServicoCorretiva, OrdemServicoPreventiva, OrdemServicoLubrificacao]:
+        for o in modelo.objects.only('dt_abertura_solicita').iterator(chunk_size=2000):
+            data_abert = _parse_dt_abertura_solicita(o.dt_abertura_solicita)
+            if data_abert:
+                anos_disponiveis.add(data_abert.year)
+    anos_disponiveis = sorted(anos_disponiveis, reverse=True)
+    if not anos_disponiveis:
+        anos_disponiveis = [hoje.year]
+    meses_nomes = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 5: 'Maio', 6: 'Junho',
+        7: 'Julho', 8: 'Agosto', 9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+
+    # Seções por classificação de local (CentroAtividade.local)
+    # Usar Ordem.cd_setormanut para mapear ao Centro de Atividade (cd_setormanut = sigla ou ca quando numérico)
+    def ordem_pertence_centro(cd_setormanut_val, centro):
+        """Verifica se ordem pertence ao centro via cd_setormanut (cd_setormanut = sigla ou ca quando numérico)."""
+        st = (cd_setormanut_val or '').strip()
+        if not st:
+            return False
+        if st.isdigit() and centro.ca is not None:
+            try:
+                return int(st) == centro.ca
+            except (ValueError, TypeError):
+                pass
+        if centro.sigla:
+            return st.upper() == (centro.sigla or '').strip().upper()
+        return False
+
+    locais_config = [
+        ('FRIGORIFICO', 'FRIGORÍFICO', Q(local__iexact='FRIGORÍFICO') | Q(local__icontains='FRIGOR')),
+        ('UTILIDADES', 'UTILIDADES', Q(local__iexact='UTILIDADES') | Q(local__icontains='UTILIDADE')),
+        ('EXTERNA', 'EXTERNA', Q(local__iexact='EXTERNA') | Q(local__icontains='EXTERN')),
+        ('INDÚSTRIA', 'INDÚSTRIA', Q(local__iexact='INDÚSTRIA') | Q(local__icontains='IND')),
+        ('APOIO', 'APOIO', Q(local__iexact='APOIO') | Q(local__icontains='APOIO')),
+    ]
+
+    # Rebuild contagem_por_centro e ordem_centro_id - centros por local
+    centros_por_local = {}
+    for key, label, q_filter in locais_config:
+        centros_por_local[key] = list(CentroAtividade.objects.filter(q_filter).order_by('ca'))
+
+    contagem_fechadas_por_centro = {}
+    contagem_abertas_por_centro = {}
+    ordem_id_to_centro_id = {}  # ordem_id -> centro_id (para ordens fechadas)
+
+    for key, centros in centros_por_local.items():
+        for c in centros:
+            contagem_fechadas_por_centro[c.id] = 0
+            contagem_abertas_por_centro[c.id] = 0
+
+    # Contar ordens fechadas e abertas por centro via cd_setormanut
+    def get_ids_fech(modelo):
+        if modelo == OrdemServicoCorretiva:
+            return ids_fech_c
+        if modelo == OrdemServicoPreventiva:
+            return ids_fech_p
+        return ids_fech_l
+
+    for modelo in [OrdemServicoCorretiva, OrdemServicoPreventiva, OrdemServicoLubrificacao]:
+        ids_fech = get_ids_fech(modelo)
+        for o in modelo.objects.only('dt_abertura_solicita', 'cd_setormanut', 'id').iterator(chunk_size=2000):
+            data_abert = _parse_dt_abertura_solicita(o.dt_abertura_solicita)
+            if not data_abert or not data_dentro_periodo(data_abert):
+                continue
+            st = (o.cd_setormanut or '').strip()
+            if not st:
+                continue
+            for key, centros in centros_por_local.items():
+                for c in centros:
+                    if ordem_pertence_centro(o.cd_setormanut, c):
+                        if o.id in ids_fech:
+                            contagem_fechadas_por_centro[c.id] = contagem_fechadas_por_centro.get(c.id, 0) + 1
+                        else:
+                            contagem_abertas_por_centro[c.id] = contagem_abertas_por_centro.get(c.id, 0) + 1
+                        break
+                else:
+                    continue
+                break
+
+    # ordem_id -> centro_id para fechadas (para calcular horas)
+    for modelo_ordem in [OrdemServicoCorretiva, OrdemServicoPreventiva, OrdemServicoLubrificacao]:
+        ids_fech = ids_fech_c if modelo_ordem == OrdemServicoCorretiva else ids_fech_p if modelo_ordem == OrdemServicoPreventiva else ids_fech_l
+        if not ids_fech:
+            continue
+        for o in modelo_ordem.objects.filter(id__in=ids_fech).only('id', 'cd_setormanut'):
+            st = (o.cd_setormanut or '').strip()
+            if not st:
+                continue
+            for key, centros in centros_por_local.items():
+                for c in centros:
+                    if ordem_pertence_centro(o.cd_setormanut, c):
+                        ordem_id_to_centro_id[o.id] = c.id
+                        break
+                else:
+                    continue
+                break
+
+    def horas_e_ordens_por_centro_fichas(modelo_ficha, ids_fechadas):
+        """
+        Por ordem: duração = primeiro início ao último fim (fichas em paralelo).
+        Retorna (horas_duracao, ordens_out, horas_apontadas_raw).
+        horas_apontadas_raw = soma de TODAS as fichas (man-hours).
+        """
+        horas_out = {}
+        ordens_out = {}
+        horas_apontadas_raw = {}  # centro_id -> soma de todas as fichas
+        if not ids_fechadas:
+            return horas_out, ordens_out, horas_apontadas_raw
+        ordem_intervals = {}
+        for f in modelo_ficha.objects.filter(ordem_servico_id__in=ids_fechadas).only(
+            'dt_ficapomanu', 'dt_inic_iteficmanu', 'dt_fim_iteficmanu', 'ordem_servico_id'
+        ).iterator(chunk_size=2000):
+            if f.ordem_servico_id not in ids_fechadas:
+                continue
+            centro_id = ordem_id_to_centro_id.get(f.ordem_servico_id)
+            if centro_id is None:
+                continue
+            dt_fic = _parse_datetime_os(f.dt_ficapomanu)
+            dt_inic = _parse_datetime_os(f.dt_inic_iteficmanu)
+            dt_fim = _parse_datetime_os(f.dt_fim_iteficmanu)
+            if not dt_inic or not dt_fim:
+                continue
+            if dt_inic.year == 1900 and dt_fic:
+                dt_inic = dt_inic.replace(year=dt_fic.year, month=dt_fic.month, day=dt_fic.day)
+            if dt_fim.year == 1900 and dt_fic:
+                dt_fim = dt_fim.replace(year=dt_fic.year, month=dt_fic.month, day=dt_fic.day)
+            mins = _minutes_between(dt_inic, dt_fim)
+            if mins is not None and mins >= 0 and mins < 24 * 60 * 2:
+                horas_apontadas_raw[centro_id] = horas_apontadas_raw.get(centro_id, 0) + mins / 60
+                key = (f.ordem_servico_id, centro_id)
+                if key not in ordem_intervals:
+                    ordem_intervals[key] = []
+                ordem_intervals[key].append((dt_inic, dt_fim))
+        for (ordem_id, centro_id), intervals in ordem_intervals.items():
+            if not intervals:
+                continue
+            dt_prim = min(i[0] for i in intervals)
+            dt_ult = max(i[1] for i in intervals)
+            mins = _minutes_between(dt_prim, dt_ult)
+            if mins is not None and mins >= 0 and mins < 24 * 60 * 2:
+                horas_out[centro_id] = horas_out.get(centro_id, 0) + mins / 60
+                if centro_id not in ordens_out:
+                    ordens_out[centro_id] = set()
+                ordens_out[centro_id].add(ordem_id)
+        return horas_out, ordens_out, horas_apontadas_raw
+
+    horas_por_centro = {}
+    horas_apontadas_por_centro = {}  # soma de todas as fichas (man-hours)
+    ordens_com_ficha_por_centro = {}
+    for modelo_ficha, ids_fech in [
+        (OrdemServicoCorretivaFicha, ids_fech_c),
+        (OrdemServicoPreventivaFicha, ids_fech_p),
+        (OrdemServicoLubrificacaoFicha, ids_fech_l),
+    ]:
+        hrs, ords, hrs_raw = horas_e_ordens_por_centro_fichas(modelo_ficha, ids_fech)
+        for cid, h in hrs.items():
+            horas_por_centro[cid] = horas_por_centro.get(cid, 0) + h
+        for cid, h in hrs_raw.items():
+            horas_apontadas_por_centro[cid] = horas_apontadas_por_centro.get(cid, 0) + h
+        for cid, s in ords.items():
+            if cid not in ordens_com_ficha_por_centro:
+                ordens_com_ficha_por_centro[cid] = set()
+            ordens_com_ficha_por_centro[cid].update(s)
+
+    # Mapeamento local_trab (Manutentor) -> key da seção (case-insensitive, várias variações)
+    def _local_to_key(lt):
+        if not lt:
+            return None
+        u = (lt or '').strip().upper()
+        if not u or u == '-':
+            return 'APOIO'
+        if 'FRIGOR' in u:
+            return 'FRIGORIFICO'
+        if 'UTILID' in u or 'ETE' in u or 'ETA' in u:
+            return 'UTILIDADES'
+        if 'EXTERN' in u:
+            return 'EXTERNA'
+        if 'IND' in u and 'STR' in u:  # INDÚSTRIA, INDUSTRIA
+            return 'INDÚSTRIA'
+        if u in ('INDUSTRIA', 'INDÚSTRIA', 'INDSTRIA'):
+            return 'INDÚSTRIA'
+        # Civil, Manutenção, Indefinido, Automação, PCM, Melhoria, etc. -> APOIO
+        return 'APOIO'
+
+    manutentores_por_key = {}
+    manutentores_turno_por_key = {}  # key -> {'A': n, 'B': n, 'C': n}
+    for key in ['FRIGORIFICO', 'UTILIDADES', 'EXTERNA', 'INDÚSTRIA', 'APOIO']:
+        manutentores_por_key[key] = 0
+        manutentores_turno_por_key[key] = {'A': 0, 'B': 0, 'C': 0}
+    for m in Manutentor.objects.filter(ativo=True).only('local_trab', 'turno').iterator(chunk_size=500):
+        k = _local_to_key(m.local_trab)
+        if k:
+            manutentores_por_key[k] = manutentores_por_key.get(k, 0) + 1
+            t = (m.turno or '').strip().upper()
+            if 'C' in t:
+                manutentores_turno_por_key[k]['C'] += 1
+            elif 'B' in t:
+                manutentores_turno_por_key[k]['B'] += 1
+            elif 'A' in t:
+                manutentores_turno_por_key[k]['A'] += 1
+
+    secoes_locais = []
+    for key, label, q_filter in locais_config:
+        centros = CentroAtividade.objects.filter(q_filter).order_by('ca')
+        labels = []
+        data_fechadas = []
+        data_abertas = []
+        data_horas = []
+        total_fech = total_abe = total_hrs = total_hrs_apontadas = total_ordens_com_ficha = 0
+        for c in centros:
+            fech = contagem_fechadas_por_centro.get(c.id, 0)
+            abe = contagem_abertas_por_centro.get(c.id, 0)
+            hrs = horas_por_centro.get(c.id, 0)
+            hrs_ap = horas_apontadas_por_centro.get(c.id, 0)
+            ordens_ficha = len(ordens_com_ficha_por_centro.get(c.id, set()))
+            total_fech += fech
+            total_abe += abe
+            total_hrs += hrs
+            total_hrs_apontadas += hrs_ap
+            total_ordens_com_ficha += ordens_ficha
+            labels.append((c.sigla or c.descricao or str(c.ca))[:30])
+            data_fechadas.append(fech)
+            data_abertas.append(abe)
+            data_horas.append(round(hrs, 1))
+        total_ordens_sec = total_fech + total_abe
+        # Tempo médio = soma das horas nas fichas / quantidade de ordens com ficha (não total fechadas)
+        tempo_medio_min = (total_hrs * 60 / total_ordens_com_ficha) if total_ordens_com_ficha > 0 else 0
+        horas_abertas_20min = (total_abe * 20) / 60
+        # Horas estimadas usando tempo médio histórico (mais realista)
+        horas_abertas_tempo_medio = (total_abe * tempo_medio_min / 60) if tempo_medio_min > 0 else horas_abertas_20min
+        # Per-centro: estimativa de horas para fechar abertas (para gráfico de análise)
+        analise_centros = []
+        for i, c in enumerate(centros):
+            abe_c = contagem_abertas_por_centro.get(c.id, 0)
+            if abe_c == 0:
+                continue
+            hrs_c = horas_por_centro.get(c.id, 0)
+            ordens_ficha_c = len(ordens_com_ficha_por_centro.get(c.id, set()))
+            tempo_medio_c = (hrs_c * 60 / ordens_ficha_c) if ordens_ficha_c > 0 else 20
+            hrs_20 = round(abe_c * 20 / 60, 1)
+            hrs_tempo_medio = round(abe_c * tempo_medio_c / 60, 1)
+            analise_centros.append({
+                'label': (c.sigla or c.descricao or str(c.ca))[:25],
+                'abertas': abe_c,
+                'horas_20min': hrs_20,
+                'horas_tempo_medio': hrs_tempo_medio,
+            })
+        secoes_locais.append({
+            'key': key,
+            'label': label,
+            'labels_json': json.dumps(labels, ensure_ascii=False),
+            'data_fechadas_json': json.dumps(data_fechadas),
+            'data_abertas_json': json.dumps(data_abertas),
+            'data_horas_json': json.dumps(data_horas),
+            'has_data': len(labels) > 0,
+            'total_ordens': total_ordens_sec,
+            'total_abertas': total_abe,
+            'total_fechadas': total_fech,
+            'horas_fechadas': round(total_hrs, 1),
+            'horas_apontadas': round(total_hrs_apontadas, 1),
+            'tempo_medio_fechada_min': round(tempo_medio_min, 1),
+            'tempo_medio_fechada_horas': round(total_hrs / total_ordens_com_ficha, 2) if total_ordens_com_ficha > 0 else 0,
+            'horas_estimadas_abertas_20min': round(horas_abertas_20min, 1),
+            'horas_estimadas_abertas_tempo_medio': round(horas_abertas_tempo_medio, 1),
+            'dias_uteis_estimados': max(1, int((horas_abertas_tempo_medio / 8) + 0.5)) if total_abe > 0 else 0,
+            'manutentores_count': manutentores_por_key.get(key, 0),
+            'manutentores_turno_a': manutentores_turno_por_key.get(key, {}).get('A', 0),
+            'manutentores_turno_b': manutentores_turno_por_key.get(key, {}).get('B', 0),
+            'manutentores_turno_c': manutentores_turno_por_key.get(key, {}).get('C', 0),
+            'dias_uteis_com_equipe': round(horas_abertas_tempo_medio / (manutentores_por_key.get(key, 1) * 8), 1) if total_abe > 0 and manutentores_por_key.get(key, 0) > 0 else None,
+            'horas_por_manutentor': round(horas_abertas_tempo_medio / manutentores_por_key.get(key, 1), 1) if total_abe > 0 and manutentores_por_key.get(key, 0) > 0 else None,
+            'analise_centros': analise_centros,
+            'analise_centros_json': json.dumps([{
+                'label': ac['label'],
+                'horas_20min': ac['horas_20min'],
+                'horas_tempo_medio': ac['horas_tempo_medio'],
+            } for ac in analise_centros], ensure_ascii=False),
+        })
+
+    context = {
+        'page_title': 'Análise de Mão de Obra e Ordens',
+        'active_page': 'analise_mao_de_obra_e_ordens',
+        'ano_filtro': ano_filtro,
+        'meses_filtro': meses_filtro_int,
+        'meses_nomes': meses_nomes,
+        'anos_disponiveis': anos_disponiveis,
+        'total_horas_fechadas': round(total_horas_fechadas, 1),
+        'tempo_medio_executar_min': round(tempo_medio_executar_min, 1),
+        'tempo_medio_executar_horas': round(tempo_medio_executar_horas, 2),
+        'horas_estimadas_abertas_20min': round(horas_estimadas_abertas_20min, 1),
+        'total_ordens': total_ordens,
+        'total_fichas': total_fichas,
+        'total_fechadas': total_fechadas,
+        'total_abertas': total_abertas,
+        'secoes_locais': secoes_locais,
+    }
+    return render(request, 'analise_mao_de_obra/analise_mao_de_obra_e_ordens.html', context)
+
+
+def configuracoes_mao_de_obra(request):
+    """Configurações de Mão de Obra"""
+    context = {
+        'page_title': 'Configurações de Mão de Obra',
+        'active_page': 'configuracoes_mao_de_obra',
+    }
+    return render(request, 'analise_mao_de_obra/configuracoes_mao_de_obra.html', context)
+
+
+def analise_mao_de_obra_preventiva(request):
+    """Análise de Mão de Obra — Preventivas e Lubrificação (OrdemServicoPreventiva, OrdemServicoLubrificacao e suas Fichas)"""
+    from datetime import datetime as dt
+    from app.models import OrdemServicoPreventiva, OrdemServicoPreventivaFicha
+    from app.models import OrdemServicoLubrificacao, OrdemServicoLubrificacaoFicha
+
+    ano_filtro = request.GET.get('ano', None)
+    meses_filtro = request.GET.getlist('mes')
+    hoje = dt.now()
+    if not ano_filtro:
+        ano_filtro = str(hoje.year)
+    try:
+        ano_filtro = int(ano_filtro)
+    except (ValueError, TypeError):
+        ano_filtro = hoje.year
+    meses_filtro_int = []
+    if meses_filtro:
+        for mes in meses_filtro:
+            try:
+                mes_int = int(mes)
+                if 1 <= mes_int <= 12:
+                    meses_filtro_int.append(mes_int)
+            except (ValueError, TypeError):
+                continue
+        meses_filtro_int = sorted(list(set(meses_filtro_int)))
+    if not meses_filtro_int:
+        meses_filtro_int = list(range(1, 13))
+
+    def data_dentro_periodo(d):
+        if not d:
+            return False
+        data = d.date() if hasattr(d, 'date') else d
+        return data.year == ano_filtro and data.month in meses_filtro_int
+
+    def processar_tipo(modelo_ordem, modelo_ficha):
+        total = fechadas = abertas = 0
+        ids_periodo = set()
+        ids_fechadas = set()
+        for o in modelo_ordem.objects.only('dt_abertura_solicita', 'dt_encordmanu', 'id').iterator(chunk_size=2000):
+            data_abert = _parse_dt_abertura_solicita(o.dt_abertura_solicita)
+            if not data_abert or not data_dentro_periodo(data_abert):
+                continue
+            total += 1
+            ids_periodo.add(o.id)
+            dt_enc = _parse_datetime_os(o.dt_encordmanu)
+            if dt_enc:
+                fechadas += 1
+                ids_fechadas.add(o.id)
+            else:
+                abertas += 1
+        total_fichas = modelo_ficha.objects.filter(ordem_servico_id__in=ids_periodo).count() if ids_periodo else 0
+
+        ordem_intervals = {}
+        horas_apontadas = 0
+        for f in modelo_ficha.objects.filter(ordem_servico_id__in=ids_periodo).only(
+            'dt_ficapomanu', 'dt_inic_iteficmanu', 'dt_fim_iteficmanu', 'ordem_servico_id'
+        ).iterator(chunk_size=2000):
+            if f.ordem_servico_id not in ids_periodo:
+                continue
+            dt_fic = _parse_datetime_os(f.dt_ficapomanu)
+            dt_inic = _parse_datetime_os(f.dt_inic_iteficmanu)
+            dt_fim = _parse_datetime_os(f.dt_fim_iteficmanu)
+            if not dt_inic or not dt_fim:
+                continue
+            if dt_inic.year == 1900 and dt_fic:
+                dt_inic = dt_inic.replace(year=dt_fic.year, month=dt_fic.month, day=dt_fic.day)
+            if dt_fim.year == 1900 and dt_fic:
+                dt_fim = dt_fim.replace(year=dt_fic.year, month=dt_fic.month, day=dt_fic.day)
+            mins = _minutes_between(dt_inic, dt_fim)
+            if mins is not None and mins >= 0 and mins < 24 * 60 * 2:
+                horas_apontadas += mins / 60
+                if f.ordem_servico_id not in ordem_intervals:
+                    ordem_intervals[f.ordem_servico_id] = []
+                ordem_intervals[f.ordem_servico_id].append((dt_inic, dt_fim))
+
+        total_hrs_duracao = 0
+        for ordem_id, intervals in ordem_intervals.items():
+            if not intervals:
+                continue
+            dt_prim = min(i[0] for i in intervals)
+            dt_ult = max(i[1] for i in intervals)
+            mins = _minutes_between(dt_prim, dt_ult)
+            if mins is not None and mins >= 0 and mins < 24 * 60 * 2:
+                total_hrs_duracao += mins / 60
+        ordens_com_ficha = len(ordem_intervals)
+        tempo_medio_min = (total_hrs_duracao * 60 / ordens_com_ficha) if ordens_com_ficha > 0 else 0
+        tempo_medio_horas = total_hrs_duracao / ordens_com_ficha if ordens_com_ficha > 0 else 0
+
+        return {
+            'total_ordens': total,
+            'total_fechadas': fechadas,
+            'total_abertas': abertas,
+            'total_fichas': total_fichas,
+            'horas_apontadas': round(horas_apontadas, 1),
+            'horas_duracao': round(total_hrs_duracao, 1),
+            'ordens_com_ficha': ordens_com_ficha,
+            'tempo_medio_min': round(tempo_medio_min, 1),
+            'tempo_medio_horas': round(tempo_medio_horas, 2),
+        }
+
+    dados_preventiva = processar_tipo(OrdemServicoPreventiva, OrdemServicoPreventivaFicha)
+    dados_lubrificacao = processar_tipo(OrdemServicoLubrificacao, OrdemServicoLubrificacaoFicha)
+
+    anos_disponiveis = set()
+    for modelo in [OrdemServicoPreventiva, OrdemServicoLubrificacao]:
+        for o in modelo.objects.only('dt_abertura_solicita').iterator(chunk_size=2000):
+            data_abert = _parse_dt_abertura_solicita(o.dt_abertura_solicita)
+            if data_abert:
+                anos_disponiveis.add(data_abert.year)
+    anos_disponiveis = sorted(anos_disponiveis, reverse=True)
+    if not anos_disponiveis:
+        anos_disponiveis = [hoje.year]
+    meses_nomes = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 5: 'Maio', 6: 'Junho',
+        7: 'Julho', 8: 'Agosto', 9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+
+    context = {
+        'page_title': 'Análise Preventiva e Lubrificação',
+        'active_page': 'analise_mao_de_obra_preventiva',
+        'ano_filtro': ano_filtro,
+        'meses_filtro': meses_filtro_int,
+        'meses_nomes': meses_nomes,
+        'anos_disponiveis': anos_disponiveis,
+        'dados_preventiva': dados_preventiva,
+        'dados_lubrificacao': dados_lubrificacao,
+    }
+    return render(request, 'analise_mao_de_obra/analise_mao_de_obra_preventiva.html', context)
+
+
 def analise_manutentores(request):
     """Análise de Manutentores - Dashboard com estatísticas"""
     from app.models import Manutentor, ManutentorMaquina, OrdemServicoCorretiva, OrdemServicoCorretivaFicha
@@ -14764,11 +16231,19 @@ def editar_manutentor(request, matricula):
 
 def consultar_manutentores(request):
     """Consultar/listar manutentores cadastrados com filtros avançados"""
-    from app.models import Manutentor, TURNO, LOCAL_TRABALHO
+    from app.models import Manutentor
     from datetime import datetime
     
     # Buscar todos os manutentores
     manutentores_list = Manutentor.objects.all()
+    
+    # Filtro por Ativo (padrão: apenas ativos quando a página abre sem parâmetros)
+    filtro_ativo = request.GET.get('filtro_ativo', '1')
+    if filtro_ativo == '1':
+        manutentores_list = manutentores_list.filter(ativo=True)
+    elif filtro_ativo == '0':
+        manutentores_list = manutentores_list.filter(ativo=False)
+    # filtro_ativo == '' (Todos) não aplica filtro
     
     # Filtro de busca geral (texto)
     search_query = request.GET.get('search', '').strip()
@@ -14810,14 +16285,32 @@ def consultar_manutentores(request):
     turnos_count = Manutentor.objects.exclude(turno__isnull=True).exclude(turno='').values('turno').distinct().count()
     locais_count = Manutentor.objects.exclude(local_trab__isnull=True).exclude(local_trab='').values('local_trab').distinct().count()
     
-    # Obter valores únicos para os dropdowns de filtros
+    # Obter valores únicos para os dropdowns de filtros (baseados no DB)
     cargos_unicos = Manutentor.objects.exclude(
         Cargo__isnull=True
     ).exclude(
         Cargo=''
     ).values_list('Cargo', flat=True).distinct().order_by('Cargo')
-    
-    
+
+    turnos_unicos = list(Manutentor.objects.exclude(
+        turno__isnull=True
+    ).exclude(
+        turno=''
+    ).values_list('turno', flat=True).distinct().order_by('turno'))
+
+    locais_unicos = list(Manutentor.objects.exclude(
+        local_trab__isnull=True
+    ).exclude(
+        local_trab=''
+    ).values_list('local_trab', flat=True).distinct().order_by('local_trab'))
+
+    # Variáveis que o template espera (algumas podem não existir no modelo)
+    postos_unicos = []
+    filtro_posto = request.GET.get('filtro_posto', '')
+    data_admissao_inicio = request.GET.get('data_admissao_inicio', '')
+    data_admissao_fim = request.GET.get('data_admissao_fim', '')
+    tipos_count = turnos_count  # fallback (Manutentor não tem tipo)
+
     context = {
         'page_title': 'Consultar Manutentores',
         'active_page': 'consultar_manutentores',
@@ -14825,14 +16318,20 @@ def consultar_manutentores(request):
         'total_count': total_count,
         'turnos_count': turnos_count,
         'locais_count': locais_count,
-        # Valores para dropdowns
-        'turnos': TURNO,
-        'locais_trabalho': LOCAL_TRABALHO,
-        'cargos_unicos': cargos_unicos,
+        'tipos_count': tipos_count,
+        # Valores para dropdowns (do banco de dados)
+        'turnos': [(t, t) for t in turnos_unicos],
+        'locais_trabalho': [(l, l) for l in locais_unicos],
+        'cargos_unicos': list(cargos_unicos),
+        'postos_unicos': postos_unicos,
         # Valores dos filtros ativos
         'filtro_turno': filtro_turno,
         'filtro_local_trab': filtro_local_trab,
         'filtro_cargo': filtro_cargo,
+        'filtro_posto': filtro_posto,
+        'filtro_ativo': filtro_ativo,
+        'data_admissao_inicio': data_admissao_inicio,
+        'data_admissao_fim': data_admissao_fim,
     }
     return render(request, 'consultar/consultar_manutentores.html', context)
 
@@ -17856,6 +19355,7 @@ def analise_projecao_gastos(request):
     import json
     
     # --- Lógica de Filtro ---
+    mostrar_todos = request.GET.get('mostrar_todos', 'false').lower() == 'true'
     ano_filtro = request.GET.get('ano', None)
     meses_filtro = request.GET.getlist('mes')
     setores_filtro = request.GET.getlist('setor')
@@ -17864,38 +19364,28 @@ def analise_projecao_gastos(request):
 
     hoje = datetime.now()
     
-    # Anos disponíveis para o filtro (baseado em ano_referencia OU created_at)
+    # Anos disponíveis para o filtro (baseado em ano_referencia, previsao_execucao OU created_at)
+    import re
     anos_disponiveis_set = set()
-    # Buscar anos de ano_referencia
     anos_ref = ProjecaoGasto.objects.exclude(ano_referencia__isnull=True).values_list('ano_referencia', flat=True).distinct()
     for ano in anos_ref:
         if ano:
             anos_disponiveis_set.add(int(ano))
-    # Buscar anos de created_at
+    # Extrair anos de previsao_execucao (ex: "DEZEMBRO / 2025")
+    prev_exec_values = ProjecaoGasto.objects.exclude(previsao_execucao__isnull=True).exclude(previsao_execucao='').values_list('previsao_execucao', flat=True).distinct()
+    for texto in prev_exec_values:
+        if texto:
+            ano_match = re.search(r'\b(20\d{2}|19\d{2})\b', str(texto))
+            if ano_match:
+                anos_disponiveis_set.add(int(ano_match.group(1)))
     projecoes_com_data = ProjecaoGasto.objects.exclude(created_at__isnull=True)
     for proj in projecoes_com_data:
         if proj.created_at:
             anos_disponiveis_set.add(proj.created_at.year)
-    
-    # Sempre incluir o ano atual na lista de anos disponíveis
     anos_disponiveis_set.add(hoje.year)
-    
     anos_disponiveis = sorted(list(anos_disponiveis_set), reverse=True)
     if not anos_disponiveis:
         anos_disponiveis = [hoje.year]
-    
-    # Se não há filtro de ano, usar o ano atual (para incluir dados novos)
-    if not ano_filtro:
-        ano_filtro = hoje.year
-    else:
-        try:
-            ano_filtro = int(ano_filtro)
-        except (ValueError, TypeError):
-            ano_filtro = hoje.year
-    
-    if ano_filtro not in anos_disponiveis:
-        anos_disponiveis.insert(0, ano_filtro)
-        anos_disponiveis = sorted(list(set(anos_disponiveis)), reverse=True)
 
     meses_filtro_int = []
     if meses_filtro:
@@ -17908,10 +19398,24 @@ def analise_projecao_gastos(request):
                 continue
         meses_filtro_int = sorted(list(set(meses_filtro_int)))
 
-    # Se nenhum mês for selecionado, usar o mês atual
-    if not meses_filtro_int:
-        meses_filtro_int = [hoje.month]
-    meses_para_mostrar = meses_filtro_int
+    if mostrar_todos:
+        ano_filtro = None
+        meses_filtro_int = list(range(1, 13))
+        meses_para_mostrar = list(range(1, 13))
+    else:
+        if not ano_filtro:
+            ano_filtro = anos_disponiveis[0] if anos_disponiveis else hoje.year
+        else:
+            try:
+                ano_filtro = int(ano_filtro)
+            except (ValueError, TypeError):
+                ano_filtro = anos_disponiveis[0] if anos_disponiveis else hoje.year
+        if ano_filtro not in anos_disponiveis:
+            anos_disponiveis.insert(0, ano_filtro)
+            anos_disponiveis = sorted(list(set(anos_disponiveis)), reverse=True)
+        if not meses_filtro_int:
+            meses_filtro_int = list(range(1, 13))
+        meses_para_mostrar = meses_filtro_int
 
     meses_choices = [
         (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
@@ -17971,17 +19475,20 @@ def analise_projecao_gastos(request):
     # Queryset sem filtro de ano (para o gráfico Gastos por Previsão, que tem seletor de ano próprio)
     projecoes_grafico_previsao = projecoes_qs
     
-    # Aplicar filtro de ano (ano_referencia OU created_at quando ano_referencia vazio)
-    q_ano = (
-        Q(ano_referencia=ano_filtro) |  # Ano de referência coincide
-        (Q(ano_referencia__isnull=True) & Q(created_at__year=ano_filtro))  # Fallback: sem ano_ref, criado no ano
-    )
-    projecoes_qs = projecoes_qs.filter(q_ano)
+    # Aplicar filtro de ano (apenas quando não mostrar_todos)
+    if not mostrar_todos and ano_filtro:
+        q_ano = (
+            Q(ano_referencia=ano_filtro) |
+            Q(previsao_execucao__icontains=str(ano_filtro)) |  # previsao_execucao contém o ano (ex: "DEZEMBRO / 2025")
+            (Q(ano_referencia__isnull=True) & Q(previsao_execucao__isnull=True) & Q(created_at__year=ano_filtro))
+        )
+        projecoes_qs = projecoes_qs.filter(q_ano)
+        projecoes_grafico_previsao = projecoes_grafico_previsao.filter(q_ano)
     
-    # Se há meses selecionados, aplicar filtro de mês
+    # Se há meses selecionados, aplicar filtro de mês (apenas quando não mostrar_todos)
     # mes_referencia no DB é armazenado como '01','02',...'12' (extraído do import), não 'JANEIRO','FEVEREIRO'
     # Também suportar previsao_execucao como fallback (ex: "DEZEMBRO / 2025")
-    if meses_filtro_int:
+    if not mostrar_todos and meses_filtro_int:
         q_mes = Q()
         # Formato numérico: mes_referencia in ['01','02',...]
         for mes_num in meses_filtro_int:
@@ -18187,9 +19694,10 @@ def analise_projecao_gastos(request):
     
     meses_nomes_curtos = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
     
+    ano_label = str(ano_filtro)[2:] if ano_filtro else '--'
     for mes_num, mes_nome in meses_choices:
         if mes_num in meses_para_mostrar:
-            label = f"{meses_nomes_curtos[mes_num-1]}/{str(ano_filtro)[2:]}"
+            label = f"{meses_nomes_curtos[mes_num-1]}/{ano_label}"
             evolucao_labels.append(label)
             
             # Alocar projeção ao mês: mes_referencia ('01','02'...) OU nome em previsao_execucao OU created_at
@@ -18273,16 +19781,24 @@ def analise_projecao_gastos(request):
 
     # Gráfico Valor por Setor: X = data (mês/ano), Y = valor (R$); uma série por setor
     meses_nomes_curtos = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-    # Pares (ano, mes) presentes nos dados (mes_referencia + ano_referencia)
+    # Pares (ano, mes) presentes nos dados (mes_referencia + ano_referencia, ou created_at como fallback)
     valor_por_setor_mes = defaultdict(lambda: defaultdict(lambda: Decimal('0')))  # setor -> (ano, mes) -> valor
     keys_meses_setor = set()  # (ano, mes)
-    for proj in projecoes_qs.exclude(ano_referencia__isnull=True):
+    for proj in projecoes_qs:
         ano = proj.ano_referencia
         mes_str = (proj.mes_referencia or '').strip()
         mes = None
         if mes_str.isdigit():
             mes = int(mes_str) if len(mes_str) <= 2 else int(mes_str[:2])
+        # Fallback: usar created_at quando ano_referencia ou mes_referencia estão vazios
+        if ano is None and proj.created_at:
+            ano = proj.created_at.year
         if mes is None or not (1 <= mes <= 12):
+            if proj.created_at:
+                mes = proj.created_at.month
+            else:
+                continue
+        if ano is None:
             continue
         setor_nome = (proj.setor or '').strip() or 'Não informado'
         key = (ano, mes)
@@ -18348,6 +19864,18 @@ def analise_projecao_gastos(request):
             'total': total,
         })
 
+    # JSON para gráfico Projeções por Setor e Status (Serviço Concluído)
+    tabela_setor_servico_labels = [r['setor'] for r in tabela_setor_servico]
+    tabela_setor_servico_sim = [float(r['sim']) for r in tabela_setor_servico]
+    tabela_setor_servico_nao = [float(r['nao']) for r in tabela_setor_servico]
+    tabela_setor_servico_indefinido = [float(r['indefinido']) for r in tabela_setor_servico]
+    tabela_setor_servico_nao_informado = [float(r['nao_informado']) for r in tabela_setor_servico]
+    tabela_setor_servico_chart_labels_json = json.dumps(tabela_setor_servico_labels, ensure_ascii=False)
+    tabela_setor_servico_chart_sim_json = json.dumps(tabela_setor_servico_sim)
+    tabela_setor_servico_chart_nao_json = json.dumps(tabela_setor_servico_nao)
+    tabela_setor_servico_chart_indefinido_json = json.dumps(tabela_setor_servico_indefinido)
+    tabela_setor_servico_chart_nao_informado_json = json.dumps(tabela_setor_servico_nao_informado)
+
     # --- Tabelas Detalhadas ---
     # Top 10 Setores por Valor
     top_setores = projecoes_qs.exclude(setor__isnull=True).exclude(setor='').values('setor').annotate(
@@ -18361,7 +19889,7 @@ def analise_projecao_gastos(request):
         valor_total=Sum('valor_total')
     ).order_by('-valor_total')[:10]
 
-    setores_para_links = list(setores_disponiveis)[:9]
+    setores_para_links = list(setores_disponiveis)
 
     context = {
         'page_title': 'Análise de Projeções de Gastos',
@@ -18375,6 +19903,7 @@ def analise_projecao_gastos(request):
         'uso_contabil_disponiveis': uso_contabil_disponiveis,
         'setores_selecionados': setores_filtro,
         'uso_contabil_filtro': uso_contabil_filtro,
+        'mostrar_todos': mostrar_todos,
 
         # KPIs
         'total_projecoes': total_projecoes,
@@ -18442,6 +19971,13 @@ def analise_projecao_gastos(request):
         # Gráfico Valor por Setor
         'valor_por_setor_labels_json': valor_por_setor_labels_json,
         'valor_por_setor_datasets_json': valor_por_setor_datasets_json,
+
+        # Gráfico Projeções por Setor e Status (Serviço Concluído)
+        'tabela_setor_servico_chart_labels_json': tabela_setor_servico_chart_labels_json,
+        'tabela_setor_servico_chart_sim_json': tabela_setor_servico_chart_sim_json,
+        'tabela_setor_servico_chart_nao_json': tabela_setor_servico_chart_nao_json,
+        'tabela_setor_servico_chart_indefinido_json': tabela_setor_servico_chart_indefinido_json,
+        'tabela_setor_servico_chart_nao_informado_json': tabela_setor_servico_chart_nao_informado_json,
 
         # Tabelas
         'top_setores': top_setores,
@@ -18586,14 +20122,21 @@ def analise_notas_fiscais(request):
 
     # --- Queryset Filtrado (baseado APENAS em data_emissao) ---
     # IMPORTANTE: Usar APENAS data_emissao para determinar o mês de pagamento previsto
+    # Incluir também notas com situacao PENDENTE sem data_emissao (não apareciam antes)
     notas_filtradas = []
     _uso_norm = _norm(uso_contabil_filtro)
     _situ_norm = _norm(situacao_filtro)
     for nota in todas_notas_list:
         data_emissao = parse_date(nota.data_emissao)
-        if not data_emissao or data_emissao.year != ano_filtro:
+        # Incluir notas PENDENTE mesmo sem data_emissao
+        if not data_emissao:
+            if nota.situacao and 'PENDENTE' in (nota.situacao or '').upper():
+                pass  # continuar para aplicar outros filtros
+            else:
+                continue
+        elif data_emissao.year != ano_filtro:
             continue
-        if meses_filtro_int and data_emissao.month not in meses_filtro_int:
+        if data_emissao and meses_filtro_int and data_emissao.month not in meses_filtro_int:
             continue
         if _uso_norm and _norm(nota.uso_contabil) != _uso_norm:
             continue

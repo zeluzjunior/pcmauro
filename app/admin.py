@@ -4,6 +4,8 @@ from .models import (
     MaquinaDocumento,
     OrdemServicoCorretiva, 
     OrdemServicoCorretivaFicha,
+    OrdemServicoLubrificacao,
+    OrdemServicoLubrificacaoFicha,
     CentroAtividade, 
     Manutentor, 
     ManutentorMaquina,
@@ -258,6 +260,43 @@ class OrdemServicoCorretivaFichaAdmin(admin.ModelAdmin):
     raw_id_fields = ('ordem_servico',)  # Para facilitar a seleção em muitos registros
     list_per_page = 50
     
+    fieldsets = (
+        ('Ordem de Serviço', {
+            'fields': ('ordem_servico',)
+        }),
+        ('Funcionário Executor OS', {
+            'fields': ('cd_func_exec_os', 'nm_func_exec_os')
+        }),
+        ('Ficha de Manutenção', {
+            'fields': ('dt_ficapomanu', 'dt_inic_iteficmanu', 'dt_fim_iteficmanu')
+        }),
+        ('Sistema', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(OrdemServicoLubrificacao)
+class OrdemServicoLubrificacaoAdmin(admin.ModelAdmin):
+    """Admin configuration for OrdemServicoLubrificacao model"""
+    list_display = ('cd_ordemserv', 'cd_maquina', 'descr_maquina', 'cd_setormanut', 'dt_entrada', 'dt_encordmanu')
+    list_filter = ('cd_setormanut', 'created_at')
+    search_fields = ('cd_ordemserv', 'cd_maquina', 'descr_maquina', 'nm_func_solic_os', 'nm_func_exec')
+    readonly_fields = ('created_at', 'updated_at')
+    list_per_page = 50
+
+
+@admin.register(OrdemServicoLubrificacaoFicha)
+class OrdemServicoLubrificacaoFichaAdmin(admin.ModelAdmin):
+    """Admin configuration for OrdemServicoLubrificacaoFicha model"""
+    list_display = ('ordem_servico', 'nm_func_exec_os', 'cd_func_exec_os', 'dt_ficapomanu', 'dt_inic_iteficmanu', 'dt_fim_iteficmanu', 'created_at')
+    list_filter = ('ordem_servico', 'created_at')
+    search_fields = ('ordem_servico__cd_ordemserv', 'nm_func_exec_os', 'cd_func_exec_os')
+    readonly_fields = ('created_at', 'updated_at')
+    raw_id_fields = ('ordem_servico',)
+    list_per_page = 50
+
     fieldsets = (
         ('Ordem de Serviço', {
             'fields': ('ordem_servico',)

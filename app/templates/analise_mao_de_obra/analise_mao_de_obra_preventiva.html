@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Análise Preventiva e Lubrificação{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(13, 110, 253, 0.5), rgba(13, 110, 253, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise de Mão de Obra</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise Preventiva e Lubrificação</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="bi bi-clipboard2-check me-2"></i>Análise Preventiva e Lubrificação
+                </h1>
+                <p class="lead">Análise de Ordens de Serviço Preventivas e de Lubrificação com suas Fichas</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <!-- Filtro de Ano e Mês -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion filter-accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button {% if not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                                <i class="fas fa-filter me-2"></i>
+                                <strong>Filtros</strong>
+                                {% if meses_filtro or ano_filtro %}
+                                    <span class="badge bg-info ms-2">
+                                        {% if meses_filtro %}
+                                            {% if meses_filtro|length == 1 %}
+                                                {{ meses_nomes|get_item:meses_filtro.0 }} de {{ ano_filtro }}
+                                            {% else %}
+                                                {{ meses_filtro|length }} meses de {{ ano_filtro }}
+                                            {% endif %}
+                                        {% else %}
+                                            Todos os meses de {{ ano_filtro }}
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'analise_mao_de_obra_preventiva' %}" class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="ano" class="form-label">Ano</label>
+                                        <select class="form-select" id="ano" name="ano" required>
+                                            {% for ano in anos_disponiveis %}
+                                                <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Meses (Selecione múltiplos meses ou deixe todos desmarcados para todos os meses)</label>
+                                        <div class="row g-2">
+                                            {% for i in "123456789012" %}
+                                                {% with mes_num=forloop.counter %}
+                                                    <div class="col-md-3 col-sm-4 col-6">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="mes" value="{{ mes_num }}" id="mes{{ mes_num }}" {% if mes_num in meses_filtro %}checked{% endif %}>
+                                                            <label class="form-check-label" for="mes{{ mes_num }}">{{ meses_nomes|get_item:mes_num }}</label>
+                                                        </div>
+                                                    </div>
+                                                {% endwith %}
+                                            {% endfor %}
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosMeses()">Selecionar Todos</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">Desmarcar Todos</button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end gap-2">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-search me-2"></i>Filtrar
+                                        </button>
+                                        <a href="{% url 'analise_mao_de_obra_preventiva' %}" class="btn btn-outline-secondary">Limpar</a>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção 1: OrdemServicoPreventiva e OrdemServicoPreventivaFicha -->
+        <div class="border-top pt-4 mt-4">
+            <h4 class="mb-4">
+                <i class="bi bi-clipboard2-check me-2 text-primary"></i>Ordens de Serviço Preventivas
+            </h4>
+        </div>
+        <p class="text-muted mb-3">Tabelas: <code>OrdemServicoPreventiva</code> e <code>OrdemServicoPreventivaFicha</code></p>
+        <div class="row mb-4 g-2">
+            <div class="col-6 col-md col-lg mb-0">
+                <div class="card stat-card border-primary shadow-sm border-0 h-100">
+                    <div class="card-body py-3">
+                        <h6 class="text-muted mb-1 small">Total de Ordens</h6>
+                        <h2 class="mb-0 fw-bold text-primary">{{ dados_preventiva.total_ordens|number_br:0 }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg mb-0">
+                <div class="card stat-card border-success shadow-sm border-0 h-100">
+                    <div class="card-body py-3">
+                        <h6 class="text-muted mb-1 small">Fechadas</h6>
+                        <h2 class="mb-0 fw-bold text-success">{{ dados_preventiva.total_fechadas|number_br:0 }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg mb-0">
+                <div class="card stat-card border-warning shadow-sm border-0 h-100">
+                    <div class="card-body py-3">
+                        <h6 class="text-muted mb-1 small">Abertas</h6>
+                        <h2 class="mb-0 fw-bold text-warning">{{ dados_preventiva.total_abertas|number_br:0 }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg mb-0">
+                <div class="card stat-card border-info shadow-sm border-0 h-100">
+                    <div class="card-body py-3">
+                        <h6 class="text-muted mb-1 small">Total de Fichas</h6>
+                        <h2 class="mb-0 fw-bold text-info">{{ dados_preventiva.total_fichas|number_br:0 }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg mb-0">
+                <div class="card stat-card border-secondary shadow-sm border-0 h-100">
+                    <div class="card-body py-3">
+                        <h6 class="text-muted mb-1 small">Horas apontadas (todas fichas)</h6>
+                        <h2 class="mb-0 fw-bold text-secondary">{{ dados_preventiva.horas_apontadas|number_br:1 }}</h2>
+                        <small class="text-muted">horas</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg mb-0">
+                <div class="card stat-card border-info shadow-sm border-0 h-100">
+                    <div class="card-body py-3">
+                        <h6 class="text-muted mb-1 small">Média de Horas por OS</h6>
+                        <h2 class="mb-0 fw-bold text-info">{{ dados_preventiva.tempo_medio_horas|number_br:2 }}</h2>
+                        <small class="text-muted">h ({{ dados_preventiva.tempo_medio_min|number_br:0 }} min)</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção 2: OrdemServicoLubrificacao e OrdemServicoLubrificacaoFicha -->
+        <div class="border-top pt-5 mt-5" style="padding-top: 2.5rem; margin-top: 4rem;">
+            <h4 class="mb-4">
+                <i class="bi bi-droplet me-2 text-primary"></i>Ordens de Serviço de Lubrificação
+            </h4>
+        </div>
+        <p class="text-muted mb-3">Tabelas: <code>OrdemServicoLubrificacao</code> e <code>OrdemServicoLubrificacaoFicha</code></p>
+        <div class="row mb-4 g-2">
+            <div class="col-6 col-md col-lg mb-0">
+                <div class="card stat-card border-primary shadow-sm border-0 h-100">
+                    <div class="card-body py-3">
+                        <h6 class="text-muted mb-1 small">Total de Ordens</h6>
+                        <h2 class="mb-0 fw-bold text-primary">{{ dados_lubrificacao.total_ordens|number_br:0 }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg mb-0">
+                <div class="card stat-card border-success shadow-sm border-0 h-100">
+                    <div class="card-body py-3">
+                        <h6 class="text-muted mb-1 small">Fechadas</h6>
+                        <h2 class="mb-0 fw-bold text-success">{{ dados_lubrificacao.total_fechadas|number_br:0 }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg mb-0">
+                <div class="card stat-card border-warning shadow-sm border-0 h-100">
+                    <div class="card-body py-3">
+                        <h6 class="text-muted mb-1 small">Abertas</h6>
+                        <h2 class="mb-0 fw-bold text-warning">{{ dados_lubrificacao.total_abertas|number_br:0 }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg mb-0">
+                <div class="card stat-card border-info shadow-sm border-0 h-100">
+                    <div class="card-body py-3">
+                        <h6 class="text-muted mb-1 small">Total de Fichas</h6>
+                        <h2 class="mb-0 fw-bold text-info">{{ dados_lubrificacao.total_fichas|number_br:0 }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg mb-0">
+                <div class="card stat-card border-secondary shadow-sm border-0 h-100">
+                    <div class="card-body py-3">
+                        <h6 class="text-muted mb-1 small">Horas apontadas (todas fichas)</h6>
+                        <h2 class="mb-0 fw-bold text-secondary">{{ dados_lubrificacao.horas_apontadas|number_br:1 }}</h2>
+                        <small class="text-muted">horas</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg mb-0">
+                <div class="card stat-card border-info shadow-sm border-0 h-100">
+                    <div class="card-body py-3">
+                        <h6 class="text-muted mb-1 small">Média de Horas por OS</h6>
+                        <h2 class="mb-0 fw-bold text-info">{{ dados_lubrificacao.tempo_medio_horas|number_br:2 }}</h2>
+                        <small class="text-muted">h ({{ dados_lubrificacao.tempo_medio_min|number_br:0 }} min)</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+function selecionarTodosMeses() {
+    document.querySelectorAll('input[name="mes"]').forEach(cb => cb.checked = true);
+}
+function desmarcarTodosMeses() {
+    document.querySelectorAll('input[name="mes"]').forEach(cb => cb.checked = false);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Importar Ordens de Lubrificação{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(13, 202, 240, 0.5), rgba(13, 202, 240, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'analise_lubrificacao' %}" class="text-white">Lubrificação</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Importar Ordens de Lubrificação</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Importar Ordens de Lubrificação</h1>
+                <p class="lead">Importe lubrificacao_aberta.csv ou lubrificacao_fechada.csv para as tabelas OrdemServicoLubrificacao e OrdemServicoLubrificacaoFicha</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="row mb-5">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-upload me-2"></i>Selecionar Arquivo</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'importar_ordens_lubrificacao' %}" enctype="multipart/form-data" id="importarForm">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="fileInput" class="form-label">Arquivo para Importação</label>
+                                <input type="file" class="form-control" id="fileInput" name="file" accept=".xlsx,.xls,.xlsm,.csv" required>
+                                <div class="form-text">Formatos: Excel (.xlsx, .xls) ou CSV (.csv). Aceita lubrificacao_aberta.csv e lubrificacao_fechada.csv</div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="updateExisting" name="update_existing">
+                                    <label class="form-check-label" for="updateExisting">Atualizar registros existentes</label>
+                                </div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-info btn-lg" id="submitBtn">
+                                    <i class="fas fa-upload me-2"></i>Importar Arquivo
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Instruções</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>O arquivo deve ter a mesma estrutura dos relatórios SIGA de lubrificação (aberta ou fechada). Os dados são importados para:</p>
+                        <ul>
+                            <li><strong>OrdemServicoLubrificacao:</strong> Ordem de serviço (CD_ORDEMSERV, CD_MAQUINA, DESCR_MAQUINA, DT_ENTRADA, etc.)</li>
+                            <li><strong>OrdemServicoLubrificacaoFicha:</strong> Fichas/Apontamentos (CD_FUNC_EXEC_OS, NM_FUNC_EXEC_OS, DT_FICAPOMANU, DT_INIC_ITEFICMANU, DT_FIM_ITEFICMANU)</li>
+                        </ul>
+                        <p>Múltiplas linhas com o mesmo CD_ORDEMSERV criam múltiplas fichas para a mesma ordem.</p>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>CSV com delimitador ponto e vírgula (;), encoding Latin-1.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-5">
+            <div class="col-12 text-center">
+                <a href="{% url 'analise_lubrificacao' %}" class="btn btn-info btn-lg">
+                    <i class="fas fa-arrow-left me-2"></i>Voltar para Análise de Lubrificação
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

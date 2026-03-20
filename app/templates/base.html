@@ -345,8 +345,19 @@
                                         <div class="collapse" id="preventiva-consultas-collapse">
                                             <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
                                                 <li><a href="{% url 'consultar_manutencoes_preventivas' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Manutenções Preventivas</a></li>
-                                                <li><a href="{% url 'consultar_manutencoes_preventivas' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Plano de Preventiva</a></li>
                                                 <li><a href="{% url 'consultar_roteiro_preventiva' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Roteiro Preventiva</a></li>
+                                            </ul>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#preventiva-plano-collapse" aria-expanded="false">
+                                            <i class="fas fa-clipboard-list"></i>
+                                            Plano de Preventiva
+                                        </button>
+                                        <div class="collapse" id="preventiva-plano-collapse">
+                                            <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
+                                                <li><a href="{% url 'analise_plano_preventiva' %}" class="link-dark rounded"><i class="bi bi-bar-chart-steps me-2"></i>Análise Plano de Preventiva</a></li>
+                                                <li><a href="{% url 'consultar_plano_preventiva' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Plano de Preventiva</a></li>
                                             </ul>
                                         </div>
                                     </li>
@@ -417,6 +428,23 @@
 
 
                         <li class="border-top my-3"></li>
+
+                        <!-- Análise de Mão de Obra -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#analise-mao-de-obra-collapse" aria-expanded="false">
+                                <i class="bi bi-people me-2"></i>
+                                <span class="btn-toggle-text">Análise de Mão de Obra</span>
+                            </button>
+                            <div class="collapse" id="analise-mao-de-obra-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'analise_geral_mao_de_obra' %}" class="link-dark rounded"><i class="bi bi-graph-up me-2"></i>Análise Geral de Mão de Obra</a></li>
+                                    <li><a href="{% url 'analise_mao_de_obra_e_ordens' %}" class="link-dark rounded"><i class="bi bi-clipboard2-data me-2"></i>Análise de Mão de Obra e Ordens</a></li>
+                                    <li><a href="{% url 'analise_mao_de_obra_preventiva' %}" class="link-dark rounded"><i class="bi bi-clipboard2-check me-2"></i>Análise Preventiva e Lubrificação</a></li>
+                                    <li><a href="{% url 'calculo_mao_de_obra' %}" class="link-dark rounded"><i class="bi bi-calculator me-2"></i>Cálculo de Mão de Obra</a></li>
+                                    <li><a href="{% url 'configuracoes_mao_de_obra' %}" class="link-dark rounded"><i class="bi bi-gear me-2"></i>Configurações de Mão de Obra</a></li>
+                                </ul>
+                            </div>
+                        </li>
             
                         <!-- Configurar Plano De Preventiva PCM -->
                         <li class="mb-1">
@@ -714,8 +742,19 @@
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'importar_maquinas' %}" class="link-dark rounded"><i class="bi bi-gear me-2"></i>Máquinas</a></li>
                                     <li><a href="{% url 'importar_manutentores' %}" class="link-dark rounded"><i class="bi bi-person-plus me-2"></i>Manutentores</a></li>
-                                    <li><a href="{% url 'importar_ordens_corretivas_e_outros' %}" class="link-dark rounded"><i class="bi bi-wrench me-2"></i>Ordens Corretivas e Outros</a></li>
-                                    <li><a href="{% url 'importar_ordens_preventivas' %}" class="link-dark rounded"><i class="bi bi-tools me-2"></i>Ordens Preventivas</a></li>
+                                    <li>
+                                        <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#importar-ordem-servico-collapse" aria-expanded="false">
+                                            <i class="fas fa-file-alt"></i>
+                                            Ordem de Serviço
+                                        </button>
+                                        <div class="collapse" id="importar-ordem-servico-collapse">
+                                            <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
+                                                <li><a href="{% url 'importar_ordens_corretivas_e_outros' %}" class="link-dark rounded"><i class="bi bi-wrench me-2"></i>Ordem Corretivas e Outros</a></li>
+                                                <li><a href="{% url 'importar_ordens_preventivas' %}" class="link-dark rounded"><i class="bi bi-tools me-2"></i>Ordem Preventiva</a></li>
+                                                <li><a href="{% url 'importar_ordens_lubrificacao' %}" class="link-dark rounded"><i class="bi bi-fuel-pump-diesel me-2"></i>Ordem Lubrificação</a></li>
+                                            </ul>
+                                        </div>
+                                    </li>
                                     <li><a href="{% url 'importar_plano_preventiva' %}" class="link-dark rounded"><i class="bi bi-clipboard-check me-2"></i>Plano Preventiva</a></li>
                                     <li><a href="{% url 'importar_roteiro_preventiva' %}" class="link-dark rounded"><i class="bi bi-list-check me-2"></i>Roteiro Preventiva</a></li>
                                     <li><a href="{% url 'importar_locais_e_cas' %}" class="link-dark rounded"><i class="bi bi-buildings me-2"></i>Centro de Atividade</a></li>
