@@ -1,10 +1,41 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load form_extras %}
 
 {% block title %}Análise de Plano Preventiva{% endblock %}
 
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .chart-container {
+        position: relative;
+        height: 320px;
+        margin-bottom: 0;
+    }
+    .chart-container-tall {
+        position: relative;
+        height: 380px;
+    }
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .kpi-card {
+        border-left: 4px solid;
+    }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .kpi-purple { border-left-color: #6f42c1; }
+    .kpi-secondary { border-left-color: #6c757d; }
+</style>
+{% endblock %}
+
 {% block content %}
-<!-- Page Header -->
 <section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
     <div class="container">
         <div class="row">
@@ -16,24 +47,457 @@
                     </ol>
                 </nav>
                 <h1 class="display-4 fw-bold mt-3">Análise de Plano Preventiva</h1>
-                <p class="lead">Dashboard com análises e estatísticas dos planos preventivos</p>
+                <p class="lead">Indicadores e gráficos sobre os registros da tabela <strong>PlanoPreventiva</strong> (filtro por data de execução)</p>
             </div>
         </div>
     </div>
 </section>
 
-<!-- Main Content -->
 <section class="py-5">
     <div class="container">
-        <div class="row">
-            <div class="col-12 text-center">
-                <div class="py-5">
-                    <i class="fas fa-chart-line fa-5x text-primary mb-4"></i>
-                    <h2 class="display-5 fw-bold mb-3">Página em Desenvolvimento</h2>
-                    <p class="lead fs-4">Aguarde</p>
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion filter-accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="false" aria-controls="filtrosCollapse">
+                                <i class="fas fa-filter me-2"></i>
+                                <strong>Filtros</strong>
+                                <span class="badge bg-info ms-2">Ano {{ ano_filtro }}</span>
+                                {% if meses_filtro %}
+                                    <span class="badge bg-secondary ms-1">
+                                        {% if meses_filtro|length == 12 %}Todos os meses{% else %}{{ meses_filtro|length }} meses{% endif %}
+                                    </span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'analise_plano_preventiva' %}" class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="ano" class="form-label">Ano (data execução)</label>
+                                        <select class="form-select" id="ano" name="ano" required>
+                                            {% for ano in anos_disponiveis %}
+                                                <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Meses (vazio = todos)</label>
+                                        <div class="row g-2">
+                                            {% for i in "123456789012" %}
+                                                {% with mes_num=forloop.counter %}
+                                                    <div class="col-md-3 col-sm-4 col-6">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="mes" value="{{ mes_num }}" id="mes{{ mes_num }}" {% if mes_num in meses_filtro %}checked{% endif %}>
+                                                            <label class="form-check-label" for="mes{{ mes_num }}">{{ meses_nomes|get_item:mes_num }}</label>
+                                                        </div>
+                                                    </div>
+                                                {% endwith %}
+                                            {% endfor %}
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosMeses()">Selecionar todos</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">Desmarcar todos</button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="fas fa-search me-2"></i>Aplicar
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+
+        <div class="row mb-3">
+            <div class="col-md-8">
+                <p class="text-muted mb-0">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Os registros são filtrados pela string de <strong>data de execução</strong> (formato DD/MM/AAAA). Indicadores e gráficos refletem apenas o período selecionado.
+                </p>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <a href="{% url 'consultar_plano_preventiva' %}?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}" class="btn btn-outline-primary">
+                    <i class="fas fa-table me-2"></i>Ver lista detalhada
+                </a>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-2">
+            <div class="col-md-3">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Registros no período</h6>
+                                <h4 class="mb-0 fw-bold">{{ total_registros }}</h4>
+                                <small class="text-muted">Linhas filtradas</small>
+                            </div>
+                            <i class="fas fa-clipboard-list fa-2x text-primary opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Máquinas distintas</h6>
+                                <h4 class="mb-0 fw-bold">{{ maquinas_distintas }}</h4>
+                                <small class="text-muted">Cód. máquina no período</small>
+                            </div>
+                            <i class="fas fa-industry fa-2x text-success opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Setores distintos</h6>
+                                <h4 class="mb-0 fw-bold">{{ setores_distintos }}</h4>
+                                <small class="text-muted">Cód. setor</small>
+                            </div>
+                            <i class="fas fa-sitemap fa-2x text-warning opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Unidades distintas</h6>
+                                <h4 class="mb-0 fw-bold">{{ unidades_distintas }}</h4>
+                                <small class="text-muted">Cód. unidade</small>
+                            </div>
+                            <i class="fas fa-building fa-2x text-info opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card stat-card kpi-card kpi-purple shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Com roteiro vinculado</h6>
+                                <h4 class="mb-0 fw-bold">{{ com_roteiro }}</h4>
+                                <small class="text-muted">{{ pct_roteiro }}% do período</small>
+                            </div>
+                            <i class="fas fa-link fa-2x opacity-25" style="color: #6f42c1;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Sem roteiro</h6>
+                                <h4 class="mb-0 fw-bold">{{ sem_roteiro }}</h4>
+                                <small class="text-muted">Registros sem FK roteiro</small>
+                            </div>
+                            <i class="fas fa-unlink fa-2x text-danger opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stat-card kpi-card kpi-secondary shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total no cadastro</h6>
+                                <h4 class="mb-0 fw-bold">{{ total_cadastro }}</h4>
+                                <small class="text-muted">Todos os registros (sem filtro)</small>
+                            </div>
+                            <i class="fas fa-database fa-2x text-secondary opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-column me-2"></i>Volume por mês (data execução)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-tall">
+                            <canvas id="chartMeses"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Top setores (quantidade de registros)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="chartSetores"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header text-white" style="background-color: #6f42c1;">
+                        <h5 class="mb-0"><i class="fas fa-project-diagram me-2"></i>Roteiro preventiva vinculado</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="chartRoteiro"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Top máquinas (registros)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-tall">
+                            <canvas id="chartMaquinas"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Período entre manutenções (dias)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="chartPeriodo"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if top_setores_rows %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-light border-bottom">
+                        <h5 class="mb-0 text-primary"><i class="fas fa-list-ol me-2"></i>Top 10 setores — detalhe</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Código Setor</th>
+                                        <th>Descrição</th>
+                                        <th class="text-end">Registros</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in top_setores_rows %}
+                                    <tr>
+                                        <td><strong>{{ row.cd_setor }}</strong></td>
+                                        <td>{{ row.descr|default:"—" }}</td>
+                                        <td class="text-end">{{ row.c }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function selecionarTodosMeses() {
+    document.querySelectorAll('#filtrosCollapse input[name="mes"]').forEach(cb => { cb.checked = true; });
+}
+function desmarcarTodosMeses() {
+    document.querySelectorAll('#filtrosCollapse input[name="mes"]').forEach(cb => { cb.checked = false; });
+}
+
+const chartColors = ['#0d6efd','#198754','#ffc107','#dc3545','#0dcaf0','#6f42c1','#fd7e14','#20c997','#e83e8c','#6c757d'];
+
+const mesesLabels = {{ meses_labels_json|safe }};
+const mesesCounts = {{ meses_counts_json|safe }};
+const setoresLabels = {{ setores_labels_json|safe }};
+const setoresData = {{ setores_data_json|safe }};
+const maquinasLabels = {{ maquinas_labels_json|safe }};
+const maquinasData = {{ maquinas_data_json|safe }};
+const periodoLabels = {{ periodo_labels_json|safe }};
+const periodoData = {{ periodo_data_json|safe }};
+const roteiroLabels = {{ roteiro_labels_json|safe }};
+const roteiroData = {{ roteiro_data_json|safe }};
+
+function renderOrEmpty(canvasId, chartFn) {
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    chartFn(el);
+}
+
+function doughnutEmptyMessage(ctx, msg) {
+    ctx.fillStyle = '#6c757d';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(msg, ctx.canvas.width / 2, ctx.canvas.height / 2);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    renderOrEmpty('chartMeses', function(canvas) {
+        new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: mesesLabels,
+                datasets: [{
+                    label: 'Registros',
+                    data: mesesCounts,
+                    backgroundColor: 'rgba(13, 110, 253, 0.7)',
+                    borderColor: '#0d6efd',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { precision: 0 } }
+                }
+            }
+        });
+    });
+
+    renderOrEmpty('chartSetores', function(canvas) {
+        if (!setoresLabels.length || !setoresData.some(v => v > 0)) {
+            const ctx = canvas.getContext('2d');
+            doughnutEmptyMessage(ctx, 'Sem dados de setor no período');
+            return;
+        }
+        new Chart(canvas.getContext('2d'), {
+            type: 'pie',
+            data: {
+                labels: setoresLabels,
+                datasets: [{
+                    data: setoresData,
+                    backgroundColor: chartColors
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    });
+
+    renderOrEmpty('chartRoteiro', function(canvas) {
+        const sum = roteiroData.reduce((a, b) => a + b, 0);
+        if (!sum) {
+            const ctx = canvas.getContext('2d');
+            doughnutEmptyMessage(ctx, 'Sem registros no período');
+            return;
+        }
+        new Chart(canvas.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: roteiroLabels,
+                datasets: [{
+                    data: roteiroData,
+                    backgroundColor: ['#6f42c1', '#dee2e6']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+    });
+
+    renderOrEmpty('chartMaquinas', function(canvas) {
+        if (!maquinasLabels.length) {
+            const ctx = canvas.getContext('2d');
+            doughnutEmptyMessage(ctx, 'Sem registros com máquina no período');
+            return;
+        }
+        new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: maquinasLabels,
+                datasets: [{
+                    label: 'Registros',
+                    data: maquinasData,
+                    backgroundColor: 'rgba(220, 53, 69, 0.75)'
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { beginAtZero: true, ticks: { precision: 0 } }
+                }
+            }
+        });
+    });
+
+    renderOrEmpty('chartPeriodo', function(canvas) {
+        const sum = periodoData.reduce((a, b) => a + b, 0);
+        if (!sum) {
+            const ctx = canvas.getContext('2d');
+            doughnutEmptyMessage(ctx, 'Sem dados de período');
+            return;
+        }
+        new Chart(canvas.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: periodoLabels,
+                datasets: [{
+                    data: periodoData,
+                    backgroundColor: ['#ffc107', '#0dcaf0', '#198754', '#dc3545', '#6c757d']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

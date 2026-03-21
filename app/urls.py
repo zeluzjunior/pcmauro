@@ -38,6 +38,8 @@ urlpatterns = [
     # Ajuste Relatórios SIGA
     path('ajuste-relatorios-siga/relatorio-nf-estf0198/', views.relatorio_nf_estf0198, name="relatorio_nf_estf0198"),
     path('ajuste-relatorios-siga/relatorio-nf-estf0198/download/', views.download_relatorio_nf_estf0198, name="download_relatorio_nf_estf0198"),
+    path('ajuste-relatorios-siga/plano-preventiva-dados-delimitado/', views.analise_plano_preventiva_dados_delimitado, name="analise_plano_preventiva_dados_delimitado"),
+    path('ajuste-relatorios-siga/plano-preventiva-dados-delimitado/download/', views.download_plano_preventiva_dados_delimitado, name="download_plano_preventiva_dados_delimitado"),
     
     # Estoque
     path('estoque/consultar/', views.consultar_estoque, name="consultar_estoque"),

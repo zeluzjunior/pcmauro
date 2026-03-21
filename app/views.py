@@ -1362,10 +1362,161 @@ def testes(request):
 
 
 def analise_plano_preventiva(request):
-    """Análise de Plano Preventiva"""
+    """Análise agregada dos dados da tabela PlanoPreventiva (filtro por ano/mês em dt_execução DD/MM/AAAA)."""
+    import json
+    from datetime import datetime as dt
+    from django.db.models import Count, Q
+    from app.models import PlanoPreventiva
+
+    ano_filtro = request.GET.get('ano', None)
+    hoje = dt.now()
+    if not ano_filtro:
+        ano_filtro = str(hoje.year)
+    try:
+        ano_filtro = int(ano_filtro)
+    except (ValueError, TypeError):
+        ano_filtro = hoje.year
+
+    meses_filtro = request.GET.getlist('mes')
+    meses_filtro_int = []
+    for mes in meses_filtro:
+        try:
+            m = int(mes)
+            if 1 <= m <= 12:
+                meses_filtro_int.append(m)
+        except (ValueError, TypeError):
+            pass
+    meses_filtro_int = sorted(set(meses_filtro_int))
+    if not meses_filtro_int:
+        meses_filtro_int = list(range(1, 13))
+
+    meses_nomes = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 5: 'Maio', 6: 'Junho',
+        7: 'Julho', 8: 'Agosto', 9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+
+    q_data = Q()
+    for mes in meses_filtro_int:
+        padrao = f'/{mes:02d}/{ano_filtro}'
+        q_data |= Q(dt_execucao__icontains=padrao)
+    qs = PlanoPreventiva.objects.filter(q_data)
+
+    total_registros = qs.count()
+    total_cadastro = PlanoPreventiva.objects.count()
+    maquinas_distintas = qs.exclude(cd_maquina__isnull=True).values('cd_maquina').distinct().count()
+    setores_distintos = qs.exclude(cd_setor__isnull=True).exclude(cd_setor='').values('cd_setor').distinct().count()
+    unidades_distintas = qs.exclude(cd_unid__isnull=True).values('cd_unid').distinct().count()
+
+    com_roteiro = qs.filter(roteiro_preventiva__isnull=False).count()
+    sem_roteiro = qs.filter(roteiro_preventiva__isnull=True).count()
+    pct_roteiro = round(100.0 * com_roteiro / total_registros, 1) if total_registros else 0.0
+
+    meses_labels = [meses_nomes[m] for m in meses_filtro_int]
+    meses_counts = []
+    for m in meses_filtro_int:
+        padrao = f'/{m:02d}/{ano_filtro}'
+        meses_counts.append(qs.filter(dt_execucao__icontains=padrao).count())
+
+    top_setores = list(
+        qs.exclude(cd_setor__isnull=True).exclude(cd_setor='')
+        .values('cd_setor')
+        .annotate(c=Count('id'))
+        .order_by('-c')[:10]
+    )
+    setor_cods = [row['cd_setor'] for row in top_setores]
+    descr_por_setor = {}
+    if setor_cods:
+        for row in qs.filter(cd_setor__in=setor_cods).order_by('cd_setor').values('cd_setor', 'descr_setor'):
+            cid = row['cd_setor']
+            if cid not in descr_por_setor:
+                descr_por_setor[cid] = row.get('descr_setor') or ''
+    setores_labels = []
+    top_setores_rows = []
+    for row in top_setores:
+        descr = descr_por_setor.get(row['cd_setor'], '')
+        lbl = str(row['cd_setor'])
+        if descr:
+            lbl = f"{row['cd_setor']} — {descr[:35]}"
+        setores_labels.append(lbl)
+        top_setores_rows.append({
+            'cd_setor': row['cd_setor'],
+            'descr': descr[:120] if descr else '',
+            'c': row['c'],
+        })
+    setores_data = [x['c'] for x in top_setores]
+
+    top_maquinas = list(
+        qs.exclude(cd_maquina__isnull=True)
+        .values('cd_maquina')
+        .annotate(c=Count('id'))
+        .order_by('-c')[:10]
+    )
+    cods = [x['cd_maquina'] for x in top_maquinas]
+    descr_map = {}
+    if cods:
+        for r in PlanoPreventiva.objects.filter(cd_maquina__in=cods).values('cd_maquina', 'descr_maquina'):
+            cid = r['cd_maquina']
+            if cid not in descr_map and r.get('descr_maquina'):
+                descr_map[cid] = r['descr_maquina']
+    maquinas_labels = []
+    for x in top_maquinas:
+        d = descr_map.get(x['cd_maquina'])
+        if d:
+            maquinas_labels.append(f"{x['cd_maquina']} — {d[:40]}")
+        else:
+            maquinas_labels.append(str(x['cd_maquina']))
+    maquinas_data = [x['c'] for x in top_maquinas]
+
+    sem_periodo = qs.filter(quantidade_periodo__isnull=True).count()
+    p_le_30 = qs.filter(quantidade_periodo__isnull=False, quantidade_periodo__lte=30).count()
+    p31_90 = qs.filter(quantidade_periodo__gte=31, quantidade_periodo__lte=90).count()
+    p91_180 = qs.filter(quantidade_periodo__gte=91, quantidade_periodo__lte=180).count()
+    p_gt_180 = qs.filter(quantidade_periodo__gt=180).count()
+
+    periodo_labels = ['≤30 dias', '31–90', '91–180', '>180', 'Não informado']
+    periodo_data = [p_le_30, p31_90, p91_180, p_gt_180, sem_periodo]
+
+    anos_disponiveis = set()
+    for val in PlanoPreventiva.objects.exclude(dt_execucao__isnull=True).exclude(dt_execucao='').values_list('dt_execucao', flat=True).distinct()[:2000]:
+        s = str(val or '').strip()
+        if '/' in s:
+            parts = s.split('/')
+            if len(parts) >= 3:
+                try:
+                    yr = parts[2]
+                    ano_y = int(yr) if len(yr) == 4 else (2000 + int(yr)) if len(yr) == 2 else None
+                    if ano_y and 2010 <= ano_y <= 2040:
+                        anos_disponiveis.add(ano_y)
+                except (ValueError, TypeError):
+                    pass
+    anos_disponiveis = sorted(anos_disponiveis, reverse=True) if anos_disponiveis else [hoje.year]
+
     context = {
         'page_title': 'Análise de Plano Preventiva',
-        'active_page': 'analise_plano_preventiva'
+        'active_page': 'analise_plano_preventiva',
+        'ano_filtro': ano_filtro,
+        'meses_filtro': meses_filtro_int,
+        'meses_nomes': meses_nomes,
+        'anos_disponiveis': anos_disponiveis,
+        'total_registros': total_registros,
+        'total_cadastro': total_cadastro,
+        'maquinas_distintas': maquinas_distintas,
+        'setores_distintos': setores_distintos,
+        'unidades_distintas': unidades_distintas,
+        'com_roteiro': com_roteiro,
+        'sem_roteiro': sem_roteiro,
+        'pct_roteiro': pct_roteiro,
+        'top_setores_rows': top_setores_rows,
+        'meses_labels_json': json.dumps(meses_labels, ensure_ascii=False),
+        'meses_counts_json': json.dumps(meses_counts),
+        'setores_labels_json': json.dumps(setores_labels, ensure_ascii=False),
+        'setores_data_json': json.dumps(setores_data),
+        'maquinas_labels_json': json.dumps(maquinas_labels, ensure_ascii=False),
+        'maquinas_data_json': json.dumps(maquinas_data),
+        'periodo_labels_json': json.dumps(periodo_labels, ensure_ascii=False),
+        'periodo_data_json': json.dumps(periodo_data),
+        'roteiro_labels_json': json.dumps(['Com roteiro vinculado', 'Sem roteiro'], ensure_ascii=False),
+        'roteiro_data_json': json.dumps([com_roteiro, sem_roteiro]),
     }
     return render(request, 'preventivas/analise_plano_preventiva.html', context)
 
@@ -2807,7 +2958,7 @@ def importar_plano_preventiva(request):
             
             # Fazer upload dos dados
             # Se only_new_records estiver marcado, update_existing será False (ignora duplicados)
-            created_count, updated_count, errors = upload_plano_preventiva_from_file(
+            created_count, updated_count, skipped_count, errors = upload_plano_preventiva_from_file(
                 file, 
                 update_existing=update_existing
             )
@@ -2821,8 +2972,17 @@ def importar_plano_preventiva(request):
                 messages.success(request, f'{created_count} registro(s) de plano preventiva criado(s) com sucesso!')
             if updated_count > 0:
                 messages.info(request, f'{updated_count} registro(s) de plano preventiva atualizado(s)!')
+            if skipped_count > 0 and not update_existing:
+                messages.info(
+                    request,
+                    f'{skipped_count} linha(s) ignorada(s) porque já existiam no banco (mesmo Plano, Máquina, Seq. tarefa e Seq. manutenção). '
+                    'Marque "Atualizar registros existentes" para sobrescrever ou verifique se não está reimportando o mesmo arquivo.'
+                )
             if created_count == 0 and updated_count == 0 and not errors:
-                messages.info(request, 'Nenhum registro novo foi importado. Todos os registros já existem no banco de dados.')
+                if skipped_count > 0:
+                    messages.warning(request, 'Nenhum registro novo: todas as linhas válidas já constavam na base (duplicadas).')
+                else:
+                    messages.info(request, 'Nenhum registro novo foi importado.')
             
         except Exception as e:
             messages.error(request, f'Erro ao importar arquivo: {str(e)}')
@@ -3435,6 +3595,138 @@ def download_relatorio_nf_estf0198(request):
         import traceback
         print(f"Erro ao fazer download do relatório NF ESTF0198: {traceback.format_exc()}")
         return redirect('relatorio_nf_estf0198')
+
+
+def analise_plano_preventiva_dados_delimitado(request):
+    """Ajuste do CSV PLANO_PREVENTIVA_DELIMITADO_DADOS (SIGA): remove linhas vazias e fragmentos só nas colunas B e C."""
+    import os
+    import re
+    import uuid
+
+    from django.conf import settings
+
+    from app.utils import clean_plano_preventiva_delimitado_csv
+
+    def _cleanup_old_plano_delimitado_session(sess):
+        old_id = sess.pop('plano_delimitado_file_id', None)
+        sess.pop('plano_delimitado_csv_b64', None)
+        if old_id and re.fullmatch(r'[a-f0-9]{32}', str(old_id)):
+            p = os.path.join(settings.MEDIA_ROOT, 'temp_plano_delimitado', f'{old_id}.csv')
+            try:
+                if os.path.isfile(p):
+                    os.unlink(p)
+            except OSError:
+                pass
+
+    if request.method == 'POST':
+        if 'file' not in request.FILES:
+            messages.error(request, 'Selecione um arquivo CSV para processar.')
+        else:
+            file = request.FILES['file']
+            if not file.name.lower().endswith('.csv'):
+                messages.error(request, 'O arquivo deve ter extensão .csv')
+            else:
+                raw = file.read()
+                text = None
+                for enc in ('utf-8-sig', 'utf-8', 'cp1252', 'latin-1', 'iso-8859-1'):
+                    try:
+                        text = raw.decode(enc)
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                if text is None:
+                    messages.error(request, 'Não foi possível decodificar o arquivo (tente salvar como UTF-8 ou Windows-1252).')
+                else:
+                    try:
+                        cleaned, stats = clean_plano_preventiva_delimitado_csv(text)
+                    except Exception as e:
+                        messages.error(request, f'Erro ao processar: {e}')
+                    else:
+                        _cleanup_old_plano_delimitado_session(request.session)
+                        out_dir = os.path.join(settings.MEDIA_ROOT, 'temp_plano_delimitado')
+                        os.makedirs(out_dir, exist_ok=True)
+                        file_id = uuid.uuid4().hex
+                        out_path = os.path.join(out_dir, f'{file_id}.csv')
+                        with open(out_path, 'w', encoding='utf-8-sig', newline='') as fp:
+                            fp.write(cleaned)
+                        request.session['plano_delimitado_file_id'] = file_id
+                        request.session['plano_delimitado_stats'] = stats
+                        request.session['plano_delimitado_filename'] = f"ajustado_{file.name}"
+                        request.session.modified = True
+                        messages.success(
+                            request,
+                            f'Arquivo processado: {stats["removed_blank"]} linha(s) totalmente vazia(s) removida(s). '
+                            f'{stats.get("adjusted_pq_rows", 0)} linha(s) com P/Q ajustadas (Q→P, R→Q quando R tinha dado e P estava vazio). '
+                            f'{stats.get("skipped_pq_nonempty_p", 0)} linha(s) com R preenchido mas P já tinha dado — não alteradas. '
+                            f'{stats["kept"]} linha(s) no resultado. Use o botão de download abaixo.'
+                        )
+                        return redirect('analise_plano_preventiva_dados_delimitado')
+
+    stats = request.session.get('plano_delimitado_stats')
+    has_file = bool(
+        request.session.get('plano_delimitado_file_id')
+        or request.session.get('plano_delimitado_csv_b64')
+    )
+    context = {
+        'page_title': 'Plano Preventiva — Dados delimitados (SIGA)',
+        'active_page': 'analise_plano_preventiva_dados_delimitado',
+        'last_stats': stats,
+        'has_processed_file': has_file,
+    }
+    return render(request, 'analise_relatorios/analise_plano_preventiva_dados_delimitado.html', context)
+
+
+def download_plano_preventiva_dados_delimitado(request):
+    """Download do CSV ajustado (arquivo temporário em MEDIA ou legado base64 na sessão)."""
+    import base64
+    import os
+    import re
+
+    from django.conf import settings
+    from django.http import HttpResponse
+    from urllib.parse import quote
+
+    file_id = request.session.get('plano_delimitado_file_id')
+    if file_id and re.fullmatch(r'[a-f0-9]{32}', str(file_id)):
+        path = os.path.join(settings.MEDIA_ROOT, 'temp_plano_delimitado', f'{file_id}.csv')
+        if not os.path.isfile(path):
+            messages.error(
+                request,
+                'Arquivo ajustado não encontrado no servidor (expirou ou foi removido). Processe o CSV novamente.',
+            )
+            return redirect('analise_plano_preventiva_dados_delimitado')
+        try:
+            with open(path, 'rb') as f:
+                raw = f.read()
+            fname = request.session.get('plano_delimitado_filename', 'PLANO_PREVENTIVA_DELIMITADO_ajustado.csv')
+            if not fname.lower().endswith('.csv'):
+                fname = fname + '.csv'
+            response = HttpResponse(raw, content_type='text/csv; charset=utf-8')
+            response['Content-Disposition'] = (
+                f'attachment; filename="{fname}"; filename*=UTF-8\'\'{quote(fname)}'
+            )
+            return response
+        except Exception as e:
+            messages.error(request, f'Erro ao gerar download: {e}')
+            return redirect('analise_plano_preventiva_dados_delimitado')
+
+    if 'plano_delimitado_csv_b64' not in request.session:
+        messages.error(request, 'Nenhum arquivo processado. Envie um CSV primeiro.')
+        return redirect('analise_plano_preventiva_dados_delimitado')
+
+    try:
+        raw = base64.b64decode(request.session['plano_delimitado_csv_b64'])
+        fname = request.session.get('plano_delimitado_filename', 'PLANO_PREVENTIVA_DELIMITADO_ajustado.csv')
+        if not fname.lower().endswith('.csv'):
+            fname = fname + '.csv'
+        response = HttpResponse(raw, content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = (
+            f'attachment; filename="{fname}"; filename*=UTF-8\'\'{quote(fname)}'
+        )
+        return response
+    except Exception as e:
+        messages.error(request, f'Erro ao gerar download: {e}')
+        return redirect('analise_plano_preventiva_dados_delimitado')
 
 
 def importar_requisicoes_almoxarifado(request):
@@ -5389,7 +5681,7 @@ def consultar_plano_preventiva(request):
     """Consultar/listar PlanoPreventiva (tabela PlanoPreventiva) com filtro de ano/mês por dt_execucao"""
     from app.models import PlanoPreventiva
     from django.core.paginator import Paginator
-    from django.db.models import Q
+    from django.db.models import Q, Min
     from datetime import datetime as dt
 
     # Filtros ano e mês (igual analise-mao-de-obra/geral)
@@ -5414,6 +5706,15 @@ def consultar_plano_preventiva(request):
         meses_filtro_int = sorted(list(set(meses_filtro_int)))
     if not meses_filtro_int:
         meses_filtro_int = list(range(1, 13))
+
+    # Valores distintos de setor (código + uma descrição representativa) para o filtro da coluna
+    setores_opciones = list(
+        PlanoPreventiva.objects.exclude(cd_setor__isnull=True)
+        .exclude(cd_setor='')
+        .values('cd_setor')
+        .annotate(descr=Min('descr_setor'))
+        .order_by('cd_setor')
+    )
 
     # Buscar PlanoPreventiva
     planos_list = PlanoPreventiva.objects.all().select_related('maquina', 'roteiro_preventiva')
@@ -5507,7 +5808,10 @@ def consultar_plano_preventiva(request):
 
     filter_setor = request.GET.get('filter_setor', '').strip()
     if filter_setor:
-        planos_list = planos_list.filter(Q(cd_setor__icontains=filter_setor) | Q(descr_setor__icontains=filter_setor))
+        planos_list = planos_list.filter(cd_setor=filter_setor)
+
+    if filter_setor and filter_setor not in {x['cd_setor'] for x in setores_opciones}:
+        setores_opciones.insert(0, {'cd_setor': filter_setor, 'descr': None})
 
     filter_unidade = request.GET.get('filter_unidade', '').strip()
     if filter_unidade:
@@ -5572,6 +5876,7 @@ def consultar_plano_preventiva(request):
         'filter_funcionario': filter_funcionario,
         'filter_setor': filter_setor,
         'filter_unidade': filter_unidade,
+        'setores_opciones': setores_opciones,
     }
     return render(request, 'preventivas/consultar_plano_preventiva.html', context)
 

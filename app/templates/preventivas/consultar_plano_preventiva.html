@@ -6,6 +6,19 @@
 
 {% block extra_css %}
 <style>
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .kpi-card {
+        border-left: 4px solid;
+    }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
     .table-container {
         max-height: 600px;
         overflow-y: auto;
@@ -28,6 +41,10 @@
         outline: none;
         border-color: #0d6efd;
         box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    select.filter-input {
+        cursor: pointer;
+        background-color: #fff;
     }
     .filter-header {
         padding: 8px !important;
@@ -158,44 +175,68 @@
             </div>
         </div>
 
-        <!-- Statistics -->
-        <div class="row mb-4">
+        <!-- Statistics (mesmo padrão visual de orcamento/analise-geral/) -->
+        <div class="row g-3 mb-4">
             <div class="col-md-3">
-                <div class="card bg-success text-white">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Total</h5>
-                        <p class="card-text display-6">{{ total_count }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total</h6>
+                                <h4 class="mb-0 fw-bold">{{ total_count }}</h4>
+                                <small class="text-muted">Total no cadastro</small>
+                            </div>
+                            <i class="fas fa-clipboard-list fa-2x text-success opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card bg-info text-white">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Mostrando</h5>
-                        <p class="card-text display-6">{{ planos|length }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Mostrando</h6>
+                                <h4 class="mb-0 fw-bold">{{ planos|length }}</h4>
+                                <small class="text-muted">Nesta página</small>
+                            </div>
+                            <i class="fas fa-eye fa-2x text-info opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card bg-warning text-white">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Máquinas</h5>
-                        <p class="card-text display-6">{{ maquinas_count }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Máquinas</h6>
+                                <h4 class="mb-0 fw-bold">{{ maquinas_count }}</h4>
+                                <small class="text-muted">Máquinas distintas</small>
+                            </div>
+                            <i class="fas fa-industry fa-2x text-warning opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card bg-primary text-white">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Setores</h5>
-                        <p class="card-text display-6">{{ setores_count }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Setores</h6>
+                                <h4 class="mb-0 fw-bold">{{ setores_count }}</h4>
+                                <small class="text-muted">Setores distintos</small>
+                            </div>
+                            <i class="fas fa-layer-group fa-2x text-primary opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Table -->
-        <div class="card shadow-sm">
+        <div class="card shadow-sm border-0">
             <div class="card-header bg-success text-white">
                 <h5 class="mb-0">
                     <i class="fas fa-calendar-check me-2"></i>Lista de Planos Preventiva
@@ -255,7 +296,14 @@
                                         <input type="text" name="filter_funcionario" class="filter-input" placeholder="Filtrar Funcionário..." value="{{ filter_funcionario|default:'' }}">
                                     </th>
                                     <th class="filter-header">
-                                        <input type="text" name="filter_setor" class="filter-input" placeholder="Filtrar Setor..." value="{{ filter_setor|default:'' }}">
+                                        <select name="filter_setor" id="filterSetor" class="filter-input filter-select" title="Filtrar por setor (dados do cadastro)">
+                                            <option value="">Todos os setores</option>
+                                            {% for s in setores_opciones %}
+                                                <option value="{{ s.cd_setor }}" {% if filter_setor == s.cd_setor %}selected{% endif %}>
+                                                    {{ s.cd_setor }}{% if s.descr %} — {{ s.descr|truncatechars:40 }}{% endif %}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
                                     </th>
                                     <th class="filter-header">
                                         <input type="text" name="filter_unidade" class="filter-input" placeholder="Filtrar Unidade..." value="{{ filter_unidade|default:'' }}">
@@ -388,10 +436,10 @@
                     <ul class="pagination justify-content-center">
                         {% if planos.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_maquina %}&filter_maquina={{ filter_maquina }}{% endif %}{% if filter_plano %}&filter_plano={{ filter_plano }}{% endif %}{% if filter_seq_manutencao %}&filter_seq_manutencao={{ filter_seq_manutencao }}{% endif %}{% if filter_data %}&filter_data={{ filter_data }}{% endif %}{% if filter_periodo %}&filter_periodo={{ filter_periodo }}{% endif %}{% if filter_seq_tarefa %}&filter_seq_tarefa={{ filter_seq_tarefa }}{% endif %}{% if filter_tarefa %}&filter_tarefa={{ filter_tarefa }}{% endif %}{% if filter_funcionario %}&filter_funcionario={{ filter_funcionario }}{% endif %}{% if filter_setor %}&filter_setor={{ filter_setor }}{% endif %}{% if filter_unidade %}&filter_unidade={{ filter_unidade }}{% endif %}&page=1">Primeira</a>
+                                <a class="page-link" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_maquina %}&filter_maquina={{ filter_maquina }}{% endif %}{% if filter_plano %}&filter_plano={{ filter_plano }}{% endif %}{% if filter_seq_manutencao %}&filter_seq_manutencao={{ filter_seq_manutencao }}{% endif %}{% if filter_data %}&filter_data={{ filter_data }}{% endif %}{% if filter_periodo %}&filter_periodo={{ filter_periodo }}{% endif %}{% if filter_seq_tarefa %}&filter_seq_tarefa={{ filter_seq_tarefa }}{% endif %}{% if filter_tarefa %}&filter_tarefa={{ filter_tarefa }}{% endif %}{% if filter_funcionario %}&filter_funcionario={{ filter_funcionario }}{% endif %}{% if filter_setor %}&filter_setor={{ filter_setor|urlencode }}{% endif %}{% if filter_unidade %}&filter_unidade={{ filter_unidade }}{% endif %}&page=1">Primeira</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_maquina %}&filter_maquina={{ filter_maquina }}{% endif %}{% if filter_plano %}&filter_plano={{ filter_plano }}{% endif %}{% if filter_seq_manutencao %}&filter_seq_manutencao={{ filter_seq_manutencao }}{% endif %}{% if filter_data %}&filter_data={{ filter_data }}{% endif %}{% if filter_periodo %}&filter_periodo={{ filter_periodo }}{% endif %}{% if filter_seq_tarefa %}&filter_seq_tarefa={{ filter_seq_tarefa }}{% endif %}{% if filter_tarefa %}&filter_tarefa={{ filter_tarefa }}{% endif %}{% if filter_funcionario %}&filter_funcionario={{ filter_funcionario }}{% endif %}{% if filter_setor %}&filter_setor={{ filter_setor }}{% endif %}{% if filter_unidade %}&filter_unidade={{ filter_unidade }}{% endif %}&page={{ planos.previous_page_number }}">Anterior</a>
+                                <a class="page-link" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_maquina %}&filter_maquina={{ filter_maquina }}{% endif %}{% if filter_plano %}&filter_plano={{ filter_plano }}{% endif %}{% if filter_seq_manutencao %}&filter_seq_manutencao={{ filter_seq_manutencao }}{% endif %}{% if filter_data %}&filter_data={{ filter_data }}{% endif %}{% if filter_periodo %}&filter_periodo={{ filter_periodo }}{% endif %}{% if filter_seq_tarefa %}&filter_seq_tarefa={{ filter_seq_tarefa }}{% endif %}{% if filter_tarefa %}&filter_tarefa={{ filter_tarefa }}{% endif %}{% if filter_funcionario %}&filter_funcionario={{ filter_funcionario }}{% endif %}{% if filter_setor %}&filter_setor={{ filter_setor|urlencode }}{% endif %}{% if filter_unidade %}&filter_unidade={{ filter_unidade }}{% endif %}&page={{ planos.previous_page_number }}">Anterior</a>
                             </li>
                         {% endif %}
                         <li class="page-item active">
@@ -399,10 +447,10 @@
                         </li>
                         {% if planos.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_maquina %}&filter_maquina={{ filter_maquina }}{% endif %}{% if filter_plano %}&filter_plano={{ filter_plano }}{% endif %}{% if filter_seq_manutencao %}&filter_seq_manutencao={{ filter_seq_manutencao }}{% endif %}{% if filter_data %}&filter_data={{ filter_data }}{% endif %}{% if filter_periodo %}&filter_periodo={{ filter_periodo }}{% endif %}{% if filter_seq_tarefa %}&filter_seq_tarefa={{ filter_seq_tarefa }}{% endif %}{% if filter_tarefa %}&filter_tarefa={{ filter_tarefa }}{% endif %}{% if filter_funcionario %}&filter_funcionario={{ filter_funcionario }}{% endif %}{% if filter_setor %}&filter_setor={{ filter_setor }}{% endif %}{% if filter_unidade %}&filter_unidade={{ filter_unidade }}{% endif %}&page={{ planos.next_page_number }}">Próxima</a>
+                                <a class="page-link" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_maquina %}&filter_maquina={{ filter_maquina }}{% endif %}{% if filter_plano %}&filter_plano={{ filter_plano }}{% endif %}{% if filter_seq_manutencao %}&filter_seq_manutencao={{ filter_seq_manutencao }}{% endif %}{% if filter_data %}&filter_data={{ filter_data }}{% endif %}{% if filter_periodo %}&filter_periodo={{ filter_periodo }}{% endif %}{% if filter_seq_tarefa %}&filter_seq_tarefa={{ filter_seq_tarefa }}{% endif %}{% if filter_tarefa %}&filter_tarefa={{ filter_tarefa }}{% endif %}{% if filter_funcionario %}&filter_funcionario={{ filter_funcionario }}{% endif %}{% if filter_setor %}&filter_setor={{ filter_setor|urlencode }}{% endif %}{% if filter_unidade %}&filter_unidade={{ filter_unidade }}{% endif %}&page={{ planos.next_page_number }}">Próxima</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_maquina %}&filter_maquina={{ filter_maquina }}{% endif %}{% if filter_plano %}&filter_plano={{ filter_plano }}{% endif %}{% if filter_seq_manutencao %}&filter_seq_manutencao={{ filter_seq_manutencao }}{% endif %}{% if filter_data %}&filter_data={{ filter_data }}{% endif %}{% if filter_periodo %}&filter_periodo={{ filter_periodo }}{% endif %}{% if filter_seq_tarefa %}&filter_seq_tarefa={{ filter_seq_tarefa }}{% endif %}{% if filter_tarefa %}&filter_tarefa={{ filter_tarefa }}{% endif %}{% if filter_funcionario %}&filter_funcionario={{ filter_funcionario }}{% endif %}{% if filter_setor %}&filter_setor={{ filter_setor }}{% endif %}{% if filter_unidade %}&filter_unidade={{ filter_unidade }}{% endif %}&page={{ planos.paginator.num_pages }}">Última</a>
+                                <a class="page-link" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_maquina %}&filter_maquina={{ filter_maquina }}{% endif %}{% if filter_plano %}&filter_plano={{ filter_plano }}{% endif %}{% if filter_seq_manutencao %}&filter_seq_manutencao={{ filter_seq_manutencao }}{% endif %}{% if filter_data %}&filter_data={{ filter_data }}{% endif %}{% if filter_periodo %}&filter_periodo={{ filter_periodo }}{% endif %}{% if filter_seq_tarefa %}&filter_seq_tarefa={{ filter_seq_tarefa }}{% endif %}{% if filter_tarefa %}&filter_tarefa={{ filter_tarefa }}{% endif %}{% if filter_funcionario %}&filter_funcionario={{ filter_funcionario }}{% endif %}{% if filter_setor %}&filter_setor={{ filter_setor|urlencode }}{% endif %}{% if filter_unidade %}&filter_unidade={{ filter_unidade }}{% endif %}&page={{ planos.paginator.num_pages }}">Última</a>
                             </li>
                         {% endif %}
                     </ul>
@@ -424,18 +472,20 @@ function desmarcarTodosMeses() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    const filterInputs = document.querySelectorAll('.filter-input');
     const filterForm = document.getElementById('filterForm');
-    
-    if (filterInputs.length && filterForm) {
-        filterInputs.forEach(input => {
-            let timeout;
-            input.addEventListener('input', function() {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => filterForm.submit(), 500);
-            });
+    if (!filterForm) return;
+
+    document.querySelectorAll('.filter-input:not(.filter-select)').forEach(input => {
+        let timeout;
+        input.addEventListener('input', function() {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => filterForm.submit(), 500);
         });
-    }
+    });
+
+    document.querySelectorAll('.filter-select').forEach(sel => {
+        sel.addEventListener('change', () => filterForm.submit());
+    });
 });
 </script>
 {% endblock %}

@@ -79,6 +79,152 @@ def read_excel_file(file, sheet_name=None, sheet_index=None, header_row=1):
         raise ValidationError(f"Erro ao ler arquivo Excel: {str(e)}")
 
 
+def _strip_cell_csv(s: str) -> str:
+    """Remove BOM, NBSP, zero-width e espaços — evita P 'vazio' com caracteres invisíveis."""
+    if s is None:
+        return ''
+    t = str(s).replace('\ufeff', '').replace('\u00a0', ' ').replace('\u200b', '').replace('\u200c', '')
+    return t.strip()
+
+
+def _detect_plano_preventiva_p_q_r_indices(header_cells: List[str]) -> Tuple[int, int, int]:
+    """
+    Localiza colunas Funcionário (P), Nome Funcionário (Q) e coluna à direita (R) pelo cabeçalho.
+    Fallback: Excel clássico P=15, Q=16, R=17 (índices 0-based).
+
+    Importante: não usar o subtexto 'funcion' solto — em Python, 'funcion' in 'funcionamento'
+    e em 'funcionalidade' é True, o que deslocava P para a coluna errada e quebrava o ajuste.
+    """
+    import unicodedata
+
+    def norm(s: str) -> str:
+        s = (s or '').strip().lower()
+        s = unicodedata.normalize('NFKD', s)
+        return ''.join(c for c in s if not unicodedata.combining(c))
+
+    idx_p = None
+    idx_q = None
+    for i, h in enumerate(header_cells):
+        hn = norm(str(h))
+        # Q: "Nome Funcionário", "Nome do Funcionário", etc. (rejeita "Nome Funcionamento" se existir)
+        if hn.startswith('nome') and 'funcionario' in hn and 'funcionamento' not in hn:
+            idx_q = i
+        # P: título exatamente "Funcionário" (normalizado → funcionario), não "Funcionamento"
+        elif hn == 'funcionario':
+            idx_p = i
+
+    if idx_p is None:
+        idx_p = 15
+    if idx_q is None:
+        idx_q = 16
+    idx_r = idx_q + 1
+    return idx_p, idx_q, idx_r
+
+
+def clean_plano_preventiva_delimitado_csv(text: str, delimiter: str = ';') -> Tuple[str, Dict[str, int]]:
+    """
+    Remove linhas inválidas do export PLANO_PREVENTIVA_DELIMITADO (CSV com ;).
+
+    Etapa 1:
+    - Remove apenas linhas totalmente vazias (só separadores / em branco).
+    - (Não remove mais linhas “só B+C” para evitar perda de dados em exportações variadas.)
+
+    Etapa 2:
+    - Ajuste P/Q/R: se a coluna **R** (à direita de Nome Funcionário) tiver dado **e P estiver vazio**,
+      copia Q→P e R→Q e esvazia R. Se P já tiver conteúdo, a linha não é alterada.
+    - Índices P/Q/R vêm do **primeiro registro (cabeçalho)** quando reconhecível; senão usa 15/16/17.
+
+    Retorna (texto CSV gerado, estatísticas).
+    """
+    import csv as _csv
+
+    reader = _csv.reader(io.StringIO(text), delimiter=delimiter)
+    rows_out: List[List[str]] = []
+    removed_blank = 0
+    total_in = 0
+
+    for row in reader:
+        total_in += 1
+        cells = [str(c) if c is not None else '' for c in row]
+        stripped = [x.strip() for x in cells]
+
+        if not any(stripped):
+            removed_blank += 1
+            continue
+
+        rows_out.append(cells)
+
+    if not rows_out:
+        buf = io.StringIO()
+        return buf.getvalue(), {
+            'total_in': total_in,
+            'removed_blank': removed_blank,
+            'removed_bc_only': 0,
+            'kept': 0,
+            'adjusted_pq_rows': 0,
+            'skipped_pq_nonempty_p': 0,
+            'idx_p': 15,
+            'idx_q': 16,
+            'idx_r': 17,
+        }
+
+    idx_p, idx_q, idx_r = _detect_plano_preventiva_p_q_r_indices(rows_out[0])
+    min_len = max(idx_p, idx_q, idx_r) + 1
+
+    # Etapa 2: R tem dado e P vazio → Q→P, R→Q, R vazio (não sobrescrever P)
+    adjusted_pq_rows = 0
+    skipped_pq_nonempty_p = 0
+    for row in rows_out:
+        while len(row) < min_len:
+            row.append('')
+        r_has = _strip_cell_csv(row[idx_r]) if idx_r < len(row) else ''
+        p_has = _strip_cell_csv(row[idx_p]) if idx_p < len(row) else ''
+        if r_has:
+            if not p_has:
+                row[idx_p] = row[idx_q]
+                row[idx_q] = row[idx_r]
+                row[idx_r] = ''
+                adjusted_pq_rows += 1
+            else:
+                skipped_pq_nonempty_p += 1
+
+    buf = io.StringIO()
+    writer = _csv.writer(buf, delimiter=delimiter, lineterminator='\r\n', quoting=_csv.QUOTE_MINIMAL)
+    for row in rows_out:
+        writer.writerow(row)
+
+    stats = {
+        'total_in': total_in,
+        'removed_blank': removed_blank,
+        'removed_bc_only': 0,
+        'kept': len(rows_out),
+        'adjusted_pq_rows': adjusted_pq_rows,
+        'skipped_pq_nonempty_p': skipped_pq_nonempty_p,
+        'idx_p': idx_p,
+        'idx_q': idx_q,
+        'idx_r': idx_r,
+    }
+    return buf.getvalue(), stats
+
+
+def _parse_csv_dict_rows_from_text(content: str, delimiter: str) -> List[Dict]:
+    """Parse texto CSV já decodificado em lista de dicts (mesma regra de read_csv_file)."""
+    csv_reader = csv.DictReader(io.StringIO(content), delimiter=delimiter)
+    data = []
+    for row in csv_reader:
+        row_dict = {}
+        for key, value in row.items():
+            normalized_key = key.strip() if key else f'col_{len(row_dict)}'
+            if value is not None:
+                normalized_value = value.strip() if str(value).strip() else ''
+            else:
+                normalized_value = None
+            row_dict[normalized_key] = normalized_value
+        if any(v for v in row_dict.values() if v):
+            data.append(row_dict)
+    return data
+
+
 def read_csv_file(file, encoding='utf-8', delimiter=','):
     """
     LÃª um arquivo CSV e retorna os dados
@@ -92,36 +238,13 @@ def read_csv_file(file, encoding='utf-8', delimiter=','):
         Lista de dicionÃ¡rios com os dados
     """
     try:
-        # Se for um arquivo Django UploadedFile, garantir que estÃ¡ no inÃ­cio
         if hasattr(file, 'read'):
             file.seek(0)
             content = file.read().decode(encoding)
         else:
             with open(file, 'r', encoding=encoding) as f:
                 content = f.read()
-        
-        # Ler CSV
-        csv_reader = csv.DictReader(io.StringIO(content), delimiter=delimiter)
-        data = []
-        for row in csv_reader:
-            # Normalizar e preservar todos os valores (incluindo vazios)
-            row_dict = {}
-            for key, value in row.items():
-                # Normalizar nome da coluna
-                normalized_key = key.strip() if key else f'col_{len(row_dict)}'
-                # Preservar valor (mesmo se vazio) mas normalizar espaços
-                # IMPORTANTE: Não converter string vazia para None, manter como string vazia
-                if value is not None:
-                    normalized_value = value.strip() if value.strip() else ''
-                else:
-                    normalized_value = None
-                row_dict[normalized_key] = normalized_value
-            # Adicionar linha se tiver pelo menos uma coluna com valor
-            if any(v for v in row_dict.values() if v):
-                data.append(row_dict)
-        
-        return data
-    
+        return _parse_csv_dict_rows_from_text(content, delimiter)
     except Exception as e:
         raise ValidationError(f"Erro ao ler arquivo CSV: {str(e)}")
 
@@ -2181,6 +2304,18 @@ def _safe_str(value, max_length=None, default=''):
     return str_value
 
 
+def _format_dt_execucao_plano(val):
+    """Normaliza data de execução para DD/MM/AAAA (Excel pode enviar datetime/date)."""
+    from datetime import datetime, date
+    if val is None or val == '':
+        return None
+    if isinstance(val, datetime):
+        return val.strftime('%d/%m/%Y')
+    if isinstance(val, date):
+        return val.strftime('%d/%m/%Y')
+    return _safe_str(val, max_length=50) if val else None
+
+
 def _get_row_value(row_data, *keys, default=''):
     """Obtém valor do row_data tentando múltiplas chaves possíveis (suporta encoding variants)."""
     for key in keys:
@@ -2590,7 +2725,77 @@ def _fix_funcionario_columns(row_data):
     return row_data
 
 
-def upload_plano_preventiva_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:
+def _score_plano_preventiva_csv_rows(data: List[Dict]) -> int:
+    """Conta linhas com Plano e Máquina reconhecíveis (usado para escolher encoding do CSV)."""
+    if not data:
+        return 0
+    score = 0
+    for row_data in data[: min(400, len(data))]:
+        try:
+            row_data = _fix_funcionario_columns(dict(row_data))
+
+            def _v(*keys):
+                return _get_row_value(row_data, *keys)
+
+            def _vn(*nk):
+                return _get_row_value_by_normalized_key(row_data, *nk)
+
+            npi = _safe_int(_v('NUMERO_PLANO', 'numero_plano', 'Plano') or _vn('plano'))
+            mqi = _safe_int(_v('CD_MAQUINA', 'cd_maquina', 'Máquina', 'Maquina') or _vn('maquina'))
+            if npi and mqi:
+                score += 1
+        except Exception:
+            continue
+    return score
+
+
+def read_csv_file_auto_encoding(file, delimiter=';') -> List[Dict]:
+    """
+    Decodifica CSV em bytes e escolhe o encoding que maximiza linhas com Plano+Máquina válidos.
+    Tenta: UTF-8 com BOM, UTF-8, cp1252 (Excel Windows), latin-1.
+    """
+    if hasattr(file, 'read'):
+        file.seek(0)
+        raw = file.read()
+    else:
+        with open(file, 'rb') as fb:
+            raw = fb.read()
+    encodings = ['utf-8-sig', 'utf-8', 'cp1252', 'latin-1', 'iso-8859-1']
+    best_data = None
+    best_score = -1
+    for enc in encodings:
+        try:
+            text = raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+        try:
+            data = _parse_csv_dict_rows_from_text(text, delimiter)
+        except Exception:
+            continue
+        score = _score_plano_preventiva_csv_rows(data)
+        if score > best_score:
+            best_score = score
+            best_data = data
+    if best_data is None:
+        raise ValidationError(
+            'Não foi possível decodificar o CSV. Use UTF-8 ou Windows-1252 e delimitador ; (ponto e vírgula).'
+        )
+    if best_score == 0:
+        for enc in encodings:
+            try:
+                text = raw.decode(enc)
+            except UnicodeDecodeError:
+                continue
+            try:
+                alt = _parse_csv_dict_rows_from_text(text, ',')
+            except Exception:
+                continue
+            if _score_plano_preventiva_csv_rows(alt) > 0:
+                return alt
+    return best_data
+
+
+def upload_plano_preventiva_from_file(file, update_existing=False) -> Tuple[int, int, int, List[str]]:
     """
     Faz upload de planos de manutenÃ§Ã£o preventiva a partir de um arquivo CSV ou Excel
     
@@ -2599,13 +2804,14 @@ def upload_plano_preventiva_from_file(file, update_existing=False) -> Tuple[int,
         update_existing: Se True, atualiza registros existentes. Se False, ignora duplicados.
     
     Returns:
-        Tupla (created_count, updated_count, errors)
+        Tupla (created_count, updated_count, skipped_count, errors)
     """
     from app.models import PlanoPreventiva, Maquina
     
     errors = []
     created_count = 0
     updated_count = 0
+    skipped_count = 0
     
     # Determinar tipo de arquivo
     file_name = file.name.lower()
@@ -2615,22 +2821,8 @@ def upload_plano_preventiva_from_file(file, update_existing=False) -> Tuple[int,
         if file_name.endswith(('.xlsx', '.xls', '.xlsm')):
             data = read_excel_file(file)
         elif file_name.endswith('.csv'):
-            # Tentar diferentes encodings e delimitadores (o arquivo usa ponto e vÃ­rgula)
-            try:
-                # Primeiro tentar com delimitador ponto e vÃ­rgula (;) e encoding latin-1
-                file.seek(0)
-                data = read_csv_file(file, encoding='latin-1', delimiter=';')
-            except Exception:
-                try:
-                    file.seek(0)
-                    data = read_csv_file(file, encoding='utf-8', delimiter=';')
-                except Exception:
-                    try:
-                        file.seek(0)
-                        data = read_csv_file(file, encoding='latin-1', delimiter=',')
-                    except Exception as e:
-                        file.seek(0)
-                        data = read_csv_file(file, encoding='utf-8', delimiter=',')
+            file.seek(0)
+            data = read_csv_file_auto_encoding(file, delimiter=';')
         else:
             raise ValidationError("Formato de arquivo nÃ£o suportado. Use .xlsx, .xls, .xlsm ou .csv")
         
@@ -2693,9 +2885,9 @@ def upload_plano_preventiva_from_file(file, update_existing=False) -> Tuple[int,
                     cd_funcionario = _safe_str(_v('FUNCIONARIO', 'FUNCIONÁRIO', 'Funcionário', 'Funcionario', 'CD_FUNCIONARIO', 'cd_funcionario') or _v_norm('funcionario'), max_length=100)
                     nome_funcionario = _safe_str(_v('NOME_FUNCIONARIO', 'NOME_FUNCIONÁRIO', 'Nome Funcionário', 'Nome Funcionario') or _v_norm('nome_funcionario'), max_length=255)
                     
-                    # Data Execução - PlanoPreventiva usa dt_execucao (CharField DD/MM/YYYY)
-                    data_execucao_str = _v('DATA_EXECUCAO', 'data_execucao', 'Data Execução', 'Data Execucao') or _v_norm('data_execucao')
-                    dt_execucao = _safe_str(data_execucao_str, max_length=50) if data_execucao_str else None
+                    # Data Execução - PlanoPreventiva usa dt_execucao (CharField DD/MM/YYYY); Excel pode vir como datetime
+                    data_execucao_raw = _v('DATA_EXECUCAO', 'data_execucao', 'Data Execução', 'Data Execucao') or _v_norm('data_execucao')
+                    dt_execucao = _format_dt_execucao_plano(data_execucao_raw)
                     
                     # Validar campos obrigatórios (Plano e Máquina para identificar unicamente)
                     if not numero_plano:
@@ -2762,6 +2954,8 @@ def upload_plano_preventiva_from_file(file, update_existing=False) -> Tuple[int,
                         )
                         if created:
                             created_count += 1
+                        else:
+                            skipped_count += 1
                     
                 except Exception as e:
                     error_msg = f"Linha {row_num}: Erro ao processar registro - {str(e)}"
@@ -2770,18 +2964,18 @@ def upload_plano_preventiva_from_file(file, update_existing=False) -> Tuple[int,
                     import traceback
                     traceback.print_exc()
         
-        return created_count, updated_count, errors
+        return created_count, updated_count, skipped_count, errors
         
     except ValidationError as e:
         errors.append(str(e))
-        return 0, 0, errors
+        return 0, 0, 0, errors
     except Exception as e:
         error_detail = f"Erro geral ao processar arquivo: {str(e)}"
         errors.append(error_detail)
         print(f"Erro geral: {error_detail}")  # Debug
         import traceback
         traceback.print_exc()
-        return 0, 0, errors
+        return 0, 0, 0, errors
 
 
 def upload_requisicoes_almoxarifado_from_file(file, data_requisicao, update_existing=False) -> Tuple[int, int, List[str]]:
