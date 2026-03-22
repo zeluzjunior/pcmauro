@@ -93,3 +93,34 @@ def number_br(value, decimals=2):
         return formatted
     except (ValueError, TypeError):
         return '0,00' if decimals > 0 else '0'
+
+
+@register.filter
+def decimal_hours_as_hm(value):
+    """
+    Converte horas decimais (ex.: 5,5) em texto '5 h 30 min'.
+    Entrada: número ou string numérica; None → '—'.
+    """
+    if value is None:
+        return '—'
+    try:
+        if isinstance(value, str):
+            value = float(value.replace(',', '.'))
+        else:
+            value = float(value)
+    except (ValueError, TypeError):
+        return '—'
+    total_min = int(round(abs(value) * 60))
+    h = total_min // 60
+    m = total_min % 60
+    parts = []
+    if h > 0:
+        parts.append(f'{h} h')
+    if m > 0:
+        parts.append(f'{m} min')
+    if not parts:
+        return '0 min'
+    out = ' '.join(parts)
+    if value < 0:
+        out = f'- {out}'
+    return out

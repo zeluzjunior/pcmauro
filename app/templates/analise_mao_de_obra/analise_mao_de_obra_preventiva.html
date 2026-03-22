@@ -4,8 +4,31 @@
 
 {% block title %}Análise de Mão de Obra - Preventivas{% endblock %}
 
+{% block extra_css %}
+<style>
+    .stat-card { transition: transform 0.2s; }
+    .stat-card:hover { transform: translateY(-5px); }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .kpi-purple { border-left-color: #6f42c1; }
+    [data-bs-toggle="collapse"].btn-link .collapse-icon { display: inline-block; transition: transform 0.2s; }
+    [data-bs-toggle="collapse"].btn-link[aria-expanded="true"] .collapse-icon { transform: rotate(90deg); }
+    /* Linha de detalhe do accordion: largura total da tabela */
+    tr.mao-obra-detail-row > td {
+        background: linear-gradient(180deg, rgba(13, 110, 253, 0.04) 0%, rgba(248, 249, 250, 1) 100%);
+    }
+    tr.mao-obra-detail-row .collapse-inner {
+        max-width: 100%;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<section class="py-5 text-white" style="background-image: linear-gradient(rgba(13, 110, 253, 0.5), rgba(13, 110, 253, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center;">
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
     <div class="container">
         <div class="row">
             <div class="col-12">
@@ -102,54 +125,84 @@
             </h4>
         </div>
         <p class="text-muted mb-3">Tabelas: <code>OrdemServicoPreventiva</code> e <code>OrdemServicoPreventivaFicha</code></p>
-        <div class="row mb-4 g-2">
-            <div class="col-6 col-md col-lg mb-0">
-                <div class="card stat-card border-primary shadow-sm border-0 h-100">
+        <div class="row mb-4 g-3">
+            <div class="col-6 col-md col-lg d-flex">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100 w-100">
                     <div class="card-body py-3">
-                        <h6 class="text-muted mb-1 small">Total de Ordens</h6>
-                        <h2 class="mb-0 fw-bold text-primary">{{ dados_preventiva.total_ordens|number_br:0 }}</h2>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Total de Ordens</h6>
+                                <h4 class="mb-0 fw-bold">{{ dados_preventiva.total_ordens|number_br:0 }}</h4>
+                            </div>
+                            <i class="bi bi-clipboard-check fa-2x text-primary opacity-25 d-none d-md-block"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-md col-lg mb-0">
-                <div class="card stat-card border-success shadow-sm border-0 h-100">
+            <div class="col-6 col-md col-lg d-flex">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100 w-100">
                     <div class="card-body py-3">
-                        <h6 class="text-muted mb-1 small">Fechadas</h6>
-                        <h2 class="mb-0 fw-bold text-success">{{ dados_preventiva.total_fechadas|number_br:0 }}</h2>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Fechadas</h6>
+                                <h4 class="mb-0 fw-bold">{{ dados_preventiva.total_fechadas|number_br:0 }}</h4>
+                            </div>
+                            <i class="bi bi-check-circle fa-2x text-success opacity-25 d-none d-md-block"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-md col-lg mb-0">
-                <div class="card stat-card border-warning shadow-sm border-0 h-100">
+            <div class="col-6 col-md col-lg d-flex">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100 w-100">
                     <div class="card-body py-3">
-                        <h6 class="text-muted mb-1 small">Abertas</h6>
-                        <h2 class="mb-0 fw-bold text-warning">{{ dados_preventiva.total_abertas|number_br:0 }}</h2>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Abertas</h6>
+                                <h4 class="mb-0 fw-bold">{{ dados_preventiva.total_abertas|number_br:0 }}</h4>
+                            </div>
+                            <i class="bi bi-folder2-open fa-2x text-warning opacity-25 d-none d-md-block"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-md col-lg mb-0">
-                <div class="card stat-card border-info shadow-sm border-0 h-100">
+            <div class="col-6 col-md col-lg d-flex">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100 w-100">
                     <div class="card-body py-3">
-                        <h6 class="text-muted mb-1 small">Total de Fichas</h6>
-                        <h2 class="mb-0 fw-bold text-info">{{ dados_preventiva.total_fichas|number_br:0 }}</h2>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Total de Fichas</h6>
+                                <h4 class="mb-0 fw-bold">{{ dados_preventiva.total_fichas|number_br:0 }}</h4>
+                            </div>
+                            <i class="bi bi-files fa-2x text-info opacity-25 d-none d-md-block"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-md col-lg mb-0">
-                <div class="card stat-card border-secondary shadow-sm border-0 h-100">
+            <div class="col-6 col-md col-lg d-flex">
+                <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100 w-100">
                     <div class="card-body py-3">
-                        <h6 class="text-muted mb-1 small">Horas apontadas (todas fichas)</h6>
-                        <h2 class="mb-0 fw-bold text-secondary">{{ dados_preventiva.horas_apontadas|number_br:1 }}</h2>
-                        <small class="text-muted">horas</small>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Horas apontadas (todas fichas)</h6>
+                                <h4 class="mb-0 fw-bold">{{ dados_preventiva.horas_apontadas|number_br:1 }}</h4>
+                                <small class="text-muted">horas</small>
+                            </div>
+                            <i class="bi bi-clock-history fa-2x text-danger opacity-25 d-none d-md-block"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-md col-lg mb-0">
-                <div class="card stat-card border-info shadow-sm border-0 h-100">
+            <div class="col-6 col-md col-lg d-flex">
+                <div class="card stat-card kpi-card kpi-purple shadow-sm border-0 h-100 w-100">
                     <div class="card-body py-3">
-                        <h6 class="text-muted mb-1 small">Média de Horas por OS</h6>
-                        <h2 class="mb-0 fw-bold text-info">{{ dados_preventiva.tempo_medio_horas|number_br:2 }}</h2>
-                        <small class="text-muted">h ({{ dados_preventiva.tempo_medio_min|number_br:0 }} min)</small>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Média de Horas por OS</h6>
+                                <h4 class="mb-0 fw-bold">{{ dados_preventiva.tempo_medio_horas|number_br:2 }}</h4>
+                                <small class="text-muted">h ({{ dados_preventiva.tempo_medio_min|number_br:0 }} min)</small>
+                            </div>
+                            <i class="bi bi-calculator fa-2x opacity-25 d-none d-md-block" style="color: #6f42c1;"></i>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -161,7 +214,14 @@
                 <i class="bi bi-person-check me-2 text-primary"></i>Capacidade vs Trabalho Alocado (Plano Preventiva)
             </h4>
         </div>
-        <p class="text-muted mb-4">Comparação entre a capacidade disponível do manutentor (<code>horas_semanais</code>, <code>tempo_trabalho</code>) e o trabalho alocado no Plano Preventiva. Agrupado por <strong>local de trabalho</strong>.</p>
+        <p class="text-muted mb-2">Comparação entre a capacidade disponível do manutentor (<code>horas_semanais</code>, <code>tempo_trabalho</code>) e o trabalho alocado no Plano Preventiva. Agrupado por <strong>local de trabalho</strong>.</p>
+        <p class="small text-muted mb-4">
+            O tempo de cada tarefa no plano usa o roteiro vinculado (<strong>Roteiro Preventiva</strong>: <code>tempo_prev</code> ou <code>cf_temp_prev</code> em <strong>HH:MM</strong>).
+            Se não houver roteiro ou o tempo não puder ser interpretado, aplica-se o
+            <strong>Tempo padrão para Ordens de Inspeção Preventiva</strong> de
+            <a href="{% url 'configuracoes_mao_de_obra' %}">Configurações de Mão de Obra</a>
+            (atualmente <strong>{{ tempo_padrao_inspecao_config_horas|decimal_hours_as_hm }}</strong>).
+        </p>
 
         {% for secao in analise_capacidade_por_local %}
         <div class="border-top" style="margin-top: 3rem; padding-top: 2rem;">
@@ -170,7 +230,7 @@
                 <span class="badge bg-secondary ms-2">{{ secao.itens|length }} manutentor(es)</span>
             </h5>
             <div class="table-responsive mb-4">
-                <table class="table table-hover table-striped align-middle">
+                <table class="table table-hover align-middle">
                     <thead class="table-light">
                         <tr>
                             <th>Manutentor</th>
@@ -186,27 +246,11 @@
                         {% for item in secao.itens %}
                         <tr>
                             <td class="align-top">
-                                <div>
-                                    <button class="btn btn-link p-0 text-start text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#maq-{{ forloop.parentloop.counter }}-{{ forloop.counter }}" aria-expanded="false" aria-controls="maq-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
-                                        <i class="fas fa-chevron-right me-1 collapse-icon" style="transition: transform 0.2s;"></i>
-                                        <strong>{{ item.manutentor.Nome|default:item.manutentor.Matricula }}</strong>
-                                    </button>
-                                    <br><small class="text-muted">Mat: {{ item.manutentor.Matricula }} — {{ item.manutentor.tempo_trabalho|default:"-" }}{% if item.manutentor.horas_semanais %} | {{ item.manutentor.horas_semanais }}h/sem{% endif %}</small>
-                                    <div class="collapse mt-2" id="maq-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
-                                        <div class="small">
-                                            {% if item.maquinas %}
-                                            <strong class="text-muted d-block mb-1">Máquinas no Plano:</strong>
-                                            <ul class="mb-0 ps-3">
-                                                {% for maq in item.maquinas %}
-                                                <li>{{ maq.cd }} {% if maq.descr %}— {{ maq.descr|truncatewords:8 }}{% endif %}</li>
-                                                {% endfor %}
-                                            </ul>
-                                            {% else %}
-                                            <span class="text-muted">Nenhuma máquina no plano.</span>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                </div>
+                                <button class="btn btn-link p-0 text-start text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#maq-{{ forloop.parentloop.counter }}-{{ forloop.counter }}" aria-expanded="false" aria-controls="maq-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
+                                    <i class="fas fa-chevron-right me-1 collapse-icon" style="transition: transform 0.2s;"></i>
+                                    <strong>{{ item.manutentor.Nome|default:item.manutentor.Matricula }}</strong>
+                                </button>
+                                <br><small class="text-muted">Mat: {{ item.manutentor.Matricula }} — {{ item.manutentor.tempo_trabalho|default:"-" }}{% if item.manutentor.horas_semanais %} | {{ item.manutentor.horas_semanais }}h/sem{% endif %}</small>
                             </td>
                             <td class="text-end">{{ item.capacidade_mensal|number_br:1 }}</td>
                             <td class="text-end">{{ item.trabalho_mensal|number_br:1 }}</td>
@@ -227,6 +271,60 @@
                                 {% endif %}
                             </td>
                         </tr>
+                        <tr class="mao-obra-detail-row">
+                            <td colspan="7" class="p-0 border-top-0">
+                                <div class="collapse" id="maq-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
+                                    <div class="collapse-inner px-3 py-3 border-bottom">
+                                        <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+                                                <i class="fas fa-industry me-1"></i>Plano por máquina
+                                            </span>
+                                            <span class="text-muted small">{{ item.manutentor.Nome|default:item.manutentor.Matricula }}</span>
+                                        </div>
+                                        {% if item.maquinas %}
+                                        <div class="table-responsive border rounded shadow-sm bg-white">
+                                            <table class="table table-sm table-hover table-striped align-middle mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th scope="col" style="width: 8rem;">Cód.</th>
+                                                        <th scope="col">Descrição</th>
+                                                        <th scope="col" class="text-end" style="width: 11rem;">Trabalho<br><small class="text-muted fw-normal">(h e min / mês)</small></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="small">
+                                                    {% for maq in item.maquinas %}
+                                                    <tr>
+                                                        <td class="font-monospace">{{ maq.cd }}</td>
+                                                        <td>
+                                                            <span class="badge bg-primary bg-opacity-10 text-primary me-1">Principal</span>
+                                                            <span class="fw-semibold text-body">{{ maq.descr }}</span>
+                                                            {% if maq.secundarias %}
+                                                            <span class="d-block text-muted mt-1" style="font-size: 0.8rem;">Total da máquina principal (inclui secundárias vinculadas)</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-end fw-semibold text-nowrap">{{ maq.trabalho_h_mes|decimal_hours_as_hm }}</td>
+                                                    </tr>
+                                                    {% for s in maq.secundarias %}
+                                                    <tr class="table-light">
+                                                        <td class="font-monospace ps-3 border-start border-3 border-secondary">{{ s.cd }}</td>
+                                                        <td class="ps-2">
+                                                            <span class="badge bg-secondary bg-opacity-25 text-dark me-1">Secundária</span>
+                                                            {{ s.descr }}
+                                                        </td>
+                                                        <td class="text-end text-nowrap">{{ s.trabalho_h_mes|decimal_hours_as_hm }}</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        {% else %}
+                                        <div class="small text-muted py-2">Nenhuma máquina no plano.</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -240,17 +338,15 @@
 
         <div class="alert alert-info mb-0 mt-4">
             <i class="fas fa-info-circle me-2"></i>
-            <strong>Como é calculado:</strong> Capacidade mensal = horas_semanais × 4,33 (ou tempo_trabalho diário × 5 × 4,33). 
-            Trabalho alocado = soma do tempo de cada tarefa no Plano, considerando a frequência (quantidade_periodo). 
-            Quando o roteiro não tem tempo definido, usa-se 30 min por tarefa.
+            <strong>Como é calculado:</strong> Capacidade mensal = horas_semanais × 4,33 (ou tempo_trabalho diário × 5 × 4,33).
+            Trabalho alocado = soma, por linha do Plano Preventiva, de <em>(tempo da tarefa em horas) × (30 ÷ quantidade_periodo)</em> — ou seja, frequência mensal assumindo mês de 30 dias.
+            O tempo da tarefa vem do roteiro em HH:MM; se não houver tempo utilizável, usa-se o padrão de
+            <a href="{% url 'configuracoes_mao_de_obra' %}" class="alert-link">Configurações</a>
+            (hoje <strong>{{ tempo_padrao_inspecao_config_horas|decimal_hours_as_hm }}</strong>).
         </div>
     </div>
 </section>
 
-<style>
-[data-bs-toggle="collapse"].btn-link .collapse-icon { display: inline-block; transition: transform 0.2s; }
-[data-bs-toggle="collapse"].btn-link[aria-expanded="true"] .collapse-icon { transform: rotate(90deg); }
-</style>
 <script>
 function selecionarTodosMeses() {
     document.querySelectorAll('input[name="mes"]').forEach(cb => cb.checked = true);

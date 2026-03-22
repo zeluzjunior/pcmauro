@@ -7,7 +7,8 @@ from .models import (
     OrdemServicoLubrificacao,
     OrdemServicoLubrificacaoFicha,
     CentroAtividade, 
-    Manutentor, 
+    Manutentor,
+    ParametrosMaoDeObra,
     ManutentorMaquina,
     ItemEstoque, 
     ManutencaoCsv, 
@@ -156,6 +157,12 @@ class ManutentorAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+@admin.register(ParametrosMaoDeObra)
+class ParametrosMaoDeObraAdmin(admin.ModelAdmin):
+    list_display = ('id', 'tempo_padrao_inspecao_preventiva_horas', 'updated_at')
+    readonly_fields = ('updated_at',)
 
 
 @admin.register(ItemEstoque)

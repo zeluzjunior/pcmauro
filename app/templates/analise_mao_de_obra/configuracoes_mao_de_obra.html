@@ -26,9 +26,50 @@
 
 <section class="py-5">
     <div class="container">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <p class="text-muted mb-0">Conteúdo em desenvolvimento.</p>
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white py-3">
+                <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Tempo para Plano de Preventiva</h5>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-muted mb-4">
+                    Estes valores são usados no cálculo de <strong>trabalho alocado</strong> em
+                    <a href="{% url 'analise_mao_de_obra_preventiva' %}">Análise de Mão de Obra — Preventivas</a>
+                    quando o roteiro da tarefa não define tempo.
+                </p>
+                <form method="post" action="{% url 'configuracoes_mao_de_obra' %}">
+                    {% csrf_token %}
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-6 col-lg-5">
+                            <label for="tempo_padrao_inspecao_preventiva_horas" class="form-label fw-semibold">
+                                Tempo padrão para Ordens de Inspeção Preventiva:
+                            </label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="tempo_padrao_inspecao_preventiva_horas" id="tempo_padrao_inspecao_preventiva_horas"
+                                       inputmode="decimal"
+                                       value="{{ parametros_mao_de_obra.tempo_padrao_inspecao_preventiva_horas|floatformat:2 }}"
+                                       placeholder="0,50" required>
+                                <span class="input-group-text">horas</span>
+                            </div>
+                            <div class="form-text">
+                                Informe em <strong>horas decimais</strong> (ex.: <code>0,5</code> ou <code>0.5</code> = 30 minutos; <code>1</code> = 1 hora).
+                            </div>
+                        </div>
+                        <div class="col-md-auto">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg me-1"></i>Salvar
+                            </button>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

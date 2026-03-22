@@ -2319,9 +2319,23 @@ def ajustar_maquinas_outros(request):
 
 def maquina_primaria_secundaria(request):
     """Agrupar Máquinas Primárias e Secundárias"""
+    import unicodedata
     from .models import Maquina, MaquinaPrimariaSecundaria
     from django.contrib import messages
-    
+
+    def _descr_gerenc_norm(s):
+        """Normaliza descr_gerenc para comparação (NBSP, espaços unicode, etc. — o Trim SQL não cobre tudo)."""
+        if s is None or s == '':
+            return ''
+        return unicodedata.normalize('NFKC', str(s)).strip().upper()
+
+    def _is_gerencia_equipamento(dg_norm):
+        """True se a gerência é da família Equipamento (EQUIPAMENTO, EQUIPAMENTOS, etc.)."""
+        if not dg_norm:
+            return False
+        # Cobre plural (EQUIPAMENTOS), sufixos comuns e variações após normalização
+        return dg_norm.startswith('EQUIPAMENTO')
+
     # Filtro por setor (descr_setormanut) - GET
     filtro_setor = (request.GET.get('setor') or request.GET.get('descr_setormanut') or '').strip() or None
     setores_disponiveis = list(
@@ -2332,27 +2346,30 @@ def maquina_primaria_secundaria(request):
         .order_by('descr_setormanut')
     )
     
-    # Buscar máquinas primárias (descr_gerenc = "MÁQUINAS PRINCIPAL") - apenas ativas; opcionalmente filtrar por setor
-    maquinas_primarias = Maquina.objects.filter(
-        descr_gerenc__iexact='MÁQUINAS PRINCIPAL',
-        ativo=True
-    )
+    # Buscar máquinas primárias (descr_gerenc = "MÁQUINAS PRINCIPAL") - apenas ativas; opcionalmente filtrar por setor.
+    # Filtro final em Python: mesmo com filtro de setor, NBSP/outros em descr_gerenc não escapam do exclude SQL.
+    maquinas_primarias_qs = Maquina.objects.filter(ativo=True).order_by('cd_maquina')
     if filtro_setor:
-        maquinas_primarias = maquinas_primarias.filter(descr_setormanut=filtro_setor)
-    maquinas_primarias = maquinas_primarias.order_by('cd_maquina')
+        maquinas_primarias_qs = maquinas_primarias_qs.filter(descr_setormanut=filtro_setor)
+    maquinas_primarias = [
+        m for m in maquinas_primarias_qs
+        if _descr_gerenc_norm(m.descr_gerenc) == 'MÁQUINAS PRINCIPAL'
+    ]
     
     # Buscar máquinas secundárias que ainda não estão relacionadas - apenas ativas; opcionalmente filtrar por setor
     maquinas_secundarias_relacionadas = MaquinaPrimariaSecundaria.objects.values_list('maquina_secundaria_id', flat=True)
-    maquinas_secundarias = Maquina.objects.filter(
-        ativo=True
-    ).exclude(
-        descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
-    ).exclude(
-        id__in=maquinas_secundarias_relacionadas
+    maquinas_secundarias_qs = (
+        Maquina.objects.filter(ativo=True)
+        .exclude(id__in=maquinas_secundarias_relacionadas)
+        .order_by('cd_maquina')
     )
     if filtro_setor:
-        maquinas_secundarias = maquinas_secundarias.filter(descr_setormanut=filtro_setor)
-    maquinas_secundarias = maquinas_secundarias.order_by('cd_maquina')
+        maquinas_secundarias_qs = maquinas_secundarias_qs.filter(descr_setormanut=filtro_setor)
+    maquinas_secundarias = [
+        m for m in maquinas_secundarias_qs
+        if _descr_gerenc_norm(m.descr_gerenc) != 'MÁQUINAS PRINCIPAL'
+        and not _is_gerencia_equipamento(_descr_gerenc_norm(m.descr_gerenc))
+    ]
     
     # Buscar relacionamentos existentes; opcionalmente filtrar por setor da máquina primária
     relacionamentos = MaquinaPrimariaSecundaria.objects.select_related('maquina_primaria', 'maquina_secundaria').order_by('-created_at')
@@ -2385,7 +2402,7 @@ def maquina_primaria_secundaria(request):
             else:
                 try:
                     maquina_primaria = Maquina.objects.get(id=maquina_primaria_id)
-                    if maquina_primaria.descr_gerenc and maquina_primaria.descr_gerenc.upper() != 'MÁQUINAS PRINCIPAL':
+                    if _descr_gerenc_norm(maquina_primaria.descr_gerenc) != 'MÁQUINAS PRINCIPAL':
                         messages.error(request, 'A máquina selecionada não é uma máquina primária.')
                     else:
                         relacionamentos_criados = 0
@@ -2394,6 +2411,9 @@ def maquina_primaria_secundaria(request):
                         for secundaria_id in maquinas_secundarias_ids:
                             try:
                                 maquina_secundaria = Maquina.objects.get(id=secundaria_id)
+                                dg = _descr_gerenc_norm(maquina_secundaria.descr_gerenc)
+                                if dg == 'MÁQUINAS PRINCIPAL' or _is_gerencia_equipamento(dg):
+                                    continue
                                 
                                 # Verificar se já existe o relacionamento
                                 if MaquinaPrimariaSecundaria.objects.filter(
@@ -16292,9 +16312,33 @@ def analise_mao_de_obra_e_ordens(request):
 
 def configuracoes_mao_de_obra(request):
     """Configurações de Mão de Obra"""
+    from decimal import Decimal, InvalidOperation
+
+    from django.contrib import messages
+    from django.shortcuts import redirect
+
+    from app.models import ParametrosMaoDeObra
+
+    params = ParametrosMaoDeObra.get_solo()
+
+    if request.method == 'POST':
+        raw = (request.POST.get('tempo_padrao_inspecao_preventiva_horas') or '').strip().replace(',', '.')
+        try:
+            val = Decimal(raw)
+            if val < 0 or val > 24:
+                messages.error(request, 'Informe um valor entre 0 e 24 horas.')
+            else:
+                params.tempo_padrao_inspecao_preventiva_horas = val
+                params.save()
+                messages.success(request, 'Configurações salvas com sucesso.')
+        except (InvalidOperation, ValueError, TypeError):
+            messages.error(request, 'Valor inválido para o tempo padrão.')
+        return redirect('configuracoes_mao_de_obra')
+
     context = {
         'page_title': 'Configurações de Mão de Obra',
         'active_page': 'configuracoes_mao_de_obra',
+        'parametros_mao_de_obra': params,
     }
     return render(request, 'analise_mao_de_obra/configuracoes_mao_de_obra.html', context)
 
@@ -16339,8 +16383,10 @@ def analise_mao_de_obra_preventiva(request):
     """Análise de Mão de Obra — Preventivas (OrdemServicoPreventiva e OrdemServicoPreventivaFicha) + Capacidade vs Plano"""
     from datetime import datetime as dt
     from decimal import Decimal
+    from collections import defaultdict
+
     from app.models import OrdemServicoPreventiva, OrdemServicoPreventivaFicha
-    from app.models import Manutentor, PlanoPreventiva, LOCAL_TRABALHO
+    from app.models import Manutentor, PlanoPreventiva, LOCAL_TRABALHO, MaquinaPrimariaSecundaria, Maquina, ParametrosMaoDeObra
 
     ano_filtro = request.GET.get('ano', None)
     meses_filtro = request.GET.getlist('mes')
@@ -16452,9 +16498,23 @@ def analise_mao_de_obra_preventiva(request):
     }
 
     # Análise de capacidade vs trabalho alocado (Manutentor + PlanoPreventiva)
-    DEFAULT_HORAS_POR_TAREFA = 0.5  # 30 min quando roteiro não tem tempo
+    try:
+        default_horas_tarefa = float(ParametrosMaoDeObra.get_solo().tempo_padrao_inspecao_preventiva_horas)
+    except Exception:
+        default_horas_tarefa = 0.5
     DIAS_POR_MES = 30
     SEMANAS_POR_MES = 4.33
+
+    secundaria_para_primaria = {}
+    primaria_para_secundarias = defaultdict(set)
+    for rel in MaquinaPrimariaSecundaria.objects.select_related(
+        'maquina_primaria', 'maquina_secundaria'
+    ).iterator(chunk_size=500):
+        pcd = rel.maquina_primaria.cd_maquina
+        scd = rel.maquina_secundaria.cd_maquina
+        secundaria_para_primaria[scd] = pcd
+        primaria_para_secundarias[pcd].add(scd)
+
     analise_capacidade_plano = []
     planos_por_matricula = {}
     for p in PlanoPreventiva.objects.filter(
@@ -16464,7 +16524,11 @@ def analise_mao_de_obra_preventiva(request):
         if not mat:
             continue
         if mat not in planos_por_matricula:
-            planos_por_matricula[mat] = {'itens': [], 'maquinas': {}}
+            planos_por_matricula[mat] = {
+                'itens': [],
+                'trabalho_por_maquina': defaultdict(float),
+                'descr_maquina': {},
+            }
         periodo = p.quantidade_periodo or 30
         freq_mensal = DIAS_POR_MES / max(1, periodo)
         tempo_raw = None
@@ -16472,11 +16536,68 @@ def analise_mao_de_obra_preventiva(request):
             tempo_raw = p.roteiro_preventiva.tempo_prev or p.roteiro_preventiva.cf_temp_prev
         tempo_h = _parse_tempo_prev_horas(tempo_raw)
         if tempo_h is None:
-            tempo_h = DEFAULT_HORAS_POR_TAREFA
+            tempo_h = default_horas_tarefa
         planos_por_matricula[mat]['itens'].append({'tempo_h': tempo_h, 'freq_mensal': freq_mensal})
+        trabalho_linha = tempo_h * freq_mensal
         if p.cd_maquina is not None:
             km = p.cd_maquina
-            planos_por_matricula[mat]['maquinas'][km] = (p.descr_maquina or '')
+            planos_por_matricula[mat]['trabalho_por_maquina'][km] += trabalho_linha
+            dm = planos_por_matricula[mat]['descr_maquina']
+            novo = (p.descr_maquina or '').strip()
+            if km not in dm or len(novo) > len(dm.get(km, '')):
+                dm[km] = novo
+
+    todos_cd_maquina = set()
+    for data in planos_por_matricula.values():
+        todos_cd_maquina.update(data['trabalho_por_maquina'].keys())
+    for sc in list(todos_cd_maquina):
+        if sc in secundaria_para_primaria:
+            todos_cd_maquina.add(secundaria_para_primaria[sc])
+    maquina_descrs = {}
+    if todos_cd_maquina:
+        maquina_descrs = dict(
+            Maquina.objects.filter(cd_maquina__in=todos_cd_maquina).values_list('cd_maquina', 'descr_maquina')
+        )
+
+    def _maquinas_plano_accordion(trabalho_por_maquina, descr_plan, maq_db):
+        """Trabalho (h/mês) por máquina; soma máquinas secundárias na máquina principal (MaquinaPrimariaSecundaria)."""
+        rolled = defaultdict(float)
+        for cd, w in trabalho_por_maquina.items():
+            w = float(w)
+            if cd in secundaria_para_primaria:
+                rolled[secundaria_para_primaria[cd]] += w
+            else:
+                rolled[cd] += w
+
+        def descr_maq(cd):
+            d_plan = (descr_plan.get(cd) or '').strip()
+            raw = maq_db.get(cd)
+            d_db = (raw or '').strip() if isinstance(raw, str) else ''
+            if len(d_db) >= len(d_plan):
+                return d_db or d_plan or str(cd)
+            return d_plan or d_db or str(cd)
+
+        rows = []
+        for cd in sorted(rolled.keys()):
+            total = round(rolled[cd], 2)
+            if total <= 0:
+                continue
+            sec_list = []
+            for scd in sorted(primaria_para_secundarias.get(cd, ())):
+                w_sec = trabalho_por_maquina.get(scd)
+                if w_sec is not None and float(w_sec) > 0:
+                    sec_list.append({
+                        'cd': scd,
+                        'descr': descr_maq(scd),
+                        'trabalho_h_mes': round(float(w_sec), 2),
+                    })
+            rows.append({
+                'cd': cd,
+                'descr': descr_maq(cd),
+                'trabalho_h_mes': total,
+                'secundarias': sec_list,
+            })
+        return rows
 
     for m in Manutentor.objects.filter(ativo=True).order_by('local_trab', 'turno', 'Nome'):
         capacidade_semanal = None
@@ -16493,13 +16614,20 @@ def analise_mao_de_obra_preventiva(request):
             capacidade_semanal = 40.0
         capacidade_mensal = round(capacidade_semanal * SEMANAS_POR_MES, 1)
 
-        planos_data = planos_por_matricula.get(m.Matricula, {'itens': [], 'maquinas': {}})
+        planos_data = planos_por_matricula.get(m.Matricula) or {
+            'itens': [],
+            'trabalho_por_maquina': {},
+            'descr_maquina': {},
+        }
         itens = planos_data.get('itens', [])
-        maquinas_dict = planos_data.get('maquinas', {})
+        trab_maq = planos_data.get('trabalho_por_maquina') or {}
+        if hasattr(trab_maq, 'items'):
+            trab_maq = dict(trab_maq)
+        descr_maq_plan = planos_data.get('descr_maquina') or {}
         trabalho_mensal = sum(item['tempo_h'] * item['freq_mensal'] for item in itens)
         trabalho_mensal = round(trabalho_mensal, 1)
         qtd_tarefas = len(itens)
-        maquinas_lista = [{'cd': k, 'descr': v or str(k)} for k, v in sorted(maquinas_dict.items())]
+        maquinas_lista = _maquinas_plano_accordion(trab_maq, descr_maq_plan, maquina_descrs)
 
         diferenca = round(capacidade_mensal - trabalho_mensal, 1)
         pct_utilizacao = round(100.0 * trabalho_mensal / capacidade_mensal, 1) if capacidade_mensal > 0 else 0
@@ -16542,7 +16670,25 @@ def analise_mao_de_obra_preventiva(request):
                 'itens': [],
             }
         analise_por_local[lt_key]['itens'].append(item)
-    analise_capacidade_por_local = sorted(analise_por_local.values(), key=lambda x: x['local_label'])
+
+    import unicodedata
+
+    def _normalize_local_code_for_sort(s: str) -> str:
+        s = (s or '').strip().lower()
+        s = unicodedata.normalize('NFKD', s)
+        return ''.join(c for c in s if not unicodedata.combining(c))
+
+    def _sort_capacidade_por_local(secao):
+        # Frigorífico primeiro, Industria em seguida, demais por local_label (LOCAL_TRABALHO)
+        n = _normalize_local_code_for_sort(secao.get('local_code', ''))
+        label = secao.get('local_label') or ''
+        if n == 'frigorifico':
+            return (0, label)
+        if n == 'industria':
+            return (1, label)
+        return (2, label)
+
+    analise_capacidade_por_local = sorted(analise_por_local.values(), key=_sort_capacidade_por_local)
 
     context = {
         'page_title': 'Análise de Mão de Obra - Preventivas',
@@ -16554,6 +16700,8 @@ def analise_mao_de_obra_preventiva(request):
         'dados_preventiva': dados_preventiva,
         'analise_capacidade_plano': analise_capacidade_plano,
         'analise_capacidade_por_local': analise_capacidade_por_local,
+        # Exposto na página: mesmo valor usado quando o roteiro não traz tempo (HH:MM) válido
+        'tempo_padrao_inspecao_config_horas': default_horas_tarefa,
     }
     return render(request, 'analise_mao_de_obra/analise_mao_de_obra_preventiva.html', context)
 

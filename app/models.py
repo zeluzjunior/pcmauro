@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 
 
@@ -528,6 +530,42 @@ class Manutentor(models.Model):
 
     def __str__(self):
         return f"{self.Matricula} - {self.Nome or 'Sem nome'}"
+
+
+class ParametrosMaoDeObra(models.Model):
+    """
+    Parâmetros globais de mão de obra (registro único, pk=1).
+    Permite evoluir com novos campos sem criar várias tabelas pequenas.
+    """
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    tempo_padrao_inspecao_preventiva_horas = models.DecimalField(
+        'Tempo padrão — Ordens de Inspeção Preventiva (horas)',
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal('0.50'),
+        help_text='Usado no cálculo do Plano Preventiva quando o roteiro não informa tempo (ex.: 0,50 = 30 min).',
+    )
+    updated_at = models.DateTimeField('Atualizado em', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Parâmetros de Mão de Obra'
+        verbose_name_plural = 'Parâmetros de Mão de Obra'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(
+            pk=1,
+            defaults={'tempo_padrao_inspecao_preventiva_horas': Decimal('0.50')},
+        )
+        return obj
+
+    def __str__(self):
+        return 'Parâmetros de Mão de Obra'
+
 
 class ManutentorMaquina(models.Model):
     """Modelo para relacionar manutentores com máquinas"""
