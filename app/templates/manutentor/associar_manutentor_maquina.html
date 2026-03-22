@@ -24,7 +24,7 @@
                         <h1 class="h2 fw-bold mb-1 mb-md-2" style="text-shadow: 0 1px 3px rgba(0,0,0,0.2);">
                             Associar Manutentor e Máquina
                         </h1>
-                        <p class="mb-0 opacity-90" style="font-size: 1rem;">Vincule um manutentor a uma ou mais máquinas</p>
+                        <p class="mb-0 opacity-90" style="font-size: 1rem;">Selecione uma Máquina Principal, veja as secundárias e confirme a associação</p>
                     </div>
                 </div>
             </div>
@@ -49,21 +49,12 @@
                 <!-- Filtros -->
                 <div id="filtros-maquinas" class="card border-0 shadow-sm mb-4">
                     <div class="card-header py-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                        <h6 class="mb-0 fw-semibold" style="font-size: 1rem;"><i class="fas fa-filter me-2"></i>Filtrar Máquinas</h6>
+                        <h6 class="mb-0 fw-semibold" style="font-size: 1rem;"><i class="fas fa-filter me-2"></i>Filtrar Máquinas Principais</h6>
                     </div>
                     <div class="card-body p-4">
                         <form method="get" action="{% url 'associar_manutentor_maquina' %}">
-                            <div class="row g-3">
-                                <div class="col-md-5">
-                                    <label class="form-label small text-muted">Gerência</label>
-                                    <select class="form-select" name="descr_gerenc">
-                                        <option value="">Todas</option>
-                                        {% for g in opcoes_gerenc %}
-                                            <option value="{{ g }}" {% if filter_gerenc == g %}selected{% endif %}>{{ g }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="col-md-5">
+                            <div class="row g-3 align-items-end">
+                                <div class="col-md-8">
                                     <label class="form-label small text-muted">Setor Manutenção</label>
                                     <select class="form-select" name="descr_setormanut">
                                         <option value="">Todos</option>
@@ -72,7 +63,7 @@
                                         {% endfor %}
                                     </select>
                                 </div>
-                                <div class="col-md-2 d-flex align-items-end gap-2">
+                                <div class="col-md-4 d-flex gap-2">
                                     <button type="submit" class="btn btn-primary">Filtrar</button>
                                     <a href="{% url 'associar_manutentor_maquina' %}" class="btn btn-outline-secondary">Limpar</a>
                                 </div>
@@ -87,60 +78,61 @@
                         <h6 class="mb-0 fw-semibold" style="font-size: 1rem;"><i class="fas fa-plus-circle me-2"></i>Nova Associação</h6>
                     </div>
                     <div class="card-body p-4 p-md-5">
-                        <form method="post" action="{% url 'associar_manutentor_maquina' %}{% if filter_gerenc or filter_setormanut %}?{% if filter_gerenc %}descr_gerenc={{ filter_gerenc|urlencode }}{% endif %}{% if filter_setormanut %}{% if filter_gerenc %}&{% endif %}descr_setormanut={{ filter_setormanut|urlencode }}{% endif %}{% endif %}">
+                        <form method="post" action="{% url 'associar_manutentor_maquina' %}{% if filter_setormanut %}?descr_setormanut={{ filter_setormanut|urlencode }}{% endif %}" id="formAssociar">
                             {% csrf_token %}
+
                             <div class="mb-4">
-                                <label for="manutentor" class="form-label fw-semibold" style="font-size: 0.95rem;">
+                                <label for="busca_manutentor" class="form-label fw-semibold" style="font-size: 0.95rem;">
                                     <i class="fas fa-user-tie me-2 text-primary"></i>Manutentor <span class="text-danger">*</span>
                                 </label>
-                                <select class="form-select" id="manutentor" name="manutentor" required>
+                                <div class="mb-2">
+                                    <input type="text" class="form-control" id="busca_manutentor" placeholder="Buscar por matrícula ou nome..." autocomplete="off">
+                                </div>
+                                <select class="form-select" id="manutentor" name="manutentor" required size="5" style="min-height: 120px;">
                                     <option value="">Selecione o Manutentor</option>
                                     {% for m in manutentores %}
-                                        <option value="{{ m.Matricula }}">{{ m.Matricula }} - {{ m.Nome|default:"Sem nome" }}</option>
+                                        <option value="{{ m.Matricula }}" data-busca="{{ m.Matricula|lower }} {{ m.Nome|default:''|lower }}">
+                                            {{ m.Matricula }} - {{ m.Nome|default:"Sem nome" }}
+                                        </option>
                                     {% endfor %}
                                 </select>
                             </div>
 
                             <div class="mb-4">
-                                <label class="form-label fw-semibold" style="font-size: 0.95rem;">
-                                    <i class="fas fa-cog me-2 text-primary"></i>Máquinas <span class="text-danger">*</span>
+                                <label for="busca_maquina_principal" class="form-label fw-semibold" style="font-size: 0.95rem;">
+                                    <i class="fas fa-cog me-2 text-primary"></i>Máquina Principal (MÁQUINAS PRINCIPAL) <span class="text-danger">*</span>
                                 </label>
-                                <p class="text-muted small mb-2">Marque as máquinas que deseja associar ao manutentor. <em>Máquinas já associadas a outro manutentor não aparecem na lista.</em></p>
-                                <div class="border rounded p-3 bg-light" style="max-height: 420px; overflow-y: auto; min-height: 120px;">
-                                    {% if maquinas %}
-                                        <div class="input-group mb-3">
-                                            <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
-                                            <input type="text" class="form-control" id="busca-maquinas" placeholder="Buscar por código ou descrição da máquina..." autocomplete="off">
-                                        </div>
-                                        <div class="row g-2" id="lista-maquinas">
-                                            {% for maq in maquinas %}
-                                                <div class="col-12 maquina-item" data-busca="{{ maq.cd_maquina }} {{ maq.descr_maquina|default:'' }}">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input flex-shrink-0" type="checkbox" name="maquinas" value="{{ maq.id }}" id="maq_{{ maq.id }}">
-                                                        <label class="form-check-label text-break" for="maq_{{ maq.id }}" style="word-wrap: break-word;">
-                                                            {{ maq.cd_maquina }} - {{ maq.descr_maquina|default:"Sem descrição" }}
-                                                            {% if maq.id in ids_principais_com_secundarias %}
-                                                                <span class="badge bg-primary ms-1">Principal</span>
-                                                            {% endif %}
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                            {% endfor %}
-                                        </div>
-                                        <small class="text-muted d-block mt-2" id="contador-maquinas">{{ maquinas|length }} máquina(s) disponível(is)</small>
-                                        {% if ids_principais_com_secundarias %}
-                                        <div class="form-check mt-3">
-                                            <input class="form-check-input" type="checkbox" name="associar_secundarias" id="associar_secundarias" value="1">
-                                            <label class="form-check-label" for="associar_secundarias">
-                                                <i class="fas fa-sitemap text-primary me-1"></i>Associar também todas as máquinas secundárias quando uma Máquina Principal for selecionada
-                                            </label>
-                                        </div>
-                                        {% endif %}
-                                    {% else %}
-                                        <div class="alert alert-warning mb-0">
-                                            Nenhuma máquina disponível. Isso pode ocorrer se todas já estiverem associadas a manutentores, ou se os filtros não retornarem resultados. Ajuste os filtros acima ou <a href="{% url 'associar_manutentor_maquina' %}">limpe os filtros</a>.
-                                        </div>
-                                    {% endif %}
+                                <div class="mb-2">
+                                    <input type="text" class="form-control" id="busca_maquina_principal" placeholder="Buscar por código ou descrição..." autocomplete="off">
+                                </div>
+                                <select class="form-select" id="maquina_principal" name="maquina_principal_id" required size="6" style="min-height: 180px;">
+                                    <option value="">Selecione uma Máquina Principal</option>
+                                    {% for maq in maquinas_principais %}
+                                        <option value="{{ maq.id }}" data-busca="{{ maq.cd_maquina|lower }} {{ maq.descr_maquina|default:''|lower }} {{ maq.descr_setormanut|default:''|lower }}">
+                                            {{ maq.cd_maquina }} - {{ maq.descr_maquina|default:"Sem descrição" }}
+                                            {% if maq.descr_setormanut %} ({{ maq.descr_setormanut }}){% endif %}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <p class="text-muted small mt-1 mb-0">Apenas máquinas classificadas como MÁQUINAS PRINCIPAL e ainda não associadas aparecem na lista.</p>
+                            </div>
+
+                            <div id="secundarias-container" class="mb-4" style="display: none;">
+                                <label class="form-label fw-semibold" style="font-size: 0.95rem;">
+                                    <i class="fas fa-link me-2 text-primary"></i>Máquinas Secundárias
+                                </label>
+                                <p class="text-muted small mb-2">Marque as secundárias que deseja associar junto com a principal. As já associadas a outro manutentor aparecem desabilitadas.</p>
+                                <div class="mb-2">
+                                    <input type="text" class="form-control" id="busca_secundarias" placeholder="Buscar secundárias por código ou descrição..." autocomplete="off">
+                                </div>
+                                <div class="border rounded p-3 bg-light" style="max-height: 320px; overflow-y: auto;">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="selectAllSecundarias">
+                                        <label class="form-check-label fw-semibold" for="selectAllSecundarias">Selecionar todas (disponíveis)</label>
+                                    </div>
+                                    <hr class="my-2">
+                                    <div id="lista-secundarias"></div>
+                                    <small class="text-muted d-block mt-2" id="contador-secundarias">0 secundária(s)</small>
                                 </div>
                             </div>
 
@@ -157,8 +149,8 @@
                                 <a href="{% url 'consultar_manutentores' %}" class="btn btn-outline-secondary">
                                     <i class="fas fa-arrow-left me-2"></i>Voltar
                                 </a>
-                                <button type="submit" class="btn btn-primary btn-lg px-4" {% if not maquinas %}disabled{% endif %}>
-                                    <i class="fas fa-save me-2"></i>Salvar Associação
+                                <button type="submit" class="btn btn-primary btn-lg px-4" id="btnConfirmar" {% if not maquinas_principais %}disabled{% endif %}>
+                                    <i class="fas fa-check me-2"></i>Confirmar Associação
                                 </button>
                             </div>
                         </form>
@@ -168,44 +160,110 @@
         </div>
     </div>
 </section>
+
+{{ secundarias_por_principal|json_script:"secundarias-data" }}
 <script>
-// Busca em tempo real na lista de máquinas
 (function() {
-    var busca = document.getElementById('busca-maquinas');
-    var lista = document.getElementById('lista-maquinas');
-    var contador = document.getElementById('contador-maquinas');
-    if (busca && lista) {
-        busca.addEventListener('input', function() {
-            var termo = this.value.trim().toLowerCase();
-            var itens = lista.querySelectorAll('.maquina-item');
-            var visiveis = 0;
-            itens.forEach(function(el) {
-                var texto = (el.getAttribute('data-busca') || '').toLowerCase();
-                var match = !termo || texto.indexOf(termo) >= 0;
-                el.style.display = match ? '' : 'none';
-                if (match) visiveis++;
-            });
-            if (contador) {
-                var total = itens.length;
-                contador.textContent = termo ? visiveis + ' de ' + total + ' máquina(s)' : total + ' máquina(s) disponível(is)';
-            }
+    var dataEl = document.getElementById('secundarias-data');
+    var secundariasPorPrincipal = dataEl ? JSON.parse(dataEl.textContent || '{}') : {};
+    var selectManutentor = document.getElementById('manutentor');
+    var buscaManutentor = document.getElementById('busca_manutentor');
+    var selectPrincipal = document.getElementById('maquina_principal');
+    var buscaPrincipal = document.getElementById('busca_maquina_principal');
+    var buscaSecundarias = document.getElementById('busca_secundarias');
+    var containerSecundarias = document.getElementById('secundarias-container');
+    var listaSecundarias = document.getElementById('lista-secundarias');
+    var contadorSecundarias = document.getElementById('contador-secundarias');
+    var selectAllCheckbox = document.getElementById('selectAllSecundarias');
+
+    function filtrarSelect(elBusca, elSelect) {
+        var termo = (elBusca ? elBusca.value : '').toLowerCase().trim();
+        var opts = elSelect ? elSelect.querySelectorAll('option') : [];
+        opts.forEach(function(opt) {
+            if (opt.value === '') { opt.style.display = ''; return; }
+            var busca = (opt.getAttribute('data-busca') || opt.textContent).toLowerCase();
+            opt.style.display = !termo || busca.indexOf(termo) >= 0 ? '' : 'none';
         });
     }
-})();
-document.querySelector('form[method="post"]')?.addEventListener('submit', function(e) {
-    var checked = this.querySelectorAll('input[name="maquinas"]:checked');
-    if (checked.length === 0) {
-        e.preventDefault();
-        alert('Marque pelo menos uma máquina para associar.');
-        return false;
+    function filtrarSelectPrincipal() { filtrarSelect(buscaPrincipal, selectPrincipal); }
+    function filtrarListaSecundarias() {
+        var termo = (buscaSecundarias ? buscaSecundarias.value : '').toLowerCase().trim();
+        var itens = listaSecundarias ? listaSecundarias.querySelectorAll('.maquina-secundaria-item') : [];
+        itens.forEach(function(el) {
+            var busca = (el.getAttribute('data-busca') || '').toLowerCase();
+            el.style.display = !termo || busca.indexOf(termo) >= 0 ? '' : 'none';
+        });
     }
-});
-// Manter foco na área de filtros após aplicar filtro (evita que a caixa "desapareça" da vista)
-{% if filter_gerenc or filter_setormanut %}
-document.addEventListener('DOMContentLoaded', function() {
-    var el = document.getElementById('filtros-maquinas');
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-});
-{% endif %}
+    if (buscaManutentor && selectManutentor) buscaManutentor.addEventListener('input', function() { filtrarSelect(buscaManutentor, selectManutentor); });
+    if (buscaPrincipal) buscaPrincipal.addEventListener('input', filtrarSelectPrincipal);
+    if (buscaSecundarias) buscaSecundarias.addEventListener('input', filtrarListaSecundarias);
+
+    function atualizarSecundarias() {
+        var pid = selectPrincipal.value;
+        listaSecundarias.innerHTML = '';
+        containerSecundarias.style.display = 'none';
+        if (buscaSecundarias) buscaSecundarias.value = '';
+        if (!pid) return;
+
+        var secundarias = secundariasPorPrincipal[pid] || [];
+        if (secundarias.length === 0) {
+            containerSecundarias.style.display = 'block';
+            listaSecundarias.innerHTML = '<p class="text-muted small mb-0"><em>Nenhuma máquina secundária vinculada a esta principal.</em></p>';
+            contadorSecundarias.textContent = '0 secundária(s)';
+            return;
+        }
+
+        containerSecundarias.style.display = 'block';
+        var disponiveis = 0;
+        secundarias.forEach(function(s) {
+            var div = document.createElement('div');
+            div.className = 'form-check maquina-secundaria-item';
+            div.setAttribute('data-busca', (s.cd_maquina + ' ' + (s.descr_maquina || '')).toLowerCase());
+            var disabled = s.ja_associada ? ' disabled' : '';
+            var checked = !s.ja_associada ? ' checked' : '';
+            div.innerHTML = '<input class="form-check-input" type="checkbox" name="maquinas_secundarias" value="' + s.id + '" id="sec_' + s.id + '"' + disabled + checked + '>' +
+                '<label class="form-check-label' + (s.ja_associada ? ' text-muted' : '') + '" for="sec_' + s.id + '">' +
+                s.cd_maquina + ' - ' + s.descr_maquina +
+                (s.ja_associada ? ' <span class="badge bg-secondary">Já associada</span>' : '') +
+                '</label>';
+            listaSecundarias.appendChild(div);
+            if (!s.ja_associada) disponiveis++;
+        });
+        contadorSecundarias.textContent = secundarias.length + ' secundária(s) (' + disponiveis + ' disponível(is))';
+    }
+
+    function atualizarSelectAll() {
+        var checks = listaSecundarias.querySelectorAll('input[name="maquinas_secundarias"]:not([disabled])');
+        var checked = listaSecundarias.querySelectorAll('input[name="maquinas_secundarias"]:not([disabled]):checked');
+        selectAllCheckbox.checked = checks.length > 0 && checked.length === checks.length;
+    }
+
+    selectPrincipal.addEventListener('change', atualizarSecundarias);
+    selectAllCheckbox.addEventListener('change', function() {
+        listaSecundarias.querySelectorAll('input[name="maquinas_secundarias"]:not([disabled])').forEach(function(cb) {
+            cb.checked = selectAllCheckbox.checked;
+        });
+    });
+    listaSecundarias.addEventListener('change', function(e) {
+        if (e.target && e.target.matches('input[name="maquinas_secundarias"]')) {
+            atualizarSelectAll();
+        }
+    });
+
+    document.getElementById('formAssociar')?.addEventListener('submit', function(e) {
+        var manutentor = document.getElementById('manutentor').value;
+        var principal = document.getElementById('maquina_principal').value;
+        if (!manutentor) {
+            e.preventDefault();
+            alert('Selecione o Manutentor.');
+            return false;
+        }
+        if (!principal) {
+            e.preventDefault();
+            alert('Selecione uma Máquina Principal.');
+            return false;
+        }
+    });
+})();
 </script>
 {% endblock %}

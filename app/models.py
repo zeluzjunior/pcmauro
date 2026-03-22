@@ -35,6 +35,11 @@ LOCAL_TRABALHO = (
     ('Indefinido', 'Indefinido'),
     ('ETE/ETA', 'ETE/ETA'),
     ('Utilidades', 'Utilidades'),
+    ('Melhoria', 'Melhoria'),
+    ('Ferramentaria', 'Ferramentaria'),
+    ('Tornearia', 'Tornearia'),
+    ('Lubrificação', 'Lubrificação'),
+    ('Automação', 'Automação'),
     ('Manutenção', 'Manutenção'),
 )
 

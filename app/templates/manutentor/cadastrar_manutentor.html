@@ -236,10 +236,11 @@
                                     </h6>
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="maquinas_selecionadas" class="form-label">Selecionar Máquinas</label>
+                                    <label for="busca_maquinas_cadastro" class="form-label">Selecionar Máquinas</label>
+                                    <input type="text" class="form-control mb-2" id="busca_maquinas_cadastro" placeholder="Buscar por código ou descrição..." autocomplete="off">
                                     <select class="form-select" id="maquinas_selecionadas" name="maquinas_selecionadas" multiple size="8">
                                         {% for maquina in maquinas_disponiveis %}
-                                            <option value="{{ maquina.id }}">
+                                            <option value="{{ maquina.id }}" data-busca="{{ maquina.cd_maquina|lower }} {{ maquina.descr_maquina|default:''|lower }}">
                                                 {{ maquina.cd_maquina }} - {{ maquina.descr_maquina|default:"Sem descrição" }}
                                             </option>
                                         {% endfor %}
@@ -266,4 +267,22 @@
         </div>
     </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    var busca = document.getElementById('busca_maquinas_cadastro');
+    var select = document.getElementById('maquinas_selecionadas');
+    if (busca && select) {
+        busca.addEventListener('input', function() {
+            var termo = this.value.toLowerCase().trim();
+            select.querySelectorAll('option').forEach(function(opt) {
+                var texto = (opt.getAttribute('data-busca') || opt.textContent).toLowerCase();
+                opt.style.display = !termo || texto.indexOf(termo) >= 0 ? '' : 'none';
+            });
+        });
+    }
+})();
+</script>
 {% endblock %}

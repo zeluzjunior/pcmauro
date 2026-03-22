@@ -235,7 +235,7 @@
                         <tr>
                             <th>Manutentor</th>
                             <th class="text-end">Capacidade<br><small class="text-muted">(h/mês)</small></th>
-                            <th class="text-end">Trabalho Alocado<br><small class="text-muted">(h/mês)</small></th>
+                            <th class="text-end">Trabalho<br><small class="text-muted">média / pico (h/mês)</small></th>
                             <th class="text-end">Tarefas</th>
                             <th class="text-end">Diferença</th>
                             <th class="text-end">Utilização</th>
@@ -253,7 +253,14 @@
                                 <br><small class="text-muted">Mat: {{ item.manutentor.Matricula }} — {{ item.manutentor.tempo_trabalho|default:"-" }}{% if item.manutentor.horas_semanais %} | {{ item.manutentor.horas_semanais }}h/sem{% endif %}</small>
                             </td>
                             <td class="text-end">{{ item.capacidade_mensal|number_br:1 }}</td>
-                            <td class="text-end">{{ item.trabalho_mensal|number_br:1 }}</td>
+                            <td class="text-end">
+                                {{ item.trabalho_mensal|number_br:1 }}
+                                <span class="text-muted">/</span>
+                                <strong title="Pico mensal (mês com maior carga)">{{ item.trabalho_pico_mensal|number_br:1 }}</strong>
+                                {% if item.sobrecarregado_pico %}
+                                <span class="badge bg-danger ms-1" title="Pico excede capacidade em algum mês">!</span>
+                                {% endif %}
+                            </td>
                             <td class="text-end">{{ item.qtd_tarefas }}</td>
                             <td class="text-end {% if item.diferenca < 0 %}text-danger{% elif item.diferenca > 20 %}text-success{% endif %}">
                                 {{ item.diferenca|number_br:1 }} h
@@ -338,9 +345,11 @@
 
         <div class="alert alert-info mb-0 mt-4">
             <i class="fas fa-info-circle me-2"></i>
-            <strong>Como é calculado:</strong> Capacidade mensal = horas_semanais × 4,33 (ou tempo_trabalho diário × 5 × 4,33).
-            Trabalho alocado = soma, por linha do Plano Preventiva, de <em>(tempo da tarefa em horas) × (30 ÷ quantidade_periodo)</em> — ou seja, frequência mensal assumindo mês de 30 dias.
-            O tempo da tarefa vem do roteiro em HH:MM; se não houver tempo utilizável, usa-se o padrão de
+            <strong>Como é calculado:</strong> Capacidade mensal = horas_semanais × 4,33 (ou tempo_trabalho × 5 × 4,33).
+            <br><strong>Trabalho alocado (simulação de calendário):</strong> Usa <code>dt_execucao</code> (DD/MM/YYYY) e <code>quantidade_periodo</code> (dias entre execuções) para simular em que meses de {{ ano_filtro }} cada tarefa realmente ocorre.
+            Ex.: tarefa em 01/01, período 56 dias → executa em Jan, final de Fev, Abr... Fev pode ter 0 h para essa tarefa.
+            <strong>Média</strong> = total anual ÷ 12. <strong>Pico</strong> = mês com maior carga. Se o pico exceder a capacidade, há sobrecarga em algum mês.
+            O tempo da tarefa vem do roteiro em HH:MM; se ausente, usa o padrão de
             <a href="{% url 'configuracoes_mao_de_obra' %}" class="alert-link">Configurações</a>
             (hoje <strong>{{ tempo_padrao_inspecao_config_horas|decimal_hours_as_hm }}</strong>).
         </div>

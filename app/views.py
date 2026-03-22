@@ -7,6 +7,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from functools import lru_cache
 import os
+import re
 
 
 def handle_form_errors(form, request):
@@ -10928,6 +10929,40 @@ def api_search_maquinas(request):
     return JsonResponse({'results': results})
 
 
+def api_maquina_primaria_secundarias(request, maquina_id):
+    """API endpoint para obter máquinas secundárias associadas a uma máquina principal (MaquinaPrimariaSecundaria)"""
+    from app.models import Maquina, MaquinaPrimariaSecundaria
+    from django.http import JsonResponse
+
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Método não permitido'}, status=405)
+
+    try:
+        maquina_principal = Maquina.objects.get(id=maquina_id)
+    except Maquina.DoesNotExist:
+        return JsonResponse({'error': 'Máquina não encontrada'}, status=404)
+
+    relacionamentos = MaquinaPrimariaSecundaria.objects.filter(
+        maquina_primaria=maquina_principal
+    ).select_related('maquina_secundaria').order_by('maquina_secundaria__cd_maquina')
+
+    maquinas_secundarias = []
+    for rel in relacionamentos:
+        sec = rel.maquina_secundaria
+        texto = f"{sec.cd_maquina} - {sec.descr_maquina or 'Sem descrição'}"
+        if sec.descr_setormanut:
+            texto += f" ({sec.descr_setormanut})"
+        maquinas_secundarias.append({
+            'id': sec.id,
+            'texto': texto,
+            'cd_maquina': str(sec.cd_maquina),
+            'descr_maquina': sec.descr_maquina or '',
+            'descr_setormanut': sec.descr_setormanut or '',
+        })
+
+    return JsonResponse({'maquinas_secundarias': maquinas_secundarias})
+
+
 def api_search_planos_pcm(request):
     """API endpoint para buscar planos PCM"""
     from app.models import MeuPlanoPreventiva
@@ -15225,114 +15260,98 @@ def cadastrar_manutentor(request):
 
 
 def associar_manutentor_maquina(request):
-    """Associar Manutentor com Máquina - selecionar manutentor, máquina e salvar relação"""
+    """Associar Manutentor com Máquina - fluxo: selecionar MÁQUINA PRINCIPAL -> ver secundárias -> confirmar"""
     from app.models import Manutentor, Maquina, ManutentorMaquina, MaquinaPrimariaSecundaria
     from django.db import IntegrityError
     from django.db.models import Q
-    import json
 
     manutentores = Manutentor.objects.all().order_by('Nome', 'Matricula')
-    maquinas = Maquina.objects.all().order_by('cd_maquina')
+    maquinas_ids_ja_associadas = list(ManutentorMaquina.objects.values_list('maquina_id', flat=True).distinct())
 
-    # Filtros por descr_gerenc e descr_setormanut (GET)
-    filter_gerenc = request.GET.get('descr_gerenc', '').strip() or None
+    # Apenas MÁQUINAS PRINCIPAL (descr_gerenc) que ainda não estão associadas a nenhum manutentor
+    maquinas_principais = Maquina.objects.filter(
+        descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
+    ).exclude(id__in=maquinas_ids_ja_associadas).order_by('cd_maquina')
+
+    # Filtros por descr_setormanut (GET)
     filter_setormanut = request.GET.get('descr_setormanut', '').strip() or None
-    if filter_gerenc:
-        maquinas = maquinas.filter(descr_gerenc=filter_gerenc)
     if filter_setormanut:
-        maquinas = maquinas.filter(descr_setormanut=filter_setormanut)
+        maquinas_principais = maquinas_principais.filter(descr_setormanut=filter_setormanut)
 
-    # Excluir máquinas que já têm associação com qualquer manutentor
-    maquinas_ids_ja_associadas = ManutentorMaquina.objects.values_list('maquina_id', flat=True).distinct()
-    maquinas = maquinas.exclude(id__in=maquinas_ids_ja_associadas)
-
-    # Opções para os filtros (valores distintos, excluindo vazios)
-    opcoes_gerenc = Maquina.objects.exclude(
-        Q(descr_gerenc__isnull=True) | Q(descr_gerenc='')
-    ).values_list('descr_gerenc', flat=True).distinct().order_by('descr_gerenc')
-    opcoes_setormanut = Maquina.objects.exclude(
+    # Opções para filtro de setor (apenas setores de máquinas principais)
+    opcoes_setormanut = Maquina.objects.filter(
+        descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
+    ).exclude(
         Q(descr_setormanut__isnull=True) | Q(descr_setormanut='')
     ).values_list('descr_setormanut', flat=True).distinct().order_by('descr_setormanut')
 
-    # Máquinas secundárias por máquina principal (para checkbox e preview)
-    maquina_ids = list(maquinas.values_list('id', flat=True))
+    # Secundárias por principal (apenas para as principals disponíveis)
+    ids_principais = list(maquinas_principais.values_list('id', flat=True))
     secundarias_por_principal = {}
-    if maquina_ids:
+    if ids_principais:
         for rel in MaquinaPrimariaSecundaria.objects.select_related(
             'maquina_primaria', 'maquina_secundaria'
-        ).filter(maquina_primaria_id__in=maquina_ids):
+        ).filter(maquina_primaria_id__in=ids_principais).order_by('maquina_secundaria__cd_maquina'):
             pid = rel.maquina_primaria_id
             if pid not in secundarias_por_principal:
                 secundarias_por_principal[pid] = []
+            sec = rel.maquina_secundaria
+            ja_associada = sec.id in maquinas_ids_ja_associadas
             secundarias_por_principal[pid].append({
-                'id': rel.maquina_secundaria.id,
-                'cd_maquina': rel.maquina_secundaria.cd_maquina,
-                'descr_maquina': rel.maquina_secundaria.descr_maquina or 'Sem descrição',
+                'id': sec.id,
+                'cd_maquina': str(sec.cd_maquina),
+                'descr_maquina': sec.descr_maquina or 'Sem descrição',
+                'ja_associada': ja_associada,
             })
 
     if request.method == 'POST':
         manutentor_matricula = request.POST.get('manutentor')
-        maquinas_ids = request.POST.getlist('maquinas')
+        maquina_principal_id = request.POST.get('maquina_principal_id')
+        maquinas_secundarias_ids = request.POST.getlist('maquinas_secundarias')
         observacoes = request.POST.get('observacoes', '').strip() or None
-        associar_secundarias = request.POST.get('associar_secundarias') == '1'
 
         if not manutentor_matricula:
             messages.error(request, 'Por favor, selecione o Manutentor.')
-        elif not maquinas_ids or all(not mid for mid in maquinas_ids):
-            messages.error(request, 'Por favor, selecione pelo menos uma máquina.')
+        elif not maquina_principal_id:
+            messages.error(request, 'Por favor, selecione uma Máquina Principal.')
         else:
             try:
                 manutentor = Manutentor.objects.get(Matricula=manutentor_matricula)
-                maquinas_a_associar = []
-                for mid in maquinas_ids:
-                    if mid:
-                        try:
-                            maq = Maquina.objects.get(id=mid)
-                            maquinas_a_associar.append(maq)
-                        except Maquina.DoesNotExist:
-                            pass
+                maquina_principal = Maquina.objects.get(id=maquina_principal_id)
 
-                # Se marcado, adicionar máquinas secundárias das principais selecionadas
-                if associar_secundarias and maquinas_a_associar:
-                    ids_principais = [m.id for m in maquinas_a_associar]
-                    secundarias_ids = set(
-                        MaquinaPrimariaSecundaria.objects.filter(
-                            maquina_primaria_id__in=ids_principais
-                        ).values_list('maquina_secundaria_id', flat=True)
-                    )
-                    for sid in secundarias_ids:
+                # Montar lista: principal + secundárias selecionadas (que não estejam já associadas)
+                maquinas_a_associar = [maquina_principal]
+                for sid in maquinas_secundarias_ids:
+                    if sid:
                         try:
                             maq_sec = Maquina.objects.get(id=sid)
-                            if maq_sec not in maquinas_a_associar:
+                            assoc_existente = ManutentorMaquina.objects.filter(maquina=maq_sec).first()
+                            if not assoc_existente:
                                 maquinas_a_associar.append(maq_sec)
                         except Maquina.DoesNotExist:
                             pass
 
-                if not maquinas_a_associar:
-                    messages.error(request, 'Nenhuma máquina válida foi selecionada.')
-                else:
-                    criadas = []
-                    ja_existentes = []
-                    for maq in maquinas_a_associar:
-                        # Verificar se máquina já está associada a qualquer manutentor
-                        assoc_existente = ManutentorMaquina.objects.filter(maquina=maq).first()
-                        if assoc_existente:
-                            ja_existentes.append(f"{maq.cd_maquina} - {maq.descr_maquina or 'Sem descrição'}")
-                        else:
-                            ManutentorMaquina.objects.create(
-                                manutentor=manutentor,
-                                maquina=maq,
-                                observacoes=observacoes
-                            )
-                            criadas.append(f"{maq.cd_maquina} - {maq.descr_maquina or 'Sem descrição'}")
+                criadas = []
+                ja_existentes = []
+                for maq in maquinas_a_associar:
+                    assoc_existente = ManutentorMaquina.objects.filter(maquina=maq).first()
+                    if assoc_existente:
+                        ja_existentes.append(f"{maq.cd_maquina} - {maq.descr_maquina or 'Sem descrição'}")
+                    else:
+                        ManutentorMaquina.objects.create(
+                            manutentor=manutentor,
+                            maquina=maq,
+                            observacoes=observacoes
+                        )
+                        criadas.append(f"{maq.cd_maquina} - {maq.descr_maquina or 'Sem descrição'}")
 
-                    if criadas:
-                        msg = f'Associação criada: {manutentor.Matricula} - {manutentor.Nome or "Sem nome"} ↔ {", ".join(criadas)}'
-                        if ja_existentes:
-                            msg += f' (já associadas a outro manutentor: {", ".join(ja_existentes)})'
-                        messages.success(request, msg)
-                    elif ja_existentes:
-                        messages.warning(request, f'Todas as máquinas selecionadas já estão associadas a outro manutentor.')
+                if criadas:
+                    msg = f'Associação criada: {manutentor.Matricula} - {manutentor.Nome or "Sem nome"} ↔ {", ".join(criadas)}'
+                    if ja_existentes:
+                        msg += f' (já associadas: {", ".join(ja_existentes)})'
+                    messages.success(request, msg)
+                else:
+                    messages.warning(request, 'Todas as máquinas selecionadas já estão associadas a outro manutentor.')
             except Manutentor.DoesNotExist:
                 messages.error(request, 'Manutentor não encontrado.')
             except Maquina.DoesNotExist:
@@ -15342,12 +15361,9 @@ def associar_manutentor_maquina(request):
             except Exception as e:
                 messages.error(request, f'Erro ao salvar: {str(e)}')
 
-        # Preservar filtros na URL ao redirecionar (form action inclui query params quando há filtros)
         from django.urls import reverse
         from urllib.parse import urlencode
         params = {}
-        if request.GET.get('descr_gerenc'):
-            params['descr_gerenc'] = request.GET.get('descr_gerenc')
         if request.GET.get('descr_setormanut'):
             params['descr_setormanut'] = request.GET.get('descr_setormanut')
         url = reverse('associar_manutentor_maquina')
@@ -15355,21 +15371,14 @@ def associar_manutentor_maquina(request):
             url += '?' + urlencode(params)
         return redirect(url)
 
-    # Dados para preview (JSON) - usar estrutura simples para evitar erros no template
-    manutentores_json = {str(m.Matricula): m.Nome or 'Sem nome' for m in manutentores}
-    maquinas_json = {str(m.id): {'cd_maquina': str(m.cd_maquina), 'descr_maquina': (m.descr_maquina or 'Sem descrição')} for m in maquinas}
-    ids_principais_com_secundarias = set(secundarias_por_principal.keys())
-
     context = {
         'page_title': 'Associar Manutentor e Máquina',
         'active_page': 'associar_manutentor_maquina',
         'manutentores': manutentores,
-        'maquinas': maquinas,
-        'opcoes_gerenc': opcoes_gerenc,
+        'maquinas_principais': maquinas_principais,
         'opcoes_setormanut': opcoes_setormanut,
-        'filter_gerenc': filter_gerenc,
         'filter_setormanut': filter_setormanut,
-        'ids_principais_com_secundarias': ids_principais_com_secundarias,
+        'secundarias_por_principal': secundarias_por_principal,
     }
     return render(request, 'manutentor/associar_manutentor_maquina.html', context)
 
@@ -16498,12 +16507,61 @@ def analise_mao_de_obra_preventiva(request):
     }
 
     # Análise de capacidade vs trabalho alocado (Manutentor + PlanoPreventiva)
+    # quantidade_periodo = intervalo em dias entre execuções (ex: 28 = a cada 28 dias, 56 = a cada 56 dias)
+    # dt_execucao = data de referência (DD/MM/YYYY) para saber em que meses a tarefa realmente ocorre
     try:
         default_horas_tarefa = float(ParametrosMaoDeObra.get_solo().tempo_padrao_inspecao_preventiva_horas)
     except Exception:
         default_horas_tarefa = 0.5
-    DIAS_POR_MES = 30
-    SEMANAS_POR_MES = 4.33
+    from datetime import date, timedelta
+    DIAS_POR_ANO = 365
+    SEMANAS_POR_ANO = 52
+    MESES_POR_ANO = 12
+    SEMANAS_POR_MES = SEMANAS_POR_ANO / MESES_POR_ANO  # 4.33
+    ano_simulacao = ano_filtro if ano_filtro else hoje.year
+
+    def _parse_dt_execucao_plano(s):
+        """Parse dt_execucao (DD/MM/YYYY) -> date or None."""
+        if not s or not isinstance(s, str):
+            return None
+        m = re.match(r'(\d{1,2})/(\d{1,2})/(\d{2,4})', str(s).strip())
+        if not m:
+            return None
+        try:
+            dia, mes, ano = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if ano < 100:
+                ano += 2000
+            if 1 <= mes <= 12 and 1 <= dia <= 31 and 2000 <= ano <= 2100:
+                from calendar import monthrange
+                dia = min(dia, monthrange(ano, mes)[1])
+                return date(ano, mes, dia)
+        except (ValueError, TypeError):
+            pass
+        return None
+
+    def _carga_mensal_calendario(itens_tarefas, ano_ref):
+        """
+        Simula o calendário: para cada tarefa (tempo_h, periodo, dt_ref), determina
+        em que meses do ano_ref ela executa. Retorna [h_mes1, h_mes2, ..., h_mes12].
+        dt_ref vem de dt_execucao; se None, assume dia 1 do mês 1.
+        """
+        carga = [0.0] * 13
+        ano_inicio = date(ano_ref, 1, 1)
+        ano_fim = date(ano_ref, 12, 31)
+        for item in itens_tarefas:
+            tempo_h = item.get('tempo_h', 0.5)
+            periodo = max(1, int(item.get('periodo', 30)))
+            dt_ref = item.get('dt_ref')
+            if not dt_ref:
+                dt_ref = date(ano_ref, 1, 1)
+            d = dt_ref
+            while d.year < ano_ref:
+                d += timedelta(days=periodo)
+            while d <= ano_fim:
+                if d >= ano_inicio and d.year == ano_ref:
+                    carga[d.month] += tempo_h
+                d += timedelta(days=periodo)
+        return carga[1:13]
 
     secundaria_para_primaria = {}
     primaria_para_secundarias = defaultdict(set)
@@ -16530,14 +16588,22 @@ def analise_mao_de_obra_preventiva(request):
                 'descr_maquina': {},
             }
         periodo = p.quantidade_periodo or 30
-        freq_mensal = DIAS_POR_MES / max(1, periodo)
+        execs_por_ano = DIAS_POR_ANO / max(1, int(periodo))
+        freq_mensal = execs_por_ano / MESES_POR_ANO
         tempo_raw = None
         if p.roteiro_preventiva:
             tempo_raw = p.roteiro_preventiva.tempo_prev or p.roteiro_preventiva.cf_temp_prev
         tempo_h = _parse_tempo_prev_horas(tempo_raw)
         if tempo_h is None:
             tempo_h = default_horas_tarefa
-        planos_por_matricula[mat]['itens'].append({'tempo_h': tempo_h, 'freq_mensal': freq_mensal})
+        dt_ref = _parse_dt_execucao_plano(p.dt_execucao)
+        planos_por_matricula[mat]['itens'].append({
+            'tempo_h': tempo_h,
+            'freq_mensal': freq_mensal,
+            'execs_por_ano': execs_por_ano,
+            'periodo': periodo,
+            'dt_ref': dt_ref,
+        })
         trabalho_linha = tempo_h * freq_mensal
         if p.cd_maquina is not None:
             km = p.cd_maquina
@@ -16624,15 +16690,21 @@ def analise_mao_de_obra_preventiva(request):
         if hasattr(trab_maq, 'items'):
             trab_maq = dict(trab_maq)
         descr_maq_plan = planos_data.get('descr_maquina') or {}
-        trabalho_mensal = sum(item['tempo_h'] * item['freq_mensal'] for item in itens)
-        trabalho_mensal = round(trabalho_mensal, 1)
+        # Simula calendário: cada tarefa executa em meses específicos conforme dt_execucao + periodo
+        carga_mensal = _carga_mensal_calendario(itens, ano_simulacao)
+        trabalho_anual = round(sum(carga_mensal), 1)
+        trabalho_pico_mensal = round(max(carga_mensal), 1) if carga_mensal else 0.0
+        trabalho_min_mensal = round(min(carga_mensal), 1) if carga_mensal else 0.0
+        trabalho_mensal = round(trabalho_anual / MESES_POR_ANO, 1)  # média mensal
         qtd_tarefas = len(itens)
         maquinas_lista = _maquinas_plano_accordion(trab_maq, descr_maq_plan, maquina_descrs)
 
-        diferenca = round(capacidade_mensal - trabalho_mensal, 1)
+        diferenca = round(capacidade_mensal - trabalho_pico_mensal, 1)
         pct_utilizacao = round(100.0 * trabalho_mensal / capacidade_mensal, 1) if capacidade_mensal > 0 else 0
+        pct_pico = round(100.0 * trabalho_pico_mensal / capacidade_mensal, 1) if capacidade_mensal > 0 else 0
+        sobrecarregado_pico = trabalho_pico_mensal > capacidade_mensal if capacidade_mensal > 0 else False
 
-        if pct_utilizacao > 110:
+        if sobrecarregado_pico or pct_pico > 110:
             status = 'excesso'
             status_label = 'Excesso de trabalho'
         elif pct_utilizacao >= 70:
@@ -16650,6 +16722,12 @@ def analise_mao_de_obra_preventiva(request):
             'capacidade_semanal': capacidade_semanal,
             'capacidade_mensal': capacidade_mensal,
             'trabalho_mensal': trabalho_mensal,
+            'trabalho_anual': trabalho_anual,
+            'trabalho_pico_mensal': trabalho_pico_mensal,
+            'trabalho_min_mensal': trabalho_min_mensal,
+            'pct_pico': pct_pico,
+            'sobrecarregado_pico': sobrecarregado_pico,
+            'ano_simulacao': ano_simulacao,
             'qtd_tarefas': qtd_tarefas,
             'maquinas': maquinas_lista,
             'diferenca': diferenca,
@@ -16707,35 +16785,38 @@ def analise_mao_de_obra_preventiva(request):
 
 
 def analise_manutentores(request):
-    """Análise de Manutentores - Dashboard com estatísticas"""
+    """Análise de Manutentores - Dashboard com estatísticas (apenas manutentores ativos)"""
     from app.models import Manutentor, ManutentorMaquina, OrdemServicoCorretiva, OrdemServicoCorretivaFicha
     from django.db.models import Count, Q
     import json
-    
+
+    # Base: apenas manutentores ativos
+    manutentores_ativos = Manutentor.objects.filter(ativo=True)
+
     # Estatísticas básicas
-    total_count = Manutentor.objects.count()
-    
+    total_count = manutentores_ativos.count()
+
     # Contagem por turno (A, B, C no campo turno) e local (Externa, Civil no campo local_trab)
-    turno_a_count = Manutentor.objects.filter(Q(turno__iexact='Turno A') | Q(turno__iexact='A')).count()
-    turno_b_count = Manutentor.objects.filter(Q(turno__iexact='Turno B') | Q(turno__iexact='B')).count()
-    turno_c_count = Manutentor.objects.filter(Q(turno__iexact='Turno C') | Q(turno__iexact='C')).count()
-    externa_count = Manutentor.objects.filter(local_trab__iexact='Externa').count()
-    civil_count = Manutentor.objects.filter(local_trab__iexact='Civil').count()
-    frigorifico_count = Manutentor.objects.filter(local_trab__iexact='Frigorífico').count()
-    industria_count = Manutentor.objects.filter(local_trab__iexact='Industria').count()
-    
+    turno_a_count = manutentores_ativos.filter(Q(turno__iexact='Turno A') | Q(turno__iexact='A')).count()
+    turno_b_count = manutentores_ativos.filter(Q(turno__iexact='Turno B') | Q(turno__iexact='B')).count()
+    turno_c_count = manutentores_ativos.filter(Q(turno__iexact='Turno C') | Q(turno__iexact='C')).count()
+    externa_count = manutentores_ativos.filter(local_trab__iexact='Externa').count()
+    civil_count = manutentores_ativos.filter(local_trab__iexact='Civil').count()
+    frigorifico_count = manutentores_ativos.filter(local_trab__iexact='Frigorífico').count()
+    industria_count = manutentores_ativos.filter(local_trab__iexact='Industria').count()
+
     # Manutentores com máquinas relacionadas (usado em outras partes)
-    manutentores_com_maquinas = Manutentor.objects.filter(
+    manutentores_com_maquinas = manutentores_ativos.filter(
         maquinas__isnull=False
     ).distinct().count()
     percentual_com_maquinas = (manutentores_com_maquinas / total_count * 100) if total_count > 0 else 0
     
-    # Total de máquinas relacionadas
-    total_maquinas_relacionadas = ManutentorMaquina.objects.count()
-    
+    # Total de máquinas relacionadas (apenas de manutentores ativos)
+    total_maquinas_relacionadas = ManutentorMaquina.objects.filter(manutentor__ativo=True).count()
+
     # Manutentores com manutenções (via OrdemServicoCorretiva ou Fichas)
-    # Buscar nomes de manutentores e contar ordens/fichas que correspondem
-    manutentores_nomes = Manutentor.objects.values_list('Nome', flat=True).exclude(Nome__isnull=True).exclude(Nome='')
+    # Buscar nomes de manutentores ativos e contar ordens/fichas que correspondem
+    manutentores_nomes = manutentores_ativos.values_list('Nome', flat=True).exclude(Nome__isnull=True).exclude(Nome='')
     manutentores_com_manutencoes = 0
     total_manutencoes_relacionadas = 0
     
@@ -16751,12 +16832,12 @@ def analise_manutentores(request):
         total_manutencoes_relacionadas += ordens_count + fichas_count
     
     # Distribuição por Turno
-    turnos_data_dict = Manutentor.objects.values('turno').annotate(total=Count('Matricula')).order_by('-total')
+    turnos_data_dict = manutentores_ativos.values('turno').annotate(total=Count('Matricula')).order_by('-total')
     turnos_labels = [item['turno'] or 'Não informado' for item in turnos_data_dict]
     turnos_data = [item['total'] for item in turnos_data_dict]
     
     # Distribuição por Local de Trabalho
-    locais_data_dict = Manutentor.objects.values('local_trab').annotate(total=Count('Matricula')).order_by('-total')
+    locais_data_dict = manutentores_ativos.values('local_trab').annotate(total=Count('Matricula')).order_by('-total')
     locais_labels = [item['local_trab'] or 'Não informado' for item in locais_data_dict]
     locais_data = [item['total'] for item in locais_data_dict]
     
@@ -16764,7 +16845,7 @@ def analise_manutentores(request):
     distribuicao_maquinas_labels = ['0 máquinas', '1 máquina', '2 máquinas', '3 máquinas', '4 máquinas', '5 máquinas', '6-10 máquinas', '11-15 máquinas', '16+ máquinas']
     distribuicao_maquinas_data = [0, 0, 0, 0, 0, 0, 0, 0, 0]
     
-    for manutentor in Manutentor.objects.all():
+    for manutentor in manutentores_ativos:
         qtd_maquinas = ManutentorMaquina.objects.filter(manutentor=manutentor).count()
         if qtd_maquinas == 0:
             distribuicao_maquinas_data[0] += 1
@@ -16786,7 +16867,7 @@ def analise_manutentores(request):
             distribuicao_maquinas_data[8] += 1
     
     # Top 10 Cargos
-    cargos_data_dict = Manutentor.objects.exclude(Cargo__isnull=True).exclude(Cargo='').values('Cargo').annotate(
+    cargos_data_dict = manutentores_ativos.exclude(Cargo__isnull=True).exclude(Cargo='').values('Cargo').annotate(
         total=Count('Matricula')
     ).order_by('-total')[:10]
     cargos_labels = [item['Cargo'][:30] for item in cargos_data_dict]
@@ -16794,7 +16875,7 @@ def analise_manutentores(request):
     
     # Top 10 Manutentores por Quantidade de Máquinas
     top_manutentores_maquinas = []
-    for manutentor in Manutentor.objects.all():
+    for manutentor in manutentores_ativos:
         qtd_maquinas = ManutentorMaquina.objects.filter(manutentor=manutentor).count()
         if qtd_maquinas > 0:
             top_manutentores_maquinas.append({
@@ -16805,7 +16886,7 @@ def analise_manutentores(request):
     
     # Top 10 Manutentores por Quantidade de Manutenções
     top_manutentores_manutencoes = []
-    for manutentor in Manutentor.objects.all():
+    for manutentor in manutentores_ativos:
         if manutentor.Nome:
             ordens_count = OrdemServicoCorretiva.objects.filter(
                 Q(nm_func_exec__icontains=manutentor.Nome)
@@ -16900,6 +16981,77 @@ def consultar_associacao_manutentor_maquina(request):
 
 def visualizar_manutentor(request, matricula):
     """Visualizar detalhes de um manutentor específico"""
+    import unicodedata
+    from app.models import Manutentor, ManutentorMaquina, Maquina, MaquinaPrimariaSecundaria
+
+    def _descr_gerenc_norm(s):
+        if s is None or s == '':
+            return ''
+        return unicodedata.normalize('NFKC', str(s)).strip().upper()
+
+    try:
+        manutentor = Manutentor.objects.get(Matricula=matricula)
+    except Manutentor.DoesNotExist:
+        messages.error(request, 'Manutentor não encontrado.')
+        return redirect('consultar_manutentores')
+
+    # Buscar máquinas relacionadas (ManutentorMaquina)
+    maquinas_relacionadas = ManutentorMaquina.objects.filter(manutentor=manutentor).select_related('maquina')
+    maquinas_ids_relacionadas = list(maquinas_relacionadas.values_list('maquina_id', flat=True))
+    maquinas_disponiveis = Maquina.objects.exclude(id__in=maquinas_ids_relacionadas).order_by('cd_maquina')
+
+    # Construir primarias_com_secundarias (accordion): agrupar por Máquina Principal
+    # 1) Encontrar principals relevantes: direct (manutentor associado) ou via secundárias
+    ids_principals = set()
+    secundaria_to_primaria = {}  # maquina_secundaria_id -> maquina_primaria
+    for rel in MaquinaPrimariaSecundaria.objects.select_related('maquina_primaria', 'maquina_secundaria'):
+        secundaria_to_primaria[rel.maquina_secundaria_id] = rel.maquina_primaria
+
+    for mm in maquinas_relacionadas:
+        maq = mm.maquina
+        # Prioridade: MaquinaPrimariaSecundaria define a hierarquia real
+        # Se é secundária na tabela, SEMPRE usar a principal (nunca criar accordion para secundária)
+        if maq.id in secundaria_to_primaria:
+            ids_principals.add(secundaria_to_primaria[maq.id].id)
+        elif _descr_gerenc_norm(maq.descr_gerenc) == 'MÁQUINAS PRINCIPAL':
+            ids_principals.add(maq.id)
+        # Máquinas sem classificação MÁQUINAS PRINCIPAL e sem vínculo secundária: não incluídas no accordion
+
+    # 2) Buscar secundárias por principal
+    rels = MaquinaPrimariaSecundaria.objects.filter(
+        maquina_primaria_id__in=ids_principals
+    ).select_related('maquina_primaria', 'maquina_secundaria').order_by('maquina_secundaria__cd_maquina')
+
+    rel_por_primaria = {}
+    for r in rels:
+        if r.maquina_primaria_id not in rel_por_primaria:
+            rel_por_primaria[r.maquina_primaria_id] = []
+        rel_por_primaria[r.maquina_primaria_id].append(r.maquina_secundaria)
+
+    # 3) Ordenar principals e montar estrutura; apenas MÁQUINAS PRINCIPAL no accordion
+    # Listar TODAS as secundárias de cada principal (de MaquinaPrimariaSecundaria), dentro do accordion
+    principals_ordenados = Maquina.objects.filter(id__in=ids_principals).order_by('cd_maquina')
+    primarias_com_secundarias = []
+    for p in principals_ordenados:
+        if _descr_gerenc_norm(p.descr_gerenc) != 'MÁQUINAS PRINCIPAL':
+            continue  # Só incluir MÁQUINAS PRINCIPAL na lista de accordions
+        todas_secundarias = rel_por_primaria.get(p.id, [])
+        primarias_com_secundarias.append({'primaria': p, 'secundarias': todas_secundarias})
+
+    context = {
+        'page_title': f'Visualizar Manutentor {manutentor.Matricula}',
+        'active_page': 'consultar_manutentores',
+        'manutentor': manutentor,
+        'maquinas_relacionadas': maquinas_relacionadas,
+        'maquinas_disponiveis': maquinas_disponiveis,
+        'primarias_com_secundarias': primarias_com_secundarias,
+    }
+    return render(request, 'visualizar/visualizar_manutentor.html', context)
+
+
+def editar_manutentor(request, matricula):
+    """Editar um manutentor existente"""
+    from app.forms import ManutentorForm
     from app.models import Manutentor, ManutentorMaquina, Maquina
     
     try:
@@ -16908,33 +17060,12 @@ def visualizar_manutentor(request, matricula):
         messages.error(request, 'Manutentor não encontrado.')
         return redirect('consultar_manutentores')
     
-    # Buscar máquinas relacionadas
+    # Máquinas do manutentor e primárias disponíveis para o formulário de adicionar
     maquinas_relacionadas = ManutentorMaquina.objects.filter(manutentor=manutentor).select_related('maquina')
-    
-    # Buscar máquinas já relacionadas para excluir da lista de disponíveis
-    maquinas_ids_relacionadas = maquinas_relacionadas.values_list('maquina_id', flat=True)
-    maquinas_disponiveis = Maquina.objects.exclude(id__in=maquinas_ids_relacionadas).order_by('cd_maquina')
-    
-    context = {
-        'page_title': f'Visualizar Manutentor {manutentor.Matricula}',
-        'active_page': 'consultar_manutentores',
-        'manutentor': manutentor,
-        'maquinas_relacionadas': maquinas_relacionadas,
-        'maquinas_disponiveis': maquinas_disponiveis,
-    }
-    return render(request, 'visualizar/visualizar_manutentor.html', context)
-
-
-def editar_manutentor(request, matricula):
-    """Editar um manutentor existente"""
-    from app.forms import ManutentorForm
-    from app.models import Manutentor
-    
-    try:
-        manutentor = Manutentor.objects.get(Matricula=matricula)
-    except Manutentor.DoesNotExist:
-        messages.error(request, 'Manutentor não encontrado.')
-        return redirect('consultar_manutentores')
+    maquinas_ids_relacionadas = list(maquinas_relacionadas.values_list('maquina_id', flat=True))
+    maquinas_primarias_disponiveis = Maquina.objects.filter(
+        descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
+    ).exclude(id__in=maquinas_ids_relacionadas).order_by('cd_maquina')
     
     if request.method == 'POST':
         # Garantir que a Matricula não seja alterada (é a primary key)
@@ -16966,6 +17097,8 @@ def editar_manutentor(request, matricula):
         'active_page': 'consultar_manutentores',
         'form': form,
         'manutentor': manutentor,
+        'maquinas_relacionadas': maquinas_relacionadas,
+        'maquinas_primarias_disponiveis': maquinas_primarias_disponiveis,
     }
     return render(request, 'editar/editar_manutentor.html', context)
 
@@ -17013,13 +17146,8 @@ def consultar_manutentores(request):
     if filtro_cargo:
         manutentores_list = manutentores_list.filter(Cargo__icontains=filtro_cargo)
     
-    # Ordenar por nome e matricula
-    manutentores_list = manutentores_list.order_by('Nome', 'Matricula')
-    
-    # Paginação
-    paginator = Paginator(manutentores_list, 50)  # 50 itens por página
-    page_number = request.GET.get('page', 1)
-    manutentores = paginator.get_page(page_number)
+    # Ordenar por nome e matricula (sem paginação - mostrar todos na mesma página)
+    manutentores = manutentores_list.order_by('Nome', 'Matricula')
     
     # Estatísticas
     total_count = Manutentor.objects.count()
@@ -17050,7 +17178,7 @@ def consultar_manutentores(request):
     filtro_posto = request.GET.get('filtro_posto', '')
     data_admissao_inicio = request.GET.get('data_admissao_inicio', '')
     data_admissao_fim = request.GET.get('data_admissao_fim', '')
-    tipos_count = turnos_count  # fallback (Manutentor não tem tipo)
+    cargos_count = len(cargos_unicos) if cargos_unicos else 0
 
     context = {
         'page_title': 'Consultar Manutentores',
@@ -17059,7 +17187,7 @@ def consultar_manutentores(request):
         'total_count': total_count,
         'turnos_count': turnos_count,
         'locais_count': locais_count,
-        'tipos_count': tipos_count,
+        'cargos_count': cargos_count,
         # Valores para dropdowns (do banco de dados)
         'turnos': [(t, t) for t in turnos_unicos],
         'locais_trabalho': [(l, l) for l in locais_unicos],
@@ -18271,7 +18399,53 @@ def remover_maquina_manutentor(request, matricula, manutentor_maquina_id):
         messages.error(request, f'Erro ao remover máquina: {str(e)}')
         print(f"Erro ao remover máquina: {error_detail}")  # Debug
     
-    return redirect('visualizar_manutentor', cadastro=cadastro)
+    return redirect('visualizar_manutentor', matricula=matricula)
+
+
+def desassociar_principal_manutentor(request, matricula):
+    """Desassociar uma Máquina Principal e todas as suas Secundárias de um manutentor"""
+    from app.models import Manutentor, ManutentorMaquina, MaquinaPrimariaSecundaria
+
+    if request.method != 'POST':
+        messages.error(request, 'Método não permitido.')
+        return redirect('visualizar_manutentor', matricula=matricula)
+
+    try:
+        manutentor = Manutentor.objects.get(Matricula=matricula)
+    except Manutentor.DoesNotExist:
+        messages.error(request, 'Manutentor não encontrado.')
+        return redirect('consultar_manutentores')
+
+    maquina_primaria_id = request.POST.get('maquina_primaria_id')
+    if not maquina_primaria_id:
+        messages.error(request, 'ID da máquina principal não informado.')
+        return redirect('visualizar_manutentor', matricula=matricula)
+
+    try:
+        maquina_primaria_id = int(maquina_primaria_id)
+    except (ValueError, TypeError):
+        messages.error(request, 'ID da máquina inválido.')
+        return redirect('visualizar_manutentor', matricula=matricula)
+
+    # Remover associação da máquina principal
+    removed_count = ManutentorMaquina.objects.filter(
+        manutentor=manutentor, maquina_id=maquina_primaria_id
+    ).delete()[0]
+
+    # Remover associações das máquinas secundárias desta principal
+    secundarias_ids = MaquinaPrimariaSecundaria.objects.filter(
+        maquina_primaria_id=maquina_primaria_id
+    ).values_list('maquina_secundaria_id', flat=True)
+    removed_count += ManutentorMaquina.objects.filter(
+        manutentor=manutentor, maquina_id__in=list(secundarias_ids)
+    ).delete()[0]
+
+    if removed_count > 0:
+        messages.success(request, f'Associação removida com sucesso ({removed_count} máquina(s) desassociada(s)).')
+    else:
+        messages.warning(request, 'Nenhuma associação encontrada para remover.')
+
+    return redirect('visualizar_manutentor', matricula=matricula)
 
 
 def remover_peca_maquina(request, maquina_id, peca_id):

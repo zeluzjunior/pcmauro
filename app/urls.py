@@ -170,6 +170,7 @@ urlpatterns = [
     path('manutentor/editar/<str:matricula>/', views.editar_manutentor, name="editar_manutentor"),
     path('manutentor/<str:matricula>/adicionar-maquina/', views.adicionar_maquina_manutentor, name="adicionar_maquina_manutentor"),
     path('manutentor/<str:matricula>/remover-maquina/<int:manutentor_maquina_id>/', views.remover_maquina_manutentor, name="remover_maquina_manutentor"),
+    path('manutentor/<str:matricula>/desassociar-principal/', views.desassociar_principal_manutentor, name="desassociar_principal_manutentor"),
     
     # Manutenção Terceiro
     path('manutencao-terceiro/cadastrar/', views.cadastrar_manutencao_terceiro, name="cadastrar_manutencao_terceiro"),
@@ -199,6 +200,7 @@ urlpatterns = [
     
     # API Endpoints
     path('api/search-maquinas/', views.api_search_maquinas, name="api_search_maquinas"),
+    path('api/maquina-primaria/<int:maquina_id>/secundarias/', views.api_maquina_primaria_secundarias, name="api_maquina_primaria_secundarias"),
     path('api/search-planos-pcm/', views.api_search_planos_pcm, name="api_search_planos_pcm"),
     path('api/salvar-agendamentos-cronograma/', views.salvar_agendamentos_cronograma, name="salvar_agendamentos_cronograma"),
     path('api/dados-diarios-requisicoes/', views.api_dados_diarios_requisicoes, name="api_dados_diarios_requisicoes"),
