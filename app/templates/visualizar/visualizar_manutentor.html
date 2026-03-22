@@ -136,6 +136,16 @@
                                     {% endif %}
                                 </p>
                             </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Horas Semanais</label>
+                                <p class="form-control-plaintext">
+                                    {% if manutentor.horas_semanais %}
+                                        <span class="badge bg-secondary">{{ manutentor.horas_semanais }}h/semana</span>
+                                    {% else %}
+                                        Não informado
+                                    {% endif %}
+                                </p>
+                            </div>
                         </div>
                             </div>
                         </div>

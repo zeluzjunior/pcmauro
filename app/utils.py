@@ -121,6 +121,34 @@ def _detect_plano_preventiva_p_q_r_indices(header_cells: List[str]) -> Tuple[int
     return idx_p, idx_q, idx_r
 
 
+def _is_bc_only_row(stripped: List[str], idx_b: int = 1, idx_c: int = 2) -> bool:
+    """
+    Retorna True se a linha tem dados APENAS nas colunas B e C:
+    B com números, C com nome (texto). Todas as outras colunas vazias.
+    """
+    if len(stripped) <= max(idx_b, idx_c):
+        return False
+    b_val = (stripped[idx_b] if idx_b < len(stripped) else '').strip()
+    c_val = (stripped[idx_c] if idx_c < len(stripped) else '').strip()
+    if not b_val or not c_val:
+        return False
+    b_clean = b_val.replace(',', '.').replace(' ', '').replace('\u00a0', '')
+    try:
+        float(b_clean)
+        b_is_num = True
+    except ValueError:
+        b_is_num = False
+    if not b_is_num:
+        return False
+    c_has_letter = any(c.isalpha() for c in c_val)
+    if not c_has_letter:
+        return False
+    for i, v in enumerate(stripped):
+        if i != idx_b and i != idx_c and (v and str(v).strip()):
+            return False
+    return True
+
+
 def clean_plano_preventiva_delimitado_csv(text: str, delimiter: str = ';') -> Tuple[str, Dict[str, int]]:
     """
     Remove linhas inválidas do export PLANO_PREVENTIVA_DELIMITADO (CSV com ;).
@@ -143,6 +171,7 @@ def clean_plano_preventiva_delimitado_csv(text: str, delimiter: str = ';') -> Tu
     removed_blank = 0
     total_in = 0
 
+    removed_bc_only = 0
     for row in reader:
         total_in += 1
         cells = [str(c) if c is not None else '' for c in row]
@@ -152,6 +181,10 @@ def clean_plano_preventiva_delimitado_csv(text: str, delimiter: str = ';') -> Tu
             removed_blank += 1
             continue
 
+        if _is_bc_only_row(stripped):
+            removed_bc_only += 1
+            continue
+
         rows_out.append(cells)
 
     if not rows_out:
@@ -159,7 +192,7 @@ def clean_plano_preventiva_delimitado_csv(text: str, delimiter: str = ';') -> Tu
         return buf.getvalue(), {
             'total_in': total_in,
             'removed_blank': removed_blank,
-            'removed_bc_only': 0,
+            'removed_bc_only': removed_bc_only,
             'kept': 0,
             'adjusted_pq_rows': 0,
             'skipped_pq_nonempty_p': 0,
@@ -196,7 +229,7 @@ def clean_plano_preventiva_delimitado_csv(text: str, delimiter: str = ';') -> Tu
     stats = {
         'total_in': total_in,
         'removed_blank': removed_blank,
-        'removed_bc_only': 0,
+        'removed_bc_only': removed_bc_only,
         'kept': len(rows_out),
         'adjusted_pq_rows': adjusted_pq_rows,
         'skipped_pq_nonempty_p': skipped_pq_nonempty_p,
@@ -2742,7 +2775,7 @@ def _score_plano_preventiva_csv_rows(data: List[Dict]) -> int:
 
             npi = _safe_int(_v('NUMERO_PLANO', 'numero_plano', 'Plano') or _vn('plano'))
             mqi = _safe_int(_v('CD_MAQUINA', 'cd_maquina', 'Máquina', 'Maquina') or _vn('maquina'))
-            if npi and mqi:
+            if npi is not None and mqi is not None:
                 score += 1
         except Exception:
             continue
@@ -2890,11 +2923,19 @@ def upload_plano_preventiva_from_file(file, update_existing=False) -> Tuple[int,
                     dt_execucao = _format_dt_execucao_plano(data_execucao_raw)
                     
                     # Validar campos obrigatórios (Plano e Máquina para identificar unicamente)
-                    if not numero_plano:
+                    # Usar 'is None' para aceitar 0 como valor válido (ex: cd_maquina=0, numero_plano=0)
+                    if numero_plano is None:
+                        # Pular linhas malformadas (ex: apenas código e nome de funcionário em colunas erradas)
+                        non_empty = [str(v).strip() for v in row_data.values() if v and str(v).strip()]
+                        if len(non_empty) <= 2 and all(
+                            (s.isdigit() and len(s) >= 4) or (not s.isdigit() and len(s) > 3)
+                            for s in non_empty
+                        ):
+                            continue  # Linha malformada ignorada
                         errors.append(f"Linha {row_num}: Campo 'Plano' ou 'NUMERO_PLANO' é obrigatório")
                         continue
                     
-                    if not cd_maquina:
+                    if cd_maquina is None:
                         errors.append(f"Linha {row_num}: Campo 'Máquina' ou 'CD_MAQUINA' é obrigatório")
                         continue
                     

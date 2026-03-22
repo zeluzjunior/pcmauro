@@ -1362,60 +1362,53 @@ def testes(request):
 
 
 def analise_plano_preventiva(request):
-    """Análise agregada dos dados da tabela PlanoPreventiva (filtro por ano/mês em dt_execução DD/MM/AAAA)."""
+    """Análise agregada dos dados da tabela PlanoPreventiva (filtros por descr_setor e nome_funcionario)."""
     import json
-    from datetime import datetime as dt
+    import re
     from django.db.models import Count, Q
-    from app.models import PlanoPreventiva
+    from app.models import PlanoPreventiva, Manutentor, LOCAL_TRABALHO, TURNO
 
-    ano_filtro = request.GET.get('ano', None)
-    hoje = dt.now()
-    if not ano_filtro:
-        ano_filtro = str(hoje.year)
-    try:
-        ano_filtro = int(ano_filtro)
-    except (ValueError, TypeError):
-        ano_filtro = hoje.year
+    qs = PlanoPreventiva.objects.all()
 
-    meses_filtro = request.GET.getlist('mes')
-    meses_filtro_int = []
-    for mes in meses_filtro:
-        try:
-            m = int(mes)
-            if 1 <= m <= 12:
-                meses_filtro_int.append(m)
-        except (ValueError, TypeError):
-            pass
-    meses_filtro_int = sorted(set(meses_filtro_int))
-    if not meses_filtro_int:
-        meses_filtro_int = list(range(1, 13))
+    filter_descr_setor = request.GET.get('filter_descr_setor', '').strip()
+    filter_nome_funcionario = request.GET.get('filter_nome_funcionario', '').strip()
+    if filter_descr_setor:
+        qs = qs.filter(descr_setor__icontains=filter_descr_setor)
+    if filter_nome_funcionario:
+        qs = qs.filter(nome_funcionario__icontains=filter_nome_funcionario)
 
     meses_nomes = {
         1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 5: 'Maio', 6: 'Junho',
         7: 'Julho', 8: 'Agosto', 9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
     }
 
-    q_data = Q()
-    for mes in meses_filtro_int:
-        padrao = f'/{mes:02d}/{ano_filtro}'
-        q_data |= Q(dt_execucao__icontains=padrao)
-    qs = PlanoPreventiva.objects.filter(q_data)
-
     total_registros = qs.count()
     total_cadastro = PlanoPreventiva.objects.count()
     maquinas_distintas = qs.exclude(cd_maquina__isnull=True).values('cd_maquina').distinct().count()
     setores_distintos = qs.exclude(cd_setor__isnull=True).exclude(cd_setor='').values('cd_setor').distinct().count()
-    unidades_distintas = qs.exclude(cd_unid__isnull=True).values('cd_unid').distinct().count()
 
     com_roteiro = qs.filter(roteiro_preventiva__isnull=False).count()
     sem_roteiro = qs.filter(roteiro_preventiva__isnull=True).count()
     pct_roteiro = round(100.0 * com_roteiro / total_registros, 1) if total_registros else 0.0
 
-    meses_labels = [meses_nomes[m] for m in meses_filtro_int]
-    meses_counts = []
-    for m in meses_filtro_int:
-        padrao = f'/{m:02d}/{ano_filtro}'
-        meses_counts.append(qs.filter(dt_execucao__icontains=padrao).count())
+    # Volume por período (ano-mês) a partir de dt_execucao (DD/MM/YYYY)
+    period_keys = set()
+    for val in qs.exclude(dt_execucao__isnull=True).exclude(dt_execucao='').values_list('dt_execucao', flat=True).distinct():
+        s = str(val or '').strip()
+        m = re.match(r'(\d{1,2})/(\d{1,2})/(\d{2,4})', s)
+        if m:
+            try:
+                mes, ano = int(m.group(2)), int(m.group(3))
+                if ano < 100:
+                    ano += 2000
+                if 1 <= mes <= 12 and 2010 <= ano <= 2040:
+                    period_keys.add((ano, mes))
+            except (ValueError, TypeError):
+                pass
+    sorted_periods = sorted(period_keys, reverse=True)[:24]
+    sorted_periods.reverse()
+    meses_labels = [f"{meses_nomes.get(m, str(m))[:3]}/{y}" for y, m in sorted_periods]
+    meses_counts = [qs.filter(dt_execucao__icontains=f'/{m:02d}/{y}').count() for y, m in sorted_periods]
 
     top_setores = list(
         qs.exclude(cd_setor__isnull=True).exclude(cd_setor='')
@@ -1467,6 +1460,16 @@ def analise_plano_preventiva(request):
             maquinas_labels.append(str(x['cd_maquina']))
     maquinas_data = [x['c'] for x in top_maquinas]
 
+    top_funcionarios = list(
+        qs.exclude(nome_funcionario__isnull=True)
+        .exclude(nome_funcionario='')
+        .values('nome_funcionario')
+        .annotate(c=Count('id'))
+        .order_by('-c')[:20]
+    )
+    funcionarios_labels = [x['nome_funcionario'][:50] for x in top_funcionarios]
+    funcionarios_data = [x['c'] for x in top_funcionarios]
+
     sem_periodo = qs.filter(quantidade_periodo__isnull=True).count()
     p_le_30 = qs.filter(quantidade_periodo__isnull=False, quantidade_periodo__lte=30).count()
     p31_90 = qs.filter(quantidade_periodo__gte=31, quantidade_periodo__lte=90).count()
@@ -1476,33 +1479,171 @@ def analise_plano_preventiva(request):
     periodo_labels = ['≤30 dias', '31–90', '91–180', '>180', 'Não informado']
     periodo_data = [p_le_30, p31_90, p91_180, p_gt_180, sem_periodo]
 
-    anos_disponiveis = set()
-    for val in PlanoPreventiva.objects.exclude(dt_execucao__isnull=True).exclude(dt_execucao='').values_list('dt_execucao', flat=True).distinct()[:2000]:
-        s = str(val or '').strip()
-        if '/' in s:
-            parts = s.split('/')
-            if len(parts) >= 3:
-                try:
-                    yr = parts[2]
-                    ano_y = int(yr) if len(yr) == 4 else (2000 + int(yr)) if len(yr) == 2 else None
-                    if ano_y and 2010 <= ano_y <= 2040:
-                        anos_disponiveis.add(ano_y)
-                except (ValueError, TypeError):
-                    pass
-    anos_disponiveis = sorted(anos_disponiveis, reverse=True) if anos_disponiveis else [hoje.year]
+    setores_opcoes = list(
+        PlanoPreventiva.objects.exclude(descr_setor__isnull=True)
+        .exclude(descr_setor='')
+        .values_list('descr_setor', flat=True)
+        .distinct()
+        .order_by('descr_setor')[:200]
+    )
+    funcionarios_opcoes = list(
+        PlanoPreventiva.objects.exclude(nome_funcionario__isnull=True)
+        .exclude(nome_funcionario='')
+        .values_list('nome_funcionario', flat=True)
+        .distinct()
+        .order_by('nome_funcionario')[:200]
+    )
+
+    # Análise por local_trab: seções baseadas em local_trab da tabela Manutentor
+    # Dentro de cada local_trab: subdivisão por turno (accordions aninhados)
+    # Matricula (Manutentor) = cd_funcionario (PlanoPreventiva) — mesma fonte de dados
+    local_trab_distintos = [
+        lt for lt in Manutentor.objects.filter(ativo=True)
+        .values_list('local_trab', flat=True)
+        .distinct()
+        .order_by('local_trab')
+        if lt is not None and str(lt).strip()
+    ]
+    local_trab_labels_map = dict(LOCAL_TRABALHO)
+    turno_labels_map = dict(TURNO)
+    turno_aliases = {'A': 'Turno A', 'B': 'Turno B', 'C': 'Turno C'}
+    analise_local_trab = []
+    for local_code in local_trab_distintos:
+        local_label = local_trab_labels_map.get(local_code, local_code)
+        manutentores = Manutentor.objects.filter(local_trab=local_code, ativo=True).order_by('turno', 'Nome')
+        turnos_na_tabela = []
+        seen = set()
+        for m in manutentores:
+            t = m.turno or 'Sem turno'
+            t_norm = str(t).strip()
+            if t_norm and t_norm not in seen:
+                seen.add(t_norm)
+                turnos_na_tabela.append(t_norm)
+        turnos_data = []
+        for turno_code in turnos_na_tabela:
+            turno_label = turno_labels_map.get(turno_code) or turno_aliases.get(turno_code, turno_code)
+            if turno_code == 'Sem turno':
+                turno_manutentores = Manutentor.objects.filter(local_trab=local_code, ativo=True).filter(Q(turno__isnull=True) | Q(turno='')).order_by('Nome')
+            else:
+                turno_manutentores = Manutentor.objects.filter(local_trab=local_code, turno=turno_code, ativo=True).order_by('Nome')
+            manutentores_data = []
+            for m in turno_manutentores:
+                planos_qs = qs.filter(cd_funcionario=m.Matricula)
+                count = planos_qs.count()
+                manutentores_data.append({
+                    'manutentor': m,
+                    'count': count,
+                    'planos': list(planos_qs.select_related('maquina').order_by('cd_maquina', 'numero_plano')[:30]),
+                })
+            total_turno = sum(d['count'] for d in manutentores_data)
+            turnos_data.append({
+                'turno_code': turno_code,
+                'turno_label': turno_label,
+                'manutentores_data': manutentores_data,
+                'total_planos': total_turno,
+            })
+        total_local = sum(t['total_planos'] for t in turnos_data)
+        analise_local_trab.append({
+            'local_code': local_code,
+            'local_label': local_label,
+            'turnos_data': turnos_data,
+            'total_planos': total_local,
+            'total_manutentores': sum(len(t['manutentores_data']) for t in turnos_data),
+        })
+
+    local_trab_labels = [item['local_label'] for item in analise_local_trab]
+    local_trab_data = [item['total_planos'] for item in analise_local_trab]
+
+    # Análise por turno: seções baseadas em turno da tabela Manutentor
+    # Dentro de cada turno: subdivisão por local_trab (estrutura espelhada da análise por local)
+    turno_distintos_raw = list(
+        Manutentor.objects.filter(ativo=True)
+        .values_list('turno', flat=True)
+        .distinct()
+        .order_by('turno')
+    )
+    turno_distintos = []
+    seen_turno = set()
+    for t in turno_distintos_raw:
+        t_norm = (t or 'Sem turno')
+        t_str = str(t_norm).strip()
+        if t_str and t_str not in seen_turno:
+            seen_turno.add(t_str)
+            turno_distintos.append(t_str)
+    analise_turno = []
+    for turno_code in turno_distintos:
+        turno_label = turno_labels_map.get(turno_code) or turno_aliases.get(turno_code, turno_code)
+        if turno_code == 'Sem turno':
+            manutentores_turno = Manutentor.objects.filter(ativo=True).filter(Q(turno__isnull=True) | Q(turno='')).order_by('local_trab', 'Nome')
+        else:
+            manutentores_turno = Manutentor.objects.filter(turno=turno_code, ativo=True).order_by('local_trab', 'Nome')
+        locais_na_tabela = []
+        seen_loc = set()
+        for m in manutentores_turno:
+            lt = m.local_trab
+            lt_norm = str(lt).strip() if lt else ''
+            if lt_norm and lt_norm not in seen_loc:
+                seen_loc.add(lt_norm)
+                locais_na_tabela.append(lt_norm)
+        locais_data = []
+        for local_code in locais_na_tabela:
+            local_label = local_trab_labels_map.get(local_code, local_code)
+            if turno_code == 'Sem turno':
+                local_manutentores = Manutentor.objects.filter(local_trab=local_code, ativo=True).filter(Q(turno__isnull=True) | Q(turno='')).order_by('Nome')
+            else:
+                local_manutentores = Manutentor.objects.filter(turno=turno_code, local_trab=local_code, ativo=True).order_by('Nome')
+            manutentores_data = []
+            for m in local_manutentores:
+                planos_qs = qs.filter(cd_funcionario=m.Matricula)
+                count = planos_qs.count()
+                manutentores_data.append({
+                    'manutentor': m,
+                    'count': count,
+                    'planos': list(planos_qs.select_related('maquina').order_by('cd_maquina', 'numero_plano')[:30]),
+                })
+            total_local = sum(d['count'] for d in manutentores_data)
+            locais_data.append({
+                'local_code': local_code,
+                'local_label': local_label,
+                'manutentores_data': manutentores_data,
+                'total_planos': total_local,
+            })
+        total_turno = sum(l['total_planos'] for l in locais_data)
+        analise_turno.append({
+            'turno_code': turno_code,
+            'turno_label': turno_label,
+            'locais_data': locais_data,
+            'total_planos': total_turno,
+            'total_manutentores': sum(len(l['manutentores_data']) for l in locais_data),
+        })
+
+    turno_labels = [item['turno_label'] for item in analise_turno]
+    turno_data = [item['total_planos'] for item in analise_turno]
+
+    # Planos sem nome_funcionario nem cd_funcionario associados
+    planos_sem_funcionario = qs.filter(
+        Q(nome_funcionario__isnull=True) | Q(nome_funcionario='')
+    ).filter(
+        Q(cd_funcionario__isnull=True) | Q(cd_funcionario='')
+    ).select_related('maquina', 'roteiro_preventiva').order_by('cd_maquina', 'numero_plano', 'sequencia_manutencao', 'sequencia_tarefa')[:500]
+    count_planos_sem_funcionario = qs.filter(
+        Q(nome_funcionario__isnull=True) | Q(nome_funcionario='')
+    ).filter(
+        Q(cd_funcionario__isnull=True) | Q(cd_funcionario='')
+    ).count()
 
     context = {
         'page_title': 'Análise de Plano Preventiva',
         'active_page': 'analise_plano_preventiva',
-        'ano_filtro': ano_filtro,
-        'meses_filtro': meses_filtro_int,
+        'filter_descr_setor': filter_descr_setor,
+        'filter_nome_funcionario': filter_nome_funcionario,
+        'setores_opcoes': setores_opcoes,
+        'funcionarios_opcoes': funcionarios_opcoes,
         'meses_nomes': meses_nomes,
-        'anos_disponiveis': anos_disponiveis,
         'total_registros': total_registros,
         'total_cadastro': total_cadastro,
         'maquinas_distintas': maquinas_distintas,
         'setores_distintos': setores_distintos,
-        'unidades_distintas': unidades_distintas,
         'com_roteiro': com_roteiro,
         'sem_roteiro': sem_roteiro,
         'pct_roteiro': pct_roteiro,
@@ -1513,10 +1654,20 @@ def analise_plano_preventiva(request):
         'setores_data_json': json.dumps(setores_data),
         'maquinas_labels_json': json.dumps(maquinas_labels, ensure_ascii=False),
         'maquinas_data_json': json.dumps(maquinas_data),
+        'funcionarios_labels_json': json.dumps(funcionarios_labels, ensure_ascii=False),
+        'funcionarios_data_json': json.dumps(funcionarios_data),
         'periodo_labels_json': json.dumps(periodo_labels, ensure_ascii=False),
         'periodo_data_json': json.dumps(periodo_data),
         'roteiro_labels_json': json.dumps(['Com roteiro vinculado', 'Sem roteiro'], ensure_ascii=False),
         'roteiro_data_json': json.dumps([com_roteiro, sem_roteiro]),
+        'planos_sem_funcionario': planos_sem_funcionario,
+        'count_planos_sem_funcionario': count_planos_sem_funcionario,
+        'analise_local_trab': analise_local_trab,
+        'local_trab_labels_json': json.dumps(local_trab_labels, ensure_ascii=False),
+        'local_trab_data_json': json.dumps(local_trab_data),
+        'analise_turno': analise_turno,
+        'turno_labels_json': json.dumps(turno_labels, ensure_ascii=False),
+        'turno_data_json': json.dumps(turno_data),
     }
     return render(request, 'preventivas/analise_plano_preventiva.html', context)
 
@@ -3656,6 +3807,7 @@ def analise_plano_preventiva_dados_delimitado(request):
                         messages.success(
                             request,
                             f'Arquivo processado: {stats["removed_blank"]} linha(s) totalmente vazia(s) removida(s). '
+                            f'{stats.get("removed_bc_only", 0)} linha(s) só com B (números) e C (nome) removida(s). '
                             f'{stats.get("adjusted_pq_rows", 0)} linha(s) com P/Q ajustadas (Q→P, R→Q quando R tinha dado e P estava vazio). '
                             f'{stats.get("skipped_pq_nonempty_p", 0)} linha(s) com R preenchido mas P já tinha dado — não alteradas. '
                             f'{stats["kept"]} linha(s) no resultado. Use o botão de download abaixo.'
@@ -5684,16 +5836,20 @@ def consultar_plano_preventiva(request):
     from django.db.models import Q, Min
     from datetime import datetime as dt
 
-    # Filtros ano e mês (igual analise-mao-de-obra/geral)
-    ano_filtro = request.GET.get('ano', None)
+    # Filtros ano e mês (igual analise-mao-de-obra/geral) - ambos permitem múltipla seleção
+    anos_filtro_raw = request.GET.getlist('ano')
     meses_filtro = request.GET.getlist('mes')
     hoje = dt.now()
-    if not ano_filtro:
-        ano_filtro = str(hoje.year)
-    try:
-        ano_filtro = int(ano_filtro)
-    except (ValueError, TypeError):
-        ano_filtro = hoje.year
+    anos_filtro_int = []
+    if anos_filtro_raw:
+        for a in anos_filtro_raw:
+            try:
+                ano_int = int(a)
+                if 2010 <= ano_int <= 2040:
+                    anos_filtro_int.append(ano_int)
+            except (ValueError, TypeError):
+                continue
+        anos_filtro_int = sorted(list(set(anos_filtro_int)))
     meses_filtro_int = []
     if meses_filtro:
         for mes in meses_filtro:
@@ -5707,6 +5863,24 @@ def consultar_plano_preventiva(request):
     if not meses_filtro_int:
         meses_filtro_int = list(range(1, 13))
 
+    # Anos disponíveis a partir de dt_execucao (precisamos antes do filtro de data)
+    anos_disponiveis_set = set()
+    for val in PlanoPreventiva.objects.exclude(dt_execucao__isnull=True).exclude(dt_execucao='').values_list('dt_execucao', flat=True).distinct()[:2000]:
+        s = str(val or '').strip()
+        if '/' in s:
+            parts = s.split('/')
+            if len(parts) >= 3:
+                try:
+                    yr = parts[2]
+                    ano = int(yr) if len(yr) == 4 else (2000 + int(yr)) if len(yr) == 2 else None
+                    if ano and 2010 <= ano <= 2040:
+                        anos_disponiveis_set.add(ano)
+                except (ValueError, TypeError):
+                    pass
+    anos_disponiveis = sorted(anos_disponiveis_set, reverse=True) if anos_disponiveis_set else [hoje.year]
+    if not anos_filtro_int:
+        anos_filtro_int = anos_disponiveis
+
     # Valores distintos de setor (código + uma descrição representativa) para o filtro da coluna
     setores_opciones = list(
         PlanoPreventiva.objects.exclude(cd_setor__isnull=True)
@@ -5719,12 +5893,13 @@ def consultar_plano_preventiva(request):
     # Buscar PlanoPreventiva
     planos_list = PlanoPreventiva.objects.all().select_related('maquina', 'roteiro_preventiva')
 
-    # Filtro por dt_execucao (CharField DD/MM/YYYY) - ano e meses
-    if meses_filtro_int:
+    # Filtro por dt_execucao (CharField DD/MM/YYYY) - anos e meses (ambos multi-seleção)
+    if meses_filtro_int and anos_filtro_int:
         q_data = Q()
-        for mes in meses_filtro_int:
-            padrao = f'/{mes:02d}/{ano_filtro}'
-            q_data |= Q(dt_execucao__icontains=padrao)
+        for ano in anos_filtro_int:
+            for mes in meses_filtro_int:
+                padrao = f'/{mes:02d}/{ano}'
+                q_data |= Q(dt_execucao__icontains=padrao)
         planos_list = planos_list.filter(q_data)
 
     # Filtro de busca geral
@@ -5828,22 +6003,6 @@ def consultar_plano_preventiva(request):
     page_number = request.GET.get('page', 1)
     planos = paginator.get_page(page_number)
 
-    # Anos disponíveis a partir de dt_execucao (formato DD/MM/YYYY)
-    anos_disponiveis = set()
-    for val in PlanoPreventiva.objects.exclude(dt_execucao__isnull=True).exclude(dt_execucao='').values_list('dt_execucao', flat=True).distinct()[:2000]:
-        s = str(val or '').strip()
-        if '/' in s:
-            parts = s.split('/')
-            if len(parts) >= 3:
-                try:
-                    yr = parts[2]
-                    ano = int(yr) if len(yr) == 4 else (2000 + int(yr)) if len(yr) == 2 else None
-                    if ano and 2010 <= ano <= 2040:
-                        anos_disponiveis.add(ano)
-                except (ValueError, TypeError):
-                    pass
-    anos_disponiveis = sorted(anos_disponiveis, reverse=True) if anos_disponiveis else [hoje.year]
-
     meses_nomes = {
         1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 5: 'Maio', 6: 'Junho',
         7: 'Julho', 8: 'Agosto', 9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
@@ -5860,7 +6019,7 @@ def consultar_plano_preventiva(request):
         'total_count': total_count,
         'maquinas_count': maquinas_count or 0,
         'setores_count': setores_count,
-        'ano_filtro': ano_filtro,
+        'anos_filtro': anos_filtro_int,
         'meses_filtro': meses_filtro_int,
         'meses_nomes': meses_nomes,
         'anos_disponiveis': anos_disponiveis,
@@ -16140,11 +16299,48 @@ def configuracoes_mao_de_obra(request):
     return render(request, 'analise_mao_de_obra/configuracoes_mao_de_obra.html', context)
 
 
+def _parse_tempo_trabalho_horas(tempo_str):
+    """Parse tempo_trabalho string (e.g. '8 horas', '8h 30min', '8:30') to decimal hours."""
+    if not tempo_str or not isinstance(tempo_str, str):
+        return None
+    import re
+    s = str(tempo_str).strip()
+    if not s:
+        return None
+    horas = 0
+    minutos = 0
+    m = re.search(r'(\d+)\s*h(?:oras?)?', s, re.I)
+    if m:
+        horas = float(m.group(1))
+    m2 = re.search(r'(\d+)\s*m(?:in(?:utos?)?)?', s, re.I)
+    if m2:
+        minutos = float(m2.group(1))
+    if not m and not m2:
+        m3 = re.search(r'(\d+)(?::(\d+))?', s)
+        if m3:
+            horas = float(m3.group(1))
+            if m3.group(2):
+                minutos = float(m3.group(2))
+    return round(horas + minutos / 60, 2)
+
+
+def _parse_tempo_prev_horas(tempo_str):
+    """Parse tempo_prev (HH:MM) to decimal hours."""
+    if not tempo_str or not isinstance(tempo_str, str):
+        return None
+    import re
+    m = re.match(r'(\d+):(\d+)', str(tempo_str).strip())
+    if m:
+        return round(int(m.group(1)) + int(m.group(2)) / 60, 2)
+    return None
+
+
 def analise_mao_de_obra_preventiva(request):
-    """Análise de Mão de Obra — Preventivas e Lubrificação (OrdemServicoPreventiva, OrdemServicoLubrificacao e suas Fichas)"""
+    """Análise de Mão de Obra — Preventivas (OrdemServicoPreventiva e OrdemServicoPreventivaFicha) + Capacidade vs Plano"""
     from datetime import datetime as dt
+    from decimal import Decimal
     from app.models import OrdemServicoPreventiva, OrdemServicoPreventivaFicha
-    from app.models import OrdemServicoLubrificacao, OrdemServicoLubrificacaoFicha
+    from app.models import Manutentor, PlanoPreventiva, LOCAL_TRABALHO
 
     ano_filtro = request.GET.get('ano', None)
     meses_filtro = request.GET.getlist('mes')
@@ -16241,14 +16437,12 @@ def analise_mao_de_obra_preventiva(request):
         }
 
     dados_preventiva = processar_tipo(OrdemServicoPreventiva, OrdemServicoPreventivaFicha)
-    dados_lubrificacao = processar_tipo(OrdemServicoLubrificacao, OrdemServicoLubrificacaoFicha)
 
     anos_disponiveis = set()
-    for modelo in [OrdemServicoPreventiva, OrdemServicoLubrificacao]:
-        for o in modelo.objects.only('dt_abertura_solicita').iterator(chunk_size=2000):
-            data_abert = _parse_dt_abertura_solicita(o.dt_abertura_solicita)
-            if data_abert:
-                anos_disponiveis.add(data_abert.year)
+    for o in OrdemServicoPreventiva.objects.only('dt_abertura_solicita').iterator(chunk_size=2000):
+        data_abert = _parse_dt_abertura_solicita(o.dt_abertura_solicita)
+        if data_abert:
+            anos_disponiveis.add(data_abert.year)
     anos_disponiveis = sorted(anos_disponiveis, reverse=True)
     if not anos_disponiveis:
         anos_disponiveis = [hoje.year]
@@ -16257,15 +16451,109 @@ def analise_mao_de_obra_preventiva(request):
         7: 'Julho', 8: 'Agosto', 9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
     }
 
+    # Análise de capacidade vs trabalho alocado (Manutentor + PlanoPreventiva)
+    DEFAULT_HORAS_POR_TAREFA = 0.5  # 30 min quando roteiro não tem tempo
+    DIAS_POR_MES = 30
+    SEMANAS_POR_MES = 4.33
+    analise_capacidade_plano = []
+    planos_por_matricula = {}
+    for p in PlanoPreventiva.objects.filter(
+        cd_funcionario__isnull=False
+    ).exclude(cd_funcionario='').select_related('roteiro_preventiva').iterator(chunk_size=2000):
+        mat = str(p.cd_funcionario).strip()
+        if not mat:
+            continue
+        if mat not in planos_por_matricula:
+            planos_por_matricula[mat] = {'itens': [], 'maquinas': {}}
+        periodo = p.quantidade_periodo or 30
+        freq_mensal = DIAS_POR_MES / max(1, periodo)
+        tempo_raw = None
+        if p.roteiro_preventiva:
+            tempo_raw = p.roteiro_preventiva.tempo_prev or p.roteiro_preventiva.cf_temp_prev
+        tempo_h = _parse_tempo_prev_horas(tempo_raw)
+        if tempo_h is None:
+            tempo_h = DEFAULT_HORAS_POR_TAREFA
+        planos_por_matricula[mat]['itens'].append({'tempo_h': tempo_h, 'freq_mensal': freq_mensal})
+        if p.cd_maquina is not None:
+            km = p.cd_maquina
+            planos_por_matricula[mat]['maquinas'][km] = (p.descr_maquina or '')
+
+    for m in Manutentor.objects.filter(ativo=True).order_by('local_trab', 'turno', 'Nome'):
+        capacidade_semanal = None
+        if m.horas_semanais is not None:
+            try:
+                capacidade_semanal = float(m.horas_semanais)
+            except (TypeError, ValueError):
+                pass
+        if capacidade_semanal is None and m.tempo_trabalho:
+            h_diarias = _parse_tempo_trabalho_horas(m.tempo_trabalho)
+            if h_diarias is not None:
+                capacidade_semanal = h_diarias * 5
+        if capacidade_semanal is None:
+            capacidade_semanal = 40.0
+        capacidade_mensal = round(capacidade_semanal * SEMANAS_POR_MES, 1)
+
+        planos_data = planos_por_matricula.get(m.Matricula, {'itens': [], 'maquinas': {}})
+        itens = planos_data.get('itens', [])
+        maquinas_dict = planos_data.get('maquinas', {})
+        trabalho_mensal = sum(item['tempo_h'] * item['freq_mensal'] for item in itens)
+        trabalho_mensal = round(trabalho_mensal, 1)
+        qtd_tarefas = len(itens)
+        maquinas_lista = [{'cd': k, 'descr': v or str(k)} for k, v in sorted(maquinas_dict.items())]
+
+        diferenca = round(capacidade_mensal - trabalho_mensal, 1)
+        pct_utilizacao = round(100.0 * trabalho_mensal / capacidade_mensal, 1) if capacidade_mensal > 0 else 0
+
+        if pct_utilizacao > 110:
+            status = 'excesso'
+            status_label = 'Excesso de trabalho'
+        elif pct_utilizacao >= 70:
+            status = 'equilibrado'
+            status_label = 'Equilibrado'
+        elif pct_utilizacao > 0:
+            status = 'subutilizado'
+            status_label = 'Capacidade ociosa'
+        else:
+            status = 'sem_trabalho'
+            status_label = 'Sem trabalho alocado'
+
+        analise_capacidade_plano.append({
+            'manutentor': m,
+            'capacidade_semanal': capacidade_semanal,
+            'capacidade_mensal': capacidade_mensal,
+            'trabalho_mensal': trabalho_mensal,
+            'qtd_tarefas': qtd_tarefas,
+            'maquinas': maquinas_lista,
+            'diferenca': diferenca,
+            'pct_utilizacao': pct_utilizacao,
+            'status': status,
+            'status_label': status_label,
+        })
+
+    local_trab_labels_map = dict(LOCAL_TRABALHO)
+    analise_por_local = {}
+    for item in analise_capacidade_plano:
+        lt = item['manutentor'].local_trab or ''
+        lt_key = str(lt).strip() or 'Indefinido'
+        if lt_key not in analise_por_local:
+            analise_por_local[lt_key] = {
+                'local_code': lt_key,
+                'local_label': local_trab_labels_map.get(lt_key, lt_key),
+                'itens': [],
+            }
+        analise_por_local[lt_key]['itens'].append(item)
+    analise_capacidade_por_local = sorted(analise_por_local.values(), key=lambda x: x['local_label'])
+
     context = {
-        'page_title': 'Análise Preventiva e Lubrificação',
+        'page_title': 'Análise de Mão de Obra - Preventivas',
         'active_page': 'analise_mao_de_obra_preventiva',
         'ano_filtro': ano_filtro,
         'meses_filtro': meses_filtro_int,
         'meses_nomes': meses_nomes,
         'anos_disponiveis': anos_disponiveis,
         'dados_preventiva': dados_preventiva,
-        'dados_lubrificacao': dados_lubrificacao,
+        'analise_capacidade_plano': analise_capacidade_plano,
+        'analise_capacidade_por_local': analise_capacidade_por_local,
     }
     return render(request, 'analise_mao_de_obra/analise_mao_de_obra_preventiva.html', context)
 

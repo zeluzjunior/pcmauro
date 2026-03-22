@@ -164,6 +164,19 @@
                                     {% endif %}
                                     <div class="form-text">Tempo de trabalho{% if form.tempo_trabalho|is_required %} <span class="text-danger">(obrigatório)</span>{% endif %}</div>
                                 </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.horas_semanais.id_for_label }}" class="form-label">
+                                        {{ form.horas_semanais.label }}
+                                        {% if form.horas_semanais|is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ form.horas_semanais }}
+                                    {% if form.horas_semanais.errors %}
+                                        <div class="text-danger small mt-1">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ form.horas_semanais.errors|first }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Quantidade de horas trabalhadas por semana{% if not form.horas_semanais|is_required %} <span class="text-muted">(opcional)</span>{% endif %}</div>
+                                </div>
                             </div>
 
                             <!-- Classificações -->

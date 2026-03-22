@@ -420,6 +420,7 @@ class ManutentorForm(forms.ModelForm):
             'horario_inicio',
             'horario_fim',
             'tempo_trabalho',
+            'horas_semanais',
             'turno',
             'local_trab',
             'ativo',
@@ -455,6 +456,12 @@ class ManutentorForm(forms.ModelForm):
                 'maxlength': '250',
                 'placeholder': 'Tempo de Trabalho'
             }),
+            'horas_semanais': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ex: 40',
+                'step': '0.01',
+                'min': '0'
+            }),
             'turno': forms.Select(attrs={
                 'class': 'form-select',
             }),
@@ -472,6 +479,7 @@ class ManutentorForm(forms.ModelForm):
             'horario_inicio': 'Horário Início',
             'horario_fim': 'Horário Fim',
             'tempo_trabalho': 'Tempo de Trabalho',
+            'horas_semanais': 'Horas Semanais',
             'turno': 'Turno',
             'local_trab': 'Local de Trabalho',
             'ativo': 'Ativo',

@@ -85,46 +85,63 @@
                 <div class="accordion filter-accordion" id="filtrosAccordion">
                     <div class="accordion-item shadow-sm border-0">
                         <h2 class="accordion-header" id="filtrosHeading">
-                            <button class="accordion-button {% if not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                            <button class="accordion-button {% if not meses_filtro and not anos_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro or anos_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
                                 <i class="fas fa-filter me-2"></i>
                                 <strong>Filtros por Data (Data Execução)</strong>
-                                {% if meses_filtro or ano_filtro %}
+                                {% if meses_filtro or anos_filtro %}
                                     <span class="badge bg-info ms-2">
-                                        {% if meses_filtro %}
-                                            {% if meses_filtro|length == 1 %}
-                                                {{ meses_nomes|get_item:meses_filtro.0 }} de {{ ano_filtro }}
+                                        {% if anos_filtro %}
+                                            {% if anos_filtro|length == 1 %}
+                                                {% if meses_filtro %}
+                                                    {% if meses_filtro|length == 1 %}
+                                                        {{ meses_nomes|get_item:meses_filtro.0 }} de {{ anos_filtro.0 }}
+                                                    {% else %}
+                                                        {{ meses_filtro|length }} meses de {{ anos_filtro.0 }}
+                                                    {% endif %}
+                                                {% else %}
+                                                    Todos os meses de {{ anos_filtro.0 }}
+                                                {% endif %}
                                             {% else %}
-                                                {{ meses_filtro|length }} meses de {{ ano_filtro }}
+                                                {{ anos_filtro|length }} anos{% if meses_filtro %} · {{ meses_filtro|length }} meses{% endif %}
                                             {% endif %}
                                         {% else %}
-                                            Todos os meses de {{ ano_filtro }}
+                                            {% if meses_filtro %}
+                                                {{ meses_filtro|length }} meses
+                                            {% else %}
+                                                Todos
+                                            {% endif %}
                                         {% endif %}
                                     </span>
                                 {% endif %}
                             </button>
                         </h2>
-                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro or anos_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
                             <div class="accordion-body">
                                 <form method="get" action="{% url 'consultar_plano_preventiva' %}" id="filtrosDataForm" class="row g-3">
                                     <input type="hidden" name="search" value="{{ search_query|default:'' }}">
                                     <input type="hidden" name="filter_maquina" value="{{ filter_maquina|default:'' }}">
-                                    <input type="hidden" name="filter_plano" value="{{ filter_plano|default:'' }}">
-                                    <input type="hidden" name="filter_seq_manutencao" value="{{ filter_seq_manutencao|default:'' }}">
                                     <input type="hidden" name="filter_data" value="{{ filter_data|default:'' }}">
                                     <input type="hidden" name="filter_periodo" value="{{ filter_periodo|default:'' }}">
                                     <input type="hidden" name="filter_seq_tarefa" value="{{ filter_seq_tarefa|default:'' }}">
                                     <input type="hidden" name="filter_tarefa" value="{{ filter_tarefa|default:'' }}">
-                                    <input type="hidden" name="filter_descr_seqplamanu" value="{{ filter_descr_seqplamanu|default:'' }}">
                                     <input type="hidden" name="filter_funcionario" value="{{ filter_funcionario|default:'' }}">
                                     <input type="hidden" name="filter_setor" value="{{ filter_setor|default:'' }}">
-                                    <input type="hidden" name="filter_unidade" value="{{ filter_unidade|default:'' }}">
                                     <div class="col-md-4">
-                                        <label for="ano" class="form-label">Ano</label>
-                                        <select class="form-select" id="ano" name="ano" required>
+                                        <label class="form-label">Anos (Selecione múltiplos ou deixe todos desmarcados para todos os anos)</label>
+                                        <div class="row g-2">
                                             {% for ano in anos_disponiveis %}
-                                                <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                                <div class="col-md-6 col-sm-6 col-6">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" name="ano" value="{{ ano }}" id="ano{{ ano }}" {% if ano in anos_filtro %}checked{% endif %}>
+                                                        <label class="form-check-label" for="ano{{ ano }}">{{ ano }}</label>
+                                                    </div>
+                                                </div>
                                             {% endfor %}
-                                        </select>
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosAnos()">Selecionar Todos</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosAnos()">Desmarcar Todos</button>
+                                        </div>
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label">Meses (Selecione múltiplos ou deixe todos desmarcados para todos os meses)</label>
@@ -163,7 +180,9 @@
         <div class="row mb-4">
             <div class="col-md-12">
                 <form method="get" action="{% url 'consultar_plano_preventiva' %}" id="searchForm" class="d-flex">
-                    <input type="hidden" name="ano" value="{{ ano_filtro }}">
+                    {% for a in anos_filtro %}
+                    <input type="hidden" name="ano" value="{{ a }}">
+                    {% endfor %}
                     {% for m in meses_filtro %}
                     <input type="hidden" name="mes" value="{{ m }}">
                     {% endfor %}
@@ -245,7 +264,9 @@
             <div class="card-body p-0">
                 <form method="get" action="{% url 'consultar_plano_preventiva' %}" id="filterForm">
                     <input type="hidden" name="search" value="{{ search_query|default:'' }}">
-                    <input type="hidden" name="ano" value="{{ ano_filtro }}">
+                    {% for a in anos_filtro %}
+                    <input type="hidden" name="ano" value="{{ a }}">
+                    {% endfor %}
                     {% for m in meses_filtro %}
                     <input type="hidden" name="mes" value="{{ m }}">
                     {% endfor %}
@@ -255,27 +276,17 @@
                             <thead>
                                 <tr>
                                     <th>Máquina</th>
-                                    <th>Plano</th>
-                                    <th>Seq. Manutenção</th>
                                     <th>Data Execução</th>
                                     <th>Período (dias)</th>
                                     <th>Seq. Tarefa</th>
                                     <th>Descrição Tarefa</th>
-                                    <th>DESCR_SEQPLAMANU</th>
                                     <th>Funcionário</th>
                                     <th>Setor</th>
-                                    <th>Unidade</th>
                                     <th>Ações</th>
                                 </tr>
                                 <tr class="filter-row">
                                     <th class="filter-header">
                                         <input type="text" name="filter_maquina" class="filter-input" placeholder="Filtrar Máquina..." value="{{ filter_maquina|default:'' }}">
-                                    </th>
-                                    <th class="filter-header">
-                                        <input type="text" name="filter_plano" class="filter-input" placeholder="Filtrar Plano..." value="{{ filter_plano|default:'' }}">
-                                    </th>
-                                    <th class="filter-header">
-                                        <input type="text" name="filter_seq_manutencao" class="filter-input" placeholder="Filtrar Seq..." value="{{ filter_seq_manutencao|default:'' }}">
                                     </th>
                                     <th class="filter-header">
                                         <input type="text" name="filter_data" class="filter-input" placeholder="Filtrar Data..." value="{{ filter_data|default:'' }}">
@@ -288,9 +299,6 @@
                                     </th>
                                     <th class="filter-header">
                                         <input type="text" name="filter_tarefa" class="filter-input" placeholder="Filtrar Tarefa..." value="{{ filter_tarefa|default:'' }}">
-                                    </th>
-                                    <th class="filter-header">
-                                        <input type="text" name="filter_descr_seqplamanu" class="filter-input" placeholder="Filtrar DESCR_SEQPLAMANU..." value="{{ filter_descr_seqplamanu|default:'' }}">
                                     </th>
                                     <th class="filter-header">
                                         <input type="text" name="filter_funcionario" class="filter-input" placeholder="Filtrar Funcionário..." value="{{ filter_funcionario|default:'' }}">
@@ -306,9 +314,6 @@
                                         </select>
                                     </th>
                                     <th class="filter-header">
-                                        <input type="text" name="filter_unidade" class="filter-input" placeholder="Filtrar Unidade..." value="{{ filter_unidade|default:'' }}">
-                                    </th>
-                                    <th class="filter-header">
                                         <!-- Sem filtro na coluna de ações -->
                                     </th>
                                 </tr>
@@ -317,24 +322,21 @@
                                 {% if planos %}
                                     {% for plano in planos %}
                                     <tr>
-                                        <td>
-                                            <strong>{{ plano.cd_maquina|default:"-" }}</strong>
-                                            {% if plano.descr_maquina %}
-                                                <br><small class="text-muted">{{ plano.descr_maquina|truncatewords:8 }}</small>
-                                            {% endif %}
+                                        <td style="word-wrap: break-word; white-space: normal; max-width: 280px;">
                                             {% if plano.maquina %}
-                                                <br><a href="{% url 'visualizar_maquina' plano.maquina.id %}" class="btn btn-sm btn-outline-primary mt-1">
-                                                    <i class="fas fa-industry"></i> Ver Máquina
+                                                <a href="{% url 'visualizar_maquina' plano.maquina.id %}">
+                                                    <strong>{{ plano.cd_maquina|default:"-" }}</strong>
+                                                    {% if plano.descr_maquina %}
+                                                        <br><span class="text-muted">{{ plano.descr_maquina }}</span>
+                                                    {% endif %}
                                                 </a>
+                                            {% else %}
+                                                <strong>{{ plano.cd_maquina|default:"-" }}</strong>
+                                                {% if plano.descr_maquina %}
+                                                    <br><span class="text-muted">{{ plano.descr_maquina }}</span>
+                                                {% endif %}
                                             {% endif %}
                                         </td>
-                                        <td>
-                                            <strong>{{ plano.numero_plano|default:"-" }}</strong>
-                                            {% if plano.descr_plano %}
-                                                <br><small class="text-muted">{{ plano.descr_plano }}</small>
-                                            {% endif %}
-                                        </td>
-                                        <td>{{ plano.sequencia_manutencao|default:"-" }}</td>
                                         <td>
                                             {% if plano.dt_execucao %}
                                                 {{ plano.dt_execucao }}
@@ -355,20 +357,6 @@
                                                 <small>{{ plano.descr_tarefa|truncatewords:12 }}</small>
                                             {% else %}
                                                 -
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if plano.descr_seqplamanu %}
-                                                <span class="badge bg-success" title="{{ plano.descr_seqplamanu }}">
-                                                    {{ plano.descr_seqplamanu|truncatewords:8 }}
-                                                </span>
-                                                {% if plano.roteiro_preventiva %}
-                                                    <br><small class="text-muted">
-                                                        <i class="fas fa-link"></i> Roteiro ID: {{ plano.roteiro_preventiva.id }}
-                                                    </small>
-                                                {% endif %}
-                                            {% else %}
-                                                <span class="text-muted">-</span>
                                             {% endif %}
                                         </td>
                                         <td>
@@ -394,16 +382,6 @@
                                             {% endif %}
                                         </td>
                                         <td>
-                                            {% if plano.nome_unid %}
-                                                {{ plano.nome_unid|truncatewords:3 }}
-                                                {% if plano.cd_unid %}
-                                                    <br><small class="text-muted">({{ plano.cd_unid }})</small>
-                                                {% endif %}
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                        <td>
                                             <a href="{% url 'visualizar_manutencao_preventiva' plano.id %}" class="btn btn-sm btn-success" title="Visualizar plano preventiva">
                                                 <i class="fas fa-eye"></i> Ver
                                             </a>
@@ -412,7 +390,7 @@
                                     {% endfor %}
                                 {% else %}
                                     <tr>
-                                        <td colspan="13" class="text-center py-5">
+                                        <td colspan="8" class="text-center py-5">
                                             <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
                                             <p class="text-muted">Nenhum plano preventiva encontrado.</p>
                                             <a href="{% url 'importar_plano_preventiva' %}" class="btn btn-primary">
@@ -436,10 +414,10 @@
                     <ul class="pagination justify-content-center">
                         {% if planos.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_maquina %}&filter_maquina={{ filter_maquina }}{% endif %}{% if filter_plano %}&filter_plano={{ filter_plano }}{% endif %}{% if filter_seq_manutencao %}&filter_seq_manutencao={{ filter_seq_manutencao }}{% endif %}{% if filter_data %}&filter_data={{ filter_data }}{% endif %}{% if filter_periodo %}&filter_periodo={{ filter_periodo }}{% endif %}{% if filter_seq_tarefa %}&filter_seq_tarefa={{ filter_seq_tarefa }}{% endif %}{% if filter_tarefa %}&filter_tarefa={{ filter_tarefa }}{% endif %}{% if filter_funcionario %}&filter_funcionario={{ filter_funcionario }}{% endif %}{% if filter_setor %}&filter_setor={{ filter_setor|urlencode }}{% endif %}{% if filter_unidade %}&filter_unidade={{ filter_unidade }}{% endif %}&page=1">Primeira</a>
+                                <a class="page-link" href="?{% for a in anos_filtro %}ano={{ a }}&{% endfor %}{% for m in meses_filtro %}mes={{ m }}{% if not forloop.last %}&{% endif %}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_maquina %}&filter_maquina={{ filter_maquina }}{% endif %}{% if filter_data %}&filter_data={{ filter_data }}{% endif %}{% if filter_periodo %}&filter_periodo={{ filter_periodo }}{% endif %}{% if filter_seq_tarefa %}&filter_seq_tarefa={{ filter_seq_tarefa }}{% endif %}{% if filter_tarefa %}&filter_tarefa={{ filter_tarefa }}{% endif %}{% if filter_funcionario %}&filter_funcionario={{ filter_funcionario }}{% endif %}{% if filter_setor %}&filter_setor={{ filter_setor|urlencode }}{% endif %}&page=1">Primeira</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_maquina %}&filter_maquina={{ filter_maquina }}{% endif %}{% if filter_plano %}&filter_plano={{ filter_plano }}{% endif %}{% if filter_seq_manutencao %}&filter_seq_manutencao={{ filter_seq_manutencao }}{% endif %}{% if filter_data %}&filter_data={{ filter_data }}{% endif %}{% if filter_periodo %}&filter_periodo={{ filter_periodo }}{% endif %}{% if filter_seq_tarefa %}&filter_seq_tarefa={{ filter_seq_tarefa }}{% endif %}{% if filter_tarefa %}&filter_tarefa={{ filter_tarefa }}{% endif %}{% if filter_funcionario %}&filter_funcionario={{ filter_funcionario }}{% endif %}{% if filter_setor %}&filter_setor={{ filter_setor|urlencode }}{% endif %}{% if filter_unidade %}&filter_unidade={{ filter_unidade }}{% endif %}&page={{ planos.previous_page_number }}">Anterior</a>
+                                <a class="page-link" href="?{% for a in anos_filtro %}ano={{ a }}&{% endfor %}{% for m in meses_filtro %}mes={{ m }}{% if not forloop.last %}&{% endif %}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_maquina %}&filter_maquina={{ filter_maquina }}{% endif %}{% if filter_data %}&filter_data={{ filter_data }}{% endif %}{% if filter_periodo %}&filter_periodo={{ filter_periodo }}{% endif %}{% if filter_seq_tarefa %}&filter_seq_tarefa={{ filter_seq_tarefa }}{% endif %}{% if filter_tarefa %}&filter_tarefa={{ filter_tarefa }}{% endif %}{% if filter_funcionario %}&filter_funcionario={{ filter_funcionario }}{% endif %}{% if filter_setor %}&filter_setor={{ filter_setor|urlencode }}{% endif %}&page={{ planos.previous_page_number }}">Anterior</a>
                             </li>
                         {% endif %}
                         <li class="page-item active">
@@ -447,10 +425,10 @@
                         </li>
                         {% if planos.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_maquina %}&filter_maquina={{ filter_maquina }}{% endif %}{% if filter_plano %}&filter_plano={{ filter_plano }}{% endif %}{% if filter_seq_manutencao %}&filter_seq_manutencao={{ filter_seq_manutencao }}{% endif %}{% if filter_data %}&filter_data={{ filter_data }}{% endif %}{% if filter_periodo %}&filter_periodo={{ filter_periodo }}{% endif %}{% if filter_seq_tarefa %}&filter_seq_tarefa={{ filter_seq_tarefa }}{% endif %}{% if filter_tarefa %}&filter_tarefa={{ filter_tarefa }}{% endif %}{% if filter_funcionario %}&filter_funcionario={{ filter_funcionario }}{% endif %}{% if filter_setor %}&filter_setor={{ filter_setor|urlencode }}{% endif %}{% if filter_unidade %}&filter_unidade={{ filter_unidade }}{% endif %}&page={{ planos.next_page_number }}">Próxima</a>
+                                <a class="page-link" href="?{% for a in anos_filtro %}ano={{ a }}&{% endfor %}{% for m in meses_filtro %}mes={{ m }}{% if not forloop.last %}&{% endif %}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_maquina %}&filter_maquina={{ filter_maquina }}{% endif %}{% if filter_data %}&filter_data={{ filter_data }}{% endif %}{% if filter_periodo %}&filter_periodo={{ filter_periodo }}{% endif %}{% if filter_seq_tarefa %}&filter_seq_tarefa={{ filter_seq_tarefa }}{% endif %}{% if filter_tarefa %}&filter_tarefa={{ filter_tarefa }}{% endif %}{% if filter_funcionario %}&filter_funcionario={{ filter_funcionario }}{% endif %}{% if filter_setor %}&filter_setor={{ filter_setor|urlencode }}{% endif %}&page={{ planos.next_page_number }}">Próxima</a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_maquina %}&filter_maquina={{ filter_maquina }}{% endif %}{% if filter_plano %}&filter_plano={{ filter_plano }}{% endif %}{% if filter_seq_manutencao %}&filter_seq_manutencao={{ filter_seq_manutencao }}{% endif %}{% if filter_data %}&filter_data={{ filter_data }}{% endif %}{% if filter_periodo %}&filter_periodo={{ filter_periodo }}{% endif %}{% if filter_seq_tarefa %}&filter_seq_tarefa={{ filter_seq_tarefa }}{% endif %}{% if filter_tarefa %}&filter_tarefa={{ filter_tarefa }}{% endif %}{% if filter_funcionario %}&filter_funcionario={{ filter_funcionario }}{% endif %}{% if filter_setor %}&filter_setor={{ filter_setor|urlencode }}{% endif %}{% if filter_unidade %}&filter_unidade={{ filter_unidade }}{% endif %}&page={{ planos.paginator.num_pages }}">Última</a>
+                                <a class="page-link" href="?{% for a in anos_filtro %}ano={{ a }}&{% endfor %}{% for m in meses_filtro %}mes={{ m }}{% if not forloop.last %}&{% endif %}{% endfor %}{% if search_query %}&search={{ search_query }}{% endif %}{% if filter_maquina %}&filter_maquina={{ filter_maquina }}{% endif %}{% if filter_data %}&filter_data={{ filter_data }}{% endif %}{% if filter_periodo %}&filter_periodo={{ filter_periodo }}{% endif %}{% if filter_seq_tarefa %}&filter_seq_tarefa={{ filter_seq_tarefa }}{% endif %}{% if filter_tarefa %}&filter_tarefa={{ filter_tarefa }}{% endif %}{% if filter_funcionario %}&filter_funcionario={{ filter_funcionario }}{% endif %}{% if filter_setor %}&filter_setor={{ filter_setor|urlencode }}{% endif %}&page={{ planos.paginator.num_pages }}">Última</a>
                             </li>
                         {% endif %}
                     </ul>
@@ -469,6 +447,12 @@ function selecionarTodosMeses() {
 }
 function desmarcarTodosMeses() {
     document.querySelectorAll('input[name="mes"]').forEach(cb => cb.checked = false);
+}
+function selecionarTodosAnos() {
+    document.querySelectorAll('input[name="ano"]').forEach(cb => cb.checked = true);
+}
+function desmarcarTodosAnos() {
+    document.querySelectorAll('input[name="ano"]').forEach(cb => cb.checked = false);
 }
 
 document.addEventListener('DOMContentLoaded', function() {

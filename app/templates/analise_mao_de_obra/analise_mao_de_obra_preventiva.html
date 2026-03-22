@@ -2,7 +2,7 @@
 {% load static %}
 {% load form_extras %}
 
-{% block title %}Análise Preventiva e Lubrificação{% endblock %}
+{% block title %}Análise de Mão de Obra - Preventivas{% endblock %}
 
 {% block content %}
 <section class="py-5 text-white" style="background-image: linear-gradient(rgba(13, 110, 253, 0.5), rgba(13, 110, 253, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center;">
@@ -13,13 +13,13 @@
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
                         <li class="breadcrumb-item active text-white" aria-current="page">Análise de Mão de Obra</li>
-                        <li class="breadcrumb-item active text-white" aria-current="page">Análise Preventiva e Lubrificação</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise Preventivas</li>
                     </ol>
                 </nav>
                 <h1 class="display-4 fw-bold mt-3">
-                    <i class="bi bi-clipboard2-check me-2"></i>Análise Preventiva e Lubrificação
+                    <i class="bi bi-clipboard2-check me-2"></i>Análise de Mão de Obra - Preventivas
                 </h1>
-                <p class="lead">Análise de Ordens de Serviço Preventivas e de Lubrificação com suas Fichas</p>
+                <p class="lead">Análise de Ordens de Serviço Preventivas e capacidade vs trabalho alocado (Plano Preventiva)</p>
             </div>
         </div>
     </div>
@@ -95,7 +95,7 @@
             </div>
         </div>
 
-        <!-- Seção 1: OrdemServicoPreventiva e OrdemServicoPreventivaFicha -->
+        <!-- OrdemServicoPreventiva e OrdemServicoPreventivaFicha -->
         <div class="border-top pt-4 mt-4">
             <h4 class="mb-4">
                 <i class="bi bi-clipboard2-check me-2 text-primary"></i>Ordens de Serviço Preventivas
@@ -155,68 +155,102 @@
             </div>
         </div>
 
-        <!-- Seção 2: OrdemServicoLubrificacao e OrdemServicoLubrificacaoFicha -->
-        <div class="border-top pt-5 mt-5" style="padding-top: 2.5rem; margin-top: 4rem;">
+        <!-- Análise de Capacidade vs Plano Preventiva (Manutentor + PlanoPreventiva) – por local_trab -->
+        <div class="border-top pt-5 mt-5">
             <h4 class="mb-4">
-                <i class="bi bi-droplet me-2 text-primary"></i>Ordens de Serviço de Lubrificação
+                <i class="bi bi-person-check me-2 text-primary"></i>Capacidade vs Trabalho Alocado (Plano Preventiva)
             </h4>
         </div>
-        <p class="text-muted mb-3">Tabelas: <code>OrdemServicoLubrificacao</code> e <code>OrdemServicoLubrificacaoFicha</code></p>
-        <div class="row mb-4 g-2">
-            <div class="col-6 col-md col-lg mb-0">
-                <div class="card stat-card border-primary shadow-sm border-0 h-100">
-                    <div class="card-body py-3">
-                        <h6 class="text-muted mb-1 small">Total de Ordens</h6>
-                        <h2 class="mb-0 fw-bold text-primary">{{ dados_lubrificacao.total_ordens|number_br:0 }}</h2>
-                    </div>
-                </div>
+        <p class="text-muted mb-4">Comparação entre a capacidade disponível do manutentor (<code>horas_semanais</code>, <code>tempo_trabalho</code>) e o trabalho alocado no Plano Preventiva. Agrupado por <strong>local de trabalho</strong>.</p>
+
+        {% for secao in analise_capacidade_por_local %}
+        <div class="border-top" style="margin-top: 3rem; padding-top: 2rem;">
+            <h5 class="mb-3">
+                <i class="fas fa-map-marker-alt me-2 text-primary"></i>{{ secao.local_label }}
+                <span class="badge bg-secondary ms-2">{{ secao.itens|length }} manutentor(es)</span>
+            </h5>
+            <div class="table-responsive mb-4">
+                <table class="table table-hover table-striped align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Manutentor</th>
+                            <th class="text-end">Capacidade<br><small class="text-muted">(h/mês)</small></th>
+                            <th class="text-end">Trabalho Alocado<br><small class="text-muted">(h/mês)</small></th>
+                            <th class="text-end">Tarefas</th>
+                            <th class="text-end">Diferença</th>
+                            <th class="text-end">Utilização</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in secao.itens %}
+                        <tr>
+                            <td class="align-top">
+                                <div>
+                                    <button class="btn btn-link p-0 text-start text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#maq-{{ forloop.parentloop.counter }}-{{ forloop.counter }}" aria-expanded="false" aria-controls="maq-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
+                                        <i class="fas fa-chevron-right me-1 collapse-icon" style="transition: transform 0.2s;"></i>
+                                        <strong>{{ item.manutentor.Nome|default:item.manutentor.Matricula }}</strong>
+                                    </button>
+                                    <br><small class="text-muted">Mat: {{ item.manutentor.Matricula }} — {{ item.manutentor.tempo_trabalho|default:"-" }}{% if item.manutentor.horas_semanais %} | {{ item.manutentor.horas_semanais }}h/sem{% endif %}</small>
+                                    <div class="collapse mt-2" id="maq-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
+                                        <div class="small">
+                                            {% if item.maquinas %}
+                                            <strong class="text-muted d-block mb-1">Máquinas no Plano:</strong>
+                                            <ul class="mb-0 ps-3">
+                                                {% for maq in item.maquinas %}
+                                                <li>{{ maq.cd }} {% if maq.descr %}— {{ maq.descr|truncatewords:8 }}{% endif %}</li>
+                                                {% endfor %}
+                                            </ul>
+                                            {% else %}
+                                            <span class="text-muted">Nenhuma máquina no plano.</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-end">{{ item.capacidade_mensal|number_br:1 }}</td>
+                            <td class="text-end">{{ item.trabalho_mensal|number_br:1 }}</td>
+                            <td class="text-end">{{ item.qtd_tarefas }}</td>
+                            <td class="text-end {% if item.diferenca < 0 %}text-danger{% elif item.diferenca > 20 %}text-success{% endif %}">
+                                {{ item.diferenca|number_br:1 }} h
+                            </td>
+                            <td class="text-end">{{ item.pct_utilizacao|number_br:1 }}%</td>
+                            <td>
+                                {% if item.status == 'excesso' %}
+                                <span class="badge bg-danger">{{ item.status_label }}</span>
+                                {% elif item.status == 'equilibrado' %}
+                                <span class="badge bg-success">{{ item.status_label }}</span>
+                                {% elif item.status == 'subutilizado' %}
+                                <span class="badge bg-warning text-dark">{{ item.status_label }}</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ item.status_label }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            <div class="col-6 col-md col-lg mb-0">
-                <div class="card stat-card border-success shadow-sm border-0 h-100">
-                    <div class="card-body py-3">
-                        <h6 class="text-muted mb-1 small">Fechadas</h6>
-                        <h2 class="mb-0 fw-bold text-success">{{ dados_lubrificacao.total_fechadas|number_br:0 }}</h2>
-                    </div>
-                </div>
-            </div>
-            <div class="col-6 col-md col-lg mb-0">
-                <div class="card stat-card border-warning shadow-sm border-0 h-100">
-                    <div class="card-body py-3">
-                        <h6 class="text-muted mb-1 small">Abertas</h6>
-                        <h2 class="mb-0 fw-bold text-warning">{{ dados_lubrificacao.total_abertas|number_br:0 }}</h2>
-                    </div>
-                </div>
-            </div>
-            <div class="col-6 col-md col-lg mb-0">
-                <div class="card stat-card border-info shadow-sm border-0 h-100">
-                    <div class="card-body py-3">
-                        <h6 class="text-muted mb-1 small">Total de Fichas</h6>
-                        <h2 class="mb-0 fw-bold text-info">{{ dados_lubrificacao.total_fichas|number_br:0 }}</h2>
-                    </div>
-                </div>
-            </div>
-            <div class="col-6 col-md col-lg mb-0">
-                <div class="card stat-card border-secondary shadow-sm border-0 h-100">
-                    <div class="card-body py-3">
-                        <h6 class="text-muted mb-1 small">Horas apontadas (todas fichas)</h6>
-                        <h2 class="mb-0 fw-bold text-secondary">{{ dados_lubrificacao.horas_apontadas|number_br:1 }}</h2>
-                        <small class="text-muted">horas</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-6 col-md col-lg mb-0">
-                <div class="card stat-card border-info shadow-sm border-0 h-100">
-                    <div class="card-body py-3">
-                        <h6 class="text-muted mb-1 small">Média de Horas por OS</h6>
-                        <h2 class="mb-0 fw-bold text-info">{{ dados_lubrificacao.tempo_medio_horas|number_br:2 }}</h2>
-                        <small class="text-muted">h ({{ dados_lubrificacao.tempo_medio_min|number_br:0 }} min)</small>
-                    </div>
-                </div>
-            </div>
+        </div>
+        {% empty %}
+        <div class="border-top pt-4 mt-4">
+            <p class="text-muted py-4">Nenhum manutentor ativo encontrado.</p>
+        </div>
+        {% endfor %}
+
+        <div class="alert alert-info mb-0 mt-4">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Como é calculado:</strong> Capacidade mensal = horas_semanais × 4,33 (ou tempo_trabalho diário × 5 × 4,33). 
+            Trabalho alocado = soma do tempo de cada tarefa no Plano, considerando a frequência (quantidade_periodo). 
+            Quando o roteiro não tem tempo definido, usa-se 30 min por tarefa.
         </div>
     </div>
 </section>
 
+<style>
+[data-bs-toggle="collapse"].btn-link .collapse-icon { display: inline-block; transition: transform 0.2s; }
+[data-bs-toggle="collapse"].btn-link[aria-expanded="true"] .collapse-icon { transform: rotate(90deg); }
+</style>
 <script>
 function selecionarTodosMeses() {
     document.querySelectorAll('input[name="mes"]').forEach(cb => cb.checked = true);

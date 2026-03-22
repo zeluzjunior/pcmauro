@@ -16,6 +16,9 @@
         position: relative;
         height: 380px;
     }
+    .turno-block .turno-header { min-height: 48px; }
+    .turno-block button.turno-toggle[aria-expanded="true"] i.fa-chevron-down { transform: rotate(180deg); }
+    .turno-block button.turno-toggle i { transition: transform 0.2s ease; display: inline-block; }
     .stat-card {
         transition: transform 0.2s;
     }
@@ -47,7 +50,7 @@
                     </ol>
                 </nav>
                 <h1 class="display-4 fw-bold mt-3">Análise de Plano Preventiva</h1>
-                <p class="lead">Indicadores e gráficos sobre os registros da tabela <strong>PlanoPreventiva</strong> (filtro por data de execução)</p>
+                <p class="lead">Indicadores e gráficos sobre os registros da tabela <strong>PlanoPreventiva</strong></p>
             </div>
         </div>
     </div>
@@ -63,10 +66,11 @@
                             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="false" aria-controls="filtrosCollapse">
                                 <i class="fas fa-filter me-2"></i>
                                 <strong>Filtros</strong>
-                                <span class="badge bg-info ms-2">Ano {{ ano_filtro }}</span>
-                                {% if meses_filtro %}
-                                    <span class="badge bg-secondary ms-1">
-                                        {% if meses_filtro|length == 12 %}Todos os meses{% else %}{{ meses_filtro|length }} meses{% endif %}
+                                {% if filter_descr_setor or filter_nome_funcionario %}
+                                    <span class="badge bg-info ms-2">
+                                        {% if filter_descr_setor %}Setor{% endif %}
+                                        {% if filter_descr_setor and filter_nome_funcionario %} · {% endif %}
+                                        {% if filter_nome_funcionario %}Funcionário{% endif %}
                                     </span>
                                 {% endif %}
                             </button>
@@ -74,37 +78,29 @@
                         <div id="filtrosCollapse" class="accordion-collapse collapse" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
                             <div class="accordion-body">
                                 <form method="get" action="{% url 'analise_plano_preventiva' %}" class="row g-3">
-                                    <div class="col-md-4">
-                                        <label for="ano" class="form-label">Ano (data execução)</label>
-                                        <select class="form-select" id="ano" name="ano" required>
-                                            {% for ano in anos_disponiveis %}
-                                                <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                    <div class="col-md-5">
+                                        <label for="filter_descr_setor" class="form-label">Descrição Setor</label>
+                                        <select class="form-select" id="filter_descr_setor" name="filter_descr_setor">
+                                            <option value="">— Todos os setores —</option>
+                                            {% for s in setores_opcoes %}
+                                                <option value="{{ s }}" {% if filter_descr_setor == s %}selected{% endif %}>{{ s|truncatechars:60 }}</option>
                                             {% endfor %}
                                         </select>
                                     </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">Meses (vazio = todos)</label>
-                                        <div class="row g-2">
-                                            {% for i in "123456789012" %}
-                                                {% with mes_num=forloop.counter %}
-                                                    <div class="col-md-3 col-sm-4 col-6">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input" type="checkbox" name="mes" value="{{ mes_num }}" id="mes{{ mes_num }}" {% if mes_num in meses_filtro %}checked{% endif %}>
-                                                            <label class="form-check-label" for="mes{{ mes_num }}">{{ meses_nomes|get_item:mes_num }}</label>
-                                                        </div>
-                                                    </div>
-                                                {% endwith %}
+                                    <div class="col-md-5">
+                                        <label for="filter_nome_funcionario" class="form-label">Nome Funcionário</label>
+                                        <select class="form-select" id="filter_nome_funcionario" name="filter_nome_funcionario">
+                                            <option value="">— Todos os funcionários —</option>
+                                            {% for f in funcionarios_opcoes %}
+                                                <option value="{{ f }}" {% if filter_nome_funcionario == f %}selected{% endif %}>{{ f|truncatechars:50 }}</option>
                                             {% endfor %}
-                                        </div>
-                                        <div class="mt-2">
-                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosMeses()">Selecionar todos</button>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">Desmarcar todos</button>
-                                        </div>
+                                        </select>
                                     </div>
-                                    <div class="col-md-2 d-flex align-items-end">
-                                        <button type="submit" class="btn btn-primary w-100">
+                                    <div class="col-md-2 d-flex align-items-end gap-2">
+                                        <button type="submit" class="btn btn-primary flex-grow-1">
                                             <i class="fas fa-search me-2"></i>Aplicar
                                         </button>
+                                        <a href="{% url 'analise_plano_preventiva' %}" class="btn btn-outline-secondary">Limpar</a>
                                     </div>
                                 </form>
                             </div>
@@ -118,46 +114,46 @@
             <div class="col-md-8">
                 <p class="text-muted mb-0">
                     <i class="fas fa-info-circle me-1"></i>
-                    Os registros são filtrados pela string de <strong>data de execução</strong> (formato DD/MM/AAAA). Indicadores e gráficos refletem apenas o período selecionado.
+                    Análise sobre todos os registros da tabela PlanoPreventiva. Use os filtros acima para restringir por setor ou funcionário.
                 </p>
             </div>
             <div class="col-md-4 text-md-end">
-                <a href="{% url 'consultar_plano_preventiva' %}?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}" class="btn btn-outline-primary">
+                <a href="{% url 'consultar_plano_preventiva' %}" class="btn btn-outline-primary">
                     <i class="fas fa-table me-2"></i>Ver lista detalhada
                 </a>
             </div>
         </div>
 
         <div class="row g-3 mb-2">
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="text-muted mb-2">Registros no período</h6>
+                                <h6 class="text-muted mb-2">Registros</h6>
                                 <h4 class="mb-0 fw-bold">{{ total_registros }}</h4>
-                                <small class="text-muted">Linhas filtradas</small>
+                                <small class="text-muted">Após filtros aplicados</small>
                             </div>
                             <i class="fas fa-clipboard-list fa-2x text-primary opacity-25"></i>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 class="text-muted mb-2">Máquinas distintas</h6>
                                 <h4 class="mb-0 fw-bold">{{ maquinas_distintas }}</h4>
-                                <small class="text-muted">Cód. máquina no período</small>
+                                <small class="text-muted">Cód. máquina</small>
                             </div>
                             <i class="fas fa-industry fa-2x text-success opacity-25"></i>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -167,20 +163,6 @@
                                 <small class="text-muted">Cód. setor</small>
                             </div>
                             <i class="fas fa-sitemap fa-2x text-warning opacity-25"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="text-muted mb-2">Unidades distintas</h6>
-                                <h4 class="mb-0 fw-bold">{{ unidades_distintas }}</h4>
-                                <small class="text-muted">Cód. unidade</small>
-                            </div>
-                            <i class="fas fa-building fa-2x text-info opacity-25"></i>
                         </div>
                     </div>
                 </div>
@@ -195,7 +177,7 @@
                             <div>
                                 <h6 class="text-muted mb-2">Com roteiro vinculado</h6>
                                 <h4 class="mb-0 fw-bold">{{ com_roteiro }}</h4>
-                                <small class="text-muted">{{ pct_roteiro }}% do período</small>
+                                <small class="text-muted">{{ pct_roteiro }}%</small>
                             </div>
                             <i class="fas fa-link fa-2x opacity-25" style="color: #6f42c1;"></i>
                         </div>
@@ -236,11 +218,248 @@
             <div class="col-12">
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="fas fa-chart-column me-2"></i>Volume por mês (data execução)</h5>
+                        <h5 class="mb-0"><i class="fas fa-chart-column me-2"></i>Volume por período (data execução)</h5>
                     </div>
                     <div class="card-body">
                         <div class="chart-container-tall">
                             <canvas id="chartMeses"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header text-white" style="background-color: #0d6efd;">
+                        <h5 class="mb-0"><i class="fas fa-users me-2"></i>Análise por Funcionário (quantidade de registros)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-tall" style="height: 420px;">
+                            <canvas id="chartFuncionarios"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header text-white" style="background-color: #20c997;">
+                        <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Análise por Local de Trabalho (local_trab)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">Manutentores e PlanoPreventiva associados a cada um, agrupados por local de trabalho e, dentro de cada local, por turno.</p>
+                        <div class="chart-container mb-4" style="height: 280px;">
+                            <canvas id="chartLocalTrab"></canvas>
+                        </div>
+                        <div class="accordion" id="accordionLocalTrab">
+                            {% for item in analise_local_trab %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.counter }}">
+                                        <strong>{{ item.local_label }}</strong>
+                                        <span class="badge bg-secondary ms-2">{{ item.total_manutentores }} manutentor(es)</span>
+                                        <span class="badge bg-info ms-1">{{ item.total_planos }} plano(s)</span>
+                                    </button>
+                                </h2>
+                                <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#accordionLocalTrab">
+                                    <div class="accordion-body p-3">
+                                        {% for td in item.turnos_data %}
+                                        {% with idx_local=forloop.parentloop.counter idx_turno=forloop.counter %}
+                                        {% cycle '#0d6efd' '#198754' '#6f42c1' '#fd7e14' '#20c997' '#0dcaf0' as turno_accent %}
+                                        <div class="turno-block border rounded-3 mb-4 overflow-hidden" style="border-left-width: 4px !important; border-left-color: {{ turno_accent }} !important; box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);">
+                                            <div class="turno-header d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 py-2" style="background: linear-gradient(135deg, rgba(13, 110, 253, 0.08), rgba(32, 201, 151, 0.08)); border-bottom: 1px solid rgba(0,0,0,0.08);">
+                                                <div class="d-flex flex-wrap align-items-center gap-2">
+                                                    <i class="fas fa-clock text-muted"></i>
+                                                    <strong class="text-dark">{{ td.turno_label }}</strong>
+                                                    <span class="badge bg-secondary">{{ td.manutentores_data|length }} manutentor(es)</span>
+                                                    <span class="badge bg-primary">{{ td.total_planos }} plano(s)</span>
+                                                </div>
+                                                <button class="btn btn-sm btn-outline-secondary turno-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTurno-{{ idx_local }}-{{ idx_turno }}" aria-expanded="false" aria-controls="collapseTurno-{{ idx_local }}-{{ idx_turno }}">
+                                                    <i class="fas fa-chevron-down me-1"></i><span>Expandir</span>
+                                                </button>
+                                            </div>
+                                            <div id="collapseTurno-{{ idx_local }}-{{ idx_turno }}" class="collapse" aria-labelledby="headingTurno-{{ idx_local }}-{{ idx_turno }}">
+                                                <div class="p-2 bg-white">
+                                                        {% for md in td.manutentores_data %}
+                                                        {% with idx_man=forloop.counter %}
+                                                        <div class="border-bottom">
+                                                            <div class="p-3 bg-light" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#planos-{{ idx_local }}-{{ idx_turno }}-{{ idx_man }}" aria-expanded="false" aria-controls="planos-{{ idx_local }}-{{ idx_turno }}-{{ idx_man }}" style="cursor: pointer;" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); this.click(); }">
+                                                                <div class="d-flex justify-content-between align-items-center">
+                                                                    <div>
+                                                                        <strong>{{ md.manutentor.Nome|default:md.manutentor.Matricula }}</strong>
+                                                                        <span class="text-muted ms-2">(Mat: {{ md.manutentor.Matricula }})</span>
+                                                                    </div>
+                                                                    <span class="badge bg-primary">{{ md.count }} plano(s)</span>
+                                                                </div>
+                                                            </div>
+                                                            <div class="collapse" id="planos-{{ idx_local }}-{{ idx_turno }}-{{ idx_man }}">
+                                                                <div class="p-2">
+                                                                    {% if md.planos %}
+                                                                    <table class="table table-sm table-hover mb-0">
+                                                                        <thead class="table-light">
+                                                                            <tr>
+                                                                                <th>Máquina</th>
+                                                                                <th>Data Execução</th>
+                                                                                <th>Descrição Tarefa</th>
+                                                                                <th>Ações</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            {% for plano in md.planos %}
+                                                                            <tr>
+                                                                                <td>{{ plano.cd_maquina|default:"-" }} {% if plano.descr_maquina %}<br><small class="text-muted">{{ plano.descr_maquina|truncatewords:6 }}</small>{% endif %}</td>
+                                                                                <td>{{ plano.dt_execucao|default:"-" }}</td>
+                                                                                <td style="max-width: 200px;">{{ plano.descr_tarefa|truncatewords:8|default:"-" }}</td>
+                                                                                <td><a href="{% url 'visualizar_manutencao_preventiva' plano.id %}" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i></a></td>
+                                                                            </tr>
+                                                                            {% endfor %}
+                                                                        </tbody>
+                                                                    </table>
+                                                                    {% if md.count > md.planos|length %}
+                                                                    <p class="small text-muted mt-1 mb-0">Exibindo {{ md.planos|length }} de {{ md.count }} planos.</p>
+                                                                    {% endif %}
+                                                                    {% else %}
+                                                                    <p class="text-muted small mb-0">Nenhum plano preventiva associado.</p>
+                                                                    {% endif %}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        {% endwith %}
+                                                        {% empty %}
+                                                        <p class="p-3 text-muted mb-0">Nenhum manutentor neste turno.</p>
+                                                        {% endfor %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endwith %}
+                                        {% empty %}
+                                        <p class="p-3 text-muted mb-0">Nenhum turno com manutentores neste local.</p>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="accordion-item">
+                                <div class="accordion-body p-4">
+                                    <p class="text-muted mb-0"><i class="fas fa-info-circle me-2"></i>Nenhum manutentor ativo com local de trabalho cadastrado.</p>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header text-white" style="background-color: #6f42c1;">
+                        <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Análise por Turno</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">Manutentores e PlanoPreventiva associados a cada um, agrupados por turno e, dentro de cada turno, por local de trabalho.</p>
+                        <div class="chart-container mb-4" style="height: 280px;">
+                            <canvas id="chartTurno"></canvas>
+                        </div>
+                        <div class="accordion" id="accordionTurno">
+                            {% for item in analise_turno %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingTurno{{ forloop.counter }}">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTurno{{ forloop.counter }}" aria-expanded="false" aria-controls="collapseTurno{{ forloop.counter }}">
+                                        <strong>{{ item.turno_label }}</strong>
+                                        <span class="badge bg-secondary ms-2">{{ item.total_manutentores }} manutentor(es)</span>
+                                        <span class="badge bg-info ms-1">{{ item.total_planos }} plano(s)</span>
+                                    </button>
+                                </h2>
+                                <div id="collapseTurno{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="headingTurno{{ forloop.counter }}" data-bs-parent="#accordionTurno">
+                                    <div class="accordion-body p-3">
+                                        {% for ld in item.locais_data %}
+                                        {% with idx_turno_item=forloop.parentloop.counter idx_local=forloop.counter %}
+                                        {% cycle '#0d6efd' '#198754' '#6f42c1' '#fd7e14' '#20c997' '#0dcaf0' as local_accent %}
+                                        <div class="turno-block border rounded-3 mb-4 overflow-hidden" style="border-left-width: 4px !important; border-left-color: {{ local_accent }} !important; box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);">
+                                            <div class="turno-header d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 py-2" style="background: linear-gradient(135deg, rgba(111, 66, 193, 0.08), rgba(32, 201, 151, 0.08)); border-bottom: 1px solid rgba(0,0,0,0.08);">
+                                                <div class="d-flex flex-wrap align-items-center gap-2">
+                                                    <i class="fas fa-map-marker-alt text-muted"></i>
+                                                    <strong class="text-dark">{{ ld.local_label }}</strong>
+                                                    <span class="badge bg-secondary">{{ ld.manutentores_data|length }} manutentor(es)</span>
+                                                    <span class="badge bg-primary">{{ ld.total_planos }} plano(s)</span>
+                                                </div>
+                                                <button class="btn btn-sm btn-outline-secondary turno-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLocalTurno-{{ idx_turno_item }}-{{ idx_local }}" aria-expanded="false" aria-controls="collapseLocalTurno-{{ idx_turno_item }}-{{ idx_local }}">
+                                                    <i class="fas fa-chevron-down me-1"></i><span>Expandir</span>
+                                                </button>
+                                            </div>
+                                            <div id="collapseLocalTurno-{{ idx_turno_item }}-{{ idx_local }}" class="collapse" aria-labelledby="headingLocalTurno-{{ idx_turno_item }}-{{ idx_local }}">
+                                                <div class="p-2 bg-white">
+                                                    {% for md in ld.manutentores_data %}
+                                                    {% with idx_man=forloop.counter %}
+                                                    <div class="border-bottom">
+                                                        <div class="p-3 bg-light" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#planosTurno-{{ idx_turno_item }}-{{ idx_local }}-{{ idx_man }}" aria-expanded="false" aria-controls="planosTurno-{{ idx_turno_item }}-{{ idx_local }}-{{ idx_man }}" style="cursor: pointer;" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); this.click(); }">
+                                                            <div class="d-flex justify-content-between align-items-center">
+                                                                <div>
+                                                                    <strong>{{ md.manutentor.Nome|default:md.manutentor.Matricula }}</strong>
+                                                                    <span class="text-muted ms-2">(Mat: {{ md.manutentor.Matricula }})</span>
+                                                                </div>
+                                                                <span class="badge bg-primary">{{ md.count }} plano(s)</span>
+                                                            </div>
+                                                        </div>
+                                                        <div class="collapse" id="planosTurno-{{ idx_turno_item }}-{{ idx_local }}-{{ idx_man }}">
+                                                            <div class="p-2">
+                                                                {% if md.planos %}
+                                                                <table class="table table-sm table-hover mb-0">
+                                                                    <thead class="table-light">
+                                                                        <tr>
+                                                                            <th>Máquina</th>
+                                                                            <th>Data Execução</th>
+                                                                            <th>Descrição Tarefa</th>
+                                                                            <th>Ações</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {% for plano in md.planos %}
+                                                                        <tr>
+                                                                            <td>{{ plano.cd_maquina|default:"-" }} {% if plano.descr_maquina %}<br><small class="text-muted">{{ plano.descr_maquina|truncatewords:6 }}</small>{% endif %}</td>
+                                                                            <td>{{ plano.dt_execucao|default:"-" }}</td>
+                                                                            <td style="max-width: 200px;">{{ plano.descr_tarefa|truncatewords:8|default:"-" }}</td>
+                                                                            <td><a href="{% url 'visualizar_manutencao_preventiva' plano.id %}" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i></a></td>
+                                                                        </tr>
+                                                                        {% endfor %}
+                                                                    </tbody>
+                                                                </table>
+                                                                {% if md.count > md.planos|length %}
+                                                                <p class="small text-muted mt-1 mb-0">Exibindo {{ md.planos|length }} de {{ md.count }} planos.</p>
+                                                                {% endif %}
+                                                                {% else %}
+                                                                <p class="text-muted small mb-0">Nenhum plano preventiva associado.</p>
+                                                                {% endif %}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {% endwith %}
+                                                    {% empty %}
+                                                    <p class="p-3 text-muted mb-0">Nenhum manutentor neste local.</p>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endwith %}
+                                        {% empty %}
+                                        <p class="p-3 text-muted mb-0">Nenhum local com manutentores neste turno.</p>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="accordion-item">
+                                <div class="accordion-body p-4">
+                                    <p class="text-muted mb-0"><i class="fas fa-info-circle me-2"></i>Nenhum manutentor ativo com turno cadastrado.</p>
+                                </div>
+                            </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
@@ -334,19 +553,67 @@
             </div>
         </div>
         {% endif %}
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0"><i class="fas fa-user-times me-2"></i>Planos Preventiva sem funcionário associado</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">
+                            Registros que não possuem <strong>nome_funcionario</strong> nem <strong>cd_funcionario</strong> preenchidos.
+                            Total: <strong>{{ count_planos_sem_funcionario }}</strong>
+                        </p>
+                        {% if planos_sem_funcionario %}
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Máquina</th>
+                                        <th>Descrição Máquina</th>
+                                        <th>Setor</th>
+                                        <th>Data Execução</th>
+                                        <th>Descrição Tarefa</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for plano in planos_sem_funcionario %}
+                                    <tr>
+                                        <td><strong>{{ plano.cd_maquina|default:"-" }}</strong></td>
+                                        <td style="max-width: 250px;">{{ plano.descr_maquina|truncatewords:12|default:"-" }}</td>
+                                        <td>{{ plano.cd_setor|default:"-" }}</td>
+                                        <td>{{ plano.dt_execucao|default:"-" }}</td>
+                                        <td style="max-width: 200px;">{{ plano.descr_tarefa|truncatewords:8|default:"-" }}</td>
+                                        <td>
+                                            <a href="{% url 'visualizar_manutencao_preventiva' plano.id %}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% if count_planos_sem_funcionario > planos_sem_funcionario|length %}
+                        <p class="text-muted small mt-2 mb-0">
+                            Exibindo os primeiros {{ planos_sem_funcionario|length }} de {{ count_planos_sem_funcionario }} registros.
+                        </p>
+                        {% endif %}
+                        {% else %}
+                        <p class="text-success mb-0"><i class="fas fa-check-circle me-1"></i>Todos os planos possuem funcionário associado.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </section>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-function selecionarTodosMeses() {
-    document.querySelectorAll('#filtrosCollapse input[name="mes"]').forEach(cb => { cb.checked = true; });
-}
-function desmarcarTodosMeses() {
-    document.querySelectorAll('#filtrosCollapse input[name="mes"]').forEach(cb => { cb.checked = false; });
-}
-
 const chartColors = ['#0d6efd','#198754','#ffc107','#dc3545','#0dcaf0','#6f42c1','#fd7e14','#20c997','#e83e8c','#6c757d'];
 
 const mesesLabels = {{ meses_labels_json|safe }};
@@ -355,6 +622,12 @@ const setoresLabels = {{ setores_labels_json|safe }};
 const setoresData = {{ setores_data_json|safe }};
 const maquinasLabels = {{ maquinas_labels_json|safe }};
 const maquinasData = {{ maquinas_data_json|safe }};
+const funcionariosLabels = {{ funcionarios_labels_json|safe }};
+const funcionariosData = {{ funcionarios_data_json|safe }};
+const localTrabLabels = {{ local_trab_labels_json|safe }};
+const localTrabData = {{ local_trab_data_json|safe }};
+const turnoLabels = {{ turno_labels_json|safe }};
+const turnoData = {{ turno_data_json|safe }};
 const periodoLabels = {{ periodo_labels_json|safe }};
 const periodoData = {{ periodo_data_json|safe }};
 const roteiroLabels = {{ roteiro_labels_json|safe }};
@@ -393,6 +666,96 @@ document.addEventListener('DOMContentLoaded', function() {
                 plugins: { legend: { display: false } },
                 scales: {
                     y: { beginAtZero: true, ticks: { precision: 0 } }
+                }
+            }
+        });
+    });
+
+    renderOrEmpty('chartFuncionarios', function(canvas) {
+        if (!funcionariosLabels.length) {
+            const ctx = canvas.getContext('2d');
+            doughnutEmptyMessage(ctx, 'Sem dados de funcionário');
+            return;
+        }
+        new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: funcionariosLabels,
+                datasets: [{
+                    label: 'Registros',
+                    data: funcionariosData,
+                    backgroundColor: 'rgba(13, 110, 253, 0.7)',
+                    borderColor: '#0d6efd',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { beginAtZero: true, ticks: { precision: 0 } }
+                }
+            }
+        });
+    });
+
+    renderOrEmpty('chartLocalTrab', function(canvas) {
+        if (!localTrabLabels.length || !localTrabData.some(v => v > 0)) {
+            const ctx = canvas.getContext('2d');
+            doughnutEmptyMessage(ctx, 'Sem dados por local de trabalho');
+            return;
+        }
+        new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: localTrabLabels,
+                datasets: [{
+                    label: 'Planos',
+                    data: localTrabData,
+                    backgroundColor: 'rgba(32, 201, 151, 0.7)',
+                    borderColor: '#20c997',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { beginAtZero: true, ticks: { precision: 0 } }
+                }
+            }
+        });
+    });
+
+    renderOrEmpty('chartTurno', function(canvas) {
+        if (!turnoLabels.length || !turnoData.some(v => v > 0)) {
+            const ctx = canvas.getContext('2d');
+            doughnutEmptyMessage(ctx, 'Sem dados por turno');
+            return;
+        }
+        new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: turnoLabels,
+                datasets: [{
+                    label: 'Planos',
+                    data: turnoData,
+                    backgroundColor: 'rgba(111, 66, 193, 0.7)',
+                    borderColor: '#6f42c1',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { beginAtZero: true, ticks: { precision: 0 } }
                 }
             }
         });

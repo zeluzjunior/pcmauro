@@ -516,6 +516,7 @@ class Manutentor(models.Model):
     tempo_trabalho = models.CharField('Tempo de Trabalho', max_length=250)
     turno = models.CharField('Turno', max_length=25, choices=TURNO)
     local_trab = models.CharField('Local de Trabalho', max_length=40, choices=LOCAL_TRABALHO)
+    horas_semanais = models.DecimalField('Horas Semanais', max_digits=5, decimal_places=2, null=True, blank=True, help_text='Quantidade de horas trabalhadas por semana')
     ativo = models.BooleanField('Ativo', default=True, db_index=True, help_text='Indica se o manutentor faz parte da equipe')
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
     updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
