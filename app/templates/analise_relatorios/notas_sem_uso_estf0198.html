@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Notas sem uso — ESTF0198{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Ajuste Relatórios SIGA</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Notas sem uso — ESTF0198</li>
+                    </ol>
+                </nav>
+                <h1 class="display-5 fw-bold mt-3">Notas sem uso — ESTF0198</h1>
+                <p class="lead mb-0">Preencha a coluna <strong>G</strong> (uso contábil) com dados do cadastro <code>NotaFiscal</code> quando houver correspondência exata em <strong>Emitente</strong>, <strong>Nota</strong> e <strong>Total Nota</strong>.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% if messages %}
+<div class="container mt-4">
+    {% for message in messages %}
+    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show shadow-sm" role="alert">
+        {{ message|safe }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<section class="py-5">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-upload me-2"></i>Enviar CSV</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">
+                            Use o mesmo layout do export SIGA (cabeçalho com <code>Emitente</code>, <code>Nota</code>, <code>Total Nota</code>, <code>uso contabil</code>, etc.), delimitador <strong>;</strong>.
+                        </p>
+                        <form method="post" action="{% url 'notas_sem_uso_estf0198' %}" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="csvFile" class="form-label">Arquivo .csv</label>
+                                <input type="file" class="form-control" id="csvFile" name="file" accept=".csv" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-gear me-1"></i> Processar e gerar arquivo ajustado
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="card border-0 bg-light shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="text-primary"><i class="bi bi-info-circle me-1"></i>Como funciona</h6>
+                        <ul class="small mb-0 ps-3">
+                            <li>Para cada linha, o sistema busca no banco uma <code>NotaFiscal</code> com o mesmo <strong>emitente</strong>, <strong>número da nota</strong> e <strong>total</strong> (valor com duas casas decimais).</li>
+                            <li>Se encontrar, copia <code>uso_contabil</code> para a coluna de uso contábil (coluna G no modelo padrão).</li>
+                            <li>Valores de total no formato brasileiro (ex.: <code>2.264,17</code>) são interpretados corretamente.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if show_download and stats %}
+        <div class="card shadow-sm border-success mt-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-download me-2"></i>Download do arquivo ajustado</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3 col-6">
+                        <div class="border rounded p-2 text-center bg-light">
+                            <div class="text-muted small">Linhas de dados</div>
+                            <div class="fs-5 fw-bold">{{ stats.linhas_dados }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="border rounded p-2 text-center bg-light">
+                            <div class="text-muted small">Correspondência no banco</div>
+                            <div class="fs-5 fw-bold text-success">{{ stats.preenchidas }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="border rounded p-2 text-center bg-light">
+                            <div class="text-muted small">Sem total válido</div>
+                            <div class="fs-5 fw-bold">{{ stats.sem_total_valido }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="border rounded p-2 text-center bg-light">
+                            <div class="text-muted small">Sem correspondência</div>
+                            <div class="fs-5 fw-bold">{{ stats.sem_correspondencia }}</div>
+                        </div>
+                    </div>
+                </div>
+                <a href="{% url 'download_notas_sem_uso_estf0198' %}" class="btn btn-success btn-lg">
+                    <i class="bi bi-file-earmark-arrow-down me-2"></i>Baixar CSV ajustado
+                </a>
+                <p class="small text-muted mt-2 mb-0">O arquivo é gerado em UTF-8 com BOM para abrir corretamente no Excel.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

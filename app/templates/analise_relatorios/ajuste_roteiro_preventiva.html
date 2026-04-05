@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Roteiro Preventiva — Dados delimitados (SIGA){% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Ajuste Relatórios SIGA</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Roteiro Preventiva — Dados delimitados</li>
+                    </ol>
+                </nav>
+                <h1 class="display-5 fw-bold mt-3">Roteiro Preventiva — Dados delimitados</h1>
+                <p class="lead mb-0">Limpeza do export <code>roteiro_preventiva_dados.csv</code> (delimitador <code>;</code>)</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% if messages %}
+<div class="container mt-4">
+    {% for message in messages %}
+    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show shadow-sm" role="alert">
+        {{ message|safe }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<section class="py-5">
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-lg-10 mx-auto">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title text-primary"><i class="fas fa-info-circle me-2"></i>O que esta ferramenta faz</h5>
+                        <p class="fw-semibold mb-1">Etapa 1 — linhas vazias</p>
+                        <ul class="mb-3">
+                            <li><strong>Remove linhas totalmente em branco</strong> (só <code>;</code> ou espaços).</li>
+                        </ul>
+                        <p class="fw-semibold mb-1">Etapa 2 — linhas só com A, B ou C</p>
+                        <ul class="mb-0">
+                            <li>Remove linhas que têm dados <strong>apenas</strong> nas colunas <strong>A</strong>, <strong>B</strong> ou <strong>C</strong> (CD_UNID, NOME_UNID, CD_FUNCIOMANU).</li>
+                            <li>Mantém apenas linhas com pelo menos um dado a partir da coluna <strong>D</strong> em diante.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-5">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-upload me-2"></i>Enviar CSV</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="fileInput" class="form-label">Arquivo <code>.csv</code></label>
+                                <input type="file" class="form-control" id="fileInput" name="file" accept=".csv" required>
+                                <div class="form-text">Encoding detectado automaticamente (UTF-8, Windows-1252, Latin-1).</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-broom me-2"></i>Processar e preparar download
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if has_processed_file %}
+        <div class="row mb-5">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm border-success">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-download me-2"></i>Baixar arquivo ajustado</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if last_stats %}
+                        <p class="mb-3">
+                            <strong>Último processamento:</strong><br>
+                            Linhas lidas: {{ last_stats.total_in }} ·
+                            Vazias removidas: {{ last_stats.removed_blank }} ·
+                            Só A/B/C removidas: {{ last_stats.removed_abc_only }} ·
+                            Linhas no arquivo final: {{ last_stats.kept }}
+                        </p>
+                        {% endif %}
+                        <a href="{% url 'download_roteiro_preventiva_ajustado' %}" class="btn btn-success btn-lg">
+                            <i class="fas fa-file-download me-2"></i>Baixar CSV ajustado
+                        </a>
+                        <p class="text-muted small mt-3 mb-0">
+                            No Excel: use <strong>Dados &gt; texto/CSV</strong> (ou importar) e defina o delimitador como <strong>ponto e vírgula</strong>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

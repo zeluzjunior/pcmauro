@@ -11,6 +11,8 @@ urlpatterns = [
     path('orcamento/analise-requisicoes/', views.analise_requisicoes, name="analise_requisicoes"),
     path('testes/', views.testes, name="testes"),
     path('analise/plano-preventiva/', views.analise_plano_preventiva, name="analise_plano_preventiva"),
+    path('planejamento/analise-plano-por-maquina/', views.analise_plano_por_maquina, name="analise_plano_por_maquina"),
+    path('planejamento/plano-preventiva-por-maquina/<int:maquina_id>/', views.visualizar_plano_preventiva_por_maquina_agrupada, name="visualizar_plano_preventiva_por_maquina_agrupada"),
     path('planejamento/maquina-primaria-secundaria/', views.maquina_primaria_secundaria, name="maquina_primaria_secundaria"),
     path('planejamento/analise-roteiro-plano-preventiva/', views.analise_roteiro_plano_preventiva, name="analise_roteiro_plano_preventiva"),  # Função limpa - recriar do zero
     path('contact/', views.contact, name="contact"),
@@ -38,8 +40,12 @@ urlpatterns = [
     # Ajuste Relatórios SIGA
     path('ajuste-relatorios-siga/relatorio-nf-estf0198/', views.relatorio_nf_estf0198, name="relatorio_nf_estf0198"),
     path('ajuste-relatorios-siga/relatorio-nf-estf0198/download/', views.download_relatorio_nf_estf0198, name="download_relatorio_nf_estf0198"),
+    path('ajuste-relatorios-siga/notas-sem-uso-estf0198/', views.notas_sem_uso_estf0198, name="notas_sem_uso_estf0198"),
+    path('ajuste-relatorios-siga/notas-sem-uso-estf0198/download/', views.download_notas_sem_uso_estf0198, name="download_notas_sem_uso_estf0198"),
     path('ajuste-relatorios-siga/plano-preventiva-dados-delimitado/', views.analise_plano_preventiva_dados_delimitado, name="analise_plano_preventiva_dados_delimitado"),
     path('ajuste-relatorios-siga/plano-preventiva-dados-delimitado/download/', views.download_plano_preventiva_dados_delimitado, name="download_plano_preventiva_dados_delimitado"),
+    path('ajuste-relatorios-siga/roteiro-preventiva-dados/', views.ajuste_roteiro_preventiva, name="ajuste_roteiro_preventiva"),
+    path('ajuste-relatorios-siga/roteiro-preventiva-dados/download/', views.download_roteiro_preventiva_ajustado, name="download_roteiro_preventiva_ajustado"),
     
     # Estoque
     path('estoque/consultar/', views.consultar_estoque, name="consultar_estoque"),
@@ -87,7 +93,11 @@ urlpatterns = [
     path('planejamento/analise-geral-pcm/', views.analise_geral_plano_preventiva_pcm, name="analise_geral_plano_preventiva_pcm"),
     path('planejamento/agrupar-acoes-plano-por-data/', views.agrupar_acoes_do_plano_por_data, name="agrupar_acoes_do_plano_por_data"),
     path('planejamento/criar-cronograma-planejado-preventiva/', views.criar_cronograma_planejado_preventiva, name="criar_cronograma_planejado_preventiva"),
+    path('planejamento/gerar-arquivo-documento-preventivas/', views.gerar_arquivo_para_preventiva, name="gerar_arquivo_para_preventiva"),
+    path('api/maquinas-filtros-gerenc/', views.api_gerenc_por_setor_maquina, name="api_gerenc_por_setor_maquina"),
+    path('api/maquinas-filtros-lista/', views.api_maquinas_por_setor_gerenc, name="api_maquinas_por_setor_gerenc"),
     path('plano-preventiva/visualizar/<int:plano_id>/', views.visualizar_manutencao_preventiva, name="visualizar_manutencao_preventiva"),
+    path('roteiros-preventiva/analise/', views.analise_roteiro_preventiva, name="analise_roteiro_preventiva"),
     path('roteiros-preventiva/consultar/', views.consultar_roteiro_preventiva, name="consultar_roteiro_preventiva"),
     path('roteiros-preventiva/visualizar/<int:roteiro_id>/', views.visualizar_roteiro_preventiva, name="visualizar_roteiro_preventiva"),
     path('analise/plano-roteiro/visualizar/<int:plano_id>/<int:roteiro_id>/', views.visualizar_analise_plano_roteiro, name="visualizar_analise_plano_roteiro"),  # Função limpa - recriar do zero
@@ -197,6 +207,8 @@ urlpatterns = [
     
     # Agenda Geral
     path('agenda-geral/', views.agenda_geral, name="agenda_geral"),
+    path('meus-planos-preventiva/calendario/', views.calendario_plano_e_roteiro, name="calendario_plano_e_roteiro"),
+    path('api/eventos-preventivas-calendario/', views.api_eventos_preventivas_calendario, name="api_eventos_preventivas_calendario"),
     
     # API Endpoints
     path('api/search-maquinas/', views.api_search_maquinas, name="api_search_maquinas"),

@@ -1,0 +1,282 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gerar Arquivo de Documento para Preventivas{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-card { background: #f8f9fa; border-radius: 8px; padding: 1.25rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Gerar Arquivo — Preventivas</li>
+                    </ol>
+                </nav>
+                <h1 class="display-5 fw-bold mt-3">
+                    <i class="bi bi-file-earmark-arrow-up me-2"></i>Gerar Arquivo de Documento para Preventivas
+                </h1>
+                <p class="lead mb-0">Filtre por setor de manutenção, gerência e máquina (cadastro de máquinas ativas).</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-funnel me-2"></i>Filtros</h5>
+            </div>
+            <div class="card-body filter-card">
+                <form method="get" action="{% url 'gerar_arquivo_para_preventiva' %}" id="formFiltros">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label for="filter_cd_setormanut" class="form-label">Código setor manutenção (cd_setormanut)</label>
+                            <select name="cd_setormanut" id="filter_cd_setormanut" class="form-select">
+                                <option value="">Selecione o setor…</option>
+                                {% for cd, label in setor_choices %}
+                                <option value="{{ cd }}" {% if selected_cd_setormanut == cd %}selected{% endif %}>{{ cd }} — {{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="filter_descr_gerenc" class="form-label">Descrição gerência (descr_gerenc)</label>
+                            <select name="descr_gerenc" id="filter_descr_gerenc" class="form-select" {% if not selected_cd_setormanut %}disabled{% endif %}>
+                                <option value="">{% if selected_cd_setormanut %}Selecione a gerência…{% else %}Selecione o setor primeiro{% endif %}</option>
+                                {% for g in gerenc_choices %}
+                                <option value="{{ g }}" {% if selected_descr_gerenc == g %}selected{% endif %}>{{ g }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="filter_maquina_id" class="form-label">Máquina (descr_maquina)</label>
+                            <select name="maquina_id" id="filter_maquina_id" class="form-select" {% if not selected_cd_setormanut or not selected_descr_gerenc %}disabled{% endif %}>
+                                <option value="">Todas neste setor e gerência</option>
+                                {% for m in maquina_choices %}
+                                <option value="{{ m.id }}" {% if selected_maquina_id == m.id|stringformat:"s" %}selected{% endif %}>{{ m.cd_maquina }} — {{ m.descr_maquina|default:"Sem descrição" }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-3 d-flex flex-wrap gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-search me-1"></i> Aplicar filtros
+                        </button>
+                        <a href="{% url 'gerar_arquivo_para_preventiva' %}" class="btn btn-outline-secondary">Limpar</a>
+                    </div>
+                    <p class="small text-muted mb-0 mt-3">
+                        <i class="bi bi-diagram-3 me-1"></i>
+                        Se você escolher uma <strong>máquina principal</strong> (gerência &quot;MÁQUINAS PRINCIPAL&quot;) no terceiro campo e aplicar os filtros, uma seção adicional listará as <strong>máquinas secundárias</strong> vinculadas a ela.
+                    </p>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0"><i class="bi bi-table me-2"></i>Resultado</h5>
+                {% if resultados %}
+                <span class="badge bg-light text-dark">{{ resultados|length }} registro{{ resultados|length|pluralize }}</span>
+                {% endif %}
+            </div>
+            <div class="card-body p-0">
+                {% if selected_cd_setormanut and selected_descr_gerenc %}
+                    {% if resultados %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Cód. máquina</th>
+                                    <th>Descrição (descr_maquina)</th>
+                                    <th>cd_setormanut</th>
+                                    <th>Setor (descr_setormanut)</th>
+                                    <th>descr_gerenc</th>
+                                    <th>Patrimônio</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for m in resultados %}
+                                <tr>
+                                    <td><strong>{{ m.cd_maquina }}</strong></td>
+                                    <td>{{ m.descr_maquina|default:"—" }}</td>
+                                    <td>{{ m.cd_setormanut|default:"—" }}</td>
+                                    <td>{{ m.descr_setormanut|default:"—" }}</td>
+                                    <td>{{ m.descr_gerenc|default:"—" }}</td>
+                                    <td>{{ m.nro_patrimonio|default:"—" }}</td>
+                                    <td class="text-nowrap">
+                                        <a href="{% url 'visualizar_maquina' m.id %}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">Ver máquina</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                        Nenhuma máquina encontrada para os filtros (incluindo máquina específica, se informada).
+                    </div>
+                    {% endif %}
+                {% else %}
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Selecione <strong>setor</strong> e <strong>gerência</strong>, depois clique em <strong>Aplicar filtros</strong>. A lista de máquinas (descr_maquina) depende desses dois campos.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if mostrar_secundarias_da_principal and maquina_principal_selecionada %}
+        <div class="card shadow-sm mt-4 border-info">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-diagram-3 me-2"></i>Máquinas secundárias relacionadas
+                </h5>
+                <small class="d-block mt-1 opacity-90">
+                    Máquina principal selecionada: <strong>{{ maquina_principal_selecionada.cd_maquina }}</strong>
+                    — {{ maquina_principal_selecionada.descr_maquina|default:"Sem descrição" }}
+                </small>
+            </div>
+            <div class="card-body p-0">
+                {% if maquinas_secundarias_relacionadas %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Cód. máquina</th>
+                                <th>Descrição (descr_maquina)</th>
+                                <th>cd_setormanut</th>
+                                <th>Setor (descr_setormanut)</th>
+                                <th>descr_gerenc</th>
+                                <th>Patrimônio</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in maquinas_secundarias_relacionadas %}
+                            <tr>
+                                <td><strong>{{ m.cd_maquina }}</strong></td>
+                                <td>{{ m.descr_maquina|default:"—" }}</td>
+                                <td>{{ m.cd_setormanut|default:"—" }}</td>
+                                <td>{{ m.descr_setormanut|default:"—" }}</td>
+                                <td>{{ m.descr_gerenc|default:"—" }}</td>
+                                <td>{{ m.nro_patrimonio|default:"—" }}</td>
+                                <td class="text-nowrap">
+                                    <a href="{% url 'visualizar_maquina' m.id %}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">Ver máquina</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-3 py-2 border-top bg-light small text-muted">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Total de máquinas secundárias vinculadas: <strong>{{ maquinas_secundarias_relacionadas|length }}</strong>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-muted">
+                    <i class="bi bi-link-45deg fs-1 d-block mb-2"></i>
+                    Nenhuma máquina secundária cadastrada para esta máquina principal.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const urlGerenc = '{% url "api_gerenc_por_setor_maquina" %}';
+    const urlMaquinas = '{% url "api_maquinas_por_setor_gerenc" %}';
+    const selSetor = document.getElementById('filter_cd_setormanut');
+    const selGerenc = document.getElementById('filter_descr_gerenc');
+    const selMaquina = document.getElementById('filter_maquina_id');
+
+    function fillGerenc(options, keepValue) {
+        const v = keepValue || '';
+        selGerenc.innerHTML = '<option value="">Selecione a gerência…</option>';
+        options.forEach(function(g) {
+            const opt = document.createElement('option');
+            opt.value = g;
+            opt.textContent = g;
+            if (g === v) opt.selected = true;
+            selGerenc.appendChild(opt);
+        });
+        selGerenc.disabled = false;
+    }
+
+    function fillMaquinas(rows, keepId) {
+        const kid = keepId ? String(keepId) : '';
+        selMaquina.innerHTML = '<option value="">Todas neste setor e gerência</option>';
+        rows.forEach(function(row) {
+            const opt = document.createElement('option');
+            opt.value = row.id;
+            const d = (row.descr_maquina || 'Sem descrição').substring(0, 120);
+            opt.textContent = row.cd_maquina + ' — ' + d;
+            if (String(row.id) === kid) opt.selected = true;
+            selMaquina.appendChild(opt);
+        });
+        selMaquina.disabled = false;
+    }
+
+    function resetGerencMaquina() {
+        selGerenc.innerHTML = '<option value="">Selecione o setor primeiro</option>';
+        selGerenc.disabled = true;
+        selMaquina.innerHTML = '<option value="">Todas neste setor e gerência</option>';
+        selMaquina.disabled = true;
+    }
+
+    if (selSetor) {
+        selSetor.addEventListener('change', function() {
+            const cd = selSetor.value;
+            if (!cd) {
+                resetGerencMaquina();
+                return;
+            }
+            fetch(urlGerenc + '?cd_setormanut=' + encodeURIComponent(cd))
+                .then(function(r) { return r.json(); })
+                .then(function(list) {
+                    fillGerenc(list, '');
+                    selMaquina.innerHTML = '<option value="">Todas neste setor e gerência</option>';
+                    selMaquina.disabled = true;
+                })
+                .catch(function() {
+                    fillGerenc([], '');
+                });
+        });
+    }
+
+    if (selGerenc) {
+        selGerenc.addEventListener('change', function() {
+            const cd = selSetor.value;
+            const ger = selGerenc.value;
+            if (!cd || !ger) {
+                selMaquina.innerHTML = '<option value="">Todas neste setor e gerência</option>';
+                selMaquina.disabled = !cd;
+                return;
+            }
+            fetch(urlMaquinas + '?cd_setormanut=' + encodeURIComponent(cd) + '&descr_gerenc=' + encodeURIComponent(ger))
+                .then(function(r) { return r.json(); })
+                .then(function(rows) {
+                    fillMaquinas(rows, '');
+                })
+                .catch(function() {
+                    fillMaquinas([], '');
+                });
+        });
+    }
+})();
+</script>
+{% endblock %}

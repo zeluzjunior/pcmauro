@@ -240,6 +240,57 @@ def clean_plano_preventiva_delimitado_csv(text: str, delimiter: str = ';') -> Tu
     return buf.getvalue(), stats
 
 
+def clean_roteiro_preventiva_csv(text: str, delimiter: str = ';') -> Tuple[str, Dict[str, int]]:
+    """
+    Remove linhas inválidas do export ROTEIRO_PREVENTIVA_DADOS (CSV com ;).
+
+    Etapa 1: Remove linhas totalmente vazias.
+    Etapa 2: Remove linhas que têm dados APENAS nas colunas A, B ou C (índices 0, 1, 2).
+             Mantém apenas linhas com pelo menos um dado em coluna D ou superior (índice >= 3).
+
+    Retorna (texto CSV gerado, estatísticas).
+    """
+    import csv as _csv
+
+    reader = _csv.reader(io.StringIO(text), delimiter=delimiter)
+    rows_out: List[List[str]] = []
+    removed_blank = 0
+    removed_abc_only = 0
+    total_in = 0
+
+    for row in reader:
+        total_in += 1
+        cells = [str(c) if c is not None else '' for c in row]
+        stripped = [x.strip() for x in cells]
+
+        if not any(stripped):
+            removed_blank += 1
+            continue
+
+        # Linha tem dados apenas em A, B ou C? (colunas D onwards vazias)
+        has_data_from_d_onwards = any(
+            s for i, s in enumerate(stripped) if i >= 3 and s
+        )
+        if not has_data_from_d_onwards:
+            removed_abc_only += 1
+            continue
+
+        rows_out.append(cells)
+
+    buf = io.StringIO()
+    writer = _csv.writer(buf, delimiter=delimiter, lineterminator='\r\n', quoting=_csv.QUOTE_MINIMAL)
+    for row in rows_out:
+        writer.writerow(row)
+
+    stats = {
+        'total_in': total_in,
+        'removed_blank': removed_blank,
+        'removed_abc_only': removed_abc_only,
+        'kept': len(rows_out),
+    }
+    return buf.getvalue(), stats
+
+
 def _parse_csv_dict_rows_from_text(content: str, delimiter: str) -> List[Dict]:
     """Parse texto CSV já decodificado em lista de dicts (mesma regra de read_csv_file)."""
     csv_reader = csv.DictReader(io.StringIO(content), delimiter=delimiter)
@@ -3198,22 +3249,22 @@ def upload_roteiro_preventiva_from_file(file, update_existing=False) -> Tuple[in
         if file_name.endswith(('.xlsx', '.xls', '.xlsm')):
             data = read_excel_file(file)
         elif file_name.endswith('.csv'):
-            # Tentar diferentes encodings e delimitadores (o arquivo usa ponto e vÃ­rgula)
-            try:
-                # Primeiro tentar com delimitador ponto e vÃ­rgula (;) e encoding latin-1
-                file.seek(0)
-                data = read_csv_file(file, encoding='latin-1', delimiter=';')
-            except Exception:
-                try:
-                    file.seek(0)
-                    data = read_csv_file(file, encoding='utf-8', delimiter=';')
-                except Exception:
+            # Tentar encodings: UTF-8 primeiro (evita mojibake em arquivos com Ç, Á, Õ etc).
+            # Latin-1 quase nunca falha, então se usado primeiro corrompe textos UTF-8.
+            data = None
+            for encoding in ('utf-8-sig', 'utf-8', 'cp1252', 'latin-1'):
+                for delimiter in (';', ','):
                     try:
                         file.seek(0)
-                        data = read_csv_file(file, encoding='latin-1', delimiter=',')
-                    except Exception as e:
-                        file.seek(0)
-                        data = read_csv_file(file, encoding='utf-8', delimiter=',')
+                        data = read_csv_file(file, encoding=encoding, delimiter=delimiter)
+                        if data and len(data) > 0:
+                            break
+                    except (UnicodeDecodeError, Exception):
+                        continue
+                if data and len(data) > 0:
+                    break
+            if not data or len(data) == 0:
+                raise ValidationError("Arquivo CSV vazio ou não foi possível decodificar com UTF-8, CP1252 ou Latin-1.")
         else:
             raise ValidationError("Formato de arquivo nÃ£o suportado. Use .xlsx, .xls, .xlsm ou .csv")
         
@@ -4038,9 +4089,10 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
         # Ler arquivo CSV (usar delimitador ponto e vírgula)
         # Precisamos ler manualmente para tratar colunas duplicadas (ex: duas colunas "Situação")
         if file_name.endswith('.csv'):
-            # Tentar diferentes encodings - começar com latin-1 (mais comum para arquivos brasileiros)
+            # utf-8-sig primeiro: arquivos gerados no sistema (download ESTF0198 etc.) vêm com BOM.
+            # Se usar latin-1 antes, o BOM vira "ï»¿" no nome da 1ª coluna e o mapeamento quebra (Emitente vazio).
             data = None
-            encodings_to_try = ['latin-1', 'iso-8859-1', 'utf-8', 'cp1252']
+            encodings_to_try = ['utf-8-sig', 'utf-8', 'latin-1', 'iso-8859-1', 'cp1252']
             
             for encoding in encodings_to_try:
                 try:
@@ -4051,6 +4103,7 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
                     else:
                         with open(file, 'r', encoding=encoding) as f:
                             content = f.read()
+                    content = content.lstrip('\ufeff')
                     
                     # Ler CSV com csv.reader para suportar campos entre aspas (com ; dentro)
                     import csv
@@ -4090,7 +4143,10 @@ def upload_notas_fiscais_from_file(file, update_existing=False) -> Tuple[int, in
                     break  # Se conseguir ler, sair do loop
                 except (UnicodeDecodeError, ValidationError) as e:
                     if encoding == encodings_to_try[-1]:  # Se for o último encoding
-                        raise ValidationError(f"Erro ao ler arquivo CSV: Não foi possível decodificar o arquivo com nenhum encoding testado (latin-1, iso-8859-1, utf-8, cp1252). Erro original: {str(e)}")
+                        raise ValidationError(
+                            f"Erro ao ler arquivo CSV: Não foi possível decodificar o arquivo com nenhum encoding testado "
+                            f"({'/'.join(encodings_to_try)}). Erro original: {str(e)}"
+                        )
                     continue  # Tentar próximo encoding
                 except Exception as e:
                     # Outros erros (não relacionados a encoding)

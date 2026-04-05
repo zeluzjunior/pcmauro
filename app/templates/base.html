@@ -345,6 +345,17 @@
                                         <div class="collapse" id="preventiva-consultas-collapse">
                                             <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
                                                 <li><a href="{% url 'consultar_manutencoes_preventivas' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Manutenções Preventivas</a></li>
+                                            </ul>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#preventiva-roteiro-collapse" aria-expanded="false">
+                                            <i class="fas fa-list-check"></i>
+                                            Roteiro de Preventiva
+                                        </button>
+                                        <div class="collapse" id="preventiva-roteiro-collapse">
+                                            <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
+                                                <li><a href="{% url 'analise_roteiro_preventiva' %}" class="link-dark rounded"><i class="bi bi-bar-chart-steps me-2"></i>Análise Roteiro Preventiva</a></li>
                                                 <li><a href="{% url 'consultar_roteiro_preventiva' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Roteiro Preventiva</a></li>
                                             </ul>
                                         </div>
@@ -357,6 +368,7 @@
                                         <div class="collapse" id="preventiva-plano-collapse">
                                             <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
                                                 <li><a href="{% url 'analise_plano_preventiva' %}" class="link-dark rounded"><i class="bi bi-bar-chart-steps me-2"></i>Análise Plano de Preventiva</a></li>
+                                                <li><a href="{% url 'analise_plano_por_maquina' %}" class="link-dark rounded"><i class="bi bi-gear-wide-connected me-2"></i>Análise de Plano Por Máquina</a></li>
                                                 <li><a href="{% url 'consultar_plano_preventiva' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Plano de Preventiva</a></li>
                                             </ul>
                                         </div>
@@ -471,6 +483,8 @@
                                     <li><a href="{% url 'analise_geral_plano_preventiva_pcm' %}" class="link-dark rounded"><i class="bi bi-pie-chart me-2"></i>Análise Geral PCM</a></li>
                                     <li><a href="{% url 'consultar_meu_plano' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Meus Planos Preventiva do PCM</a></li>
                                     <li><a href="{% url 'criar_cronograma_planejado_preventiva' %}" class="link-dark rounded"><i class="bi bi-calendar-plus me-2"></i>Criar Calendário Plenejado de Preventivas</a></li>
+                                    <li><a href="{% url 'calendario_plano_e_roteiro' %}" class="link-dark rounded"><i class="bi bi-calendar3 me-2"></i>Calendário de Preventivas</a></li>
+                                    <li><a href="{% url 'gerar_arquivo_para_preventiva' %}" class="link-dark rounded"><i class="bi bi-file-earmark-arrow-up me-2"></i>Gerar Arquivo de Documento para Preventivas</a></li>
                                 </ul>
                             </div>
                         </li>
@@ -612,8 +626,7 @@
                                     </button>
                                         <div class="collapse" id="orcamento-notas-fiscais-collapse">
                                         <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
-                                            <li><a href="{% url 'importar_notas_fiscais' %}" class="link-dark rounded"><i class="fas fa-upload me-2"></i>Importar/Atualizar Notas Fiscais</a></li>
-                                             <li><a href="{% url 'analise_notas_fiscais' %}" class="link-dark rounded"><i class="fas fa-chart-pie me-2"></i>Análise de Notas Fiscais</a></li>
+                                            <li><a href="{% url 'analise_notas_fiscais' %}" class="link-dark rounded"><i class="fas fa-chart-pie me-2"></i>Análise de Notas Fiscais</a></li>
                                             <li><a href="{% url 'consultar_notas_fiscais' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Notas Fiscais</a></li>
                                         </ul>
                                     </div>
@@ -791,7 +804,9 @@
                             <div class="collapse" id="ajuste-relatorios-siga-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'relatorio_nf_estf0198' %}" class="link-dark rounded"><i class="bi bi-file-earmark-text me-2"></i>Relatório NF ESTF0198</a></li>
+                                    <li><a href="{% url 'notas_sem_uso_estf0198' %}" class="link-dark rounded"><i class="bi bi-inbox me-2"></i>Notas sem uso — ESTF0198</a></li>
                                     <li><a href="{% url 'analise_plano_preventiva_dados_delimitado' %}" class="link-dark rounded"><i class="bi bi-table me-2"></i>Plano Preventiva — Dados delimitados</a></li>
+                                    <li><a href="{% url 'ajuste_roteiro_preventiva' %}" class="link-dark rounded"><i class="bi bi-list-check me-2"></i>Roteiro Preventiva — Dados delimitados</a></li>
                                 </ul>
                             </div>
                         </li>

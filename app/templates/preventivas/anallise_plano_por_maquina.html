@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Análise de Plano Por Máquina{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-row th {
+        background-color: #e9ecef !important;
+        padding: 4px 8px !important;
+        vertical-align: middle;
+    }
+    .filter-row .filter-input {
+        width: 100%;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        margin: 0;
+    }
+    .filter-row .filter-input:focus {
+        outline: none;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'analise_plano_preventiva' %}" class="text-white">Plano de Preventiva</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise de Plano Por Máquina</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Análise de Plano Por Máquina</h1>
+                <p class="lead">Máquinas principais por setor de manutenção</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+
+        {% for secao in secoes_locais %}
+        <!-- Seção por Local (CentroAtividade.local) - mesma divisão visual de analise_mao_de_obra_e_ordens -->
+        <div class="{% if not forloop.first %}border-top{% endif %}" style="{% if forloop.first %}padding-top: 1rem; margin-top: 0;{% else %}padding-top: 10rem; margin-top: 4rem;{% endif %}">
+            <h4 class="mb-4">
+                <i class="fas fa-list me-2 text-primary"></i>Máquinas Principais por Setor de Manutenção — {{ secao.label }}
+                <small class="text-muted ms-2">(Gerência: MÁQUINAS PRINCIPAL)</small>
+            </h4>
+        </div>
+
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-building me-2"></i>{{ secao.label }}
+                            <small class="ms-2">— Setores de Manutenção</small>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="accordion accordion-flush" id="accordion{{ secao.key }}">
+                                {% for setor_data in secao.setores %}
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header" id="heading{{ secao.key }}_{{ forloop.counter }}">
+                                            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ secao.key }}_{{ forloop.counter }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse{{ secao.key }}_{{ forloop.counter }}">
+                                                <strong>
+                                                    <i class="fas fa-building me-2"></i>Setor {{ setor_data.cd_setormanut }}
+                                                    {% if setor_data.descr_setormanut %}
+                                                        - {{ setor_data.descr_setormanut }}
+                                                    {% endif %}
+                                                </strong>
+                                                <span class="badge bg-success ms-2">{{ setor_data.maquinas|length }} máquina(s)</span>
+                                            </button>
+                                        </h2>
+                                        <div id="collapse{{ secao.key }}_{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading{{ secao.key }}_{{ forloop.counter }}" data-bs-parent="#accordion{{ secao.key }}">
+                                            <div class="accordion-body p-0">
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover table-sm mb-0 table-maquinas-setor" id="tableSetor{{ secao.key }}_{{ forloop.counter }}">
+                                                        <thead class="table-light">
+                                                            <tr>
+                                                                <th style="width: 8%;">#</th>
+                                                                <th style="width: 12%;">Código</th>
+                                                                <th style="width: 32%;">Descrição</th>
+                                                                <th style="width: 23%;">Manutentor(es)</th>
+                                                                <th style="width: 15%;">Patrimônio</th>
+                                                                <th style="width: 10%;" class="text-center">Ações</th>
+                                                            </tr>
+                                                            <tr class="filter-row">
+                                                                <th></th>
+                                                                <th><input type="text" class="filter-input" placeholder="Filtrar código..." data-col="1"></th>
+                                                                <th><input type="text" class="filter-input" placeholder="Filtrar descrição..." data-col="2"></th>
+                                                                <th><input type="text" class="filter-input" placeholder="Filtrar manutentor..." data-col="3"></th>
+                                                                <th><input type="text" class="filter-input" placeholder="Filtrar patrimônio..." data-col="4"></th>
+                                                                <th></th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {% for maquina in setor_data.maquinas %}
+                                                                <tr>
+                                                                    <td><strong>{{ forloop.counter }}</strong></td>
+                                                                    <td>
+                                                                        <span class="badge bg-primary">{{ maquina.cd_maquina }}</span>
+                                                                    </td>
+                                                                    <td>{{ maquina.descr_maquina|truncatewords:15 }}</td>
+                                                                    <td>
+                                                                        {% if maquina.manutentores %}
+                                                                            {% for m in maquina.manutentores %}
+                                                                                <a href="{% url 'visualizar_manutentor' m.matricula %}" class="badge bg-primary text-decoration-none me-1" title="{{ m.nome }}">{{ m.nome|truncatechars:20 }}</a>
+                                                                            {% endfor %}
+                                                                        {% else %}
+                                                                            <span class="text-muted">-</span>
+                                                                        {% endif %}
+                                                                    </td>
+                                                                    <td>
+                                                                        {% if maquina.nro_patrimonio != '-' %}
+                                                                            <span class="badge bg-info">{{ maquina.nro_patrimonio }}</span>
+                                                                        {% else %}
+                                                                            <span class="text-muted">-</span>
+                                                                        {% endif %}
+                                                                    </td>
+                                                                    <td class="text-center">
+                                                                        <a href="{% url 'visualizar_plano_preventiva_por_maquina_agrupada' maquina.id %}" class="btn btn-sm btn-outline-success me-1" title="Ver Plano Preventiva agrupado" target="_blank" rel="noopener noreferrer">
+                                                                            <i class="fas fa-calendar-check"></i>
+                                                                        </a>
+                                                                        <a href="{% url 'visualizar_maquina' maquina.id %}" class="btn btn-sm btn-outline-primary" title="Visualizar máquina" target="_blank" rel="noopener noreferrer">
+                                                                            <i class="fas fa-eye"></i>
+                                                                        </a>
+                                                                    </td>
+                                                                </tr>
+                                                            {% endfor %}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>Nenhuma máquina encontrada com gerência "MÁQUINAS PRINCIPAL".
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Filter tables inside accordions
+    document.querySelectorAll('.table-maquinas-setor').forEach(function(table) {
+        const filterInputs = table.querySelectorAll('.filter-input');
+        const tbody = table.querySelector('tbody');
+        if (!tbody) return;
+
+        function applyFilters() {
+            const filters = [];
+            filterInputs.forEach(function(input) {
+                filters.push((input.value || '').trim().toLowerCase());
+            });
+
+            let visibleCount = 0;
+            tbody.querySelectorAll('tr').forEach(function(row, idx) {
+                const cells = row.querySelectorAll('td');
+                let show = true;
+                filters.forEach(function(filter, colIdx) {
+                    if (filter && cells[colIdx + 1]) { // +1 because col 0 is #, filters start at Código
+                        const cellText = (cells[colIdx + 1].textContent || '').toLowerCase();
+                        if (cellText.indexOf(filter) === -1) {
+                            show = false;
+                        }
+                    }
+                });
+                row.style.display = show ? '' : 'none';
+                if (show) visibleCount++;
+            });
+        }
+
+        filterInputs.forEach(function(input) {
+            input.addEventListener('input', applyFilters);
+        });
+    });
+});
+</script>
+{% endblock %}

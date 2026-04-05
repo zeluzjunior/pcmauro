@@ -4,6 +4,83 @@
 
 {% block title %}Configuração de Paradas de Máquina{% endblock %}
 
+{% block extra_css %}
+<style>
+/* Calendário mensal: 7 colunas (Dom–Sáb), dia na célula correta da semana */
+.prod-cal-table {
+    table-layout: fixed;
+    width: 100%;
+}
+.prod-cal-table thead th {
+    font-size: 0.72rem;
+    font-weight: 600;
+    width: 14.28%;
+}
+.prod-cal-table td {
+    vertical-align: middle;
+    padding: 0.3rem !important;
+}
+.prod-cal-table td.prod-cal-empty {
+    background: #e9ecef;
+    opacity: 0.55;
+}
+.prod-dia-btn {
+    position: relative;
+    display: block;
+    margin: 0;
+    width: 100%;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.prod-dia-face {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.65rem;
+    padding: 0.35rem 0.2rem;
+    border: 2px solid #ced4da;
+    border-radius: 0.4rem;
+    background: #fff;
+    font-weight: 600;
+    font-size: 0.95rem;
+    line-height: 1.2;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+.prod-dia-btn:hover .prod-dia-face {
+    border-color: #0d6efd;
+    background: #f0f7ff;
+}
+.prod-cal-table--ind .prod-dia-btn:hover .prod-dia-face {
+    border-color: #6c757d;
+    background: #f8f9fa;
+}
+.prod-dia-btn input.visually-hidden:focus-visible + .prod-dia-face {
+    outline: 0;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.45);
+    border-color: #0d6efd;
+}
+.prod-cal-table--ind .prod-dia-btn input.visually-hidden:focus-visible + .prod-dia-face {
+    box-shadow: 0 0 0 3px rgba(108, 117, 125, 0.45);
+    border-color: #6c757d;
+}
+.prod-cal-table--frig .prod-dia-btn input:checked + .prod-dia-face {
+    background: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+}
+.prod-cal-table--ind .prod-dia-btn input:checked + .prod-dia-face {
+    background: #6c757d;
+    border-color: #6c757d;
+    color: #fff;
+}
+.prod-dias-card {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <!-- Page Header -->
 <section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
@@ -37,12 +114,23 @@
             {% endfor %}
         </div>
         {% endif %}
-        <p class="text-muted mb-4">Configure os parâmetros por mês (ano <strong>{{ ano_atual }}</strong>). O mesmo conjunto de parâmetros é usado em todos os meses; os valores podem ser diferentes para cada mês. <strong>Formato brasileiro:</strong> use vírgula para decimais (ex: 12,5) e ponto para milhares (ex: 1.500).</p>
+        <p class="text-muted mb-4">Configure os parâmetros por mês. <strong>Formato brasileiro:</strong> use vírgula para decimais (ex: 12,5) e ponto para milhares (ex: 1.500).</p>
+        <p class="text-muted small mb-4">Em cada mês, marque os <strong>dias produtivos</strong> (calendário domingo–sábado). O campo <strong>Dias úteis</strong> é gravado conforme o que você informar; o <strong>Total de Abate Planejado</strong> é recalculado no servidor como Suínos/dia × Dias úteis quando ambos existem.</p>
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+            <label for="anoConfigSelect" class="mb-0 fw-semibold text-secondary small">Ano da configuração</label>
+            <select id="anoConfigSelect" class="form-select form-select-sm" style="max-width: 110px;" title="Trocar o ano recarrega a página">
+                {% for y in anos_config_choices %}
+                <option value="{{ y }}" {% if y == ano_edicao %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
 
         <form method="post" action="" id="form-config-parada">
             {% csrf_token %}
+            <input type="hidden" name="salvar_config_parada_maquina" value="1">
+            <input type="hidden" name="config_ano" value="{{ ano_edicao }}">
         <div class="accordion" id="accordionMeses">
-            {% for mes_num, mes_nome, cfg_frig, cfg_ind in config_por_mes %}
+            {% for mes_num, mes_nome, cfg_frig, cfg_ind, semanas_cal in config_por_mes %}
             <div class="accordion-item">
                 <h2 class="accordion-header" id="heading{{ mes_num }}">
                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ mes_num }}" aria-expanded="false" aria-controls="collapse{{ mes_num }}">
@@ -90,6 +178,37 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div class="mb-4 p-3 rounded border bg-light prod-dias-card">
+                            <p class="small fw-semibold text-primary mb-2"><i class="fas fa-calendar-check me-1"></i>Dias produtivos — Frigorífico ({{ mes_nome }} {{ ano_atual }})</p>
+                            <p class="small text-muted mb-3">Toque no dia para marcar ou desmarcar. O campo <strong>Dias úteis</strong> acima acompanha a quantidade de dias marcados ao salvar.</p>
+                            <div class="table-responsive" data-mes="{{ mes_num }}" data-secao="frigorifico">
+                                <table class="table table-bordered table-sm text-center mb-0 prod-cal-table prod-cal-table--frig" role="grid" aria-label="Calendário dias produtivos frigorífico {{ mes_nome }} {{ ano_atual }}">
+                                    <thead>
+                                        <tr class="table-light">
+                                            {% for w in cal_cabecalho_semana %}
+                                            <th scope="col" class="py-2">{{ w }}</th>
+                                            {% endfor %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for week in semanas_cal %}
+                                        <tr>
+                                            {% for d in week %}
+                                            <td class="{% if d == 0 %}prod-cal-empty{% endif %}">
+                                                {% if d != 0 %}
+                                                <label class="prod-dia-btn" for="frig_prod_{{ mes_num }}_{{ d }}">
+                                                    <input class="prod-dia-cb visually-hidden" type="checkbox" value="1" name="mes_{{ mes_num }}_frigorifico_prod_dia_{{ d }}" id="frig_prod_{{ mes_num }}_{{ d }}" data-mes="{{ mes_num }}" data-secao="frigorifico" {% if cfg_frig and cfg_frig.dias_produtivos and d in cfg_frig.dias_produtivos %}checked{% endif %}>
+                                                    <span class="prod-dia-face">{{ d }}</span>
+                                                </label>
+                                                {% endif %}
+                                            </td>
+                                            {% endfor %}
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
 
                         <hr class="my-4">
 
@@ -122,6 +241,37 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+                        <div class="mb-2 p-3 rounded border bg-light prod-dias-card">
+                            <p class="small fw-semibold text-secondary mb-2"><i class="fas fa-calendar-check me-1"></i>Dias produtivos — Indústria ({{ mes_nome }} {{ ano_atual }})</p>
+                            <p class="small text-muted mb-3">Toque no dia para marcar ou desmarcar. O campo <strong>Dias úteis</strong> acima acompanha a quantidade de dias marcados ao salvar.</p>
+                            <div class="table-responsive" data-mes="{{ mes_num }}" data-secao="industria">
+                                <table class="table table-bordered table-sm text-center mb-0 prod-cal-table prod-cal-table--ind" role="grid" aria-label="Calendário dias produtivos indústria {{ mes_nome }} {{ ano_atual }}">
+                                    <thead>
+                                        <tr class="table-light">
+                                            {% for w in cal_cabecalho_semana %}
+                                            <th scope="col" class="py-2">{{ w }}</th>
+                                            {% endfor %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for week in semanas_cal %}
+                                        <tr>
+                                            {% for d in week %}
+                                            <td class="{% if d == 0 %}prod-cal-empty{% endif %}">
+                                                {% if d != 0 %}
+                                                <label class="prod-dia-btn" for="ind_prod_{{ mes_num }}_{{ d }}">
+                                                    <input class="prod-dia-cb visually-hidden" type="checkbox" value="1" name="mes_{{ mes_num }}_industria_prod_dia_{{ d }}" id="ind_prod_{{ mes_num }}_{{ d }}" data-mes="{{ mes_num }}" data-secao="industria" {% if cfg_ind and cfg_ind.dias_produtivos and d in cfg_ind.dias_produtivos %}checked{% endif %}>
+                                                    <span class="prod-dia-face">{{ d }}</span>
+                                                </label>
+                                                {% endif %}
+                                            </td>
+                                            {% endfor %}
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -290,8 +440,29 @@
     function initTotalAbate() {
         [1,2,3,4,5,6,7,8,9,10,11,12].forEach(updateTotalAbate);
     }
+    function syncProdDiasUteis(mesNum, secao) {
+        var cbs = document.querySelectorAll('input.prod-dia-cb[data-mes="' + mesNum + '"][data-secao="' + secao + '"]:checked');
+        var n = cbs.length;
+        var name = secao === 'frigorifico' ? 'mes_' + mesNum + '_frigorifico_dias_uteis' : 'mes_' + mesNum + '_industria_dias_uteis';
+        var inp = document.querySelector('input[name="' + name + '"]');
+        if (inp) inp.value = n > 0 ? String(n) : '';
+        if (secao === 'frigorifico') updateTotalAbate(mesNum);
+    }
     document.addEventListener('DOMContentLoaded', function() {
+        var anoSel = document.getElementById('anoConfigSelect');
+        if (anoSel) {
+            anoSel.addEventListener('change', function() {
+                var u = new URL(window.location.href);
+                u.searchParams.set('ano', this.value);
+                window.location.href = u.toString();
+            });
+        }
         initTotalAbate();
+        document.querySelectorAll('input.prod-dia-cb').forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                syncProdDiasUteis(cb.getAttribute('data-mes'), cb.getAttribute('data-secao'));
+            });
+        });
         document.getElementById('form-config-parada').addEventListener('input', function(e) {
             var t = e.target;
             if (t.classList.contains('input-suinos-dia') || t.classList.contains('input-dias-uteis')) {

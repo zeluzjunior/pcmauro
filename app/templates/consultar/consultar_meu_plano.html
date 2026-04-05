@@ -5,6 +5,13 @@
 
 {% block extra_css %}
 <style>
+    .stat-card { transition: transform 0.2s; }
+    .stat-card:hover { transform: translateY(-5px); }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
     .table-container {
         max-height: 85vh;
         min-height: 70vh;
@@ -205,45 +212,68 @@
             </div>
         </div>
 
-        <!-- Statistics -->
-        <div class="row mb-4">
+        <!-- Statistics (mesmo padrão visual de consultar roteiros preventiva) -->
+        <div class="row g-3 mb-4">
             <div class="col-md-3">
-                <div class="card bg-success text-white">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Total</h5>
-                        <p class="card-text display-6">{{ total_count }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total</h6>
+                                <h4 class="mb-0 fw-bold">{{ total_count }}</h4>
+                                <small class="text-muted">Total no cadastro</small>
+                            </div>
+                            <i class="fas fa-clipboard-list fa-2x text-success opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card bg-info text-white">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Mostrando</h5>
-                        <p class="card-text display-6">{{ planos|length }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Mostrando</h6>
+                                <h4 class="mb-0 fw-bold">{{ planos|length }}</h4>
+                                <small class="text-muted">Nesta página</small>
+                            </div>
+                            <i class="fas fa-eye fa-2x text-info opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card bg-warning text-white">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Máquinas</h5>
-                        <p class="card-text display-6">{{ maquinas_count }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Máquinas</h6>
+                                <h4 class="mb-0 fw-bold">{{ maquinas_count }}</h4>
+                                <small class="text-muted">Máquinas distintas</small>
+                            </div>
+                            <i class="fas fa-industry fa-2x text-warning opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card bg-primary text-white">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Com Roteiro</h5>
-                        <p class="card-text display-6">{{ planos_com_roteiro }}</p>
-                        <small>Planos vinculados</small>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Com Roteiro</h6>
+                                <h4 class="mb-0 fw-bold">{{ planos_com_roteiro }}</h4>
+                                <small class="text-muted">Planos vinculados</small>
+                            </div>
+                            <i class="fas fa-link fa-2x text-primary opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Table -->
-        <div class="card shadow-sm">
+        <div class="card shadow-sm border-0">
             <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
                     <i class="fas fa-calendar-check me-2"></i>Lista de Meus Planos Preventiva

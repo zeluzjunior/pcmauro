@@ -24,9 +24,37 @@
     .input-group:hover .input-group-text { background-color: #f8f9fa !important; }
     .hover-lift { transition: transform 0.2s, box-shadow 0.2s; }
     .hover-lift:hover { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    /* Layout em faixas horizontais: cada linha alinha Frigorífico | Indústria */
+    /* Ajuste o espaçamento inferior de cada faixa editando as variáveis abaixo (desktop). */
+    .analise-paradas-bands {
+        --band-mb-titulos: 2rem;
+        --band-mb-kpi-projecao: 2rem;
+        --band-mb-kpi-real: 2rem;
+        --band-mb-evolucao: 2rem;
+        --band-mb-maquinas: 8rem;
+        --band-mb-projecao-indicador: 8rem;
+    }
+    .analise-paradas-bands .band-row {
+        align-items: stretch;
+    }
+    .analise-paradas-bands .band-row--titulos { margin-bottom: var(--band-mb-titulos); }
+    .analise-paradas-bands .band-row--kpi-projecao { margin-bottom: var(--band-mb-kpi-projecao); }
+    .analise-paradas-bands .band-row--kpi-real { margin-bottom: var(--band-mb-kpi-real); }
+    .analise-paradas-bands .band-row--evolucao { margin-bottom: var(--band-mb-evolucao); }
+    .analise-paradas-bands .band-row--maquinas { margin-bottom: var(--band-mb-maquinas); }
+    .analise-paradas-bands .band-row--projecao-indicador { margin-bottom: var(--band-mb-projecao-indicador); }
+    /* Última faixa: sem espaço extra antes do fim do bloco (o wrapper .analise-paradas-bands já tem .mb-5). Remova esta regra se quiser aplicar --band-mb-projecao-indicador até o fim. */
+    .analise-paradas-bands .band-row:last-child {
+        margin-bottom: 0;
+    }
+    .analise-paradas-bands .band-inner {
+        height: 100%;
+    }
+    .analise-paradas-bands .chart-container {
+        margin-bottom: 0;
+    }
     /* Layout dividido: Indústria (esquerda) | Frigorífico (direita) */
     .section-panel {
-        min-height: 400px;
         border-radius: 8px;
         overflow: hidden;
         box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
@@ -55,8 +83,83 @@
     .section-panel .section-body {
         padding: 1.25rem;
     }
+    /* Produção real: destaque visual só no cartão "Indicador Atual" */
+    .analise-paradas-bands .band-row--kpi-real .row.g-2 > .col-6 .card:not(.kpi-indicador-atual) {
+        opacity: 0.82;
+        filter: saturate(0.92);
+        box-shadow: 0 0.1rem 0.15rem rgba(0, 0, 0, 0.05) !important;
+    }
+    .analise-paradas-bands .kpi-indicador-atual {
+        position: relative;
+        z-index: 2;
+        transform: scale(1.06);
+        border-radius: 0.375rem;
+        transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    .analise-paradas-bands .kpi-indicador-atual .card-body {
+        padding-top: 0.65rem !important;
+        padding-bottom: 0.65rem !important;
+    }
+    .analise-paradas-bands .kpi-indicador-atual.border-success {
+        border-left-width: 6px !important;
+        background: linear-gradient(160deg, rgba(25, 135, 84, 0.28) 0%, rgba(25, 135, 84, 0.12) 45%, rgba(255, 255, 255, 0.92) 100%);
+        box-shadow:
+            0 0.55rem 1.35rem rgba(25, 135, 84, 0.42),
+            0 0 0 4px rgba(25, 135, 84, 0.38),
+            0 0 1.75rem rgba(25, 135, 84, 0.28) !important;
+    }
+    .analise-paradas-bands .kpi-indicador-atual.border-success .card-body {
+        background: rgba(25, 135, 84, 0.14);
+        border-radius: 0 0.25rem 0.25rem 0;
+    }
+    .analise-paradas-bands .kpi-indicador-atual.border-success .card-body h6 {
+        color: #0a4d2e !important;
+        font-weight: 600;
+    }
+    .analise-paradas-bands .kpi-indicador-atual.border-success .card-body h5.text-success {
+        color: #0d442a !important;
+        font-size: 1.35rem;
+        letter-spacing: -0.02em;
+    }
+    .analise-paradas-bands .kpi-indicador-atual.border-danger {
+        border-left-width: 6px !important;
+        background: linear-gradient(160deg, rgba(220, 53, 69, 0.3) 0%, rgba(220, 53, 69, 0.14) 45%, rgba(255, 255, 255, 0.92) 100%);
+        box-shadow:
+            0 0.55rem 1.35rem rgba(220, 53, 69, 0.42),
+            0 0 0 4px rgba(220, 53, 69, 0.4),
+            0 0 1.75rem rgba(220, 53, 69, 0.28) !important;
+    }
+    .analise-paradas-bands .kpi-indicador-atual.border-danger .card-body {
+        background: rgba(220, 53, 69, 0.15);
+        border-radius: 0 0.25rem 0.25rem 0;
+    }
+    .analise-paradas-bands .kpi-indicador-atual.border-danger .card-body h6 {
+        color: #842029 !important;
+        font-weight: 600;
+    }
+    .analise-paradas-bands .kpi-indicador-atual.border-danger .card-body h5.text-danger {
+        color: #9a2530 !important;
+        font-size: 1.35rem;
+        letter-spacing: -0.02em;
+    }
+    /* Sem meta (% perda máx.) ou sem indicador: sem verde/vermelho enganoso */
+    .analise-paradas-bands .kpi-indicador-atual.border-secondary {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(108, 117, 125, 0.08) 100%);
+        box-shadow:
+            0 0.4rem 1rem rgba(108, 117, 125, 0.22),
+            0 0 0 3px rgba(108, 117, 125, 0.2) !important;
+    }
+    /* Telas estreitas: sobrescreva aqui as margens por faixa (mobile). */
     @media (max-width: 767.98px) {
-        .section-panel { min-height: 300px; }
+        .analise-paradas-bands {
+            --band-mb-titulos: 7rem;
+            --band-mb-kpi-projecao: 7rem;
+            --band-mb-kpi-real: 7rem;
+            --band-mb-evolucao: 7rem;
+            --band-mb-maquinas: 7rem;
+            --band-mb-projecao-indicador: 7rem;
+        }
+        .analise-paradas-bands .band-row:last-child { margin-bottom: 0; }
     }
 </style>
 {% endblock %}
@@ -168,100 +271,166 @@
             <strong>Frigorífico</strong> e <strong>Indústria</strong> são definidos na página <a href="{% url 'configuracao_parada_maquina' %}">Configuração</a> (seção &quot;Recursos incluídos na Análise das Paradas de Máquinas&quot;), com base na coluna <code>descr_linha_producao</code> da tabela ParadaMaquina.
         </div>
 
-        <!-- Layout dividido: Frigorífico (esquerda) | Indústria (direita) -->
-        <div class="row g-4 mb-5">
-            <!-- Coluna ESQUERDA: Frigorífico -->
-            <div class="col-lg-6">
-                <div class="section-panel section-panel-frigorifico">
-                    <div class="section-header d-flex align-items-center justify-content-between">
-                        <span><i class="fas fa-industry me-2"></i>Frigorífico</span>
-                        <a href="{% url 'analise_parada_frigorifico' %}?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}" class="btn btn-sm btn-light">Ver completa <i class="fas fa-external-link-alt ms-1"></i></a>
+        <!-- Frigorífico | Indústria: faixas horizontais alinhadas (mesmo assunto na mesma linha) -->
+        <div class="analise-paradas-bands mb-5">
+            <!-- Faixa 0: títulos -->
+            <div class="row g-4 band-row band-row--titulos">
+                <div class="col-lg-6">
+                    <div class="section-panel section-panel-frigorifico band-inner mb-0">
+                        <div class="section-header d-flex align-items-center justify-content-between">
+                            <span><i class="fas fa-industry me-2"></i>Frigorífico</span>
+                            <a href="{% url 'analise_parada_frigorifico' %}?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}" class="btn btn-sm btn-light">Ver completa <i class="fas fa-external-link-alt ms-1"></i></a>
+                        </div>
                     </div>
-                    <div class="section-body">
-                        <!-- KPIs Frigorífico - Projeção -->
-                        <p class="text-muted small mb-2">Projeção de abate:</p>
-                        <div class="row g-2 mb-3">
-                            <div class="col-6 col-md-4"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Suínos/dia planejados</h6><h5 class="mb-0 fw-bold">{% if suinos_abatidos_por_dia_medio_frig is not None %}{{ suinos_abatidos_por_dia_medio_frig|number_br:0 }}{% else %}-{% endif %}</h5></div></div></div>
-                            <div class="col-6 col-md-4"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Dias úteis</h6><h5 class="mb-0 fw-bold">{{ dias_uteis_total_frig|default:0|number_br:0 }}</h5></div></div></div>
-                            <div class="col-6 col-md-4"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">% Perda Máx.</h6><h5 class="mb-0 fw-bold">{% if perda_maximo_frig is not None %}{{ perda_maximo_frig|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
-                            <div class="col-6"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Fator Eficiência</h6><h5 class="mb-0 fw-bold">{% if fator_eficiencia_frig is not None %}{{ fator_eficiencia_frig|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
-                            <div class="col-6"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Perda Máxima planejada</h6><h5 class="mb-0 fw-bold">{{ perda_maxima_calculada_frig|number_br:2 }}</h5></div></div></div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="section-panel section-panel-industria band-inner mb-0">
+                        <div class="section-header d-flex align-items-center justify-content-between">
+                            <span><i class="fas fa-cogs me-2"></i>Indústria</span>
+                            <a href="{% url 'analise_parada_industria' %}?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}" class="btn btn-sm btn-light">Ver completa <i class="fas fa-external-link-alt ms-1"></i></a>
                         </div>
-                        <!-- KPIs Frigorífico - Real -->
-                        <p class="text-muted small mb-2">Produção real:</p>
-                        <div class="row g-2 mb-3">
-                            <div class="col-6"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Quantidade Paradas</h6><h5 class="mb-0 fw-bold">{{ total_paradas_frig|number_br:0 }}</h5></div></div></div>
-                            <div class="col-6"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Carcaças Já Perdidas</h6><h5 class="mb-0 fw-bold">{{ soma_capacidade_frig|number_br:2 }}</h5></div></div></div>
-                            <div class="col-6"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Suínos abatidos</h6><h5 class="mb-0 fw-bold">{{ soma_suinos_abatidos_frig|default:0|number_br:0 }}</h5></div></div></div>
-                            <div class="col-6">{% if indicador_atual_frig is not None and perda_maximo_frig is not None and indicador_atual_frig > perda_maximo_frig %}<div class="card border-0 border-start border-4 border-danger shadow-sm">{% else %}<div class="card border-0 border-start border-4 border-success shadow-sm">{% endif %}<div class="card-body py-2"><h6 class="text-muted mb-0 small">Indicador Atual</h6><h5 class="mb-0 fw-bold {% if indicador_atual_frig is not None and perda_maximo_frig is not None and indicador_atual_frig > perda_maximo_frig %}text-danger{% else %}text-success{% endif %}">{% if indicador_atual_frig is not None %}{{ indicador_atual_frig|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
+                    </div>
+                </div>
+            </div>
+            <!-- Faixa 1: KPIs projeção -->
+            <div class="row g-4 band-row band-row--kpi-projecao">
+                <div class="col-lg-6">
+                    <div class="section-panel section-panel-frigorifico band-inner">
+                        <div class="section-body">
+                            <p class="text-muted small mb-2">Projeção de abate:</p>
+                            <div class="row g-2">
+                                <div class="col-6 col-md-4"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Suínos por dia planejados:</h6><h5 class="mb-0 fw-bold">{% if suinos_abatidos_por_dia_medio_frig is not None %}{{ suinos_abatidos_por_dia_medio_frig|number_br:0 }}{% else %}-{% endif %}</h5></div></div></div>
+                                <div class="col-6 col-md-4"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Dias úteis de Abate:</h6><h5 class="mb-0 fw-bold">{{ dias_uteis_total_frig|default:0|number_br:0 }}</h5></div></div></div>
+                                <div class="col-6 col-md-4"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Indicador de % Perda Máx.</h6><h5 class="mb-0 fw-bold">{% if perda_maximo_frig is not None %}{{ perda_maximo_frig|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
+                                <div class="col-6"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Fator Eficiência: </h6><h5 class="mb-0 fw-bold">{% if fator_eficiencia_frig is not None %}{{ fator_eficiencia_frig|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
+                                <div class="col-6"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Perda Máxima planejada:</h6><h5 class="mb-0 fw-bold">{{ perda_maxima_calculada_frig|number_br:2 }}</h5></div></div></div>
+                            </div>
                         </div>
-                        <!-- Evolução Diária Frigorífico -->
-                        <div class="card shadow-sm border-0 mb-2"><div class="card-header bg-primary text-white py-2"><div class="d-flex justify-content-between align-items-center"><h6 class="mb-0"><i class="fas fa-chart-line me-1"></i>Evolução Diária</h6><input type="month" class="form-control form-control-sm" id="mesSelecionadoFrig" value="{{ mes_selecionado }}" style="max-width: 140px;"></div></div><div class="card-body p-2"><div class="chart-container" style="height: 200px;"><canvas id="dailyChartFrig"></canvas></div></div></div>
-                        <!-- Paradas por Máquina Frigorífico -->
-                        <div class="card shadow-sm border-0 mb-2"><div class="card-header bg-primary text-white py-2"><h6 class="mb-0"><i class="fas fa-cogs me-1"></i>Paradas por Máquina</h6></div><div class="card-body p-2"><div class="chart-container" style="height: 200px;"><canvas id="maquinasChartFrig"></canvas></div></div></div>
-                        <!-- Projeção Indicador Atual Frigorífico -->
-                        {% if projecao_dias_corridos and projecao_dias_restantes is not None %}
-                        <div class="card shadow-sm border-0 border-start border-4 border-info">
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="section-panel section-panel-industria band-inner">
+                        <div class="section-body">
+                            <p class="text-muted small mb-2">Projeção de produção:</p>
+                            <div class="row g-2">
+                                <div class="col-6 col-md-4"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Média de Produção diária planejada:</h6><h5 class="mb-0 fw-bold">{% if producao_diaria_planejada_industria is not None %}{{ producao_diaria_planejada_industria|number_br:0 }}{% else %}-{% endif %}</h5></div></div></div>
+                                <div class="col-6 col-md-4"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Média de Dias úteis:</h6><h5 class="mb-0 fw-bold">{{ dias_uteis_total_industria|default:0|number_br:0 }}</h5></div></div></div>
+                                <div class="col-6 col-md-4"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Indicador de % Perda Máxima:</h6><h5 class="mb-0 fw-bold">{% if perda_maximo_industria is not None %}{{ perda_maximo_industria|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
+                                <div class="col-6"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Fator Eficiência da Indústria:</h6><h5 class="mb-0 fw-bold">{% if fator_eficiencia_industria is not None %}{{ fator_eficiencia_industria|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
+                                <div class="col-6"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Perda Máxima Mensal em Kg:</h6><h5 class="mb-0 fw-bold">{{ perda_maxima_planejada_industria|number_br:2 }}</h5></div></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Faixa 2: KPIs produção real -->
+            <div class="row g-4 band-row band-row--kpi-real">
+                <div class="col-lg-6">
+                    <div class="section-panel section-panel-frigorifico band-inner">
+                        <div class="section-body">
+                            <p class="text-muted small mb-2">Produção real:</p>
+                            <div class="row g-2">
+                                <div class="col-6"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Quantidade Paradas</h6><h5 class="mb-0 fw-bold">{{ total_paradas_frig|number_br:0 }}</h5></div></div></div>
+                                <div class="col-6"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Carcaças Já Perdidas</h6><h5 class="mb-0 fw-bold">{{ soma_capacidade_frig|number_br:2 }}</h5></div></div></div>
+                                <div class="col-6"><div class="card border-0 border-start border-4 border-primary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Suínos abatidos</h6><h5 class="mb-0 fw-bold">{{ soma_suinos_abatidos_frig|default:0|number_br:0 }}</h5></div></div></div>
+                                <div class="col-6">{% if indicador_atual_frig is not None and perda_maximo_frig is not None %}{% if indicador_atual_frig > perda_maximo_frig %}<div class="card border-0 border-start border-4 border-danger shadow-sm kpi-indicador-atual">{% else %}<div class="card border-0 border-start border-4 border-success shadow-sm kpi-indicador-atual">{% endif %}{% else %}<div class="card border-0 border-start border-4 border-secondary shadow-sm kpi-indicador-atual">{% endif %}<div class="card-body py-2"><h6 class="text-muted mb-0 small">Indicador Atual</h6><h5 class="mb-0 fw-bold {% if indicador_atual_frig is not None and perda_maximo_frig is not None %}{% if indicador_atual_frig > perda_maximo_frig %}text-danger{% else %}text-success{% endif %}{% else %}text-secondary{% endif %}">{% if indicador_atual_frig is not None %}{{ indicador_atual_frig|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="section-panel section-panel-industria band-inner">
+                        <div class="section-body">
+                            <p class="text-muted small mb-2">Produção real:</p>
+                            <div class="row g-2">
+                                <div class="col-6"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Total Paradas: </h6><h5 class="mb-0 fw-bold">{{ total_paradas_ind|number_br:0 }}</h5></div></div></div>
+                                <div class="col-6"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Total já perido (Kg): </h6><h5 class="mb-0 fw-bold">{{ soma_capacidade_ind|number_br:2 }}</h5></div></div></div>
+                                <div class="col-6"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Produção realizada</h6><h5 class="mb-0 fw-bold">{{ soma_producao_industria|number_br:2 }}</h5></div></div></div>
+                                <div class="col-6">{% if indicador_atual_industria is not None and perda_maximo_industria is not None %}{% if indicador_atual_industria > perda_maximo_industria %}<div class="card border-0 border-start border-4 border-danger shadow-sm kpi-indicador-atual">{% else %}<div class="card border-0 border-start border-4 border-success shadow-sm kpi-indicador-atual">{% endif %}{% else %}<div class="card border-0 border-start border-4 border-secondary shadow-sm kpi-indicador-atual">{% endif %}<div class="card-body py-2"><h6 class="text-muted mb-0 small">Indicador Atual</h6><h5 class="mb-0 fw-bold {% if indicador_atual_industria is not None and perda_maximo_industria is not None %}{% if indicador_atual_industria > perda_maximo_industria %}text-danger{% else %}text-success{% endif %}{% else %}text-secondary{% endif %}">{% if indicador_atual_industria is not None %}{{ indicador_atual_industria|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Faixa 3: Evolução diária -->
+            <div class="row g-4 band-row band-row--evolucao">
+                <div class="col-lg-6">
+                    <div class="section-panel section-panel-frigorifico band-inner">
+                        <div class="section-body pt-2 pb-2">
+                            <div class="card shadow-sm border-0 mb-0"><div class="card-header bg-primary text-white py-2"><div class="d-flex justify-content-between align-items-center"><h6 class="mb-0"><i class="fas fa-chart-line me-1"></i>Evolução Diária</h6><input type="month" class="form-control form-control-sm" id="mesSelecionadoFrig" value="{{ mes_selecionado }}" style="max-width: 140px;"></div></div><div class="card-body p-2"><div class="chart-container" style="height: 200px;"><canvas id="dailyChartFrig"></canvas></div></div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="section-panel section-panel-industria band-inner">
+                        <div class="section-body pt-2 pb-2">
+                            <div class="card shadow-sm border-0 mb-0"><div class="card-header bg-secondary text-white py-2"><div class="d-flex justify-content-between align-items-center"><h6 class="mb-0"><i class="fas fa-chart-line me-1"></i>Evolução Diária</h6><input type="month" class="form-control form-control-sm" id="mesSelecionadoInd" value="{{ mes_selecionado }}" style="max-width: 140px;"></div></div><div class="card-body p-2"><div class="chart-container" style="height: 200px;"><canvas id="dailyChartInd"></canvas></div></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Faixa 4: Paradas por máquina -->
+            <div class="row g-4 band-row band-row--maquinas">
+                <div class="col-lg-6">
+                    <div class="section-panel section-panel-frigorifico band-inner">
+                        <div class="section-body pt-2 pb-2">
+                            <div class="card shadow-sm border-0 mb-0"><div class="card-header bg-primary text-white py-2"><h6 class="mb-0"><i class="fas fa-cogs me-1"></i>Paradas por Máquina</h6></div><div class="card-body p-2"><div class="chart-container" style="height: 200px;"><canvas id="maquinasChartFrig"></canvas></div></div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="section-panel section-panel-industria band-inner">
+                        <div class="section-body pt-2 pb-2">
+                            <div class="card shadow-sm border-0 mb-0"><div class="card-header bg-secondary text-white py-2"><h6 class="mb-0"><i class="fas fa-cogs me-1"></i>Paradas por Máquina</h6></div><div class="card-body p-2"><div class="chart-container" style="height: 200px;"><canvas id="maquinasChartInd"></canvas></div></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Faixa 5: Projeção do indicador (fim do mês) -->
+            <div class="row g-4 band-row band-row--projecao-indicador">
+                <div class="col-lg-6">
+                    {% if projecao_dias_passados_frig and projecao_dias_restantes_frig is not None %}
+                    <div class="section-panel section-panel-frigorifico band-inner border-0 shadow-none bg-transparent">
+                        <div class="card shadow-sm border-0 border-start border-4 border-info h-100">
                             <div class="card-header bg-info text-white py-2"><h6 class="mb-0"><i class="fas fa-project-diagram me-1"></i>Projeção do Indicador Atual (restante do mês)</h6></div>
                             <div class="card-body p-2">
-                                <p class="text-muted small mb-2">Baseado na média diária de Carcaças Já Perdidas aplicada aos dias restantes:</p>
+                                <p class="text-muted small mb-2">Média de carcaças perdidas <strong>por dia produtivo</strong> (só dias marcados em Configuração), projetada sobre os <strong>dias produtivos restantes</strong> do mês:</p>
                                 <div class="row g-2">
-                                    <div class="col-6 col-md-4"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Dias com dados</h6><h5 class="mb-0 fw-bold">{{ projecao_dias_corridos }}</h5></div></div></div>
-                                    <div class="col-6 col-md-4"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Dias restantes</h6><h5 class="mb-0 fw-bold">{{ projecao_dias_restantes }}</h5></div></div></div>
-                                    <div class="col-6 col-md-4"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Média carcaças/dia</h6><h5 class="mb-0 fw-bold">{% if projecao_avg_perda_frig_dia is not None %}{{ projecao_avg_perda_frig_dia|number_br:2 }}{% else %}-{% endif %}</h5></div></div></div>
+                                    <div class="col-6 col-md-4"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Dias produtivos decorridos</h6><h5 class="mb-0 fw-bold">{{ projecao_dias_passados_frig }}</h5></div></div></div>
+                                    <div class="col-6 col-md-4"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Dias produtivos restantes</h6><h5 class="mb-0 fw-bold">{{ projecao_dias_restantes_frig }}</h5></div></div></div>
+                                    <div class="col-6 col-md-4"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Média carcaças / dia produtivo</h6><h5 class="mb-0 fw-bold">{% if projecao_avg_perda_frig_dia is not None %}{{ projecao_avg_perda_frig_dia|number_br:2 }}{% else %}-{% endif %}</h5></div></div></div>
+                                    <div class="col-6 col-md-6"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Perda projetada (fim do mês)</h6><h5 class="mb-0 fw-bold">{% if projecao_perda_frig_total is not None %}{{ projecao_perda_frig_total|number_br:2 }}{% else %}-{% endif %}</h5><span class="text-muted small">carcaças</span></div></div></div>
+                                    <div class="col-6 col-md-6"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Suínos projetados (fim do mês)</h6><h5 class="mb-0 fw-bold">{% if projecao_suinos_frig_total is not None %}{{ projecao_suinos_frig_total|number_br:0 }}{% else %}-{% endif %}</h5></div></div></div>
                                     <div class="col-12"><div class="card border-0 {% if projecao_indicador_frig is not None and perda_maximo_frig is not None and projecao_indicador_frig > perda_maximo_frig %}border-danger{% else %}border-success{% endif %} border-start border-4"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Indicador projetado (fim do mês)</h6><h5 class="mb-0 fw-bold {% if projecao_indicador_frig is not None and perda_maximo_frig is not None and projecao_indicador_frig > perda_maximo_frig %}text-danger{% else %}text-success{% endif %}">{% if projecao_indicador_frig is not None %}{{ projecao_indicador_frig|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
                                 </div>
                             </div>
                         </div>
-                        {% endif %}
                     </div>
+                    {% else %}
+                    <div class="section-panel section-panel-frigorifico band-inner d-flex align-items-center justify-content-center text-muted small" style="min-height: 120px;">Sem projeção para o período (dados insuficientes).</div>
+                    {% endif %}
                 </div>
-            </div>
-            <!-- Coluna DIREITA: Indústria -->
-            <div class="col-lg-6">
-                <div class="section-panel section-panel-industria">
-                    <div class="section-header d-flex align-items-center justify-content-between">
-                        <span><i class="fas fa-cogs me-2"></i>Indústria</span>
-                        <a href="{% url 'analise_parada_industria' %}?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}" class="btn btn-sm btn-light">Ver completa <i class="fas fa-external-link-alt ms-1"></i></a>
-                    </div>
-                    <div class="section-body">
-                        <!-- KPIs Indústria - Projeção -->
-                        <p class="text-muted small mb-2">Projeção de produção:</p>
-                        <div class="row g-2 mb-3">
-                            <div class="col-6 col-md-4"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Média de Produção diária planejada:</h6><h5 class="mb-0 fw-bold">{% if producao_diaria_planejada_industria is not None %}{{ producao_diaria_planejada_industria|number_br:0 }}{% else %}-{% endif %}</h5></div></div></div>
-                            <div class="col-6 col-md-4"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Média de Dias úteis:</h6><h5 class="mb-0 fw-bold">{{ dias_uteis_total_industria|default:0|number_br:0 }}</h5></div></div></div>
-                            <div class="col-6 col-md-4"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Indicador de % Perda Máxima:</h6><h5 class="mb-0 fw-bold">{% if perda_maximo_industria is not None %}{{ perda_maximo_industria|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
-                            <div class="col-6"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Fator Eficiência da Indústria:</h6><h5 class="mb-0 fw-bold">{% if fator_eficiencia_industria is not None %}{{ fator_eficiencia_industria|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
-                            <div class="col-6"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Perda Mensal em Kg:</h6><h5 class="mb-0 fw-bold">{{ perda_maxima_planejada_industria|number_br:2 }}</h5></div></div></div>
-                        </div>
-                        <!-- KPIs Indústria - Real -->
-                        <p class="text-muted small mb-2">Produção real:</p>
-                        <div class="row g-2 mb-3">
-                            <div class="col-6"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Total Paradas</h6><h5 class="mb-0 fw-bold">{{ total_paradas_ind|number_br:0 }}</h5></div></div></div>
-                            <div class="col-6"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Total já perido:(Kg)</h6><h5 class="mb-0 fw-bold">{{ soma_capacidade_ind|number_br:2 }}</h5></div></div></div>
-                            <div class="col-6"><div class="card border-0 border-start border-4 border-secondary shadow-sm"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Produção realizada</h6><h5 class="mb-0 fw-bold">{{ soma_producao_industria|number_br:2 }}</h5></div></div></div>
-                            <div class="col-6">{% if indicador_atual_industria is not None and perda_maximo_industria is not None and indicador_atual_industria > perda_maximo_industria %}<div class="card border-0 border-start border-4 border-danger shadow-sm">{% else %}<div class="card border-0 border-start border-4 border-success shadow-sm">{% endif %}<div class="card-body py-2"><h6 class="text-muted mb-0 small">Indicador Atual</h6><h5 class="mb-0 fw-bold {% if indicador_atual_industria is not None and perda_maximo_industria is not None and indicador_atual_industria > perda_maximo_industria %}text-danger{% else %}text-success{% endif %}">{% if indicador_atual_industria is not None %}{{ indicador_atual_industria|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
-                        </div>
-                        <!-- Evolução Diária Indústria -->
-                        <div class="card shadow-sm border-0 mb-2"><div class="card-header bg-secondary text-white py-2"><div class="d-flex justify-content-between align-items-center"><h6 class="mb-0"><i class="fas fa-chart-line me-1"></i>Evolução Diária</h6><input type="month" class="form-control form-control-sm" id="mesSelecionadoInd" value="{{ mes_selecionado }}" style="max-width: 140px;"></div></div><div class="card-body p-2"><div class="chart-container" style="height: 200px;"><canvas id="dailyChartInd"></canvas></div></div></div>
-                        <!-- Paradas por Máquina Indústria -->
-                        <div class="card shadow-sm border-0 mb-2"><div class="card-header bg-secondary text-white py-2"><h6 class="mb-0"><i class="fas fa-cogs me-1"></i>Paradas por Máquina</h6></div><div class="card-body p-2"><div class="chart-container" style="height: 200px;"><canvas id="maquinasChartInd"></canvas></div></div></div>
-                        <!-- Projeção Indicador Atual Indústria -->
-                        {% if projecao_dias_corridos and projecao_dias_restantes is not None %}
-                        <div class="card shadow-sm border-0 border-start border-4 border-info">
+                <div class="col-lg-6">
+                    {% if projecao_dias_passados_ind and projecao_dias_restantes_ind is not None %}
+                    <div class="section-panel section-panel-industria band-inner border-0 shadow-none bg-transparent">
+                        <div class="card shadow-sm border-0 border-start border-4 border-info h-100">
                             <div class="card-header bg-info text-white py-2"><h6 class="mb-0"><i class="fas fa-project-diagram me-1"></i>Projeção do Indicador Atual (restante do mês)</h6></div>
                             <div class="card-body p-2">
-                                <p class="text-muted small mb-2">Baseado na média diária de Total já perdido (Kg) aplicada aos dias restantes:</p>
+                                <p class="text-muted small mb-2">Média de kg perdidos <strong>por dia em que houve produção informada</strong> (Produção diária, com kg de indústria informado e maior que zero), até o fim do período filtrado; extrapolação sobre os <strong>dias produtivos restantes</strong> do mês (Configuração):</p>
                                 <div class="row g-2">
-                                    <div class="col-6 col-md-4"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Dias com dados</h6><h5 class="mb-0 fw-bold">{{ projecao_dias_corridos }}</h5></div></div></div>
-                                    <div class="col-6 col-md-4"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Dias restantes</h6><h5 class="mb-0 fw-bold">{{ projecao_dias_restantes }}</h5></div></div></div>
-                                    <div class="col-6 col-md-4"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Média Kg perdidos/dia</h6><h5 class="mb-0 fw-bold">{% if projecao_avg_perda_ind_dia is not None %}{{ projecao_avg_perda_ind_dia|number_br:2 }}{% else %}-{% endif %}</h5></div></div></div>
+                                    <div class="col-6 col-md-4"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Dias com produção informada</h6><h5 class="mb-0 fw-bold">{{ projecao_dias_passados_ind }}</h5></div></div></div>
+                                    <div class="col-6 col-md-4"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Dias produtivos restantes</h6><h5 class="mb-0 fw-bold">{{ projecao_dias_restantes_ind }}</h5></div></div></div>
+                                    <div class="col-6 col-md-4"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Média kg perdidos / dia com produção</h6><h5 class="mb-0 fw-bold">{% if projecao_avg_perda_ind_dia is not None %}{{ projecao_avg_perda_ind_dia|number_br:2 }}{% else %}-{% endif %}</h5></div></div></div>
+                                    <div class="col-6 col-md-6"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Perda projetada (fim do mês)</h6><h5 class="mb-0 fw-bold">{% if projecao_perda_ind_kg_total is not None %}{{ projecao_perda_ind_kg_total|number_br:2 }}{% else %}-{% endif %}</h5><span class="text-muted small">kg</span></div></div></div>
+                                    <div class="col-6 col-md-6"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Produção projetada (fim do mês)</h6><h5 class="mb-0 fw-bold">{% if projecao_producao_ind_kg_total is not None %}{{ projecao_producao_ind_kg_total|number_br:2 }}{% else %}-{% endif %}</h5><span class="text-muted small">kg</span></div></div></div>
                                     <div class="col-12"><div class="card border-0 {% if projecao_indicador_industria is not None and perda_maximo_industria is not None and projecao_indicador_industria > perda_maximo_industria %}border-danger{% else %}border-success{% endif %} border-start border-4"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Indicador projetado (fim do mês)</h6><h5 class="mb-0 fw-bold {% if projecao_indicador_industria is not None and perda_maximo_industria is not None and projecao_indicador_industria > perda_maximo_industria %}text-danger{% else %}text-success{% endif %}">{% if projecao_indicador_industria is not None %}{{ projecao_indicador_industria|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
                                 </div>
                             </div>
                         </div>
-                        {% endif %}
                     </div>
+                    {% else %}
+                    <div class="section-panel section-panel-industria band-inner d-flex align-items-center justify-content-center text-muted small" style="min-height: 120px;">Sem projeção para o período (dados insuficientes).</div>
+                    {% endif %}
                 </div>
             </div>
         </div>

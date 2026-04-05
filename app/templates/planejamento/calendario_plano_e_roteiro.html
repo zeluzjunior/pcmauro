@@ -1,0 +1,334 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Calendário de Preventivas{% endblock %}
+
+{% block extra_css %}
+<!-- FullCalendar CSS -->
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.min.css' rel='stylesheet' />
+
+<style>
+    .calendar-container {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .filter-panel {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    .filter-panel h5 {
+        margin-bottom: 15px;
+        color: #333;
+        font-weight: 600;
+    }
+
+    .filter-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        align-items: flex-end;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .filter-group label {
+        font-weight: 500;
+        color: #555;
+        margin: 0;
+    }
+
+    .filter-group select {
+        min-width: 220px;
+        padding: 8px 12px;
+        border: 2px solid #dee2e6;
+        border-radius: 5px;
+        font-size: 0.95rem;
+    }
+
+    .filter-group select:focus {
+        outline: none;
+        border-color: #0d6efd;
+    }
+
+    /* FullCalendar customizations */
+    .fc { font-family: inherit; }
+    .fc-button {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+    .fc-button:hover {
+        background-color: #0b5ed7;
+        border-color: #0a58ca;
+    }
+    .fc-event { cursor: pointer; border-radius: 4px; }
+    .fc-event:hover { opacity: 0.85; }
+
+    .fc-more-link {
+        font-weight: 500;
+        color: #0d6efd !important;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: #e7f1ff;
+    }
+    .fc-more-link:hover {
+        background: #cfe2ff;
+        color: #0a58ca !important;
+    }
+    .fc-popover {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .fc-popover .fc-popover-header {
+        background: #198754;
+        color: white;
+        padding: 8px 12px;
+        font-weight: 600;
+    }
+    .fc-popover .fc-event {
+        margin: 4px 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_meu_plano' %}" class="text-white">Meus Planos Preventiva</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Calendário de Preventivas</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-calendar-alt me-2"></i>Calendário de Preventivas
+                </h1>
+                <p class="lead">Previsão de manutenções baseada em dt_abertura e intervalo (cs_qtde_periodo_max) do RoteiroPreventiva</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Filter Panel -->
+        <div class="filter-panel">
+            <h5><i class="fas fa-filter me-2"></i>Filtrar</h5>
+            <form method="get" action="{% url 'calendario_plano_e_roteiro' %}" id="filterForm">
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label for="filter-funciomanu">Funcionário (nome_funciomanu)</label>
+                        <select id="filter-funciomanu" name="nome_funciomanu" class="form-select">
+                            <option value="">Todos</option>
+                            {% for f in funcionarios %}
+                            <option value="{{ f }}" {% if selected_funciomanu == f %}selected{% endif %}>{{ f }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-maquina">Máquina (descr_maquina)</label>
+                        <select id="filter-maquina" name="descr_maquina" class="form-select">
+                            <option value="">Todas</option>
+                            {% for m in maquinas %}
+                            <option value="{{ m }}" {% if selected_maquina == m %}selected{% endif %}>{{ m|truncatewords:8 }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-setor">Setor (descr_setormanut)</label>
+                        <select id="filter-setor" name="descr_setormanut" class="form-select">
+                            <option value="">Todos</option>
+                            {% for s in setores %}
+                            <option value="{{ s }}" {% if selected_setor == s %}selected{% endif %}>{{ s|truncatewords:8 }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-sync me-1"></i> Aplicar
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Workload Analysis Section -->
+        {% if workload_analysis %}
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-balance-scale me-2"></i>Análise de Carga de Trabalho por Manutentor
+                    <span class="badge bg-light text-primary ms-2">Próximos {{ workload_periodo }}</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card border-0 bg-light h-100">
+                            <div class="card-body py-2">
+                                <small class="text-muted">Total de tarefas</small>
+                                <h5 class="mb-0 fw-bold">{{ workload_total_tarefas }}</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 bg-light h-100">
+                            <div class="card-body py-2">
+                                <small class="text-muted">Total ~horas</small>
+                                <h5 class="mb-0 fw-bold">{{ workload_total_horas }} h</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 bg-light h-100">
+                            <div class="card-body py-2">
+                                <small class="text-muted">Média por manutentor (tarefas)</small>
+                                <h5 class="mb-0 fw-bold">{{ workload_media_tarefas }}</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 bg-light h-100">
+                            <div class="card-body py-2">
+                                <small class="text-muted">Média por manutentor (~horas)</small>
+                                <h5 class="mb-0 fw-bold">{{ workload_media_horas }} h</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-muted small mb-3">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Baseado em dt_abertura e cs_qtde_periodo_max do RoteiroPreventiva. Tempo estimado por tempo_prev ou padrão do sistema.
+                    Use os filtros acima e clique em <strong>Aplicar</strong> para atualizar a análise.
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Manutentor</th>
+                                <th class="text-end">Tarefas</th>
+                                <th class="text-end">~Horas</th>
+                                <th>Status</th>
+                                <th>Recomendação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for w in workload_analysis %}
+                            <tr>
+                                <td><strong>{{ w.nome }}</strong></td>
+                                <td class="text-end">{{ w.tarefas }}</td>
+                                <td class="text-end">{{ w.horas }} h</td>
+                                <td>
+                                    {% if w.status == 'sobrecarregado' %}
+                                    <span class="badge bg-danger">Sobrecarregado</span>
+                                    {% elif w.status == 'capacidade_ociosa' %}
+                                    <span class="badge bg-success">Pode assumir mais</span>
+                                    {% else %}
+                                    <span class="badge bg-primary">Equilibrado</span>
+                                    {% endif %}
+                                </td>
+                                <td><small class="text-muted">{{ w.recomendacao }}</small></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Calendar Container -->
+        <div class="calendar-container">
+            <div id="calendar"></div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<!-- FullCalendar JS -->
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/locales/pt-br.global.min.js'></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const calendarEl = document.getElementById('calendar');
+    let calendar;
+
+    calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+        },
+        locale: 'pt-br',
+        firstDay: 1,
+        dayMaxEvents: 4,
+        moreLinkContent: function(arg) {
+            return { html: '<span>+ ' + arg.num + ' mais</span>' };
+        },
+        moreLinkClick: 'popover',
+        navLinks: true,
+        buttonText: {
+            today: 'Hoje',
+            month: 'Mês',
+            week: 'Semana',
+            day: 'Dia',
+            list: 'Lista'
+        },
+        events: function(fetchInfo, successCallback, failureCallback) {
+            const url = new URL('{% url "api_eventos_preventivas_calendario" %}', window.location.origin);
+            url.searchParams.append('start', fetchInfo.start.toISOString());
+            url.searchParams.append('end', fetchInfo.end.toISOString());
+            const funciomanu = document.getElementById('filter-funciomanu').value;
+            const maquina = document.getElementById('filter-maquina').value;
+            const setor = document.getElementById('filter-setor').value;
+            if (funciomanu) url.searchParams.append('nome_funciomanu', funciomanu);
+            if (maquina) url.searchParams.append('descr_maquina', maquina);
+            if (setor) url.searchParams.append('descr_setormanut', setor);
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => successCallback(data))
+                .catch(error => {
+                    console.error('Error:', error);
+                    failureCallback(error);
+                });
+        },
+        eventClick: function(info) {
+            if (info.event.extendedProps.url) {
+                window.open(info.event.extendedProps.url, '_blank');
+            }
+        },
+        eventDidMount: function(info) {
+            const desc = info.event.extendedProps.descricao || info.event.extendedProps.maquina;
+            if (desc) info.el.setAttribute('title', desc);
+        }
+    });
+
+    calendar.render();
+
+    document.querySelectorAll('#filter-funciomanu, #filter-maquina, #filter-setor').forEach(function(el) {
+        el.addEventListener('change', function() {
+            calendar.refetchEvents();
+        });
+    });
+});
+</script>
+{% endblock %}

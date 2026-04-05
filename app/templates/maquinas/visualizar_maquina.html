@@ -56,7 +56,7 @@
             <div class="col-12">
 
                 <!-- Informações da Máquina -->
-                <div class="card shadow-sm mb-4">
+                <div class="card shadow-sm visualizar-maquina-section">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
                             <i class="fas fa-info-circle me-2"></i>Informações da Máquina
@@ -138,7 +138,7 @@
                 </div>
 
                 <!-- Planos Preventiva -->
-                <div class="card shadow-sm mb-4">
+                <div class="card shadow-sm visualizar-maquina-section">
                     <div class="card-header bg-success text-white">
                         <h5 class="mb-0">
                             <i class="fas fa-calendar-check me-2"></i>Planos de Manutenção Preventiva
@@ -240,41 +240,40 @@
                     </div>
                 </div>
 
-                <!-- Calendário de Planos Preventiva PCM -->
-                {% if meus_planos_preventiva %}
-                <div class="card shadow-sm mb-4">
+                <!-- Calendário de preventivas (mesmo dado que /meus-planos-preventiva/calendario — RoteiroPreventiva) -->
+                <div class="card shadow-sm visualizar-maquina-section">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-calendar-alt me-2"></i>Calendário de Planos Preventiva PCM - Esta Máquina
-                            <span class="badge bg-light text-dark ms-2">{{ meus_planos_preventiva|length }}</span>
+                            <i class="fas fa-calendar-alt me-2"></i>Calendário de Preventivas — Esta Máquina
                         </h5>
+                        <small class="d-block mt-1 opacity-90">Previsão com base em dt_abertura e intervalo (cs_qtde_periodo_max) do RoteiroPreventiva, como em Meus Planos Preventiva → Calendário.</small>
                     </div>
                     <div class="card-body">
                         <div id="calendar" style="min-height: 600px;"></div>
                         <div class="mt-3">
                             <small class="text-muted">
                                 <i class="fas fa-info-circle me-1"></i>
-                                Clique em um evento para ver mais detalhes. Use os botões de navegação para mudar de mês/semana.
+                                Clique em um evento para abrir o roteiro preventiva. Use os botões de navegação para mudar de mês/semana.
                             </small>
                         </div>
                     </div>
                 </div>
-                {% endif %}
 
                 <!-- Calendário de Planos Preventiva PCM - Máquinas Secundárias -->
                 {% if is_maquina_principal and relacionamentos_como_primaria %}
-                <div class="card shadow-sm mb-4">
+                <div class="card shadow-sm visualizar-maquina-section">
                     <div class="card-header bg-info text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-calendar-alt me-2"></i>Calendário de Planos Preventiva PCM - Máquinas Secundárias
+                            <i class="fas fa-calendar-alt me-2"></i>Calendário de Preventivas — Máquinas Secundárias
                             <span class="badge bg-light text-dark ms-2">{{ relacionamentos_como_primaria.count }} máquinas</span>
                         </h5>
+                        <small class="d-block mt-1 opacity-90">Mesma fonte de dados do calendário geral (RoteiroPreventiva), agregando as máquinas secundárias desta principal.</small>
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
                             <p class="text-muted mb-2">
                                 <i class="fas fa-info-circle me-1"></i>
-                                Este calendário mostra os planos preventivos de todas as máquinas secundárias associadas a esta máquina principal.
+                                Roteiros preventivos (previsão por dt_abertura e período) das máquinas secundárias associadas a esta máquina principal.
                             </p>
                             <div class="d-flex flex-wrap gap-2">
                                 {% for rel in relacionamentos_como_primaria %}
@@ -299,7 +298,7 @@
 
                 <!-- Relacionamentos Primária/Secundária -->
                 {% if relacionamentos_como_primaria or relacionamentos_como_secundaria %}
-                <div class="card shadow-sm mb-4">
+                <div class="card shadow-sm visualizar-maquina-section">
                     <div class="card-header bg-info text-white">
                         <h5 class="mb-0">
                             <i class="fas fa-sitemap me-2"></i>Relacionamentos de Máquinas
@@ -455,7 +454,7 @@
                 {% endif %}
 
                 <!-- Arquivos e Imagens - Em uma linha -->
-                <div class="row mb-4">
+                <div class="row visualizar-maquina-section">
                     <!-- Foto da Máquina -->
                     <div class="col-md-4 mb-3">
                         <div class="card shadow-sm h-100">
@@ -767,7 +766,7 @@
 
 
                 <!-- Setor de Manutenção -->
-                <div class="accordion mb-4" id="accordionSetorManutencao">
+                <div class="accordion visualizar-maquina-section" id="accordionSetorManutencao">
                     <div class="accordion-item">
                         <h2 class="accordion-header" id="headingSetor">
                             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSetor" aria-expanded="false" aria-controls="collapseSetor">
@@ -798,7 +797,7 @@
                 </div>
 
                 <!-- Documentos da Máquina -->
-                <div class="card shadow-sm mb-4">
+                <div class="card shadow-sm visualizar-maquina-section">
                     <div class="card-header bg-info text-white">
                         <h5 class="mb-0">
                             <i class="fas fa-file-upload me-2"></i>Documentos da Máquina
@@ -875,7 +874,7 @@
                 </div>
 
                 <!-- Informações do Sistema -->
-                <div class="accordion mb-4" id="accordionInformacoesSistema">
+                <div class="accordion visualizar-maquina-section" id="accordionInformacoesSistema">
                     <div class="accordion-item">
                         <h2 class="accordion-header" id="headingSistema">
                             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSistema" aria-expanded="false" aria-controls="collapseSistema">
@@ -924,7 +923,12 @@
 {% endblock %}
 
 {% block extra_css %}
-{% if meus_planos_preventiva or is_maquina_principal %}
+<style>
+    /* Espaçamento entre seções para facilitar leitura dos dados */
+    .visualizar-maquina-section {
+        margin-bottom: 7.5rem !important;
+    }
+</style>
 <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.min.css' rel='stylesheet' />
 <style>
     #calendar, #calendar-secundarias {
@@ -938,20 +942,41 @@
         opacity: 0.8;
     }
 </style>
-{% endif %}
 {% endblock %}
 
 {% block extra_js %}
-{% if meus_planos_preventiva or is_maquina_principal %}
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/locales/pt-br.global.min.js'></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Calendário principal (esta máquina)
+    const apiPreventivasUrl = '{% url "api_eventos_preventivas_calendario" %}';
+
+    function buildEventsFetcher(extraParams) {
+        return function(fetchInfo, successCallback, failureCallback) {
+            const url = new URL(apiPreventivasUrl, window.location.origin);
+            url.searchParams.append('start', fetchInfo.start.toISOString());
+            url.searchParams.append('end', fetchInfo.end.toISOString());
+            if (extraParams) {
+                Object.keys(extraParams).forEach(function(k) {
+                    if (extraParams[k] !== undefined && extraParams[k] !== null && extraParams[k] !== '') {
+                        url.searchParams.append(k, extraParams[k]);
+                    }
+                });
+            }
+            fetch(url)
+                .then(function(response) { return response.json(); })
+                .then(function(data) { successCallback(data); })
+                .catch(function(err) { failureCallback(err); });
+        };
+    }
+
+    // Calendário principal — mesmos eventos que /meus-planos-preventiva/calendario (RoteiroPreventiva)
     const calendarEl = document.getElementById('calendar');
     if (calendarEl) {
         const calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
             locale: 'pt-br',
+            firstDay: 1,
             headerToolbar: {
                 left: 'prev,next today',
                 center: 'title',
@@ -964,20 +989,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 day: 'Dia',
                 list: 'Lista'
             },
-            events: '{% url "calendario_planos_maquina" maquina.id %}',
+            events: buildEventsFetcher({ maquina_id: '{{ maquina.id }}' }),
             eventClick: function(info) {
-                // Abrir página de visualização do plano quando clicar no evento
                 if (info.event.extendedProps.url) {
-                    window.location.href = info.event.extendedProps.url;
-                } else {
-                    // Mostrar informações do evento em um popup
-                    let mensagem = '<strong>' + info.event.title + '</strong><br>';
-                    if (info.event.extendedProps.descricao) {
-                        mensagem += '<br>' + info.event.extendedProps.descricao.replace(/\n/g, '<br>');
-                    }
-                    alert(mensagem);
+                    window.open(info.event.extendedProps.url, '_blank');
                 }
                 info.jsEvent.preventDefault();
+            },
+            eventDidMount: function(info) {
+                const desc = info.event.extendedProps.descricao || info.event.extendedProps.maquina;
+                if (desc) info.el.setAttribute('title', desc);
             },
             eventDisplay: 'block',
             height: 'auto',
@@ -987,17 +1008,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 meridiem: false
             }
         });
-        
         calendar.render();
     }
-    
-    // Calendário de máquinas secundárias (se for máquina principal)
+
     {% if is_maquina_principal and relacionamentos_como_primaria %}
     const calendarSecundariasEl = document.getElementById('calendar-secundarias');
     if (calendarSecundariasEl) {
         const calendarSecundarias = new FullCalendar.Calendar(calendarSecundariasEl, {
             initialView: 'dayGridMonth',
             locale: 'pt-br',
+            firstDay: 1,
             headerToolbar: {
                 left: 'prev,next today',
                 center: 'title',
@@ -1010,33 +1030,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 day: 'Dia',
                 list: 'Lista'
             },
-            events: '{% url "calendario_planos_secundarias" maquina.id %}',
+            events: buildEventsFetcher({ maquina_principal_id: '{{ maquina.id }}' }),
             eventClick: function(info) {
-                // Mostrar opções: ver plano ou ver máquina
-                if (info.event.extendedProps.url && info.event.extendedProps.maquina_url) {
+                const roteiroUrl = info.event.extendedProps.url;
+                const maqUrl = info.event.extendedProps.maquina_url;
+                if (roteiroUrl && maqUrl) {
                     const escolha = confirm(
-                        info.event.title + '\n\n' + 
-                        (info.event.extendedProps.descricao || '').replace(/\n/g, '\n') + 
-                        '\n\nClique OK para ver o plano ou Cancelar para ver a máquina.'
+                        info.event.title + '\n\n' +
+                        (info.event.extendedProps.descricao || '') +
+                        '\n\nOK = abrir roteiro preventiva\nCancelar = abrir página da máquina'
                     );
                     if (escolha) {
-                        window.location.href = info.event.extendedProps.url;
+                        window.open(roteiroUrl, '_blank');
                     } else {
-                        window.location.href = info.event.extendedProps.maquina_url;
+                        window.location.href = maqUrl;
                     }
-                } else if (info.event.extendedProps.url) {
-                    window.location.href = info.event.extendedProps.url;
-                } else if (info.event.extendedProps.maquina_url) {
-                    window.location.href = info.event.extendedProps.maquina_url;
-                } else {
-                    // Mostrar informações do evento em um popup
-                    let mensagem = '<strong>' + info.event.title + '</strong><br>';
-                    if (info.event.extendedProps.descricao) {
-                        mensagem += '<br>' + info.event.extendedProps.descricao.replace(/\n/g, '<br>');
-                    }
-                    alert(mensagem);
+                } else if (roteiroUrl) {
+                    window.open(roteiroUrl, '_blank');
+                } else if (maqUrl) {
+                    window.location.href = maqUrl;
                 }
                 info.jsEvent.preventDefault();
+            },
+            eventDidMount: function(info) {
+                const desc = info.event.extendedProps.descricao || info.event.extendedProps.maquina;
+                if (desc) info.el.setAttribute('title', desc);
             },
             eventDisplay: 'block',
             height: 'auto',
@@ -1046,11 +1064,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 meridiem: false
             }
         });
-        
         calendarSecundarias.render();
     }
     {% endif %}
 });
 </script>
-{% endif %}
 {% endblock %}

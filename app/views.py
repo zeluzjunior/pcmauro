@@ -1673,13 +1673,181 @@ def analise_plano_preventiva(request):
     return render(request, 'preventivas/analise_plano_preventiva.html', context)
 
 
+def analise_plano_por_maquina(request):
+    """Análise de Plano Por Máquina - Máquinas Principais agrupadas por Local do CentroAtividade.
+    O Setor (cd_setormanut) corresponde à sigla na tabela CentroAtividade. Ex: ABT 2488=FRIGORÍFICO, PRU 2291=INDÚSTRIA."""
+    from app.models import Maquina, CentroAtividade
+
+    # Mapa sigla (CentroAtividade) -> local: cd_setormanut = sigla do CA (ex: ABT 2488, PRU 2291)
+    centros = CentroAtividade.objects.exclude(sigla__isnull=True).exclude(sigla='').exclude(
+        local__isnull=True
+    ).exclude(local='').values('sigla', 'local')
+    sigla_para_local = {}
+    for c in centros:
+        sigla = (c['sigla'] or '').strip()
+        if sigla:
+            sigla_para_local[sigla.upper()] = c['local']
+            sigla_para_local[sigla] = c['local']  # lookup exato também
+
+    def _local_from_setor(cd_setormanut):
+        """Retorna (key, label) baseado em CentroAtividade.local onde sigla = cd_setormanut"""
+        if not cd_setormanut:
+            return ('SEM_LOCAL', 'Sem local')
+        s = str(cd_setormanut).strip()
+        loc = sigla_para_local.get(s) or sigla_para_local.get(s.upper())
+        if not loc:
+            return ('SEM_LOCAL', 'Sem local')
+        loc_upper = (loc or '').strip().upper()
+        if 'FRIGOR' in loc_upper:
+            return ('FRIGORIFICO', 'FRIGORÍFICO')
+        if 'UTILIDADE' in loc_upper or 'UTILIDADES' in loc_upper:
+            return ('UTILIDADES', 'UTILIDADES')
+        if 'EXTERN' in loc_upper:
+            return ('EXTERNA', 'EXTERNA')
+        if 'IND' in loc_upper or 'INDUSTRIA' in loc_upper:
+            return ('INDUSTRIA', 'INDÚSTRIA')
+        if 'APOIO' in loc_upper:
+            return ('APOIO', 'APOIO')
+        return ('OUTROS', loc)
+
+    # Máquinas "MÁQUINAS PRINCIPAL"
+    maquinas_principais = Maquina.objects.filter(
+        descr_gerenc__iexact='MÁQUINAS PRINCIPAL'
+    ).exclude(
+        cd_setormanut__isnull=True
+    ).exclude(
+        cd_setormanut=''
+    ).prefetch_related('manutentores__manutentor').order_by('cd_setormanut', 'cd_maquina')
+
+    ordem_locais = [('FRIGORIFICO', 'FRIGORÍFICO'), ('INDUSTRIA', 'INDÚSTRIA'), ('UTILIDADES', 'UTILIDADES'),
+                    ('EXTERNA', 'EXTERNA'), ('APOIO', 'APOIO'), ('OUTROS', 'Outros'), ('SEM_LOCAL', 'Sem local')]
+    dados_por_local = {key: {'label': lbl, 'setores': {}} for key, lbl in ordem_locais}
+
+    for maquina in maquinas_principais:
+        loc_key, loc_label = _local_from_setor(maquina.cd_setormanut)
+        if loc_key not in dados_por_local:
+            dados_por_local[loc_key] = {'label': loc_label, 'setores': {}}
+        setor = str(maquina.cd_setormanut)
+        if setor not in dados_por_local[loc_key]['setores']:
+            dados_por_local[loc_key]['setores'][setor] = {
+                'cd_setormanut': setor,
+                'descr_setormanut': maquina.descr_setormanut or 'Sem descrição',
+                'maquinas': []
+            }
+        manutentores_list = [
+            {'matricula': mm.manutentor.Matricula, 'nome': mm.manutentor.Nome or mm.manutentor.Matricula}
+            for mm in maquina.manutentores.all()
+        ]
+        dados_por_local[loc_key]['setores'][setor]['maquinas'].append({
+            'id': maquina.id,
+            'cd_maquina': maquina.cd_maquina,
+            'descr_maquina': maquina.descr_maquina or 'Sem descrição',
+            'nro_patrimonio': maquina.nro_patrimonio or '-',
+            'manutentores': manutentores_list
+        })
+
+    secoes_locais = []
+    for key, label in ordem_locais:
+        d = dados_por_local.get(key, {'setores': {}})
+        setores_list = sorted(d['setores'].values(), key=lambda x: x['cd_setormanut'])
+        if setores_list:
+            secoes_locais.append({
+                'label': label,
+                'key': key,
+                'setores': setores_list,
+            })
+
+    context = {
+        'page_title': 'Análise de Plano Por Máquina',
+        'active_page': 'analise_plano_por_maquina',
+        'secoes_locais': secoes_locais,
+    }
+    return render(request, 'preventivas/anallise_plano_por_maquina.html', context)
+
+
+def visualizar_plano_preventiva_por_maquina_agrupada(request, maquina_id):
+    """Visualizar Plano de Preventiva agrupado pela perspectiva da MÁQUINA PRINCIPAL (incluindo máquinas secundárias)"""
+    from app.models import Maquina, MaquinaPrimariaSecundaria, PlanoPreventiva
+    from django.shortcuts import redirect
+    from django.contrib import messages
+
+    try:
+        maquina_primaria = Maquina.objects.get(id=maquina_id)
+    except Maquina.DoesNotExist:
+        messages.error(request, 'Máquina não encontrada.')
+        return redirect('analise_plano_por_maquina')
+
+    # Relacionamentos como primária (esta máquina tem secundárias)
+    relacionamentos = MaquinaPrimariaSecundaria.objects.filter(
+        maquina_primaria=maquina_primaria
+    ).select_related('maquina_secundaria').order_by('maquina_secundaria__cd_maquina')
+
+    # Coletar cd_maquina: primária + todas secundárias
+    codigos_maquinas = [maquina_primaria.cd_maquina]
+    maquinas_secundarias = []
+    for rel in relacionamentos:
+        sec = rel.maquina_secundaria
+        codigos_maquinas.append(sec.cd_maquina)
+        maquinas_secundarias.append(sec)
+
+    # Buscar PlanoPreventiva para todas essas máquinas
+    planos_qs = PlanoPreventiva.objects.filter(
+        cd_maquina__in=codigos_maquinas
+    ).select_related('maquina', 'roteiro_preventiva').order_by('cd_maquina', 'numero_plano', 'sequencia_manutencao', 'sequencia_tarefa')
+
+    # Agrupar por máquina: primária e cada secundária
+    planos_primaria = [p for p in planos_qs if p.cd_maquina == maquina_primaria.cd_maquina]
+    # Lista de (maquina_secundaria, planos) para iteração no template
+    secundarias_com_planos = [
+        (sec, [p for p in planos_qs if p.cd_maquina == sec.cd_maquina])
+        for sec in maquinas_secundarias
+    ]
+    total_planos = len(planos_primaria) + sum(len(ps) for _, ps in secundarias_com_planos)
+
+    context = {
+        'page_title': f'Plano Preventiva - {maquina_primaria.descr_maquina or maquina_primaria.cd_maquina}',
+        'active_page': 'analise_plano_por_maquina',
+        'maquina_primaria': maquina_primaria,
+        'maquinas_secundarias': maquinas_secundarias,
+        'planos_primaria': planos_primaria,
+        'secundarias_com_planos': secundarias_com_planos,
+        'total_planos': total_planos,
+    }
+    return render(request, 'preventivas/visualizar_plano_preventiva_por_maquina_agrupada.html', context)
+
+
 def analise_roteiro_plano_preventiva(request):
     """Análise de Roteiro e Plano de Preventiva - Encontrar relações baseadas em campos específicos"""
-    from app.models import PlanoPreventiva, RoteiroPreventiva, MeuPlanoPreventiva, Maquina
+    from app.models import PlanoPreventiva, RoteiroPreventiva, MeuPlanoPreventiva, Maquina, CentroAtividade
     from django.core.paginator import Paginator
     from django.db import transaction
     from django.contrib import messages
-    
+
+    def _build_descricao_completa_roteiro(roteiro):
+        """Constrói descrição completa a partir dos campos do Roteiro (dados que só existem no Roteiro)."""
+        partes = []
+        if roteiro.descr_seqplamanu and str(roteiro.descr_seqplamanu).strip():
+            partes.append(str(roteiro.descr_seqplamanu).strip())
+        if roteiro.descr_tarefamanu and str(roteiro.descr_tarefamanu).strip():
+            partes.append(str(roteiro.descr_tarefamanu).strip())
+        if roteiro.descr_recomenos and str(roteiro.descr_recomenos).strip():
+            partes.append(str(roteiro.descr_recomenos).strip())
+        if partes:
+            return '\n\n'.join(partes)
+        return roteiro.descr_seqplamanu or ''
+
+    def _melhor_roteiro_para_plano(roteiros_matching):
+        """Dado N Roteiros que batem com um Plano (1:N), retorna o que tem descrição mais completa."""
+        if not roteiros_matching:
+            return None
+        if len(roteiros_matching) == 1:
+            return roteiros_matching[0]
+        return max(roteiros_matching, key=lambda r: (
+            bool(r.descr_seqplamanu and str(r.descr_seqplamanu).strip()),
+            len(str(r.descr_seqplamanu or '')),
+            len(str(r.descr_tarefamanu or '')) + len(str(r.descr_recomenos or '')),
+        ))
+
     # Verificar se é uma ação de confirmação e salvamento
     if request.method == 'POST':
         # Debug: imprimir dados recebidos
@@ -1735,71 +1903,70 @@ def analise_roteiro_plano_preventiva(request):
                 
                 return True
             
-            # Process all relationships
+            # Process all relationships (1:N: pick best roteiro when multiple match)
             with transaction.atomic():
                 for plano in planos:
-                    for roteiro in roteiros:
-                        if campos_correspondem(plano, roteiro):
-                            # Check if already saved
-                            ja_existe = MeuPlanoPreventiva.objects.filter(
+                    matching = [r for r in roteiros if campos_correspondem(plano, r)]
+                    roteiro = _melhor_roteiro_para_plano(matching)
+                    if not roteiro:
+                        continue
+                    ja_existe = MeuPlanoPreventiva.objects.filter(
+                        cd_maquina=plano.cd_maquina,
+                        numero_plano=plano.numero_plano,
+                        sequencia_manutencao=plano.sequencia_manutencao,
+                        sequencia_tarefa=plano.sequencia_tarefa
+                    ).exists()
+                    if not ja_existe:
+                        try:
+                            desc_detalhada = _build_descricao_completa_roteiro(roteiro)
+                            meu_plano, created = MeuPlanoPreventiva.objects.get_or_create(
                                 cd_maquina=plano.cd_maquina,
                                 numero_plano=plano.numero_plano,
                                 sequencia_manutencao=plano.sequencia_manutencao,
-                                sequencia_tarefa=plano.sequencia_tarefa
-                            ).exists()
-                            
-                            if not ja_existe:
-                                try:
-                                    meu_plano, created = MeuPlanoPreventiva.objects.get_or_create(
-                                        cd_maquina=plano.cd_maquina,
-                                        numero_plano=plano.numero_plano,
-                                        sequencia_manutencao=plano.sequencia_manutencao,
-                                        sequencia_tarefa=plano.sequencia_tarefa,
-                                        defaults={
-                                            'cd_unid': plano.cd_unid,
-                                            'nome_unid': plano.nome_unid,
-                                            'cd_setor': plano.cd_setor,
-                                            'descr_setor': plano.descr_setor,
-                                            'cd_atividade': plano.cd_atividade,
-                                            'descr_maquina': plano.descr_maquina,
-                                            'nro_patrimonio': plano.nro_patrimonio,
-                                            'descr_plano': plano.descr_plano,
-                                            'dt_execucao': plano.dt_execucao,
-                                            'quantidade_periodo': plano.quantidade_periodo,
-                                            'descr_tarefa': plano.descr_tarefa,
-                                            'cd_funcionario': plano.cd_funcionario,
-                                            'nome_funcionario': plano.nome_funcionario,
-                                            'descr_seqplamanu': roteiro.descr_seqplamanu,
-                                            'desc_detalhada_do_roteiro_preventiva': roteiro.descr_seqplamanu,
-                                            'roteiro_preventiva': roteiro,
-                                            'maquina': plano.maquina,
-                                        }
-                                    )
-                                    
-                                    if not created:
-                                        meu_plano.desc_detalhada_do_roteiro_preventiva = roteiro.descr_seqplamanu
-                                        meu_plano.descr_seqplamanu = roteiro.descr_seqplamanu
-                                        meu_plano.roteiro_preventiva = roteiro
-                                        meu_plano.cd_unid = plano.cd_unid
-                                        meu_plano.nome_unid = plano.nome_unid
-                                        meu_plano.cd_setor = plano.cd_setor
-                                        meu_plano.descr_setor = plano.descr_setor
-                                        meu_plano.cd_atividade = plano.cd_atividade
-                                        meu_plano.descr_maquina = plano.descr_maquina
-                                        meu_plano.nro_patrimonio = plano.nro_patrimonio
-                                        meu_plano.descr_plano = plano.descr_plano
-                                        meu_plano.dt_execucao = plano.dt_execucao
-                                        meu_plano.quantidade_periodo = plano.quantidade_periodo
-                                        meu_plano.descr_tarefa = plano.descr_tarefa
-                                        meu_plano.cd_funcionario = plano.cd_funcionario
-                                        meu_plano.nome_funcionario = plano.nome_funcionario
-                                        meu_plano.maquina = plano.maquina
-                                        meu_plano.save()
-                                    
-                                    relacionamentos_confirmados += 1
-                                except Exception as e:
-                                    relacionamentos_erro += 1
-                                    print(f"Erro ao confirmar relação Plano {plano.id} - Roteiro {roteiro.id}: {str(e)}")
+                                sequencia_tarefa=plano.sequencia_tarefa,
+                                defaults={
+                                    'cd_unid': plano.cd_unid,
+                                    'nome_unid': plano.nome_unid,
+                                    'cd_setor': plano.cd_setor,
+                                    'descr_setor': plano.descr_setor,
+                                    'cd_atividade': plano.cd_atividade,
+                                    'descr_maquina': plano.descr_maquina,
+                                    'nro_patrimonio': plano.nro_patrimonio,
+                                    'descr_plano': plano.descr_plano,
+                                    'dt_execucao': plano.dt_execucao,
+                                    'quantidade_periodo': plano.quantidade_periodo,
+                                    'descr_tarefa': plano.descr_tarefa,
+                                    'cd_funcionario': plano.cd_funcionario,
+                                    'nome_funcionario': plano.nome_funcionario,
+                                    'descr_seqplamanu': roteiro.descr_seqplamanu,
+                                    'desc_detalhada_do_roteiro_preventiva': desc_detalhada,
+                                    'roteiro_preventiva': roteiro,
+                                    'maquina': plano.maquina,
+                                }
+                            )
+                            if not created:
+                                meu_plano.desc_detalhada_do_roteiro_preventiva = desc_detalhada
+                                meu_plano.descr_seqplamanu = roteiro.descr_seqplamanu
+                                meu_plano.roteiro_preventiva = roteiro
+                                meu_plano.cd_unid = plano.cd_unid
+                                meu_plano.nome_unid = plano.nome_unid
+                                meu_plano.cd_setor = plano.cd_setor
+                                meu_plano.descr_setor = plano.descr_setor
+                                meu_plano.cd_atividade = plano.cd_atividade
+                                meu_plano.descr_maquina = plano.descr_maquina
+                                meu_plano.nro_patrimonio = plano.nro_patrimonio
+                                meu_plano.descr_plano = plano.descr_plano
+                                meu_plano.dt_execucao = plano.dt_execucao
+                                meu_plano.quantidade_periodo = plano.quantidade_periodo
+                                meu_plano.descr_tarefa = plano.descr_tarefa
+                                meu_plano.cd_funcionario = plano.cd_funcionario
+                                meu_plano.nome_funcionario = plano.nome_funcionario
+                                meu_plano.maquina = plano.maquina
+                                meu_plano.save()
+                            relacionamentos_confirmados += 1
+                        except Exception as e:
+                            relacionamentos_erro += 1
+                            print(f"Erro ao confirmar relação Plano {plano.id} - Roteiro {roteiro.id}: {str(e)}")
             
             if relacionamentos_confirmados > 0:
                 messages.success(request, f'{relacionamentos_confirmados} relação(ões) confirmada(s) e salva(s) com sucesso!')
@@ -1849,7 +2016,7 @@ def analise_roteiro_plano_preventiva(request):
                             'cd_funcionario': plano.cd_funcionario,
                             'nome_funcionario': plano.nome_funcionario,
                             'descr_seqplamanu': roteiro.descr_seqplamanu,
-                            'desc_detalhada_do_roteiro_preventiva': roteiro.descr_seqplamanu,
+                            'desc_detalhada_do_roteiro_preventiva': _build_descricao_completa_roteiro(roteiro),
                             'roteiro_preventiva': roteiro,
                             'maquina': plano.maquina,
                         }
@@ -1857,7 +2024,8 @@ def analise_roteiro_plano_preventiva(request):
                     
                     # Se já existia, atualizar com os dados do roteiro
                     if not created:
-                        meu_plano.desc_detalhada_do_roteiro_preventiva = roteiro.descr_seqplamanu
+                        desc_detalhada = _build_descricao_completa_roteiro(roteiro)
+                        meu_plano.desc_detalhada_do_roteiro_preventiva = desc_detalhada
                         meu_plano.descr_seqplamanu = roteiro.descr_seqplamanu
                         meu_plano.roteiro_preventiva = roteiro
                         # Atualizar outros campos que possam ter mudado
@@ -1892,9 +2060,9 @@ def analise_roteiro_plano_preventiva(request):
                 print(f"Erro ao salvar relação: {traceback.format_exc()}")
                 return redirect('analise_roteiro_plano_preventiva')
     
-    # Buscar todos os registros
-    planos = PlanoPreventiva.objects.all()
-    roteiros = RoteiroPreventiva.objects.all()
+    # Buscar todos os registros (select_related para CentroAtividade via maquina)
+    planos = PlanoPreventiva.objects.select_related('maquina__centro_atividade').all()
+    roteiros = RoteiroPreventiva.objects.select_related('maquina__centro_atividade').all()
     
     # Estatísticas gerais
     total_planos = planos.count()
@@ -1994,18 +2162,87 @@ def analise_roteiro_plano_preventiva(request):
         if total == 0:
             return 0
         return (score / total * 100)
-    
+
+    # Auto-confirmar matches perfeitos (ainda não salvos em MeuPlanoPreventiva)
+    auto_confirmados = 0
+    with transaction.atomic():
+        for plano in planos:
+            matching = [r for r in roteiros if campos_correspondem(plano, r)]
+            roteiro = _melhor_roteiro_para_plano(matching)
+            if not roteiro:
+                continue
+            ja_existe = MeuPlanoPreventiva.objects.filter(
+                cd_maquina=plano.cd_maquina,
+                numero_plano=plano.numero_plano,
+                sequencia_manutencao=plano.sequencia_manutencao,
+                sequencia_tarefa=plano.sequencia_tarefa
+            ).exists()
+            if not ja_existe:
+                try:
+                    desc_detalhada = _build_descricao_completa_roteiro(roteiro)
+                    meu_plano, created = MeuPlanoPreventiva.objects.get_or_create(
+                        cd_maquina=plano.cd_maquina,
+                        numero_plano=plano.numero_plano,
+                        sequencia_manutencao=plano.sequencia_manutencao,
+                        sequencia_tarefa=plano.sequencia_tarefa,
+                        defaults={
+                            'cd_unid': plano.cd_unid,
+                            'nome_unid': plano.nome_unid,
+                            'cd_setor': plano.cd_setor,
+                            'descr_setor': plano.descr_setor,
+                            'cd_atividade': plano.cd_atividade,
+                            'descr_maquina': plano.descr_maquina,
+                            'nro_patrimonio': plano.nro_patrimonio,
+                            'descr_plano': plano.descr_plano,
+                            'dt_execucao': plano.dt_execucao,
+                            'quantidade_periodo': plano.quantidade_periodo,
+                            'descr_tarefa': plano.descr_tarefa,
+                            'cd_funcionario': plano.cd_funcionario,
+                            'nome_funcionario': plano.nome_funcionario,
+                            'descr_seqplamanu': roteiro.descr_seqplamanu,
+                            'desc_detalhada_do_roteiro_preventiva': desc_detalhada,
+                            'roteiro_preventiva': roteiro,
+                            'maquina': plano.maquina,
+                        }
+                    )
+                    if not created:
+                        meu_plano.desc_detalhada_do_roteiro_preventiva = desc_detalhada
+                        meu_plano.descr_seqplamanu = roteiro.descr_seqplamanu
+                        meu_plano.roteiro_preventiva = roteiro
+                        meu_plano.cd_unid = plano.cd_unid
+                        meu_plano.nome_unid = plano.nome_unid
+                        meu_plano.cd_setor = plano.cd_setor
+                        meu_plano.descr_setor = plano.descr_setor
+                        meu_plano.cd_atividade = plano.cd_atividade
+                        meu_plano.descr_maquina = plano.descr_maquina
+                        meu_plano.nro_patrimonio = plano.nro_patrimonio
+                        meu_plano.descr_plano = plano.descr_plano
+                        meu_plano.dt_execucao = plano.dt_execucao
+                        meu_plano.quantidade_periodo = plano.quantidade_periodo
+                        meu_plano.descr_tarefa = plano.descr_tarefa
+                        meu_plano.cd_funcionario = plano.cd_funcionario
+                        meu_plano.nome_funcionario = plano.nome_funcionario
+                        meu_plano.maquina = plano.maquina
+                        meu_plano.save()
+                    auto_confirmados += 1
+                except Exception:
+                    pass  # Silenciar erro individual, continuar com os demais
+    if auto_confirmados > 0:
+        messages.success(
+            request,
+            f'{auto_confirmados} relação(ões) perfeita(s) auto-confirmada(s) e salva(s) em MeuPlanoPreventiva.'
+        )
+
     for plano in planos:
         melhor_match = None
         melhor_score = 0
-        
-        # Buscar roteiros que correspondem exatamente
-        for roteiro in roteiros:
-            if campos_correspondem(plano, roteiro):
-                melhor_match = roteiro
-                melhor_score = 100
-                break
-        
+
+        # Buscar roteiros que correspondem exatamente (1:N: vários roteiros podem bater)
+        matching = [r for r in roteiros if campos_correspondem(plano, r)]
+        melhor_match = _melhor_roteiro_para_plano(matching)
+        if melhor_match:
+            melhor_score = 100
+
         if melhor_match:
             # Verificar se já foi salvo em MeuPlanoPreventiva
             # Usar a mesma combinação de campos usada no get_or_create
@@ -2143,6 +2380,43 @@ def analise_roteiro_plano_preventiva(request):
         relacionamentos_display = relacionamentos_filtrados[:100]
         planos_sem_display = planos_sem_relacao_filtrados[:100]
         roteiros_sem_display = roteiros_sem_relacao_filtrados[:100]
+
+    # Agrupar planos/roteiros sem match por CentroAtividade (para accordion)
+    _centro_by_ca = {c.ca: c for c in CentroAtividade.objects.all()}
+
+    def _get_centro_plano(plano):
+        if plano.maquina and plano.maquina.centro_atividade:
+            return plano.maquina.centro_atividade
+        if plano.cd_atividade:
+            return _centro_by_ca.get(plano.cd_atividade)
+        return None
+
+    def _get_centro_roteiro(roteiro):
+        if roteiro.maquina and roteiro.maquina.centro_atividade:
+            return roteiro.maquina.centro_atividade
+        return None
+
+    def _group_by_centro(items, get_centro, key_item):
+        groups = {}
+        for item in items:
+            centro = get_centro(item[key_item])
+            if centro:
+                label = f"CA {centro.ca} - {centro.sigla or centro.descricao or 'Sem descrição'}"
+                key = (centro.ca, centro.id)
+            else:
+                label = "Sem Centro de Atividade"
+                key = (0, 0)
+            if key not in groups:
+                groups[key] = {'centro': centro, 'label': label, 'items': []}
+            groups[key]['items'].append(item)
+        return sorted(groups.values(), key=lambda g: (g['centro'] is None, g['label']))
+
+    planos_sem_por_centro = _group_by_centro(
+        planos_sem_relacao_filtrados, _get_centro_plano, 'plano'
+    )
+    roteiros_sem_por_centro = _group_by_centro(
+        roteiros_sem_relacao_filtrados, _get_centro_roteiro, 'roteiro'
+    )
     
     context = {
         'page_title': 'Análise de Roteiro e Plano de Preventiva',
@@ -2150,6 +2424,8 @@ def analise_roteiro_plano_preventiva(request):
         'relacionamentos': relacionamentos_display,
         'planos_sem_relacao': planos_sem_display,
         'roteiros_sem_relacao': roteiros_sem_display,
+        'planos_sem_por_centro': planos_sem_por_centro,
+        'roteiros_sem_por_centro': roteiros_sem_por_centro,
         'total_planos': total_planos,
         'total_roteiros': total_roteiros,
         'total_relacionamentos': total_relacionamentos,
@@ -3448,6 +3724,222 @@ def importar_paradas_maquina(request):
     return render(request, 'importar/importar_paradas_de_maquina.html', base_context)
 
 
+def notas_sem_uso_estf0198(request):
+    """Upload CSV (formato ESTF0198), preenche coluna G (uso contábil) a partir de NotaFiscal no banco."""
+    import csv
+    import io
+    import os
+    import tempfile
+    import unicodedata
+    from django.contrib import messages
+    from django.shortcuts import redirect
+    from app.models import NotaFiscal
+    from app.utils import _safe_decimal
+
+    def norm_header_cell(h):
+        if h is None:
+            return ''
+        return unicodedata.normalize('NFKD', str(h)).encode('ASCII', 'ignore').decode().lower().strip()
+
+    def find_column_indices(header_row):
+        headers = [norm_header_cell(h) for h in header_row]
+        idx_emit, idx_nota, idx_total, idx_uso = None, None, None, None
+        for i, h in enumerate(headers):
+            if h == 'emitente' or (h.startswith('emitente') and 'fantasia' not in h):
+                if idx_emit is None:
+                    idx_emit = i
+            elif h == 'nota':
+                idx_nota = i
+            elif 'total' in h and 'nota' in h.replace(' ', ''):
+                idx_total = i
+            elif 'uso' in h and 'contabil' in h:
+                idx_uso = i
+        return {
+            'emitente': idx_emit if idx_emit is not None else 0,
+            'nota': idx_nota if idx_nota is not None else 2,
+            'total': idx_total if idx_total is not None else 5,
+            'uso': idx_uso if idx_uso is not None else 6,
+        }
+
+    def decode_uploaded(file_obj):
+        raw = file_obj.read()
+        if isinstance(raw, str):
+            return raw
+        for enc in ('utf-8-sig', 'utf-8', 'latin-1', 'iso-8859-1', 'cp1252'):
+            try:
+                return raw.decode(enc)
+            except UnicodeDecodeError:
+                continue
+        raise ValueError('Não foi possível decodificar o arquivo (encoding).')
+
+    from decimal import Decimal, ROUND_HALF_UP
+
+    def q2(d):
+        if d is None:
+            return None
+        return d.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    def build_uso_lookup():
+        """Chave (emitente strip, nota strip, total_nota com 2 casas) -> uso_contabil."""
+        lookup = {}
+        for nf in NotaFiscal.objects.all().only('emitente', 'nota', 'total_nota', 'uso_contabil').iterator(chunk_size=2000):
+            e = (nf.emitente or '').strip()
+            n = (nf.nota or '').strip()
+            t = q2(nf.total_nota)
+            if t is None:
+                continue
+            key = (e, n, t)
+            if key not in lookup:
+                u = nf.uso_contabil
+                lookup[key] = (u or '').strip() if u else ''
+        return lookup
+
+    if request.method == 'POST':
+        if 'file' not in request.FILES:
+            messages.error(request, 'Selecione um arquivo CSV para enviar.')
+            return redirect('notas_sem_uso_estf0198')
+        up = request.FILES['file']
+        name = (up.name or '').lower()
+        if not name.endswith('.csv'):
+            messages.error(request, 'Envie um arquivo com extensão .csv (delimitador ;).')
+            return redirect('notas_sem_uso_estf0198')
+        old_path = request.session.get('estf0198_output_path')
+        if old_path and os.path.isfile(old_path):
+            try:
+                os.unlink(old_path)
+            except OSError:
+                pass
+        request.session.pop('estf0198_output_path', None)
+        request.session.pop('estf0198_stats', None)
+
+        try:
+            content = decode_uploaded(up)
+        except ValueError as e:
+            messages.error(request, str(e))
+            return redirect('notas_sem_uso_estf0198')
+
+        try:
+            reader = csv.reader(io.StringIO(content), delimiter=';')
+            rows = list(reader)
+            if not rows:
+                messages.error(request, 'Arquivo vazio.')
+                return redirect('notas_sem_uso_estf0198')
+
+            header = rows[0]
+            col = find_column_indices(header)
+            n_cols = len(header)
+            idx_e, idx_n, idx_t, idx_u = col['emitente'], col['nota'], col['total'], col['uso']
+
+            uso_lookup = build_uso_lookup()
+            matched = 0
+            no_total = 0
+            no_match = 0
+
+            out_rows = [list(header)]
+            for row in rows[1:]:
+                if not row or not any((str(c).strip() if c is not None else '') for c in row):
+                    out_rows.append(list(row))
+                    continue
+                r = list(row)
+                while len(r) < max(n_cols, idx_u + 1, idx_t + 1, idx_n + 1, idx_e + 1):
+                    r.append('')
+                emit = (r[idx_e] or '').strip() if idx_e < len(r) else ''
+                nota = (r[idx_n] or '').strip() if idx_n < len(r) else ''
+                total_raw = r[idx_t] if idx_t < len(r) else ''
+                total_dec = _safe_decimal(total_raw)
+                if total_dec is not None:
+                    total_dec = q2(total_dec)
+                key = (emit, nota, total_dec) if total_dec is not None else None
+                uso_val = ''
+                if key is None:
+                    no_total += 1
+                elif key in uso_lookup:
+                    uso_val = uso_lookup[key]
+                    matched += 1
+                else:
+                    no_match += 1
+                while len(r) <= idx_u:
+                    r.append('')
+                r[idx_u] = uso_val
+                if len(r) < n_cols:
+                    while len(r) < n_cols:
+                        r.append('')
+                out_rows.append(r)
+
+            fd, tmp_path = tempfile.mkstemp(suffix='.csv', prefix='estf0198_')
+            os.close(fd)
+            try:
+                with open(tmp_path, 'w', encoding='utf-8-sig', newline='') as out_f:
+                    writer = csv.writer(out_f, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+                    writer.writerows(out_rows)
+            except Exception:
+                if os.path.isfile(tmp_path):
+                    os.unlink(tmp_path)
+                raise
+
+            request.session['estf0198_output_path'] = tmp_path
+            request.session['estf0198_stats'] = {
+                'linhas_dados': len(rows) - 1,
+                'preenchidas': matched,
+                'sem_total_valido': no_total,
+                'sem_correspondencia': no_match,
+            }
+            messages.success(
+                request,
+                'Arquivo processado. Coluna de uso contábil (G) preenchida quando havia correspondência exata '
+                '(Emitente, Nota e Total Nota) no cadastro de notas fiscais. Faça o download abaixo.',
+            )
+        except Exception as e:
+            messages.error(request, f'Erro ao processar o arquivo: {e}')
+        return redirect('notas_sem_uso_estf0198')
+
+    show_download = False
+    stats = request.session.get('estf0198_stats')
+    out_path = request.session.get('estf0198_output_path')
+    if out_path and os.path.isfile(out_path):
+        show_download = True
+    else:
+        if out_path:
+            request.session.pop('estf0198_output_path', None)
+        stats = None
+
+    context = {
+        'page_title': 'Notas sem uso — ESTF0198',
+        'active_page': 'notas_sem_uso_estf0198',
+        'show_download': show_download,
+        'stats': stats,
+    }
+    return render(request, 'analise_relatorios/notas_sem_uso_estf0198.html', context)
+
+
+def download_notas_sem_uso_estf0198(request):
+    import os
+    from django.http import HttpResponse
+    from django.contrib import messages
+    from django.shortcuts import redirect
+
+    path = request.session.get('estf0198_output_path')
+    if not path or not os.path.isfile(path):
+        messages.error(request, 'Não há arquivo processado para baixar. Envie o CSV novamente.')
+        return redirect('notas_sem_uso_estf0198')
+    try:
+        with open(path, 'rb') as f:
+            data = f.read()
+    except OSError:
+        messages.error(request, 'Erro ao ler o arquivo gerado.')
+        return redirect('notas_sem_uso_estf0198')
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+    request.session.pop('estf0198_output_path', None)
+    request.session.pop('estf0198_stats', None)
+
+    response = HttpResponse(data, content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="notas_ajustadas_uso_contabil_estf0198.csv"'
+    return response
+
+
 def relatorio_nf_estf0198(request):
     """Relatório NF ESTF0198 page view - Ajuste de arquivo CSV"""
     from django.http import HttpResponse
@@ -3900,6 +4392,117 @@ def download_plano_preventiva_dados_delimitado(request):
     except Exception as e:
         messages.error(request, f'Erro ao gerar download: {e}')
         return redirect('analise_plano_preventiva_dados_delimitado')
+
+
+def ajuste_roteiro_preventiva(request):
+    """Ajuste do CSV ROTEIRO_PREVENTIVA_DADOS: remove linhas vazias e linhas com dados só em A, B ou C."""
+    import os
+    import re
+    import uuid
+
+    from django.conf import settings
+
+    from app.utils import clean_roteiro_preventiva_csv
+
+    def _cleanup_old_session(sess):
+        old_id = sess.pop('roteiro_preventiva_file_id', None)
+        if old_id and re.fullmatch(r'[a-f0-9]{32}', str(old_id)):
+            p = os.path.join(settings.MEDIA_ROOT, 'temp_roteiro_preventiva', f'{old_id}.csv')
+            try:
+                if os.path.isfile(p):
+                    os.unlink(p)
+            except OSError:
+                pass
+
+    if request.method == 'POST':
+        if 'file' not in request.FILES:
+            messages.error(request, 'Selecione um arquivo CSV para processar.')
+        else:
+            file = request.FILES['file']
+            if not file.name.lower().endswith('.csv'):
+                messages.error(request, 'O arquivo deve ter extensão .csv')
+            else:
+                raw = file.read()
+                text = None
+                for enc in ('utf-8-sig', 'utf-8', 'cp1252', 'latin-1', 'iso-8859-1'):
+                    try:
+                        text = raw.decode(enc)
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                if text is None:
+                    messages.error(request, 'Não foi possível decodificar o arquivo (tente salvar como UTF-8 ou Windows-1252).')
+                else:
+                    try:
+                        cleaned, stats = clean_roteiro_preventiva_csv(text)
+                    except Exception as e:
+                        messages.error(request, f'Erro ao processar: {e}')
+                    else:
+                        _cleanup_old_session(request.session)
+                        out_dir = os.path.join(settings.MEDIA_ROOT, 'temp_roteiro_preventiva')
+                        os.makedirs(out_dir, exist_ok=True)
+                        file_id = uuid.uuid4().hex
+                        out_path = os.path.join(out_dir, f'{file_id}.csv')
+                        with open(out_path, 'w', encoding='utf-8-sig', newline='') as fp:
+                            fp.write(cleaned)
+                        request.session['roteiro_preventiva_file_id'] = file_id
+                        request.session['roteiro_preventiva_stats'] = stats
+                        request.session['roteiro_preventiva_filename'] = f"ajustado_{file.name}"
+                        request.session.modified = True
+                        messages.success(
+                            request,
+                            f'Arquivo processado: {stats["removed_blank"]} linha(s) vazia(s) removida(s), '
+                            f'{stats["removed_abc_only"]} linha(s) só com A/B/C removida(s), '
+                            f'{stats["kept"]} linha(s) mantidas. Use o botão de download abaixo.'
+                        )
+                        return redirect('ajuste_roteiro_preventiva')
+
+    stats = request.session.get('roteiro_preventiva_stats')
+    has_file = bool(request.session.get('roteiro_preventiva_file_id'))
+    context = {
+        'page_title': 'Roteiro Preventiva — Dados delimitados (SIGA)',
+        'active_page': 'ajuste_roteiro_preventiva',
+        'last_stats': stats,
+        'has_processed_file': has_file,
+    }
+    return render(request, 'analise_relatorios/ajuste_roteiro_preventiva.html', context)
+
+
+def download_roteiro_preventiva_ajustado(request):
+    """Download do CSV ajustado (arquivo temporário em MEDIA)."""
+    import os
+    import re
+
+    from django.conf import settings
+    from django.http import HttpResponse
+    from urllib.parse import quote
+
+    file_id = request.session.get('roteiro_preventiva_file_id')
+    if file_id and re.fullmatch(r'[a-f0-9]{32}', str(file_id)):
+        path = os.path.join(settings.MEDIA_ROOT, 'temp_roteiro_preventiva', f'{file_id}.csv')
+        if not os.path.isfile(path):
+            messages.error(
+                request,
+                'Arquivo ajustado não encontrado (expirou ou foi removido). Processe o CSV novamente.',
+            )
+            return redirect('ajuste_roteiro_preventiva')
+        try:
+            with open(path, 'rb') as f:
+                raw = f.read()
+            fname = request.session.get('roteiro_preventiva_filename', 'roteiro_preventiva_dados_ajustado.csv')
+            if not fname.lower().endswith('.csv'):
+                fname = fname + '.csv'
+            response = HttpResponse(raw, content_type='text/csv; charset=utf-8')
+            response['Content-Disposition'] = (
+                f'attachment; filename="{fname}"; filename*=UTF-8\'\'{quote(fname)}'
+            )
+            return response
+        except Exception as e:
+            messages.error(request, f'Erro ao gerar download: {e}')
+            return redirect('ajuste_roteiro_preventiva')
+
+    messages.error(request, 'Nenhum arquivo processado. Envie um CSV primeiro.')
+    return redirect('ajuste_roteiro_preventiva')
 
 
 def importar_requisicoes_almoxarifado(request):
@@ -5666,7 +6269,7 @@ def consultar_maquinas(request):
         'filter_gerenc': filter_gerenc,
         'search_query': search_query,
     }
-    return render(request, 'consultar/consultar_maquinas.html', context)
+    return render(request, 'maquinas/consultar_maquinas.html', context)
 
 
 def consultar_manutencoes_preventivas(request):
@@ -6840,17 +7443,32 @@ def configuracao_parada_maquina(request):
     from app.models import ConfigParadaMaquina, ConfigRecursoParadaMaquina, ConfigLinhaProducaoCentroAtividade, ParadaMaquina, CentroAtividade
     from datetime import date
     from decimal import Decimal, InvalidOperation
+    from calendar import monthrange, Calendar
+
+    # Calendário com domingo na primeira coluna (padrão visual comum no Brasil)
+    _cal_dom_primeiro = Calendar(firstweekday=6)
 
     meses = [
         (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
         (5, 'Maio'), (6, 'Junho'), (7, 'Julho'), (8, 'Agosto'),
         (9, 'Setembro'), (10, 'Outubro'), (11, 'Novembro'), (12, 'Dezembro'),
     ]
-    ano_atual = date.today().year
+    hoje = date.today()
+    ano_default = hoje.year
+    try:
+        _raw_ano = request.POST.get('config_ano') if request.method == 'POST' else request.GET.get('ano')
+        if _raw_ano is not None and str(_raw_ano).strip() != '':
+            _iy = int(str(_raw_ano).strip())
+            ano_edicao = _iy if 2000 <= _iy <= 2100 else ano_default
+        else:
+            ano_edicao = ano_default
+    except (ValueError, TypeError):
+        ano_edicao = ano_default
+    anos_config_choices = list(range(ano_default - 6, ano_default + 2))
 
     def _normalize_br_number(s):
         """Converte número no padrão BR (1.234,56) para formato Python (1234.56)."""
-        s = str(s).strip()
+        s = str(s).strip().replace('\xa0', '').replace('\u202f', '')
         if not s:
             return ''
         s = s.replace('.', '').replace(',', '.')
@@ -6880,10 +7498,23 @@ def configuracao_parada_maquina(request):
 
     def _parse_percentage(val):
         """Parse percentage value, stripping trailing '%' if present. Accepts BR format (85,50 ou 85,50%)."""
-        if val is None or str(val).strip() == '':
+        if val is None:
             return None
-        s = str(val).strip().rstrip('%').strip()
+        s = str(val).replace('\xa0', '').replace('\u202f', '').strip()
+        if not s:
+            return None
+        s = s.rstrip('%').strip()
         return _parse_decimal(s)
+
+    def _parse_dias_produtivos_post(mes_num, secao_prefix):
+        """Lê checkboxes mes_{m}_{prefix}_prod_dia_{d}; retorna lista ordenada de dias (1..último dia do mês)."""
+        ult = monthrange(ano_edicao, mes_num)[1]
+        dias = []
+        for d in range(1, ult + 1):
+            key = f'mes_{mes_num}_{secao_prefix}_prod_dia_{d}'
+            if request.POST.get(key):
+                dias.append(d)
+        return sorted(dias)
 
     # POST: identificar qual formulário foi enviado
     if request.method == 'POST' and 'salvar_linha_ca' in request.POST:
@@ -6928,43 +7559,96 @@ def configuracao_parada_maquina(request):
         messages.success(request, 'Recursos incluídos na análise salvos com sucesso.')
         return redirect('configuracao_parada_maquina')
 
-    if request.method == 'POST':
+    def _int_post_merge(key, current):
+        """POST vazio → None; número válido → valor; inválido → mantém current."""
+        raw = request.POST.get(key)
+        if raw is None:
+            return current
+        s = str(raw).replace('\xa0', '').replace('\u202f', '').strip()
+        if not s:
+            return None
+        v = _parse_int(s)
+        return v if v is not None else current
+
+    def _dec_post_merge(key, current):
+        raw = request.POST.get(key)
+        if raw is None:
+            return current
+        s = str(raw).replace('\xa0', '').replace('\u202f', '').strip()
+        if not s:
+            return None
+        v = _parse_decimal(s)
+        return v if v is not None else current
+
+    def _pct_post_merge(key, current):
+        raw = request.POST.get(key)
+        if raw is None:
+            return current
+        s = str(raw).replace('\xa0', '').replace('\u202f', '').strip()
+        if not s:
+            return None
+        v = _parse_percentage(s)
+        return v if v is not None else current
+
+    if request.method == 'POST' and request.POST.get('salvar_config_parada_maquina'):
         for mes_num, _ in meses:
-            # Frigorífico
+            ex_f = ConfigParadaMaquina.objects.filter(ano=ano_edicao, mes=mes_num, secao='frigorifico').first()
+            ex_i = ConfigParadaMaquina.objects.filter(ano=ano_edicao, mes=mes_num, secao='industria').first()
+            dias_prod_frig = _parse_dias_produtivos_post(mes_num, 'frigorifico')
+            dias_prod_ind = _parse_dias_produtivos_post(mes_num, 'industria')
+            dias_uteis_frig = _int_post_merge(f'mes_{mes_num}_frigorifico_dias_uteis', ex_f.dias_uteis if ex_f else None)
+            dias_uteis_ind = _int_post_merge(f'mes_{mes_num}_industria_dias_uteis', ex_i.dias_uteis_industria if ex_i else None)
+            suinos_f = _int_post_merge(f'mes_{mes_num}_frigorifico_suinos_abatidos', ex_f.suinos_abatidos if ex_f else None)
+            total_abate_post = _int_post_merge(f'mes_{mes_num}_frigorifico_total_abate_planejado', ex_f.total_abate_planejado if ex_f else None)
+            if suinos_f is not None and dias_uteis_frig is not None:
+                total_abate_frig = suinos_f * dias_uteis_frig
+            else:
+                total_abate_frig = total_abate_post
             ConfigParadaMaquina.objects.update_or_create(
-                ano=ano_atual,
+                ano=ano_edicao,
                 mes=mes_num,
                 secao='frigorifico',
                 defaults={
-                    'suinos_abatidos': _parse_int(request.POST.get(f'mes_{mes_num}_frigorifico_suinos_abatidos')),
-                    'dias_uteis': _parse_int(request.POST.get(f'mes_{mes_num}_frigorifico_dias_uteis')),
-                    'total_abate_planejado': _parse_int(request.POST.get(f'mes_{mes_num}_frigorifico_total_abate_planejado')),
-                    'perda_maximo': _parse_percentage(request.POST.get(f'mes_{mes_num}_frigorifico_perda_maximo')),
-                    'fator_eficiencia': _parse_percentage(request.POST.get(f'mes_{mes_num}_frigorifico_fator_eficiencia')),
-                    'carcacas_por_minuto': _parse_decimal(request.POST.get(f'mes_{mes_num}_frigorifico_carcacas_por_minuto')),
-                }
+                    'suinos_abatidos': suinos_f,
+                    'dias_uteis': dias_uteis_frig,
+                    'dias_produtivos': dias_prod_frig,
+                    'total_abate_planejado': total_abate_frig,
+                    'perda_maximo': _pct_post_merge(f'mes_{mes_num}_frigorifico_perda_maximo', ex_f.perda_maximo if ex_f else None),
+                    'fator_eficiencia': _pct_post_merge(f'mes_{mes_num}_frigorifico_fator_eficiencia', ex_f.fator_eficiencia if ex_f else None),
+                    'carcacas_por_minuto': _dec_post_merge(f'mes_{mes_num}_frigorifico_carcacas_por_minuto', ex_f.carcacas_por_minuto if ex_f else None),
+                },
             )
-            # Indústria
             ConfigParadaMaquina.objects.update_or_create(
-                ano=ano_atual,
+                ano=ano_edicao,
                 mes=mes_num,
                 secao='industria',
                 defaults={
-                    'dias_uteis_industria': _parse_int(request.POST.get(f'mes_{mes_num}_industria_dias_uteis')),
-                    'total_producao_planejada_industria': _parse_int(request.POST.get(f'mes_{mes_num}_industria_total_producao')),
-                    'perda_maximo_industria': _parse_percentage(request.POST.get(f'mes_{mes_num}_industria_perda_maximo')),
-                    'fator_eficiencia_industria': _parse_percentage(request.POST.get(f'mes_{mes_num}_industria_fator_eficiencia')),
-                }
+                    'dias_uteis_industria': dias_uteis_ind,
+                    'dias_produtivos': dias_prod_ind,
+                    'total_producao_planejada_industria': _int_post_merge(
+                        f'mes_{mes_num}_industria_total_producao',
+                        ex_i.total_producao_planejada_industria if ex_i else None,
+                    ),
+                    'perda_maximo_industria': _pct_post_merge(f'mes_{mes_num}_industria_perda_maximo', ex_i.perda_maximo_industria if ex_i else None),
+                    'fator_eficiencia_industria': _pct_post_merge(f'mes_{mes_num}_industria_fator_eficiencia', ex_i.fator_eficiencia_industria if ex_i else None),
+                },
             )
         messages.success(request, 'Configuração salva com sucesso.')
-        return redirect('configuracao_parada_maquina')
+        from django.urls import reverse
+        return redirect(f"{reverse('configuracao_parada_maquina')}?ano={ano_edicao}")
 
-    # GET: carregar configurações do ano atual
-    configs = ConfigParadaMaquina.objects.filter(ano=ano_atual)
+    # GET: carregar configurações do ano em edição
+    configs = ConfigParadaMaquina.objects.filter(ano=ano_edicao)
     config_frigorifico = {c.mes: c for c in configs if c.secao == 'frigorifico'}
     config_industria = {c.mes: c for c in configs if c.secao == 'industria'}
     config_por_mes = [
-        (mes_num, mes_nome, config_frigorifico.get(mes_num), config_industria.get(mes_num))
+        (
+            mes_num,
+            mes_nome,
+            config_frigorifico.get(mes_num),
+            config_industria.get(mes_num),
+            _cal_dom_primeiro.monthdayscalendar(ano_edicao, mes_num),
+        )
         for mes_num, mes_nome in meses
     ]
 
@@ -6994,7 +7678,10 @@ def configuracao_parada_maquina(request):
         'active_page': 'configuracao_parada_maquina',
         'meses': meses,
         'config_por_mes': config_por_mes,
-        'ano_atual': ano_atual,
+        'cal_cabecalho_semana': ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
+        'ano_atual': ano_edicao,
+        'ano_edicao': ano_edicao,
+        'anos_config_choices': anos_config_choices,
         'config_frigorifico': config_frigorifico,
         'config_industria': config_industria,
         'grupos_recurso': grupos_recurso,
@@ -7375,14 +8062,55 @@ def _analise_paradas_maquina_impl(request, template_name):
     projecao_avg_perda_ind_dia = None
     projecao_indicador_frig_val = None
     projecao_indicador_ind_val = None
+    projecao_perda_frig_total = None
+    projecao_suinos_frig_total = None
+    projecao_perda_ind_kg_total = None
+    projecao_producao_ind_kg_total = None
+    projecao_dias_passados_frig = None
+    projecao_dias_restantes_frig = None
+    projecao_dias_passados_ind = None
+    projecao_dias_restantes_ind = None
+
+    def _dias_produtivos_passados_restantes(cfg, dia_ref, ultimo_dia_mes):
+        """
+        Para a projeção: conta dias produtivos já decorridos (dia <= dia_ref) e restantes no mês.
+        Se ConfigParadaMaquina.dias_produtivos estiver preenchido, usa só esses dias (alinhado a Dias úteis).
+        Caso contrário, usa dias corridos do calendário (retrocompatível).
+        """
+        if cfg and cfg.dias_produtivos:
+            dias = sorted({int(x) for x in cfg.dias_produtivos if 1 <= int(x) <= ultimo_dia_mes})
+            passados = sum(1 for d in dias if d <= dia_ref)
+            restantes = sum(1 for d in dias if d > dia_ref)
+            return passados, restantes
+        return dia_ref, max(0, ultimo_dia_mes - dia_ref)
+
     if meses_para_iterar and periodo_fim:
         ref_ano, ref_mes_num = periodo_fim.year, periodo_fim.month
         ultimo_dia_ref = monthrange(ref_ano, ref_mes_num)[1]
-        dias_corridos = periodo_fim.day
-        dias_restantes = max(0, ultimo_dia_ref - dias_corridos)
-        if dias_corridos > 0 and dias_restantes >= 0:
-            projecao_dias_corridos = dias_corridos
-            projecao_dias_restantes = dias_restantes
+        dia_ref = periodo_fim.day
+        cfg_proj_frig = ConfigParadaMaquina.objects.filter(
+            ano=ref_ano, mes=ref_mes_num, secao='frigorifico'
+        ).first()
+        cfg_proj_ind = ConfigParadaMaquina.objects.filter(
+            ano=ref_ano, mes=ref_mes_num, secao='industria'
+        ).first()
+        n_pass_f, n_rest_f = _dias_produtivos_passados_restantes(cfg_proj_frig, dia_ref, ultimo_dia_ref)
+        n_pass_i, n_rest_i = _dias_produtivos_passados_restantes(cfg_proj_ind, dia_ref, ultimo_dia_ref)
+        # Indústria: média de perda/produção usa só dias em que houve produção informada (ProducaoDiaria)
+        n_dias_com_producao_ind = ProducaoDiaria.objects.filter(
+            ano=ref_ano,
+            mes=ref_mes_num,
+            dia__lte=dia_ref,
+            producao_industria__isnull=False,
+            producao_industria__gt=0,
+        ).count()
+        projecao_dias_passados_frig = n_pass_f
+        projecao_dias_restantes_frig = n_rest_f
+        projecao_dias_passados_ind = n_dias_com_producao_ind
+        projecao_dias_restantes_ind = n_rest_i
+        projecao_dias_corridos = n_pass_f
+        projecao_dias_restantes = n_rest_f
+        if n_pass_f > 0 and n_rest_f >= 0:
             # Frigorífico: dados do mês de referência
             qs_frig_ref = qs_frigorifico.filter(data__year=ref_ano, data__month=ref_mes_num, data__lte=periodo_fim)
             soma_cap_frig_ref = qs_frig_ref.aggregate(c=Sum('capacidade'))['c']
@@ -7390,29 +8118,34 @@ def _analise_paradas_maquina_impl(request, template_name):
             soma_suinos_ref = ProducaoDiaria.objects.filter(ano=ref_ano, mes=ref_mes_num, dia__lte=periodo_fim.day).aggregate(s=Sum('suinos_abatidos'))['s']
             soma_suinos_ref = int(soma_suinos_ref or 0)
             if soma_suinos_ref > 0 and fator_eficiencia_frig is not None:
-                avg_perda_frig_dia = soma_cap_frig_ref / Decimal(str(dias_corridos))
-                avg_suinos_dia = Decimal(str(soma_suinos_ref)) / Decimal(str(dias_corridos))
+                avg_perda_frig_dia = soma_cap_frig_ref / Decimal(str(n_pass_f))
+                avg_suinos_dia = Decimal(str(soma_suinos_ref)) / Decimal(str(n_pass_f))
                 projecao_avg_perda_frig_dia = float(avg_perda_frig_dia)
-                perda_projetada_frig = soma_cap_frig_ref + (avg_perda_frig_dia * Decimal(str(dias_restantes)))
-                suinos_projetado_frig = Decimal(str(soma_suinos_ref)) + (avg_suinos_dia * Decimal(str(dias_restantes)))
+                perda_projetada_frig = soma_cap_frig_ref + (avg_perda_frig_dia * Decimal(str(n_rest_f)))
+                suinos_projetado_frig = Decimal(str(soma_suinos_ref)) + (avg_suinos_dia * Decimal(str(n_rest_f)))
                 if suinos_projetado_frig and suinos_projetado_frig > 0:
                     projecao_indicador_frig_val = float((perda_projetada_frig / suinos_projetado_frig) * Decimal(str(fator_eficiencia_frig)))
                     projecao_indicador_frig = projecao_indicador_frig_val
-            # Indústria: dados do mês de referência
+                projecao_perda_frig_total = float(perda_projetada_frig)
+                projecao_suinos_frig_total = float(suinos_projetado_frig)
+        if n_dias_com_producao_ind > 0 and n_rest_i >= 0:
+            # Indústria: média kg perda/dia e média produção/dia pelo nº de dias com produção informada (não pelo calendário produtivo)
             qs_ind_ref = qs_industria.filter(data__year=ref_ano, data__month=ref_mes_num, data__lte=periodo_fim)
             soma_cap_ind_ref = qs_ind_ref.aggregate(c=Sum('capacidade'))['c']
             soma_cap_ind_ref = Decimal(str(soma_cap_ind_ref)) if soma_cap_ind_ref is not None else Decimal('0')
             soma_prod_ref = ProducaoDiaria.objects.filter(ano=ref_ano, mes=ref_mes_num, dia__lte=periodo_fim.day).aggregate(s=Sum('producao_industria'))['s']
             soma_prod_ref = Decimal(str(soma_prod_ref)) if soma_prod_ref is not None else Decimal('0')
             if soma_prod_ref and soma_prod_ref > 0 and fator_eficiencia_industria is not None:
-                avg_perda_ind_dia = soma_cap_ind_ref / Decimal(str(dias_corridos))
-                avg_prod_dia = soma_prod_ref / Decimal(str(dias_corridos))
+                avg_perda_ind_dia = soma_cap_ind_ref / Decimal(str(n_dias_com_producao_ind))
+                avg_prod_dia = soma_prod_ref / Decimal(str(n_dias_com_producao_ind))
                 projecao_avg_perda_ind_dia = float(avg_perda_ind_dia)
-                perda_projetada_ind = soma_cap_ind_ref + (avg_perda_ind_dia * Decimal(str(dias_restantes)))
-                prod_projetada_ind = soma_prod_ref + (avg_prod_dia * Decimal(str(dias_restantes)))
+                perda_projetada_ind = soma_cap_ind_ref + (avg_perda_ind_dia * Decimal(str(n_rest_i)))
+                prod_projetada_ind = soma_prod_ref + (avg_prod_dia * Decimal(str(n_rest_i)))
                 if prod_projetada_ind and prod_projetada_ind > 0:
                     projecao_indicador_ind_val = float((perda_projetada_ind / prod_projetada_ind) * Decimal(str(fator_eficiencia_industria)))
                     projecao_indicador_industria = projecao_indicador_ind_val
+                projecao_perda_ind_kg_total = float(perda_projetada_ind)
+                projecao_producao_ind_kg_total = float(prod_projetada_ind)
     
     # Gerar meses do período — contagens diretas para garantir alinhamento com o filtro (apenas meses selecionados)
     for data_atual in meses_para_iterar:
@@ -8067,8 +8800,16 @@ def _analise_paradas_maquina_impl(request, template_name):
         'projecao_indicador_industria': projecao_indicador_industria,
         'projecao_dias_corridos': projecao_dias_corridos,
         'projecao_dias_restantes': projecao_dias_restantes,
+        'projecao_dias_passados_frig': projecao_dias_passados_frig,
+        'projecao_dias_restantes_frig': projecao_dias_restantes_frig,
+        'projecao_dias_passados_ind': projecao_dias_passados_ind,
+        'projecao_dias_restantes_ind': projecao_dias_restantes_ind,
         'projecao_avg_perda_frig_dia': projecao_avg_perda_frig_dia,
         'projecao_avg_perda_ind_dia': projecao_avg_perda_ind_dia,
+        'projecao_perda_frig_total': projecao_perda_frig_total,
+        'projecao_suinos_frig_total': projecao_suinos_frig_total,
+        'projecao_perda_ind_kg_total': projecao_perda_ind_kg_total,
+        'projecao_producao_ind_kg_total': projecao_producao_ind_kg_total,
         'dias_uteis_total_frig': dias_uteis_total_frig,
         'dias_uteis_total_industria': dias_uteis_total_industria,
         'total_producao_planejada_industria': total_producao_planejada_industria,
@@ -9240,7 +9981,8 @@ def consultar_notas_fiscais(request):
                 Q(emitente__icontains=search_query) |
                 Q(nome_fantasia_emitente__icontains=search_query) |
                 Q(nome_unidade__icontains=search_query) |
-                Q(situacao__icontains=search_query)
+                Q(situacao__icontains=search_query) |
+                Q(observacoes__icontains=search_query)
             )
     
     # Filtros específicos
@@ -9277,6 +10019,10 @@ def consultar_notas_fiscais(request):
     filtro_data_autorizacao = request.GET.get('filtro_data_autorizacao', '').strip()
     if filtro_data_autorizacao:
         notas_list = notas_list.filter(data_autorizacao__icontains=filtro_data_autorizacao)
+    
+    filtro_observacoes = request.GET.get('filtro_observacoes', '').strip()
+    if filtro_observacoes:
+        notas_list = notas_list.filter(observacoes__icontains=filtro_observacoes)
     
     ordenar_total = request.GET.get('ordenar_total', '').strip()
     
@@ -9374,6 +10120,7 @@ def consultar_notas_fiscais(request):
         'filtro_uso_contabil': filtro_uso_contabil,
         'filtro_data_emissao': filtro_data_emissao,
         'filtro_data_autorizacao': filtro_data_autorizacao,
+        'filtro_observacoes': filtro_observacoes,
         'ordenar_total': ordenar_total,
     }
     return render(request, 'consultar/consultar_notas_fiscais.html', context)
@@ -11133,6 +11880,87 @@ def salvar_agendamentos_cronograma(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
+def analise_roteiro_preventiva(request):
+    """Análise dos dados da tabela RoteiroPreventiva"""
+    from app.models import RoteiroPreventiva
+    from django.db.models import Count
+
+    # KPIs gerais
+    total_count = RoteiroPreventiva.objects.count()
+    maquinas_count = RoteiroPreventiva.objects.exclude(cd_maquina__isnull=True).values('cd_maquina').distinct().count()
+    setores_count = RoteiroPreventiva.objects.exclude(cd_setormanut__isnull=True).exclude(cd_setormanut='').values('cd_setormanut').distinct().count()
+    planos_count = RoteiroPreventiva.objects.exclude(cd_planmanut__isnull=True).values('cd_planmanut').distinct().count()
+    unidades_count = RoteiroPreventiva.objects.exclude(cd_unid__isnull=True).values('cd_unid').distinct().count()
+
+    # Roteiros com/sem ordem de serviço
+    com_ordem_servico = RoteiroPreventiva.objects.exclude(cd_ordemserv__isnull=True).count()
+    sem_ordem_servico = total_count - com_ordem_servico
+
+    # Roteiros com/sem data de execução
+    com_data_execucao = RoteiroPreventiva.objects.exclude(dt_primexec__isnull=True).exclude(dt_primexec='').count()
+    sem_data_execucao = total_count - com_data_execucao
+
+    # Top máquinas (por quantidade de roteiros)
+    top_maquinas = list(
+        RoteiroPreventiva.objects.filter(cd_maquina__isnull=False)
+        .values('cd_maquina', 'descr_maquina')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:10]
+    )
+
+    # Top setores
+    top_setores = list(
+        RoteiroPreventiva.objects.exclude(cd_setormanut__isnull=True).exclude(cd_setormanut='')
+        .values('cd_setormanut', 'descr_setormanut')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:10]
+    )
+
+    # Top planos
+    top_planos = list(
+        RoteiroPreventiva.objects.filter(cd_planmanut__isnull=False)
+        .values('cd_planmanut', 'descr_planmanut')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:10]
+    )
+
+    # Distribuição por período (qtde_periodo em dias)
+    roteiros_por_periodo = list(
+        RoteiroPreventiva.objects.filter(qtde_periodo__isnull=False)
+        .values('qtde_periodo')
+        .annotate(total=Count('id'))
+        .order_by('qtde_periodo')
+    )
+
+    # Top funcionários (responsáveis)
+    top_funcionarios = list(
+        RoteiroPreventiva.objects.exclude(nome_funciomanu__isnull=True).exclude(nome_funciomanu='')
+        .values('cd_funciomanu', 'nome_funciomanu')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:10]
+    )
+
+    context = {
+        'page_title': 'Análise Roteiro Preventiva',
+        'active_page': 'analise_roteiro_preventiva',
+        'total_count': total_count,
+        'maquinas_count': maquinas_count,
+        'setores_count': setores_count,
+        'planos_count': planos_count,
+        'unidades_count': unidades_count,
+        'com_ordem_servico': com_ordem_servico,
+        'sem_ordem_servico': sem_ordem_servico,
+        'com_data_execucao': com_data_execucao,
+        'sem_data_execucao': sem_data_execucao,
+        'top_maquinas': top_maquinas,
+        'top_setores': top_setores,
+        'top_planos': top_planos,
+        'roteiros_por_periodo': roteiros_por_periodo,
+        'top_funcionarios': top_funcionarios,
+    }
+    return render(request, 'preventivas/analise_roteiro_preventiva.html', context)
+
+
 def consultar_roteiro_preventiva(request):
     """Consultar/listar roteiros de manutenção preventiva"""
     from app.models import RoteiroPreventiva
@@ -11289,7 +12117,7 @@ def consultar_roteiro_preventiva(request):
         'filter_unidade': filter_unidade,
         'search_query': search_query,
     }
-    return render(request, 'consultar/consultar_roteiro_preventiva.html', context)
+    return render(request, 'preventivas/consultar_roteiro_preventiva.html', context)
 
 
 def visualizar_roteiro_preventiva(request, roteiro_id):
@@ -17492,6 +18320,369 @@ def agenda_geral(request):
         'active_page': 'agenda_geral',
     }
     return render(request, 'agenda_geral.html', context)
+
+
+def calendario_plano_e_roteiro(request):
+    """Calendário de Manutenções Preventivas baseado em dt_abertura e cs_qtde_periodo_max do RoteiroPreventiva"""
+    from app.models import RoteiroPreventiva, ParametrosMaoDeObra
+    from django.db.models import Q
+    from datetime import datetime, timedelta, date
+    from collections import defaultdict
+    import re
+
+    filter_funciomanu = request.GET.get('nome_funciomanu', '').strip()
+    filter_maquina = request.GET.get('descr_maquina', '').strip()
+    filter_setor = request.GET.get('descr_setormanut', '').strip()
+
+    funcionarios = list(
+        RoteiroPreventiva.objects.exclude(
+            Q(nome_funciomanu__isnull=True) | Q(nome_funciomanu='')
+        ).values_list('nome_funciomanu', flat=True).distinct().order_by('nome_funciomanu')
+    )
+    maquinas = list(
+        RoteiroPreventiva.objects.exclude(
+            Q(descr_maquina__isnull=True) | Q(descr_maquina='')
+        ).values_list('descr_maquina', flat=True).distinct().order_by('descr_maquina')
+    )
+    setores = list(
+        RoteiroPreventiva.objects.exclude(
+            Q(descr_setormanut__isnull=True) | Q(descr_setormanut='')
+        ).values_list('descr_setormanut', flat=True).distinct().order_by('descr_setormanut')
+    )
+
+    def parse_dt(s):
+        if not s or not str(s).strip():
+            return None
+        s = str(s).strip()
+        for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y'):
+            try:
+                return datetime.strptime(s, fmt).date()
+            except ValueError:
+                continue
+        return None
+
+    def parse_tempo_horas(tempo_str):
+        if not tempo_str or not isinstance(tempo_str, str):
+            return None
+        m = re.match(r'(\d+):(\d+)', str(tempo_str).strip())
+        if m:
+            return round(int(m.group(1)) + int(m.group(2)) / 60, 2)
+        return None
+
+    default_horas = float(ParametrosMaoDeObra.get_solo().tempo_padrao_inspecao_preventiva_horas or 0.5)
+    hoje = date.today()
+    start_analise = hoje
+    end_analise = hoje + timedelta(days=90)
+
+    roteiros = RoteiroPreventiva.objects.all()
+    if filter_funciomanu:
+        roteiros = roteiros.filter(nome_funciomanu=filter_funciomanu)
+    if filter_maquina:
+        roteiros = roteiros.filter(descr_maquina__icontains=filter_maquina)
+    if filter_setor:
+        roteiros = roteiros.filter(descr_setormanut__icontains=filter_setor)
+
+    workload = defaultdict(lambda: {'tarefas': 0, 'horas': 0.0})
+    for r in roteiros:
+        base = parse_dt(r.dt_abertura)
+        if not base:
+            continue
+        interval = r.cs_qtde_periodo_max or r.qtde_periodo or 30
+        if interval <= 0:
+            interval = 30
+        horas_tarefa = parse_tempo_horas(r.tempo_prev or r.cf_temp_prev) or default_horas
+        nome = r.nome_funciomanu or '(Sem funcionário)'
+        d = base
+        while d > start_analise:
+            d = d - timedelta(days=interval)
+        while d <= end_analise:
+            if d >= start_analise:
+                workload[nome]['tarefas'] += 1
+                workload[nome]['horas'] += horas_tarefa
+            d = d + timedelta(days=interval)
+
+    workload_list = [
+        {'nome': nome, 'tarefas': w['tarefas'], 'horas': round(w['horas'], 1)}
+        for nome, w in sorted(workload.items(), key=lambda x: -x[1]['tarefas'])
+    ]
+
+    total_tarefas = sum(w['tarefas'] for w in workload.values())
+    total_horas = sum(w['horas'] for w in workload.values())
+    n_manut = max(1, len(workload))
+    media_tarefas = total_tarefas / n_manut
+    media_horas = total_horas / n_manut
+
+    for item in workload_list:
+        ratio_t = item['tarefas'] / media_tarefas if media_tarefas else 0
+        ratio_h = item['horas'] / media_horas if media_horas else 0
+        ratio = (ratio_t + ratio_h) / 2 if (media_tarefas or media_horas) else 1
+        if ratio >= 1.3:
+            item['status'] = 'sobrecarregado'
+            item['recomendacao'] = 'Considerar realocar parte das tarefas para outros manutentores.'
+        elif ratio <= 0.6 and media_tarefas > 0:
+            item['status'] = 'capacidade_ociosa'
+            item['recomendacao'] = 'Pode assumir mais tarefas preventivas.'
+        else:
+            item['status'] = 'equilibrado'
+            item['recomendacao'] = 'Carga adequada.'
+
+    context = {
+        'page_title': 'Calendário de Preventivas',
+        'active_page': 'calendario_plano_e_roteiro',
+        'funcionarios': funcionarios,
+        'maquinas': maquinas,
+        'setores': setores,
+        'selected_funciomanu': filter_funciomanu,
+        'selected_maquina': filter_maquina,
+        'selected_setor': filter_setor,
+        'workload_analysis': workload_list,
+        'workload_total_tarefas': total_tarefas,
+        'workload_total_horas': round(total_horas, 1),
+        'workload_media_tarefas': round(media_tarefas, 1),
+        'workload_media_horas': round(media_horas, 1),
+        'workload_periodo': '90 dias',
+    }
+    return render(request, 'planejamento/calendario_plano_e_roteiro.html', context)
+
+
+def gerar_arquivo_para_preventiva(request):
+    """Filtros por setor (cd_setormanut), gerência e máquina — base em Maquina ativa."""
+    from app.models import Maquina, MaquinaPrimariaSecundaria
+
+    base_qs = Maquina.objects.filter(ativo=True)
+
+    setor_map = {}
+    for m in base_qs.exclude(cd_setormanut__isnull=True).exclude(cd_setormanut='').order_by('cd_setormanut'):
+        if m.cd_setormanut not in setor_map:
+            setor_map[m.cd_setormanut] = (m.descr_setormanut or m.cd_setormanut).strip()
+    setor_choices = sorted(setor_map.items(), key=lambda x: (str(x[0]),))
+
+    selected_cd = request.GET.get('cd_setormanut', '').strip()
+    selected_gerenc = request.GET.get('descr_gerenc', '').strip()
+    selected_maquina_id = request.GET.get('maquina_id', '').strip()
+
+    gerenc_choices = []
+    if selected_cd:
+        gerenc_choices = list(
+            base_qs.filter(cd_setormanut=selected_cd)
+            .exclude(descr_gerenc__isnull=True)
+            .exclude(descr_gerenc='')
+            .values_list('descr_gerenc', flat=True)
+            .distinct()
+            .order_by('descr_gerenc')
+        )
+
+    maquina_choices = []
+    if selected_cd and selected_gerenc:
+        maquina_choices = list(
+            base_qs.filter(cd_setormanut=selected_cd, descr_gerenc=selected_gerenc).order_by('cd_maquina')
+        )
+
+    resultados = []
+    if selected_cd and selected_gerenc:
+        qs = base_qs.filter(cd_setormanut=selected_cd, descr_gerenc=selected_gerenc)
+        if selected_maquina_id:
+            try:
+                qs = qs.filter(id=int(selected_maquina_id))
+            except ValueError:
+                qs = qs.none()
+        resultados = list(qs.order_by('cd_maquina'))
+
+    mostrar_secundarias_da_principal = False
+    maquina_principal_selecionada = None
+    maquinas_secundarias_relacionadas = []
+    if selected_maquina_id:
+        try:
+            sel = base_qs.filter(id=int(selected_maquina_id)).first()
+        except ValueError:
+            sel = None
+        if sel and selected_cd and selected_gerenc:
+            if sel.cd_setormanut != selected_cd or sel.descr_gerenc != selected_gerenc:
+                sel = None
+        if sel and sel.descr_gerenc and 'MÁQUINAS PRINCIPAL' in sel.descr_gerenc.upper():
+            mostrar_secundarias_da_principal = True
+            maquina_principal_selecionada = sel
+            rels = (
+                MaquinaPrimariaSecundaria.objects.filter(maquina_primaria=sel)
+                .select_related('maquina_secundaria')
+                .order_by('maquina_secundaria__cd_maquina')
+            )
+            maquinas_secundarias_relacionadas = [r.maquina_secundaria for r in rels]
+
+    context = {
+        'page_title': 'Gerar Arquivo de Documento para Preventivas',
+        'active_page': 'gerar_arquivo_para_preventiva',
+        'setor_choices': setor_choices,
+        'gerenc_choices': gerenc_choices,
+        'maquina_choices': maquina_choices,
+        'selected_cd_setormanut': selected_cd,
+        'selected_descr_gerenc': selected_gerenc,
+        'selected_maquina_id': selected_maquina_id,
+        'resultados': resultados,
+        'mostrar_secundarias_da_principal': mostrar_secundarias_da_principal,
+        'maquina_principal_selecionada': maquina_principal_selecionada,
+        'maquinas_secundarias_relacionadas': maquinas_secundarias_relacionadas,
+    }
+    return render(request, 'planejamento/gerar_arquivo_para_preventiva.html', context)
+
+
+def api_gerenc_por_setor_maquina(request):
+    """JSON: descr_gerenc distintos para um cd_setormanut (máquinas ativas)."""
+    from app.models import Maquina
+    from django.http import JsonResponse
+
+    cd = request.GET.get('cd_setormanut', '').strip()
+    if not cd:
+        return JsonResponse([], safe=False)
+    qs = (
+        Maquina.objects.filter(ativo=True, cd_setormanut=cd)
+        .exclude(descr_gerenc__isnull=True)
+        .exclude(descr_gerenc='')
+        .values_list('descr_gerenc', flat=True)
+        .distinct()
+        .order_by('descr_gerenc')
+    )
+    return JsonResponse(list(qs), safe=False)
+
+
+def api_maquinas_por_setor_gerenc(request):
+    """JSON: máquinas para cd_setormanut + descr_gerenc (ativas)."""
+    from app.models import Maquina
+    from django.http import JsonResponse
+
+    cd = request.GET.get('cd_setormanut', '').strip()
+    ger = request.GET.get('descr_gerenc', '').strip()
+    if not cd or not ger:
+        return JsonResponse([], safe=False)
+    rows = (
+        Maquina.objects.filter(ativo=True, cd_setormanut=cd, descr_gerenc=ger)
+        .order_by('cd_maquina')
+        .values('id', 'cd_maquina', 'descr_maquina')
+    )
+    return JsonResponse(list(rows), safe=False)
+
+
+def api_eventos_preventivas_calendario(request):
+    """API: eventos de manutenção preventiva para o calendário (dt_abertura + intervalo cs_qtde_periodo_max)"""
+    from app.models import RoteiroPreventiva, Maquina, MaquinaPrimariaSecundaria
+    from django.http import JsonResponse
+    from django.db.models import Q
+    from django.urls import reverse
+    from datetime import datetime, timedelta, date
+
+    def parse_dt(s):
+        if not s or not str(s).strip():
+            return None
+        s = str(s).strip()
+        for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y'):
+            try:
+                return datetime.strptime(s, fmt).date()
+            except ValueError:
+                continue
+        return None
+
+    start_str = request.GET.get('start')
+    end_str = request.GET.get('end')
+    filter_funciomanu = request.GET.get('nome_funciomanu', '').strip()
+    filter_maquina = request.GET.get('descr_maquina', '').strip()
+    filter_setor = request.GET.get('descr_setormanut', '').strip()
+    maquina_pk = request.GET.get('maquina_id', '').strip()
+    maquina_principal_pk = request.GET.get('maquina_principal_id', '').strip()
+
+    try:
+        start = datetime.fromisoformat(start_str.replace('Z', '+00:00')).date()
+        end = datetime.fromisoformat(end_str.replace('Z', '+00:00')).date()
+    except (ValueError, AttributeError):
+        start = date.today().replace(day=1)
+        end = start + timedelta(days=365)
+
+    roteiros = RoteiroPreventiva.objects.all()
+
+    if maquina_principal_pk:
+        try:
+            principal = Maquina.objects.get(id=int(maquina_principal_pk))
+            is_principal = principal.descr_gerenc and 'MÁQUINAS PRINCIPAL' in principal.descr_gerenc.upper()
+            if not is_principal:
+                roteiros = roteiros.none()
+            else:
+                rels = MaquinaPrimariaSecundaria.objects.filter(maquina_primaria=principal)
+                sec_ids = list(rels.values_list('maquina_secundaria_id', flat=True))
+                sec_codigos = list(rels.values_list('maquina_secundaria__cd_maquina', flat=True))
+                q = Q()
+                if sec_ids:
+                    q |= Q(maquina_id__in=sec_ids)
+                if sec_codigos:
+                    q |= Q(cd_maquina__in=sec_codigos)
+                if q:
+                    roteiros = roteiros.filter(q)
+                else:
+                    roteiros = roteiros.none()
+        except (ValueError, Maquina.DoesNotExist):
+            roteiros = roteiros.none()
+    elif maquina_pk:
+        try:
+            m = Maquina.objects.get(id=int(maquina_pk))
+            roteiros = roteiros.filter(Q(cd_maquina=m.cd_maquina) | Q(maquina_id=m.id))
+        except (ValueError, Maquina.DoesNotExist):
+            roteiros = roteiros.none()
+    else:
+        if filter_funciomanu:
+            roteiros = roteiros.filter(nome_funciomanu=filter_funciomanu)
+        if filter_maquina:
+            roteiros = roteiros.filter(descr_maquina__icontains=filter_maquina)
+        if filter_setor:
+            roteiros = roteiros.filter(descr_setormanut__icontains=filter_setor)
+
+    roteiros = roteiros.select_related('maquina')
+    roteiros_list = list(roteiros)
+    cds_sem_fk = {r.cd_maquina for r in roteiros_list if not r.maquina_id and r.cd_maquina is not None}
+    cd_para_id = {
+        m.cd_maquina: m.id
+        for m in Maquina.objects.filter(cd_maquina__in=cds_sem_fk).only('id', 'cd_maquina')
+    }
+
+    eventos = []
+    for r in roteiros_list:
+        base = parse_dt(r.dt_abertura)
+        if not base:
+            continue
+        interval = r.cs_qtde_periodo_max or r.qtde_periodo or 30
+        if interval <= 0:
+            interval = 30
+
+        d = base
+        while d > start:
+            d = d - timedelta(days=interval)
+        while d <= end:
+            if d >= start:
+                title = f"{r.descr_maquina or r.cd_maquina or 'Máq.'} - {r.descr_tarefamanu or r.descr_seqplamanu or 'Preventiva'}"
+                if r.nome_funciomanu:
+                    title += f" ({r.nome_funciomanu})"
+                vid = r.maquina_id or cd_para_id.get(r.cd_maquina)
+                maquina_url = (
+                    request.build_absolute_uri(reverse('visualizar_maquina', args=[vid]))
+                    if vid else None
+                )
+                eventos.append({
+                    'id': f'prev_{r.id}_{d.isoformat()}',
+                    'title': title[:80] + ('...' if len(title) > 80 else ''),
+                    'start': datetime.combine(d, datetime.min.time()).isoformat(),
+                    'allDay': True,
+                    'color': '#198754',
+                    'textColor': '#fff',
+                    'extendedProps': {
+                        'tipo': 'preventiva',
+                        'roteiro_id': r.id,
+                        'maquina': r.descr_maquina or str(r.cd_maquina),
+                        'funcionario': r.nome_funciomanu or '',
+                        'descricao': r.descr_seqplamanu or r.descr_tarefamanu or '',
+                        'url': request.build_absolute_uri(reverse('visualizar_roteiro_preventiva', args=[r.id])),
+                        'maquina_url': maquina_url,
+                    }
+                })
+            d = d + timedelta(days=interval)
+
+    return JsonResponse(eventos, safe=False)
 
 
 def api_eventos_calendario(request):

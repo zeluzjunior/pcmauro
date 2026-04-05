@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load form_extras %}
 
 {% block title %}Visualizar Projeção de Gasto #{{ projecao.id }}{% endblock %}
 
@@ -44,7 +45,7 @@
                         <div class="row">
                             <div class="col-md-3 mb-3">
                                 <label class="form-label fw-bold">ID Excel</label>
-                                <p class="form-control-plaintext">{{ projecao.id_excel|default:"-" }}</p>
+                                <p class="form-control-plaintext">{% if projecao.id_excel is not None %}{{ projecao.id_excel|number_br:0 }}{% else %}-{% endif %}</p>
                             </div>
                             <div class="col-md-3 mb-3">
                                 <label class="form-label fw-bold">Setor</label>
@@ -79,7 +80,7 @@
                                 <label class="form-label fw-bold">Valor Total</label>
                                 <p class="form-control-plaintext fs-5 text-success fw-bold">
                                     {% if projecao.valor_total %}
-                                        R$ {{ projecao.valor_total|floatformat:2 }}
+                                        {{ projecao.valor_total|currency_br }}
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
@@ -247,7 +248,7 @@
                                         <td>{{ rel.nota_fiscal.nota|default:"-" }}</td>
                                         <td>
                                             {% if rel.nota_fiscal.total_nota %}
-                                                R$ {{ rel.nota_fiscal.total_nota|floatformat:2 }}
+                                                {{ rel.nota_fiscal.total_nota|currency_br }}
                                             {% else %}
                                                 -
                                             {% endif %}

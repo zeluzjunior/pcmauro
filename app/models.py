@@ -708,7 +708,10 @@ class MaquinaPrimariaSecundaria(models.Model):
         return f"{self.maquina_primaria.cd_maquina} - {self.maquina_secundaria.cd_maquina}"
 
 class PlanoPreventiva(models.Model):
-    """Modelo para armazenar dados de plano de manutenção preventiva"""
+    """
+    Blueprint das ações de manutenção preventiva.
+    Uma ação do Plano pode gerar N Roteiros (1:N) quando executada várias vezes (Ordens de Serviço).
+    """
     # Unidade
     cd_unid = models.IntegerField('Código Unidade', blank=True, null=True)
     nome_unid = models.CharField('Nome Unidade', max_length=255, blank=True, null=True)
@@ -783,7 +786,13 @@ class PlanoPreventiva(models.Model):
         return f"Plano {self.numero_plano} - Máquina {self.cd_maquina} - Seq {self.sequencia_manutencao}"
 
 class MeuPlanoPreventiva(models.Model):
-    """Modelo para armazenar dados de plano de manutenção preventiva com descrição detalhada do roteiro"""
+    """
+    Resumo enriquecido que combina PlanoPreventiva + RoteiroPreventiva.
+    O Plano é o "blueprint" das ações; o Roteiro é gerado quando a ação vira Ordem de Serviço real.
+    Relação 1:N: uma ação do Plano pode gerar N Roteiros (múltiplas execuções).
+    Alguns dados existem apenas no Roteiro (ex: descr_seqplamanu) devido a falhas no export Excel.
+    Este modelo une ambos para criar uma descrição completa da ação.
+    """
     # Unidade
     cd_unid = models.IntegerField('Código Unidade', blank=True, null=True)
     nome_unid = models.CharField('Nome Unidade', max_length=255, blank=True, null=True)
@@ -1050,7 +1059,11 @@ class PlanoPreventivaDocumento(models.Model):
         return f"{self.plano_preventiva.numero_plano} - {nome_arquivo}"
 
 class RoteiroPreventiva(models.Model):
-    """Modelo para armazenar dados de roteiro de manutenção preventiva"""
+    """
+    Execução/Ordem de Serviço ligada a uma ação do PlanoPreventiva.
+    Múltiplos Roteiros podem corresponder ao mesmo Plano (relação N:1).
+    Campos como descr_seqplamanu existem só aqui, por falhas no export Excel do Plano.
+    """
     # Unidade
     cd_unid = models.IntegerField('Código Unidade', blank=True, null=True)
     nome_unid = models.CharField('Nome Unidade', max_length=255, blank=True, null=True)
@@ -1718,6 +1731,8 @@ class ConfigParadaMaquina(models.Model):
     perda_maximo = models.DecimalField('% de Perda Máximo', max_digits=6, decimal_places=2, blank=True, null=True)
     fator_eficiencia = models.DecimalField('Fator de Eficiência %', max_digits=6, decimal_places=2, blank=True, null=True)
     carcacas_por_minuto = models.DecimalField('Nº Carcaças por Minuto', max_digits=10, decimal_places=2, blank=True, null=True)
+    # Dias do mês marcados como produtivos (1..31); usado na análise e para contagem de dias úteis
+    dias_produtivos = models.JSONField('Dias produtivos', default=list, blank=True)
 
     # Parâmetros Indústria
     dias_uteis_industria = models.IntegerField('Dias úteis (Indústria)', blank=True, null=True)
@@ -1741,6 +1756,14 @@ class ConfigParadaMaquina(models.Model):
 
     def __str__(self):
         return f"Config {self.ano}/{self.mes} - {self.get_secao_display()}"
+
+    def count_dias_produtivos(self):
+        """Quantidade de dias produtivos (lista em dias_produtivos) ou fallback aos dias úteis gravados."""
+        if self.dias_produtivos:
+            return len(self.dias_produtivos)
+        if self.secao == 'frigorifico':
+            return int(self.dias_uteis) if self.dias_uteis is not None else 0
+        return int(self.dias_uteis_industria) if self.dias_uteis_industria is not None else 0
 
 class ConfigRecursoParadaMaquina(models.Model):
     """

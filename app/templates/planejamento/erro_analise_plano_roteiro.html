@@ -5,6 +5,14 @@
 
 {% block extra_css %}
 <style>
+    .stat-card { transition: transform 0.2s; }
+    .stat-card:hover { transform: translateY(-5px); }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
     .error-card {
         border-left: 4px solid #dc3545;
         background-color: #fff5f5;
@@ -216,32 +224,47 @@
             </div>
         </div>
 
-        <!-- Statistics Cards for General Overview -->
-        <div class="row mb-4">
+        <!-- Statistics Cards for General Overview (mesmo padrão visual de consultar roteiros) -->
+        <div class="row g-3 mb-4">
             <div class="col-md-4">
-                <div class="card stat-card shadow-sm bg-warning text-dark">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Planos sem Match</h5>
-                        <p class="card-text display-6">{{ total_planos_sem_match }}</p>
-                        <small>Planos sem roteiro correspondente</small>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Planos sem Match</h6>
+                                <h4 class="mb-0 fw-bold">{{ total_planos_sem_match }}</h4>
+                                <small class="text-muted">Planos sem roteiro</small>
+                            </div>
+                            <i class="fas fa-exclamation-triangle fa-2x text-warning opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card stat-card shadow-sm bg-danger text-white">
+                <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Roteiros sem Match</h5>
-                        <p class="card-text display-6">{{ total_roteiros_sem_match }}</p>
-                        <small>Roteiros sem plano correspondente</small>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Roteiros sem Match</h6>
+                                <h4 class="mb-0 fw-bold">{{ total_roteiros_sem_match }}</h4>
+                                <small class="text-muted">Roteiros sem plano</small>
+                            </div>
+                            <i class="fas fa-exclamation-circle fa-2x text-danger opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card stat-card shadow-sm bg-info text-white">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Total sem Match</h5>
-                        <p class="card-text display-6">{{ total_planos_sem_match|add:total_roteiros_sem_match }}</p>
-                        <small>Registros sem correspondência</small>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total sem Match</h6>
+                                <h4 class="mb-0 fw-bold">{{ total_planos_sem_match|add:total_roteiros_sem_match }}</h4>
+                                <small class="text-muted">Registros sem correspondência</small>
+                            </div>
+                            <i class="fas fa-unlink fa-2x text-info opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -454,44 +477,64 @@
         </div>
 
         {% else %}
-        <!-- Statistics Cards for Specific Analysis -->
-        <div class="row mb-4">
+        <!-- Statistics Cards for Specific Analysis (mesmo padrão visual de consultar roteiros) -->
+        <div class="row g-3 mb-4">
             <div class="col-md-3">
-                <div class="card stat-card shadow-sm bg-danger text-white">
+                <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Total de Erros</h5>
-                        <p class="card-text display-6">{{ total_erros }}</p>
-                        <small>Campos com problemas</small>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total de Erros</h6>
+                                <h4 class="mb-0 fw-bold">{{ total_erros }}</h4>
+                                <small class="text-muted">Campos com problemas</small>
+                            </div>
+                            <i class="fas fa-times-circle fa-2x text-danger opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card stat-card shadow-sm bg-warning text-dark">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Campos Vazios</h5>
-                        <p class="card-text display-6">{{ campos_vazios }}</p>
-                        <small>Valores faltando</small>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Campos Vazios</h6>
+                                <h4 class="mb-0 fw-bold">{{ campos_vazios }}</h4>
+                                <small class="text-muted">Valores faltando</small>
+                            </div>
+                            <i class="fas fa-ban fa-2x text-warning opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card stat-card shadow-sm bg-info text-white">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Campos Diferentes</h5>
-                        <p class="card-text display-6">{{ campos_diferentes }}</p>
-                        <small>Valores não correspondem</small>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Campos Diferentes</h6>
+                                <h4 class="mb-0 fw-bold">{{ campos_diferentes }}</h4>
+                                <small class="text-muted">Valores não correspondem</small>
+                            </div>
+                            <i class="fas fa-not-equal fa-2x text-info opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card stat-card shadow-sm bg-secondary text-white">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Status</h5>
-                        <p class="card-text">
-                            <span class="badge bg-danger" style="font-size: 1rem; padding: 8px 16px;">
-                                <i class="fas fa-times-circle"></i> Sem Match
-                            </span>
-                        </p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Status</h6>
+                                <p class="mb-0">
+                                    <span class="badge bg-danger" style="font-size: 0.9rem; padding: 6px 12px;">
+                                        <i class="fas fa-times-circle"></i> Sem Match
+                                    </span>
+                                </p>
+                            </div>
+                            <i class="fas fa-exclamation-triangle fa-2x text-primary opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>

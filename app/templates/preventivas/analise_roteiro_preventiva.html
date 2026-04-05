@@ -1,0 +1,374 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Análise Roteiro Preventiva{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card { transition: transform 0.2s; }
+    .stat-card:hover { transform: translateY(-5px); }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .kpi-purple { border-left-color: #6f42c1; }
+    .kpi-number { font-size: 2rem; font-weight: 700; line-height: 1.2; }
+    .table-top { font-size: 0.9rem; }
+    @media (max-width: 768px) {
+        .kpi-number { font-size: 1.65rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_roteiro_preventiva' %}" class="text-white">Roteiro de Preventiva</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise Roteiro Preventiva</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="bi bi-bar-chart-steps me-2"></i>Análise Roteiro Preventiva
+                </h1>
+                <p class="lead">Análise consolidada dos dados da tabela RoteiroPreventiva</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        <!-- Link para Consultar -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <a href="{% url 'consultar_roteiro_preventiva' %}" class="btn btn-outline-success">
+                    <i class="fas fa-search me-2"></i>Consultar Roteiros Preventiva
+                </a>
+            </div>
+        </div>
+
+        <!-- KPI Cards - Linha 1 -->
+        <div class="row mb-2 g-3">
+            <div class="col-6 col-md col-lg d-flex">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100 w-100">
+                    <div class="card-body py-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Total de Roteiros</h6>
+                                <h3 class="mb-1 fw-bold kpi-number">{{ total_count|default:0 }}</h3>
+                                <small class="text-muted">registros</small>
+                            </div>
+                            <i class="bi bi-list-check fa-2x text-primary opacity-25 d-none d-md-block"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg d-flex">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100 w-100">
+                    <div class="card-body py-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Máquinas</h6>
+                                <h3 class="mb-1 fw-bold kpi-number">{{ maquinas_count|default:0 }}</h3>
+                                <small class="text-muted">distintas</small>
+                            </div>
+                            <i class="bi bi-gear fa-2x text-info opacity-25 d-none d-md-block"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg d-flex">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100 w-100">
+                    <div class="card-body py-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Setores</h6>
+                                <h3 class="mb-1 fw-bold kpi-number">{{ setores_count|default:0 }}</h3>
+                                <small class="text-muted">distintos</small>
+                            </div>
+                            <i class="bi bi-building fa-2x text-success opacity-25 d-none d-md-block"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg d-flex">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100 w-100">
+                    <div class="card-body py-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Planos</h6>
+                                <h3 class="mb-1 fw-bold kpi-number">{{ planos_count|default:0 }}</h3>
+                                <small class="text-muted">distintos</small>
+                            </div>
+                            <i class="bi bi-clipboard-check fa-2x text-warning opacity-25 d-none d-md-block"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg d-flex">
+                <div class="card stat-card kpi-card kpi-purple shadow-sm border-0 h-100 w-100">
+                    <div class="card-body py-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Unidades</h6>
+                                <h3 class="mb-1 fw-bold kpi-number">{{ unidades_count|default:0 }}</h3>
+                                <small class="text-muted">distintas</small>
+                            </div>
+                            <i class="bi bi-house fa-2x opacity-25 d-none d-md-block" style="color: #6f42c1;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI Cards - Linha 2 (Ordem de Serviço e Execução) -->
+        <div class="row mb-4 g-3">
+            <div class="col-6 col-md col-lg d-flex">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100 w-100">
+                    <div class="card-body py-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Com Ordem de Serviço</h6>
+                                <h3 class="mb-1 fw-bold kpi-number">{{ com_ordem_servico|default:0 }}</h3>
+                                <small class="text-muted">roteiros</small>
+                            </div>
+                            <i class="bi bi-file-earmark-check fa-2x text-success opacity-25 d-none d-md-block"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg d-flex">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100 w-100">
+                    <div class="card-body py-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Sem Ordem de Serviço</h6>
+                                <h3 class="mb-1 fw-bold kpi-number">{{ sem_ordem_servico|default:0 }}</h3>
+                                <small class="text-muted">roteiros</small>
+                            </div>
+                            <i class="bi bi-file-earmark-x fa-2x text-warning opacity-25 d-none d-md-block"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg d-flex">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100 w-100">
+                    <div class="card-body py-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Com Data de Execução</h6>
+                                <h3 class="mb-1 fw-bold kpi-number">{{ com_data_execucao|default:0 }}</h3>
+                                <small class="text-muted">executados</small>
+                            </div>
+                            <i class="bi bi-calendar-check fa-2x text-primary opacity-25 d-none d-md-block"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md col-lg d-flex">
+                <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100 w-100">
+                    <div class="card-body py-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Sem Data de Execução</h6>
+                                <h3 class="mb-1 fw-bold kpi-number">{{ sem_data_execucao|default:0 }}</h3>
+                                <small class="text-muted">pendentes</small>
+                            </div>
+                            <i class="bi bi-calendar-x fa-2x text-danger opacity-25 d-none d-md-block"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Máquinas, Setores e Planos -->
+        <div class="row mb-4">
+            <!-- Top Máquinas -->
+            <div class="col-lg-4 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0"><i class="bi bi-gear me-2"></i>Top 10 Máquinas</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm table-top mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Código</th>
+                                        <th>Descrição</th>
+                                        <th class="text-end">Roteiros</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in top_maquinas %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td><span class="badge bg-primary">{{ item.cd_maquina }}</span></td>
+                                        <td>{{ item.descr_maquina|truncatewords:5|default:"-" }}</td>
+                                        <td class="text-end"><strong>{{ item.total }}</strong></td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="4" class="text-center text-muted py-3">Nenhum dado</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Setores -->
+            <div class="col-lg-4 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0"><i class="bi bi-building me-2"></i>Top 10 Setores</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm table-top mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Setor</th>
+                                        <th class="text-end">Roteiros</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in top_setores %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>
+                                            <span class="badge bg-success">{{ item.cd_setormanut }}</span>
+                                            {% if item.descr_setormanut %}
+                                                <br><small class="text-muted">{{ item.descr_setormanut|truncatewords:4 }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end"><strong>{{ item.total }}</strong></td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="3" class="text-center text-muted py-3">Nenhum dado</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Planos -->
+            <div class="col-lg-4 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-warning text-dark">
+                        <h6 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>Top 10 Planos</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm table-top mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Código</th>
+                                        <th>Descrição</th>
+                                        <th class="text-end">Roteiros</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in top_planos %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td><span class="badge bg-warning text-dark">{{ item.cd_planmanut }}</span></td>
+                                        <td>{{ item.descr_planmanut|truncatewords:5|default:"-" }}</td>
+                                        <td class="text-end"><strong>{{ item.total }}</strong></td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="4" class="text-center text-muted py-3">Nenhum dado</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Distribuição por Período e Top Funcionários -->
+        <div class="row">
+            <!-- Distribuição por Período (dias) -->
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0"><i class="bi bi-calendar2-range me-2"></i>Roteiros por Período (dias)</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Período (dias)</th>
+                                        <th class="text-end">Quantidade</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in roteiros_por_periodo %}
+                                    <tr>
+                                        <td>{{ item.qtde_periodo }} dias</td>
+                                        <td class="text-end"><strong>{{ item.total }}</strong></td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="2" class="text-center text-muted py-3">Nenhum dado</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Funcionários -->
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h6 class="mb-0"><i class="bi bi-person-badge me-2"></i>Top 10 Funcionários</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Nome</th>
+                                        <th>Código</th>
+                                        <th class="text-end">Roteiros</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in top_funcionarios %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>{{ item.nome_funciomanu|truncatewords:4 }}</td>
+                                        <td><span class="badge bg-secondary">{{ item.cd_funciomanu|default:"-" }}</span></td>
+                                        <td class="text-end"><strong>{{ item.total }}</strong></td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="4" class="text-center text-muted py-3">Nenhum dado</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Plano Preventiva - {{ maquina_primaria.descr_maquina|default:maquina_primaria.cd_maquina }}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'analise_plano_por_maquina' %}" class="text-white">Análise de Plano Por Máquina</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Plano Preventiva Agrupado</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Plano de Preventiva por Máquina</h1>
+                <p class="lead mb-2">
+                    <i class="fas fa-star me-2 text-warning"></i>
+                    <strong>Máquina Principal:</strong> {{ maquina_primaria.descr_maquina|default:"Máquina" }} ({{ maquina_primaria.cd_maquina }})
+                </p>
+                {% if maquinas_secundarias %}
+                <p class="mb-0">
+                    <i class="fas fa-link me-2"></i>
+                    <strong>Máquinas Secundárias:</strong>
+                    {% for sec in maquinas_secundarias %}
+                        <a href="{% url 'visualizar_maquina' sec.id %}" class="badge bg-info text-decoration-none me-1" target="_blank">{{ sec.cd_maquina }} - {{ sec.descr_maquina|truncatewords:4 }}</a>
+                    {% endfor %}
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+
+        <!-- Máquina Principal - Planos Preventiva -->
+        <div class="card shadow-sm mb-5">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-star me-2"></i>Máquina Principal ({{ maquina_primaria.cd_maquina }})
+                    <span class="badge bg-light text-dark ms-2">{{ planos_primaria|length }} plano(s)</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>{{ maquina_primaria.descr_maquina|default:"Sem descrição" }}</strong>
+                    <a href="{% url 'visualizar_maquina' maquina_primaria.id %}" class="btn btn-sm btn-outline-primary ms-2" target="_blank" rel="noopener noreferrer">
+                        <i class="fas fa-eye"></i> Ver Máquina
+                    </a>
+                </div>
+                {% if planos_primaria %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Plano</th>
+                                <th>Seq. Manutenção</th>
+                                <th>Data Execução</th>
+                                <th>Período (dias)</th>
+                                <th>Seq. Tarefa</th>
+                                <th>Descrição Tarefa</th>
+                                <th>Funcionário</th>
+                                <th>Setor</th>
+                                <th class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for plano in planos_primaria %}
+                            <tr>
+                                <td>
+                                    <strong>{{ plano.numero_plano|default:"-" }}</strong>
+                                    {% if plano.descr_plano %}
+                                        <br><small class="text-muted">{{ plano.descr_plano }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>{{ plano.sequencia_manutencao|default:"-" }}</td>
+                                <td>{{ plano.dt_execucao|default:"-" }}</td>
+                                <td>
+                                    {% if plano.quantidade_periodo %}
+                                        <span class="badge bg-info">{{ plano.quantidade_periodo }}</span>
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td>{{ plano.sequencia_tarefa|default:"-" }}</td>
+                                <td style="max-width: 250px;">{{ plano.descr_tarefa|truncatewords:12|default:"-" }}</td>
+                                <td>
+                                    {% if plano.nome_funcionario %}
+                                        {{ plano.nome_funcionario }}{% if plano.cd_funcionario %} ({{ plano.cd_funcionario }}){% endif %}
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td>
+                                    {% if plano.cd_setor %}
+                                        <span class="badge bg-secondary">{{ plano.cd_setor }}</span>
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <a href="{% url 'visualizar_manutencao_preventiva' plano.id %}" class="btn btn-sm btn-outline-success" title="Visualizar plano" target="_blank" rel="noopener noreferrer">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-calendar-times fa-2x text-muted mb-2"></i>
+                    <p class="text-muted mb-0">Nenhum plano de preventiva encontrado para a máquina principal.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Máquinas Secundárias - Planos Preventiva -->
+        {% for sec, planos in secundarias_com_planos %}
+        <div class="card shadow-sm mb-5">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-link me-2"></i>Máquina Secundária ({{ sec.cd_maquina }})
+                    <span class="badge bg-light text-dark ms-2">{{ planos|length }} plano(s)</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>{{ sec.descr_maquina|default:"Sem descrição" }}</strong>
+                    <a href="{% url 'visualizar_maquina' sec.id %}" class="btn btn-sm btn-outline-info ms-2" target="_blank" rel="noopener noreferrer">
+                        <i class="fas fa-eye"></i> Ver Máquina
+                    </a>
+                </div>
+                {% if planos %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Plano</th>
+                                <th>Seq. Manutenção</th>
+                                <th>Data Execução</th>
+                                <th>Período (dias)</th>
+                                <th>Seq. Tarefa</th>
+                                <th>Descrição Tarefa</th>
+                                <th>Funcionário</th>
+                                <th>Setor</th>
+                                <th class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for plano in planos %}
+                            <tr>
+                                <td>
+                                    <strong>{{ plano.numero_plano|default:"-" }}</strong>
+                                    {% if plano.descr_plano %}
+                                        <br><small class="text-muted">{{ plano.descr_plano }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>{{ plano.sequencia_manutencao|default:"-" }}</td>
+                                <td>{{ plano.dt_execucao|default:"-" }}</td>
+                                <td>
+                                    {% if plano.quantidade_periodo %}
+                                        <span class="badge bg-info">{{ plano.quantidade_periodo }}</span>
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td>{{ plano.sequencia_tarefa|default:"-" }}</td>
+                                <td style="max-width: 250px;">{{ plano.descr_tarefa|truncatewords:12|default:"-" }}</td>
+                                <td>
+                                    {% if plano.nome_funcionario %}
+                                        {{ plano.nome_funcionario }}{% if plano.cd_funcionario %} ({{ plano.cd_funcionario }}){% endif %}
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td>
+                                    {% if plano.cd_setor %}
+                                        <span class="badge bg-secondary">{{ plano.cd_setor }}</span>
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <a href="{% url 'visualizar_manutencao_preventiva' plano.id %}" class="btn btn-sm btn-outline-success" title="Visualizar plano" target="_blank" rel="noopener noreferrer">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-calendar-times fa-2x text-muted mb-2"></i>
+                    <p class="text-muted mb-0">Nenhum plano de preventiva encontrado para esta máquina secundária.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if not maquinas_secundarias %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            Esta máquina não possui máquinas secundárias relacionadas na tabela MaquinaPrimariaSecundaria.
+            Apenas os planos da própria máquina principal são exibidos acima.
+        </div>
+        {% endif %}
+
+        <!-- Back button -->
+        <div class="mt-4">
+            <a href="{% url 'analise_plano_por_maquina' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Voltar para Análise de Plano Por Máquina
+            </a>
+        </div>
+    </div>
+</section>
+{% endblock %}
