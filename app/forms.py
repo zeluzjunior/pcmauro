@@ -1,6 +1,19 @@
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Maquina, MaquinaDocumento, OrdemServicoCorretiva, OrdemServicoCorretivaFicha, CentroAtividade, Manutentor, ManutencaoTerceiro, PlanoPreventivaDocumento, MeuPlanoPreventiva, AgendamentoCronograma, Visitas
+from .models import (
+    Maquina,
+    MaquinaDocumento,
+    OrdemServicoCorretiva,
+    OrdemServicoCorretivaFicha,
+    CentroAtividade,
+    Manutentor,
+    ManutencaoTerceiro,
+    PlanoPreventivaDocumento,
+    MeuPlanoPreventiva,
+    AgendamentoCronograma,
+    Visitas,
+    AssuntoReuniaoPCM,
+)
 
 
 class MaquinaForm(forms.ModelForm):
@@ -987,3 +1000,20 @@ class VisitasForm(forms.ModelForm):
         cleaned_data = super().clean()
         return cleaned_data
 
+
+class AssuntoReuniaoPCMForm(forms.ModelForm):
+    class Meta:
+        model = AssuntoReuniaoPCM
+        fields = ['titulo', 'duracao_minutos', 'arquivo', 'data_reuniao', 'ordem', 'observacoes']
+        widgets = {
+            'titulo': forms.TextInput(attrs={'class': 'form-control', 'maxlength': 300, 'placeholder': 'Título do assunto'}),
+            'duracao_minutos': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'step': 1}),
+            'arquivo': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'data_reuniao': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'ordem': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'step': 1}),
+            'observacoes': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 8,
+                'placeholder': 'Observações, notas ou contexto sobre este assunto…',
+            }),
+        }

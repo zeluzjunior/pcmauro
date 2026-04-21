@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ assunto.titulo }} — Assunto{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'reuniao_pcm' %}" class="text-white">Reunião PCM</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Assunto</li>
+                    </ol>
+                </nav>
+                <h1 class="display-5 fw-bold mt-3">
+                    <i class="bi bi-journal-text me-2"></i>{{ assunto.titulo }}
+                </h1>
+                <p class="lead mb-0">Detalhes do registro no cadastro</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <span class="fw-semibold">{{ assunto.titulo }}</span>
+                        <a href="{% url 'reuniao_pcm' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Voltar à Reunião PCM</a>
+                    </div>
+                    <div class="card-body p-4">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4 text-muted">ID (registro)</dt>
+                            <dd class="col-sm-8">{{ assunto.pk }}</dd>
+
+                            <dt class="col-sm-4 text-muted">Título do assunto</dt>
+                            <dd class="col-sm-8">{{ assunto.titulo }}</dd>
+
+                            <dt class="col-sm-4 text-muted">Duração (minutos)</dt>
+                            <dd class="col-sm-8">{{ assunto.duracao_minutos }}</dd>
+
+                            <dt class="col-sm-4 text-muted">Data da reunião</dt>
+                            <dd class="col-sm-8">{{ assunto.data_reuniao|date:"d/m/Y" }}</dd>
+
+                            <dt class="col-sm-4 text-muted">Ordem na pauta</dt>
+                            <dd class="col-sm-8">{{ assunto.ordem }}</dd>
+
+                            <dt class="col-sm-4 text-muted align-self-start pt-1">Observações</dt>
+                            <dd class="col-sm-8">
+                                {% if assunto.observacoes %}
+                                    <div class="border rounded p-3 bg-light small" style="white-space: pre-wrap;">{{ assunto.observacoes }}</div>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </dd>
+
+                            <dt class="col-sm-4 text-muted">Arquivo anexo</dt>
+                            <dd class="col-sm-8">
+                                {% if assunto.arquivo %}
+                                    <a href="{{ assunto.arquivo.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary"><i class="bi bi-download me-1"></i>{{ assunto.nome_arquivo_curto }}</a>
+                                {% else %}
+                                    <span class="text-muted">Nenhum arquivo anexado</span>
+                                {% endif %}
+                            </dd>
+                        </dl>
+                    </div>
+                    <div class="card-footer bg-light border-0">
+                        <a href="{% url 'configuracao_reuniao_pcm' %}?edit={{ assunto.pk }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil me-1"></i>Editar na configuração</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

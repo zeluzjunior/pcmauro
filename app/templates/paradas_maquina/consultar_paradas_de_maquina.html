@@ -119,6 +119,7 @@
                         <form method="GET" class="row g-3 align-items-end" action="{% url 'consultar_paradas_maquina' %}">
                             <!-- Preservar busca geral e filtros de coluna -->
                             <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                            <input type="hidden" name="sort_data" value="{{ sort_data|default:'desc' }}">
                             {% if col_descr_recurso %}<input type="hidden" name="col_descr_recurso" value="{{ col_descr_recurso }}">{% endif %}
                             {% if col_cod_parada %}<input type="hidden" name="col_cod_parada" value="{{ col_cod_parada }}">{% endif %}
                             {% if col_descr_parada %}<input type="hidden" name="col_descr_parada" value="{{ col_descr_parada }}">{% endif %}
@@ -180,6 +181,7 @@
                     {% for mes in meses_filtro %}
                         <input type="hidden" name="mes" value="{{ mes }}">
                     {% endfor %}
+                    <input type="hidden" name="sort_data" value="{{ sort_data|default:'desc' }}">
                     {% if col_descr_recurso %}<input type="hidden" name="col_descr_recurso" value="{{ col_descr_recurso }}">{% endif %}
                     {% if col_cod_parada %}<input type="hidden" name="col_cod_parada" value="{{ col_cod_parada }}">{% endif %}
                     {% if col_descr_parada %}<input type="hidden" name="col_descr_parada" value="{{ col_descr_parada }}">{% endif %}
@@ -273,19 +275,29 @@
                             <table class="table table-hover table-striped mb-0" id="paradasTable">
                                 <thead>
                                     <tr>
-                                        <th class="col-data">Data</th>
+                                        <th class="col-data">
+                                            <a href="?ano={{ ano_filtro }}{% for mes in meses_filtro %}&mes={{ mes }}{% endfor %}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}{% if col_descr_recurso %}&col_descr_recurso={{ col_descr_recurso|urlencode }}{% endif %}{% if col_cod_parada %}&col_cod_parada={{ col_cod_parada|urlencode }}{% endif %}{% if col_descr_parada %}&col_descr_parada={{ col_descr_parada|urlencode }}{% endif %}{% if col_descr_linha %}&col_descr_linha={{ col_descr_linha|urlencode }}{% endif %}{% if col_turno %}&col_turno={{ col_turno|urlencode }}{% endif %}{% if col_motivo %}&col_motivo={{ col_motivo|urlencode }}{% endif %}{% if col_acao %}&col_acao={{ col_acao|urlencode }}{% endif %}&sort_data={% if sort_data == 'asc' %}desc{% else %}asc{% endif %}"
+                                               class="text-decoration-none text-dark">
+                                                Data
+                                                {% if sort_data == 'asc' %}
+                                                    <i class="fas fa-sort-up ms-1"></i>
+                                                {% else %}
+                                                    <i class="fas fa-sort-down ms-1"></i>
+                                                {% endif %}
+                                            </a>
+                                        </th>
+                                        <th class="col-capacidade">Capacidade</th>
+                                        <th class="col-codigo">Máquina</th>
                                         <th class="col-hora">Horário Inicial</th>
                                         <th class="col-hora">Horário Final</th>
+                                        <th class="col-descricao">Motivo</th>
+                                        <th class="col-descricao">Ação</th>
+                                        <th class="col-descricao">Descrição Linha</th>
                                         <th class="col-descricao">Descrição Recurso</th>
-                                        <th class="col-codigo">Máquina</th>
                                         <th class="col-descricao">Nome Máquina</th>
                                         <th class="col-codigo">Cód. Parada</th>
                                         <th class="col-descricao">Descrição Parada</th>
-                                        <th class="col-descricao">Descrição Linha</th>
                                         <th class="col-turno">Turno</th>
-                                        <th class="col-capacidade">Capacidade</th>
-                                        <th class="col-descricao">Motivo</th>
-                                        <th class="col-descricao">Ação</th>
                                         <th class="col-codigo">OS</th>
                                         <th class="col-codigo" style="min-width: 90px;">Ações</th>
                                     </tr>
@@ -293,16 +305,16 @@
                                         <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="0"></th>
                                         <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="1"></th>
                                         <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="2"></th>
-                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="3" name="col_descr_recurso" form="columnFilterForm" value="{{ col_descr_recurso|default:'' }}"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="3"></th>
                                         <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="4"></th>
-                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="5"></th>
-                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="6" name="col_cod_parada" form="columnFilterForm" value="{{ col_cod_parada|default:'' }}"></th>
-                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="7" name="col_descr_parada" form="columnFilterForm" value="{{ col_descr_parada|default:'' }}"></th>
-                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="8" name="col_descr_linha" form="columnFilterForm" value="{{ col_descr_linha|default:'' }}"></th>
-                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="9" name="col_turno" form="columnFilterForm" value="{{ col_turno|default:'' }}"></th>
-                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="10"></th>
-                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="11" name="col_motivo" form="columnFilterForm" value="{{ col_motivo|default:'' }}"></th>
-                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="12" name="col_acao" form="columnFilterForm" value="{{ col_acao|default:'' }}"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="5" name="col_motivo" form="columnFilterForm" value="{{ col_motivo|default:'' }}"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="6" name="col_acao" form="columnFilterForm" value="{{ col_acao|default:'' }}"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="7" name="col_descr_linha" form="columnFilterForm" value="{{ col_descr_linha|default:'' }}"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="8" name="col_descr_recurso" form="columnFilterForm" value="{{ col_descr_recurso|default:'' }}"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="9"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="10" name="col_cod_parada" form="columnFilterForm" value="{{ col_cod_parada|default:'' }}"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="11" name="col_descr_parada" form="columnFilterForm" value="{{ col_descr_parada|default:'' }}"></th>
+                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="12" name="col_turno" form="columnFilterForm" value="{{ col_turno|default:'' }}"></th>
                                         <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="13"></th>
                                         <th>
                                             <form method="GET" action="{% url 'consultar_paradas_maquina' %}" id="columnFilterForm" class="d-inline">
@@ -311,6 +323,7 @@
                                                 <input type="hidden" name="mes" value="{{ mes }}">
                                                 {% endfor %}
                                                 <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                                                <input type="hidden" name="sort_data" value="{{ sort_data|default:'desc' }}">
                                                 <button type="submit" class="btn btn-sm btn-outline-primary" title="Aplicar filtros de coluna (total correto em todas as páginas)">
                                                     <i class="fas fa-filter"></i> Aplicar
                                                 </button>
@@ -322,9 +335,13 @@
                                     {% for parada in paradas %}
                                     <tr>
                                         <td>{{ parada.data|date:"d/m/Y"|default:"-" }}</td>
-                                        <td>{{ parada.horario_inicial|time:"H:i"|default:"-" }}</td>
-                                        <td>{{ parada.horario_final|time:"H:i"|default:"-" }}</td>
-                                        <td>{{ parada.descr_recurso|default:"-"|truncatewords:10 }}</td>
+                                        <td class="col-capacidade" data-capacidade="{% if parada.capacidade %}{{ parada.capacidade }}{% else %}0{% endif %}">
+                                            {% if parada.capacidade %}
+                                                {{ parada.capacidade|floatformat:3 }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
                                         <td>
                                             {% if parada.maquina_info %}
                                                 {% if parada.maquina_info.maquina_id %}
@@ -338,20 +355,16 @@
                                                 -
                                             {% endif %}
                                         </td>
+                                        <td>{{ parada.horario_inicial|time:"H:i"|default:"-" }}</td>
+                                        <td>{{ parada.horario_final|time:"H:i"|default:"-" }}</td>
+                                        <td>{{ parada.motivo|default:"-"|truncatewords:15 }}</td>
+                                        <td>{{ parada.acao|default:"-"|truncatewords:15 }}</td>
+                                        <td>{{ parada.descr_linha_producao|default:"-"|truncatewords:10 }}</td>
+                                        <td>{{ parada.descr_recurso|default:"-"|truncatewords:10 }}</td>
                                         <td>{% if parada.maquina_info %}{{ parada.maquina_info.descr_maquina|default:"-"|truncatewords:12 }}{% else %}-{% endif %}</td>
                                         <td>{{ parada.cod_parada|default:"-" }}</td>
                                         <td>{{ parada.descr_parada|default:"-"|truncatewords:10 }}</td>
-                                        <td>{{ parada.descr_linha_producao|default:"-"|truncatewords:10 }}</td>
                                         <td class="col-turno">{{ parada.turno|default:"-" }}</td>
-                                        <td class="col-capacidade" data-capacidade="{% if parada.capacidade %}{{ parada.capacidade }}{% else %}0{% endif %}">
-                                            {% if parada.capacidade %}
-                                                {{ parada.capacidade|floatformat:3 }}
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                        <td>{{ parada.motivo|default:"-"|truncatewords:15 }}</td>
-                                        <td>{{ parada.acao|default:"-"|truncatewords:15 }}</td>
                                         <td>
                                             {% if parada.os_list %}
                                                 {% for os_num in parada.os_list %}
@@ -379,9 +392,9 @@
                                 {% if paradas %}
                                 <tfoot>
                                     <tr id="totalsRow" data-server-total-capacidade="{{ total_capacidade }}" {% if col_descr_recurso or col_cod_parada or col_descr_parada or col_descr_linha or col_turno or col_motivo or col_acao %}data-server-column-filters="1"{% endif %}>
-                                        <td colspan="10" class="text-end"><strong>Total</strong> <span id="totalsScope" class="text-muted small"></span></td>
+                                        <td class="text-end"><strong>Total</strong> <span id="totalsScope" class="text-muted small"></span></td>
                                         <td class="col-capacidade" id="totalCapacidade">{{ total_capacidade|floatformat:3 }}</td>
-                                        <td colspan="5"></td>
+                                        <td colspan="13"></td>
                                     </tr>
                                 </tfoot>
                                 {% endif %}
@@ -424,8 +437,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const totalsRow = document.getElementById('totalsRow');
         const serverTotalCap = totalsRow ? parseFloat(String(totalsRow.getAttribute('data-server-total-capacidade') || '0').replace(',', '.')) || 0 : 0;
         const serverColumnFiltersActive = totalsRow && totalsRow.getAttribute('data-server-column-filters') === '1';
-        const CAPACIDADE_COL = 10;
-        const CLIENT_ONLY_COLS = [0, 1, 2, 4, 5, 10, 13];
+        const CAPACIDADE_COL = 1;
+        const CLIENT_ONLY_COLS = [0, 1, 2, 3, 4, 9, 13];
 
         function parseCapacidade(val) {
             if (val == null || val === '' || val === '-') return 0;

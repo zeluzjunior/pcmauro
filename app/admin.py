@@ -25,6 +25,7 @@ from .models import (
     ConfigLinhaProducaoCentroAtividade,
     ConfigRecursoParadaMaquina,
     ParadaMaquinaOS,
+    AssuntoReuniaoPCM,
 )
 
 
@@ -597,3 +598,16 @@ class ParadaMaquinaOSAdmin(admin.ModelAdmin):
     list_filter = ('os_numero', 'created_at')
     search_fields = ('os_numero',)
     readonly_fields = ('created_at',)
+
+
+@admin.register(AssuntoReuniaoPCM)
+class AssuntoReuniaoPCMAdmin(admin.ModelAdmin):
+    list_display = ('titulo', 'data_reuniao', 'duracao_minutos', 'ordem', 'tem_arquivo')
+
+    @admin.display(description='Anexo', boolean=True)
+    def tem_arquivo(self, obj):
+        return bool(obj.arquivo)
+
+    list_filter = ('data_reuniao',)
+    search_fields = ('titulo', 'observacoes')
+    ordering = ('-data_reuniao', 'ordem', 'id')

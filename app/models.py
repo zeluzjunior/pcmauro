@@ -1876,3 +1876,42 @@ class Evento(models.Model):
 
     def __str__(self):
         return f"{self.descricao[:50] if self.descricao else 'Sem descrição'} - {self.data.strftime('%d/%m/%Y') if self.data else 'Sem data'}"
+
+
+class AssuntoReuniaoPCM(models.Model):
+    """Assuntos configurados para a Reunião PCM (pauta)."""
+
+    titulo = models.CharField('Título do assunto', max_length=300)
+    duracao_minutos = models.PositiveIntegerField('Duração (minutos)', default=15)
+    arquivo = models.FileField(
+        'Arquivo anexo',
+        upload_to='reuniao_pcm/assuntos/',
+        blank=True,
+        null=True,
+        help_text='Arquivo opcional vinculado a este assunto (apresentação, planilha, etc.).',
+    )
+    data_reuniao = models.DateField('Data da reunião')
+    ordem = models.PositiveSmallIntegerField('Ordem na pauta', default=0)
+    observacoes = models.TextField(
+        'Observações',
+        blank=True,
+        help_text='Texto livre (notas, contexto, detalhes adicionais sobre o assunto).',
+    )
+
+    class Meta:
+        verbose_name = 'Assunto Reunião PCM'
+        verbose_name_plural = 'Assuntos Reunião PCM'
+        ordering = ['data_reuniao', 'ordem', 'id']
+        indexes = [
+            models.Index(fields=['data_reuniao']),
+        ]
+
+    def __str__(self):
+        return f'{self.titulo} ({self.data_reuniao})'
+
+    def nome_arquivo_curto(self):
+        """Nome do arquivo sem o caminho do storage (para exibição)."""
+        if not self.arquivo:
+            return ''
+        from pathlib import Path
+        return Path(self.arquivo.name).name

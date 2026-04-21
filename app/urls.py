@@ -207,7 +207,12 @@ urlpatterns = [
     
     # Agenda Geral
     path('agenda-geral/', views.agenda_geral, name="agenda_geral"),
+    path('reuniao/reuniao-pcm/', views.reuniao_pcm, name="reuniao_pcm"),
+    path('reuniao/assunto/<int:pk>/excluir/', views.excluir_assunto_reuniao, name="excluir_assunto_reuniao"),
+    path('reuniao/assunto/<int:pk>/', views.visualizar_assunto_reuniao, name="visualizar_assunto_reuniao"),
+    path('reuniao/configuracao-reuniao-pcm/', views.configuracao_reuniao_pcm, name="configuracao_reuniao_pcm"),
     path('meus-planos-preventiva/calendario/', views.calendario_plano_e_roteiro, name="calendario_plano_e_roteiro"),
+    path('meus-planos-preventiva/calendario/exportar-pdf/', views.export_calendario_preventivas_pdf, name="export_calendario_preventivas_pdf"),
     path('api/eventos-preventivas-calendario/', views.api_eventos_preventivas_calendario, name="api_eventos_preventivas_calendario"),
     
     # API Endpoints

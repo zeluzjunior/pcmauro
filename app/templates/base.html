@@ -533,6 +533,20 @@
                                 <span class="btn-toggle-text">Agenda Geral</span>
                             </a>
                         </li>
+
+                        <!-- Reuniões -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#reunioes-collapse" aria-expanded="false">
+                                <i class="bi bi-people me-2"></i>
+                                <span class="btn-toggle-text">Reuniões</span>
+                            </button>
+                            <div class="collapse" id="reunioes-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'configuracao_reuniao_pcm' %}" class="link-dark rounded"><i class="bi bi-gear me-2"></i>Configuração Reunião PCM</a></li>
+                                    <li><a href="{% url 'reuniao_pcm' %}" class="link-dark rounded"><i class="bi bi-camera-video me-2"></i>Reunião PCM</a></li>
+                                </ul>
+                            </div>
+                        </li>
                         
                         <!-- manutenção de terceiros -->
                         <li class="mb-1">

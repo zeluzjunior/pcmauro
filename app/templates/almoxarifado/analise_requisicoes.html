@@ -1352,6 +1352,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const operacoesLabels = {{ operacoes_labels|safe }};
             const operacoesData = {{ operacoes_data|safe }};
+            const operacoesDataValor = {{ operacoes_data_valor|safe }};
             
             console.log('Operacoes Chart - Labels:', operacoesLabels);
             console.log('Operacoes Chart - Data:', operacoesData);
@@ -1382,7 +1383,38 @@ document.addEventListener('DOMContentLoaded', function() {
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            position: 'right'
+                            position: 'right',
+                            labels: {
+                                generateLabels: function(chart) {
+                                    const dataset = chart.data.datasets[0] || { data: [] };
+                                    const labels = chart.data.labels || [];
+                                    const bg = dataset.backgroundColor || [];
+                                    return labels.map(function(label, i) {
+                                        const valor = Number((operacoesDataValor && operacoesDataValor[i]) || 0);
+                                        return {
+                                            text: `${label} - R$ ${valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
+                                            fillStyle: bg[i % bg.length],
+                                            strokeStyle: '#ffffff',
+                                            lineWidth: 2,
+                                            hidden: !chart.getDataVisibility(i),
+                                            index: i
+                                        };
+                                    });
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const idx = context.dataIndex;
+                                    const quantidade = Number(context.raw || 0);
+                                    const valor = Number((operacoesDataValor && operacoesDataValor[idx]) || 0);
+                                    return [
+                                        `Quantidade: ${quantidade.toLocaleString('pt-BR')}`,
+                                        `Valor: R$ ${valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
+                                    ];
+                                }
+                            }
                         }
                     }
                 }

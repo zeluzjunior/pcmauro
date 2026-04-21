@@ -1,6 +1,6 @@
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.core.mail import send_mail
 from django.conf import settings
 from django.core.paginator import Paginator
@@ -954,11 +954,13 @@ def analise_requisicoes(request):
     
     operacoes_labels = []
     operacoes_data = []
+    operacoes_data_valor = []
     for operacao, dados in sorted_operacoes:
         if len(operacao) > 30:
             operacao = operacao[:27] + "..."
         operacoes_labels.append(operacao)
         operacoes_data.append(dados['count'])
+        operacoes_data_valor.append(float(dados['valor']))
     
     # Requisições recentes (últimas 20)
     requisicoes_recentes_list = queryset_base.order_by('-data_requisicao', '-created_at')[:20]
@@ -1141,6 +1143,7 @@ def analise_requisicoes(request):
         'centros_data_valor': json.dumps(centros_data_valor),
         'operacoes_labels': json.dumps(operacoes_labels),
         'operacoes_data': json.dumps(operacoes_data),
+        'operacoes_data_valor': json.dumps(operacoes_data_valor),
         'usuarios_labels': json.dumps(usuarios_labels),
         'usuarios_data_count': json.dumps(usuarios_data_count),
         'usuarios_data_valor': json.dumps(usuarios_data_valor),
@@ -7126,6 +7129,9 @@ def consultar_paradas_maquina(request):
     
     # Busca geral
     search_query = request.GET.get('search', '').strip()
+    sort_data = request.GET.get('sort_data', 'desc').strip().lower()
+    if sort_data not in ('asc', 'desc'):
+        sort_data = 'desc'
     todas_paradas = ParadaMaquina.objects.all()
     
     # Obter anos disponíveis (baseado em data)
@@ -7190,8 +7196,11 @@ def consultar_paradas_maquina(request):
     if col_acao:
         paradas_list = paradas_list.filter(acao__icontains=col_acao)
 
-    # Ordenar por data (mais recente primeiro) e horário inicial
-    paradas_list = paradas_list.order_by('-data', '-horario_inicial', 'cod_recurso')
+    # Ordenar por data (novo->antigo ou antigo->novo) e horário inicial
+    if sort_data == 'asc':
+        paradas_list = paradas_list.order_by('data', 'horario_inicial', 'cod_recurso')
+    else:
+        paradas_list = paradas_list.order_by('-data', '-horario_inicial', 'cod_recurso')
     paradas_list = paradas_list.prefetch_related('os_confirmadas')
 
     # Estatísticas baseadas nos dados FILTRADOS (antes da paginação)
@@ -7410,6 +7419,7 @@ def consultar_paradas_maquina(request):
         'meses_choices': meses_choices,
         # Preservar filtros no contexto
         'search_query': search_query,
+        'sort_data': sort_data,
         # Filtros de coluna (para manter valores nos inputs)
         'col_descr_recurso': col_descr_recurso,
         'col_cod_parada': col_cod_parada,
@@ -10494,7 +10504,7 @@ def analise_geral_plano_preventiva_pcm(request):
 
 def analise_ordens_de_servico(request):
     """Análise de Ordens de Serviço - Dashboard com estatísticas e filtros"""
-    from app.models import OrdemServicoCorretiva, OrdemServicoPreventiva, OrdemServicoCorretivaFicha, CentroAtividade
+    from app.models import OrdemServicoCorretiva, OrdemServicoPreventiva, OrdemServicoCorretivaFicha, OrdemServicoLubrificacao, CentroAtividade
     from django.db.models import Count, Q, Avg
     from datetime import datetime, timedelta
     from collections import defaultdict
@@ -10582,21 +10592,27 @@ def analise_ordens_de_servico(request):
                             ordens_filtradas.append(ordem)
         return ordens_filtradas
     
-    # Obter todas as ordens corretivas e filtrar
+    # Obter todas as ordens corretivas e filtrar (universo completo de corretivas)
     todas_ordens_corretivas = OrdemServicoCorretiva.objects.all()
+    ordens_corretivas_map = {ordem.id: ordem for ordem in todas_ordens_corretivas}
     ordens_corretivas_filtradas = filtrar_ordens_por_data(todas_ordens_corretivas, ano_filtro, meses_filtro_int)
     
     # Obter todas as ordens preventivas e filtrar
     todas_ordens_preventivas = OrdemServicoPreventiva.objects.all()
     ordens_preventivas_filtradas = filtrar_ordens_por_data(todas_ordens_preventivas, ano_filtro, meses_filtro_int)
+
+    # Obter todas as ordens de lubrificação e filtrar
+    todas_ordens_lubrificacao = OrdemServicoLubrificacao.objects.all()
+    ordens_lubrificacao_filtradas = filtrar_ordens_por_data(todas_ordens_lubrificacao, ano_filtro, meses_filtro_int)
     
     # Combinar ordens filtradas para estatísticas gerais
-    ordens_filtradas = ordens_corretivas_filtradas + ordens_preventivas_filtradas
+    ordens_filtradas = ordens_corretivas_filtradas + ordens_preventivas_filtradas + ordens_lubrificacao_filtradas
     
     # Estatísticas básicas (filtradas)
     total_corretivas = len(ordens_corretivas_filtradas)
     total_preventivas = len(ordens_preventivas_filtradas)
-    total_ordens = total_corretivas + total_preventivas
+    total_lubrificacao = len(ordens_lubrificacao_filtradas)
+    total_ordens = total_corretivas + total_preventivas + total_lubrificacao
     
     # ========== ESTATÍSTICAS ORDEMSERVICOCORRETIVA (FILTRADAS) ==========
     # Ordens por tipo de ordem (descr_tpordservtv) - MUITO IMPORTANTE
@@ -10649,6 +10665,18 @@ def analise_ordens_de_servico(request):
     solicitacoes = sum(1 for ordem in ordens_filtradas if ordem.descr_sitordsetv and ordem.descr_sitordsetv.strip().upper() == 'SOLICITAÇÃO ABERTA')
     # Tempo Total Necessário: (Ordens Abertas + Solicitações) * 15 min → horas
     tempo_total_necessario_horas = (ordens_abertas + solicitacoes) * 15 / 60
+
+    # Ordens abertas por tipo de ordem (boxes dinâmicos)
+    ordens_abertas_por_tipo_dict = defaultdict(int)
+    for ordem in ordens_filtradas:
+        situacao = (ordem.descr_sitordsetv or '').strip().upper()
+        if situacao == 'ORDEM DE SERVIÇO EM EXECUÇÃO':
+            tipo = (ordem.descr_tpordservtv or '').strip() or 'Não informado'
+            ordens_abertas_por_tipo_dict[tipo] += 1
+    ordens_abertas_por_tipo = [
+        {'tipo': tipo, 'total': total}
+        for tipo, total in sorted(ordens_abertas_por_tipo_dict.items(), key=lambda x: x[1], reverse=True)
+    ]
     
     # Ordens com e sem máquina
     ordens_com_maquina = sum(1 for ordem in ordens_filtradas if ordem.cd_maquina)
@@ -10714,7 +10742,7 @@ def analise_ordens_de_servico(request):
     # Obter IDs das ordens corretivas filtradas (fichas só existem para corretivas)
     ordens_filtradas_ids = [ordem.id for ordem in ordens_corretivas_filtradas]
     
-    # Fichas relacionadas às ordens filtradas
+    # Fichas relacionadas às ordens corretivas filtradas
     # SQLite tem limite de 999 variáveis por query, então dividimos em chunks
     fichas_filtradas_list = []
     chunk_size = 500  # Usar 500 para estar bem abaixo do limite de 999
@@ -10726,7 +10754,7 @@ def analise_ordens_de_servico(request):
     
     total_fichas = len(fichas_filtradas_list)
     ordens_com_fichas = len(set(ficha.ordem_servico_id for ficha in fichas_filtradas_list))
-    ordens_sem_fichas = total_corretivas - ordens_com_fichas  # Fichas só existem para corretivas
+    ordens_sem_fichas = total_ordens - ordens_com_fichas
     
     # Média de fichas por ordem
     if ordens_com_fichas > 0:
@@ -10741,7 +10769,7 @@ def analise_ordens_de_servico(request):
     top_ordens_fichas_list = sorted(ordens_com_fichas_dict.items(), key=lambda x: x[1], reverse=True)[:10]
     top_ordens_fichas = []
     for ordem_id, num_fichas in top_ordens_fichas_list:
-        ordem = next((o for o in ordens_filtradas if o.id == ordem_id), None)
+        ordem = ordens_corretivas_map.get(ordem_id)
         if ordem:
             top_ordens_fichas.append({
                 'cd_ordemserv': ordem.cd_ordemserv,
@@ -10762,7 +10790,7 @@ def analise_ordens_de_servico(request):
     # Percentuais
     taxa_ordens_com_maquina = (ordens_com_maquina / total_ordens * 100) if total_ordens > 0 else 0
     taxa_ordens_com_executor = (ordens_com_executor / total_ordens * 100) if total_ordens > 0 else 0
-    taxa_ordens_com_fichas = (ordens_com_fichas / total_corretivas * 100) if total_corretivas > 0 else 0  # Fichas só existem para corretivas
+    taxa_ordens_com_fichas = (ordens_com_fichas / total_ordens * 100) if total_ordens > 0 else 0
     
     # Contar setores e unidades únicos
     setores_unicos = set()
@@ -10775,7 +10803,7 @@ def analise_ordens_de_servico(request):
     setores_count = len(setores_unicos)
     unidades_count = len(unidades_unicas)
     
-    # Obter lista de anos disponíveis (de ambas as tabelas)
+    # Obter lista de anos disponíveis (fichas corretivas, preventivas e lubrificação)
     anos_disponiveis = set()
     for ordem in todas_ordens_corretivas:
         if ordem.dt_abertura_solicita:
@@ -10783,6 +10811,11 @@ def analise_ordens_de_servico(request):
             if data_parseada:
                 anos_disponiveis.add(data_parseada.year)
     for ordem in todas_ordens_preventivas:
+        if ordem.dt_abertura_solicita:
+            data_parseada = parse_dt_abertura_solicita(ordem.dt_abertura_solicita)
+            if data_parseada:
+                anos_disponiveis.add(data_parseada.year)
+    for ordem in todas_ordens_lubrificacao:
         if ordem.dt_abertura_solicita:
             data_parseada = parse_dt_abertura_solicita(ordem.dt_abertura_solicita)
             if data_parseada:
@@ -10806,6 +10839,7 @@ def analise_ordens_de_servico(request):
         'total_ordens': total_ordens,
         'total_corretivas': total_corretivas,
         'total_preventivas': total_preventivas,
+        'total_lubrificacao': total_lubrificacao,
         'setores_count': setores_count,
         'unidades_count': unidades_count,
         
@@ -10821,6 +10855,7 @@ def analise_ordens_de_servico(request):
         'ordens_com_solicitante': ordens_com_solicitante,
         'ordens_sem_solicitante': ordens_sem_solicitante,
         'ordens_abertas': ordens_abertas,
+        'ordens_abertas_por_tipo': ordens_abertas_por_tipo,
         'ordens_fechadas': ordens_fechadas,
         'solicitacoes': solicitacoes,
         'tempo_total_necessario_horas': tempo_total_necessario_horas,
@@ -18322,6 +18357,112 @@ def agenda_geral(request):
     return render(request, 'agenda_geral.html', context)
 
 
+def reuniao_pcm(request):
+    from collections import defaultdict
+    from app.models import AssuntoReuniaoPCM
+
+    assuntos = AssuntoReuniaoPCM.objects.all()
+    por_data = defaultdict(list)
+    for a in assuntos:
+        por_data[a.data_reuniao].append(a)
+    for d in por_data:
+        por_data[d].sort(key=lambda x: (x.ordem, x.id))
+    assuntos_por_data = sorted(por_data.items(), key=lambda x: x[0])
+
+    context = {
+        'page_title': 'Reunião PCM',
+        'active_page': 'reuniao_pcm',
+        'assuntos_por_data': assuntos_por_data,
+    }
+    return render(request, 'reuniao/reuniao_pcm.html', context)
+
+
+def visualizar_assunto_reuniao(request, pk):
+    from django.shortcuts import get_object_or_404
+    from app.models import AssuntoReuniaoPCM
+
+    assunto = get_object_or_404(AssuntoReuniaoPCM, pk=pk)
+    context = {
+        'page_title': assunto.titulo,
+        'active_page': 'reuniao_pcm',
+        'assunto': assunto,
+    }
+    return render(request, 'reuniao/visualizar_assunto_reuniao.html', context)
+
+
+def excluir_assunto_reuniao(request, pk):
+    from django.shortcuts import get_object_or_404, redirect
+    from django.contrib import messages
+    from app.models import AssuntoReuniaoPCM
+
+    if request.method != 'POST':
+        return redirect('reuniao_pcm')
+
+    obj = get_object_or_404(AssuntoReuniaoPCM, pk=pk)
+    titulo = obj.titulo
+    if obj.arquivo:
+        obj.arquivo.delete(save=False)
+    obj.delete()
+    messages.success(request, f'Assunto removido: {titulo}')
+    return redirect('reuniao_pcm')
+
+
+def configuracao_reuniao_pcm(request):
+    from django.shortcuts import get_object_or_404, redirect
+    from django.contrib import messages
+    from app.models import AssuntoReuniaoPCM
+    from app.forms import AssuntoReuniaoPCMForm
+
+    edit_obj = None
+    edit_pk = request.GET.get('edit')
+    if edit_pk:
+        edit_obj = get_object_or_404(AssuntoReuniaoPCM, pk=edit_pk)
+
+    if request.method == 'POST':
+        action = request.POST.get('action', '')
+        if action == 'delete':
+            pk = request.POST.get('pk')
+            if pk:
+                obj = get_object_or_404(AssuntoReuniaoPCM, pk=pk)
+                if obj.arquivo:
+                    obj.arquivo.delete(save=False)
+                obj.delete()
+                messages.success(request, 'Assunto removido.')
+            return redirect('configuracao_reuniao_pcm')
+
+        if action == 'save':
+            pk = request.POST.get('pk')
+            if pk:
+                obj = get_object_or_404(AssuntoReuniaoPCM, pk=pk)
+                form = AssuntoReuniaoPCMForm(request.POST, request.FILES, instance=obj)
+            else:
+                form = AssuntoReuniaoPCMForm(request.POST, request.FILES)
+            if form.is_valid():
+                form.save()
+                messages.success(request, 'Assunto salvo.')
+                return redirect('configuracao_reuniao_pcm')
+            context = {
+                'page_title': 'Configuração Reunião PCM',
+                'active_page': 'configuracao_reuniao_pcm',
+                'form': form,
+                'assuntos': AssuntoReuniaoPCM.objects.all(),
+                'editando': bool(pk),
+                'edit_pk': int(pk) if pk else None,
+            }
+            return render(request, 'reuniao/configuracao_reuniao_pcm.html', context)
+
+    form = AssuntoReuniaoPCMForm(instance=edit_obj)
+    context = {
+        'page_title': 'Configuração Reunião PCM',
+        'active_page': 'configuracao_reuniao_pcm',
+        'form': form,
+        'assuntos': AssuntoReuniaoPCM.objects.all(),
+        'editando': edit_obj is not None,
+        'edit_pk': edit_obj.pk if edit_obj else None,
+    }
+    return render(request, 'reuniao/configuracao_reuniao_pcm.html', context)
+
+
 def calendario_plano_e_roteiro(request):
     """Calendário de Manutenções Preventivas baseado em dt_abertura e cs_qtde_periodo_max do RoteiroPreventiva"""
     from app.models import RoteiroPreventiva, ParametrosMaoDeObra
@@ -18445,6 +18586,291 @@ def calendario_plano_e_roteiro(request):
     return render(request, 'planejamento/calendario_plano_e_roteiro.html', context)
 
 
+def _eventos_preventivas_calendario_list(
+    request,
+    start,
+    end,
+    filter_funciomanu='',
+    filter_maquina='',
+    filter_setor='',
+    maquina_pk='',
+    maquina_principal_pk='',
+):
+    """Lista de eventos no mesmo formato da API do calendário de preventivas."""
+    from app.models import RoteiroPreventiva, Maquina, MaquinaPrimariaSecundaria
+    from django.db.models import Q
+    from django.urls import reverse
+    from datetime import datetime, timedelta, date
+
+    def parse_dt(s):
+        if not s or not str(s).strip():
+            return None
+        s = str(s).strip()
+        for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y'):
+            try:
+                return datetime.strptime(s, fmt).date()
+            except ValueError:
+                continue
+        return None
+
+    roteiros = RoteiroPreventiva.objects.all()
+
+    if maquina_principal_pk:
+        try:
+            principal = Maquina.objects.get(id=int(maquina_principal_pk))
+            is_principal = principal.descr_gerenc and 'MÁQUINAS PRINCIPAL' in principal.descr_gerenc.upper()
+            if not is_principal:
+                roteiros = roteiros.none()
+            else:
+                rels = MaquinaPrimariaSecundaria.objects.filter(maquina_primaria=principal)
+                sec_ids = list(rels.values_list('maquina_secundaria_id', flat=True))
+                sec_codigos = list(rels.values_list('maquina_secundaria__cd_maquina', flat=True))
+                q = Q()
+                if sec_ids:
+                    q |= Q(maquina_id__in=sec_ids)
+                if sec_codigos:
+                    q |= Q(cd_maquina__in=sec_codigos)
+                if q:
+                    roteiros = roteiros.filter(q)
+                else:
+                    roteiros = roteiros.none()
+        except (ValueError, Maquina.DoesNotExist):
+            roteiros = roteiros.none()
+    elif maquina_pk:
+        try:
+            m = Maquina.objects.get(id=int(maquina_pk))
+            roteiros = roteiros.filter(Q(cd_maquina=m.cd_maquina) | Q(maquina_id=m.id))
+        except (ValueError, Maquina.DoesNotExist):
+            roteiros = roteiros.none()
+    else:
+        if filter_funciomanu:
+            roteiros = roteiros.filter(nome_funciomanu=filter_funciomanu)
+        if filter_maquina:
+            roteiros = roteiros.filter(descr_maquina__icontains=filter_maquina)
+        if filter_setor:
+            roteiros = roteiros.filter(descr_setormanut__icontains=filter_setor)
+
+    roteiros = roteiros.select_related('maquina')
+    roteiros_list = list(roteiros)
+    cds_sem_fk = {r.cd_maquina for r in roteiros_list if not r.maquina_id and r.cd_maquina is not None}
+    cd_para_id = {
+        m.cd_maquina: m.id
+        for m in Maquina.objects.filter(cd_maquina__in=cds_sem_fk).only('id', 'cd_maquina')
+    }
+
+    eventos = []
+    for r in roteiros_list:
+        base = parse_dt(r.dt_abertura)
+        if not base:
+            continue
+        interval = r.cs_qtde_periodo_max or r.qtde_periodo or 30
+        if interval <= 0:
+            interval = 30
+
+        d = base
+        while d > start:
+            d = d - timedelta(days=interval)
+        while d <= end:
+            if d >= start:
+                title = f"{r.descr_maquina or r.cd_maquina or 'Máq.'} - {r.descr_tarefamanu or r.descr_seqplamanu or 'Preventiva'}"
+                if r.nome_funciomanu:
+                    title += f" ({r.nome_funciomanu})"
+                vid = r.maquina_id or cd_para_id.get(r.cd_maquina)
+                maquina_url = (
+                    request.build_absolute_uri(reverse('visualizar_maquina', args=[vid]))
+                    if vid else None
+                )
+                eventos.append({
+                    'id': f'prev_{r.id}_{d.isoformat()}',
+                    'title': title[:80] + ('...' if len(title) > 80 else ''),
+                    'start': datetime.combine(d, datetime.min.time()).isoformat(),
+                    'allDay': True,
+                    'color': '#198754',
+                    'textColor': '#fff',
+                    'extendedProps': {
+                        'tipo': 'preventiva',
+                        'roteiro_id': r.id,
+                        'maquina': r.descr_maquina or str(r.cd_maquina),
+                        'funcionario': r.nome_funciomanu or '',
+                        'descricao': r.descr_seqplamanu or r.descr_tarefamanu or '',
+                        'url': request.build_absolute_uri(reverse('visualizar_roteiro_preventiva', args=[r.id])),
+                        'maquina_url': maquina_url,
+                    }
+                })
+            d = d + timedelta(days=interval)
+
+    return eventos
+
+
+def export_calendario_preventivas_pdf(request):
+    """Exporta PDF em formato de calendário (grade mensal) para o ano civil completo."""
+    import io
+    from calendar import monthcalendar
+    from collections import defaultdict
+    from datetime import datetime, date
+    from xml.sax.saxutils import escape
+
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    MESES_PT = (
+        '',
+        'Janeiro',
+        'Fevereiro',
+        'Março',
+        'Abril',
+        'Maio',
+        'Junho',
+        'Julho',
+        'Agosto',
+        'Setembro',
+        'Outubro',
+        'Novembro',
+        'Dezembro',
+    )
+    DIAS_SEMANA_PT = ('Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom')
+
+    filter_funciomanu = request.GET.get('nome_funciomanu', '').strip()
+    filter_maquina = request.GET.get('descr_maquina', '').strip()
+    filter_setor = request.GET.get('descr_setormanut', '').strip()
+
+    ano_raw = request.GET.get('ano', '').strip()
+    try:
+        ano = int(ano_raw)
+    except (ValueError, TypeError):
+        ano = date.today().year
+    if ano < 2000 or ano > 2100:
+        ano = date.today().year
+
+    start = date(ano, 1, 1)
+    end = date(ano, 12, 31)
+
+    eventos = _eventos_preventivas_calendario_list(
+        request, start, end, filter_funciomanu, filter_maquina, filter_setor, '', ''
+    )
+
+    def _ev_date(e):
+        return datetime.fromisoformat(e['start'].replace('Z', '+00:00')).date()
+
+    by_date = defaultdict(list)
+    for e in eventos:
+        by_date[_ev_date(e)].append(str(e.get('title') or ''))
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=14 * mm,
+        leftMargin=14 * mm,
+        topMargin=12 * mm,
+        bottomMargin=12 * mm,
+    )
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'title_pt',
+        parent=styles['Title'],
+        fontName='Helvetica-Bold',
+        fontSize=15,
+        spaceAfter=6,
+    )
+    month_title_style = ParagraphStyle(
+        'month_title',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=13,
+        spaceAfter=8,
+        spaceBefore=0,
+    )
+    wd_header_style = ParagraphStyle(
+        'wd_hdr',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=9,
+        leading=11,
+        alignment=1,
+    )
+    day_cell_style = ParagraphStyle(
+        'day_cell',
+        parent=styles['Normal'],
+        fontSize=6.5,
+        leading=7.5,
+        alignment=0,
+    )
+
+    usable_w = landscape(A4)[0] - 28 * mm
+    col_w = usable_w / 7.0
+
+    def _day_cell(day_num, mes, ano_):
+        if day_num == 0:
+            return Paragraph('', day_cell_style)
+        dd = date(ano_, mes, day_num)
+        titles = by_date.get(dd, [])
+        parts = [f'<b>{day_num}</b>']
+        max_lines = 5
+        for t in titles[:max_lines]:
+            st = str(t)
+            if len(st) > 52:
+                st = st[:49] + '…'
+            parts.append(escape(st))
+        if len(titles) > max_lines:
+            parts.append(escape(f'+{len(titles) - max_lines} mais'))
+        return Paragraph('<br/>'.join(parts), day_cell_style)
+
+    story = []
+    story.append(Paragraph(escape('Calendário de Preventivas'), title_style))
+    story.append(Paragraph(escape(f'Ano calendário completo: {ano}'), styles['Normal']))
+    filtros = []
+    if filter_funciomanu:
+        filtros.append(f'Funcionário: {filter_funciomanu}')
+    if filter_maquina:
+        filtros.append(f'Máquina: {filter_maquina}')
+    if filter_setor:
+        filtros.append(f'Setor: {filter_setor}')
+    if filtros:
+        story.append(Paragraph(escape('Filtros: ' + ' | '.join(filtros)), styles['Normal']))
+    else:
+        story.append(Paragraph(escape('Filtros: nenhum (todos os roteiros).'), styles['Normal']))
+    story.append(Spacer(1, 8))
+
+    for mes in range(1, 13):
+        if mes > 1:
+            story.append(PageBreak())
+        story.append(Paragraph(escape(f'{MESES_PT[mes]} {ano}'), month_title_style))
+
+        header_row = [Paragraph(escape(n), wd_header_style) for n in DIAS_SEMANA_PT]
+        grid_rows = [header_row]
+        for week in monthcalendar(ano, mes):
+            row = []
+            for d in week:
+                row.append(_day_cell(d, mes, ano))
+            grid_rows.append(row)
+
+        tbl = Table(grid_rows, colWidths=[col_w] * 7, repeatRows=1)
+        tbl.setStyle(
+            TableStyle(
+                [
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#198754')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fafafa')]),
+                    ('BACKGROUND', (5, 1), (6, -1), colors.HexColor('#f4f7fb')),
+                ]
+            )
+        )
+        story.append(tbl)
+
+    doc.build(story)
+    buffer.seek(0)
+    fname = f'calendario_preventivas_{ano}.pdf'
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{fname}"'
+    return response
+
+
 def gerar_arquivo_para_preventiva(request):
     """Filtros por setor (cd_setormanut), gerência e máquina — base em Maquina ativa."""
     from app.models import Maquina, MaquinaPrimariaSecundaria
@@ -18564,22 +18990,8 @@ def api_maquinas_por_setor_gerenc(request):
 
 def api_eventos_preventivas_calendario(request):
     """API: eventos de manutenção preventiva para o calendário (dt_abertura + intervalo cs_qtde_periodo_max)"""
-    from app.models import RoteiroPreventiva, Maquina, MaquinaPrimariaSecundaria
     from django.http import JsonResponse
-    from django.db.models import Q
-    from django.urls import reverse
     from datetime import datetime, timedelta, date
-
-    def parse_dt(s):
-        if not s or not str(s).strip():
-            return None
-        s = str(s).strip()
-        for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y'):
-            try:
-                return datetime.strptime(s, fmt).date()
-            except ValueError:
-                continue
-        return None
 
     start_str = request.GET.get('start')
     end_str = request.GET.get('end')
@@ -18596,92 +19008,9 @@ def api_eventos_preventivas_calendario(request):
         start = date.today().replace(day=1)
         end = start + timedelta(days=365)
 
-    roteiros = RoteiroPreventiva.objects.all()
-
-    if maquina_principal_pk:
-        try:
-            principal = Maquina.objects.get(id=int(maquina_principal_pk))
-            is_principal = principal.descr_gerenc and 'MÁQUINAS PRINCIPAL' in principal.descr_gerenc.upper()
-            if not is_principal:
-                roteiros = roteiros.none()
-            else:
-                rels = MaquinaPrimariaSecundaria.objects.filter(maquina_primaria=principal)
-                sec_ids = list(rels.values_list('maquina_secundaria_id', flat=True))
-                sec_codigos = list(rels.values_list('maquina_secundaria__cd_maquina', flat=True))
-                q = Q()
-                if sec_ids:
-                    q |= Q(maquina_id__in=sec_ids)
-                if sec_codigos:
-                    q |= Q(cd_maquina__in=sec_codigos)
-                if q:
-                    roteiros = roteiros.filter(q)
-                else:
-                    roteiros = roteiros.none()
-        except (ValueError, Maquina.DoesNotExist):
-            roteiros = roteiros.none()
-    elif maquina_pk:
-        try:
-            m = Maquina.objects.get(id=int(maquina_pk))
-            roteiros = roteiros.filter(Q(cd_maquina=m.cd_maquina) | Q(maquina_id=m.id))
-        except (ValueError, Maquina.DoesNotExist):
-            roteiros = roteiros.none()
-    else:
-        if filter_funciomanu:
-            roteiros = roteiros.filter(nome_funciomanu=filter_funciomanu)
-        if filter_maquina:
-            roteiros = roteiros.filter(descr_maquina__icontains=filter_maquina)
-        if filter_setor:
-            roteiros = roteiros.filter(descr_setormanut__icontains=filter_setor)
-
-    roteiros = roteiros.select_related('maquina')
-    roteiros_list = list(roteiros)
-    cds_sem_fk = {r.cd_maquina for r in roteiros_list if not r.maquina_id and r.cd_maquina is not None}
-    cd_para_id = {
-        m.cd_maquina: m.id
-        for m in Maquina.objects.filter(cd_maquina__in=cds_sem_fk).only('id', 'cd_maquina')
-    }
-
-    eventos = []
-    for r in roteiros_list:
-        base = parse_dt(r.dt_abertura)
-        if not base:
-            continue
-        interval = r.cs_qtde_periodo_max or r.qtde_periodo or 30
-        if interval <= 0:
-            interval = 30
-
-        d = base
-        while d > start:
-            d = d - timedelta(days=interval)
-        while d <= end:
-            if d >= start:
-                title = f"{r.descr_maquina or r.cd_maquina or 'Máq.'} - {r.descr_tarefamanu or r.descr_seqplamanu or 'Preventiva'}"
-                if r.nome_funciomanu:
-                    title += f" ({r.nome_funciomanu})"
-                vid = r.maquina_id or cd_para_id.get(r.cd_maquina)
-                maquina_url = (
-                    request.build_absolute_uri(reverse('visualizar_maquina', args=[vid]))
-                    if vid else None
-                )
-                eventos.append({
-                    'id': f'prev_{r.id}_{d.isoformat()}',
-                    'title': title[:80] + ('...' if len(title) > 80 else ''),
-                    'start': datetime.combine(d, datetime.min.time()).isoformat(),
-                    'allDay': True,
-                    'color': '#198754',
-                    'textColor': '#fff',
-                    'extendedProps': {
-                        'tipo': 'preventiva',
-                        'roteiro_id': r.id,
-                        'maquina': r.descr_maquina or str(r.cd_maquina),
-                        'funcionario': r.nome_funciomanu or '',
-                        'descricao': r.descr_seqplamanu or r.descr_tarefamanu or '',
-                        'url': request.build_absolute_uri(reverse('visualizar_roteiro_preventiva', args=[r.id])),
-                        'maquina_url': maquina_url,
-                    }
-                })
-            d = d + timedelta(days=interval)
-
+    eventos = _eventos_preventivas_calendario_list(
+        request, start, end, filter_funciomanu, filter_maquina, filter_setor, maquina_pk, maquina_principal_pk
+    )
     return JsonResponse(eventos, safe=False)
 
 

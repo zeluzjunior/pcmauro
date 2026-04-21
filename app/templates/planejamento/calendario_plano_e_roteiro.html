@@ -158,9 +158,12 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="filter-group">
+                    <div class="filter-group d-flex flex-wrap gap-2 align-items-end">
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-sync me-1"></i> Aplicar
+                        </button>
+                        <button type="button" class="btn btn-outline-danger" id="exportCalendarioPdfBtn" title="Exporta o ano civil completo (grade mensal) em PDF, respeitando os filtros; o ano é o da visão atual do calendário">
+                            <i class="fas fa-file-pdf me-1"></i> Exportar PDF
                         </button>
                     </div>
                 </div>
@@ -328,6 +331,19 @@ document.addEventListener('DOMContentLoaded', function() {
         el.addEventListener('change', function() {
             calendar.refetchEvents();
         });
+    });
+
+    document.getElementById('exportCalendarioPdfBtn').addEventListener('click', function() {
+        const ano = calendar.view.currentStart.getFullYear();
+        const url = new URL('{% url "export_calendario_preventivas_pdf" %}', window.location.origin);
+        url.searchParams.set('ano', String(ano));
+        const funciomanu = document.getElementById('filter-funciomanu').value;
+        const maquina = document.getElementById('filter-maquina').value;
+        const setor = document.getElementById('filter-setor').value;
+        if (funciomanu) url.searchParams.append('nome_funciomanu', funciomanu);
+        if (maquina) url.searchParams.append('descr_maquina', maquina);
+        if (setor) url.searchParams.append('descr_setormanut', setor);
+        window.location.href = url.toString();
     });
 });
 </script>

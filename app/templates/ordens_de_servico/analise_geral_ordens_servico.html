@@ -73,7 +73,7 @@
                 <h1 class="display-4 fw-bold mt-3">
                     <i class="fas fa-chart-bar me-2"></i>Análise de Ordens de Serviço
                 </h1>
-                <p class="lead">Dashboard com estatísticas e análises das ordens de serviço corretivas, preventivas e fichas de manutenção</p>
+                <p class="lead">Dashboard com estatísticas e análises das ordens de serviço corretivas, preventivas, lubrificação e fichas de manutenção</p>
             </div>
         </div>
     </div>
@@ -157,8 +157,8 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 class="text-muted mb-2">Total de Ordens</h6>
-                                <h2 class="mb-0 fw-bold">{{ total_corretivas }}</h2>
-                                <small class="text-muted">Ordens corretivas</small>
+                                <h2 class="mb-0 fw-bold">{{ total_ordens }}</h2>
+                                <small class="text-muted">Todas as ordens analisadas</small>
                             </div>
                             <i class="fas fa-clipboard-list fa-3x text-primary opacity-25"></i>
                         </div>
@@ -268,6 +268,38 @@
                 </div>
             </div>
         </div>
+
+        <!-- KPI Cards Row 3: Ordens Abertas por Tipo de Ordem -->
+        {% if ordens_abertas_por_tipo %}
+        <div class="row mb-5">
+            <div class="col-12 mb-3">
+                <h5 class="mb-0">
+                    <i class="fas fa-tags me-2 text-primary"></i>Ordens Abertas por Tipo de Ordem
+                </h5>
+                <small class="text-muted">Baseado em status "Ordem de Serviço em Execução" no período filtrado</small>
+            </div>
+            <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
+                <div class="card stat-card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Ordens Preventivas</h6>
+                        <h3 class="mb-0 fw-bold text-primary">{{ total_preventivas }}</h3>
+                        <small class="text-muted">No período filtrado</small>
+                    </div>
+                </div>
+            </div>
+            {% for item in ordens_abertas_por_tipo %}
+            <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
+                <div class="card stat-card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">{{ item.tipo|truncatechars:45 }}</h6>
+                        <h3 class="mb-0 fw-bold text-primary">{{ item.total }}</h3>
+                        <small class="text-muted">ordens abertas</small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
 
         <!-- Charts Row 1: Tipo de Ordem (MUITO IMPORTANTE) e Evolução Temporal -->
         <div class="row mb-5">
@@ -443,7 +475,7 @@
                                     <td class="text-end"><strong>{{ item.total }}</strong></td>
                                     <td class="text-end">
                                         <span class="badge bg-primary">
-                                            {% widthratio item.total total_corretivas 100 %}%
+                                            {% widthratio item.total total_ordens 100 %}%
                                         </span>
                                     </td>
                                 </tr>

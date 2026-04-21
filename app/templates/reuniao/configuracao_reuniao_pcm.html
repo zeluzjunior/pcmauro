@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Configuração Reunião PCM{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Reuniões</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Configuração Reunião PCM</li>
+                    </ol>
+                </nav>
+                <h1 class="display-5 fw-bold mt-3">
+                    <i class="bi bi-gear me-2"></i>Configuração Reunião PCM
+                </h1>
+                <p class="lead mb-0">Cadastre os assuntos da pauta (aparecem na página <a href="{% url 'reuniao_pcm' %}" class="text-white text-decoration-underline">Reunião PCM</a>).</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message|safe }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-light py-3">
+                <h2 class="h5 mb-0"><i class="bi bi-plus-circle me-2 text-primary"></i>{% if editando %}Editar assunto{% else %}Novo assunto{% endif %}</h2>
+            </div>
+            <div class="card-body p-4">
+                <form method="post" action="{% url 'configuracao_reuniao_pcm' %}" enctype="multipart/form-data" novalidate>
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="save">
+                    {% if edit_pk %}<input type="hidden" name="pk" value="{{ edit_pk }}">{% endif %}
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label for="id_titulo" class="form-label">Título do assunto <span class="text-danger">*</span></label>
+                            {{ form.titulo }}
+                            {% if form.titulo.errors %}<div class="invalid-feedback d-block">{{ form.titulo.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="id_duracao_minutos" class="form-label">Duração (minutos)</label>
+                            {{ form.duracao_minutos }}
+                            {% if form.duracao_minutos.errors %}<div class="invalid-feedback d-block">{{ form.duracao_minutos.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="id_ordem" class="form-label">Ordem na pauta</label>
+                            {{ form.ordem }}
+                            {% if form.ordem.errors %}<div class="invalid-feedback d-block">{{ form.ordem.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="id_data_reuniao" class="form-label">Data da reunião <span class="text-danger">*</span></label>
+                            {{ form.data_reuniao }}
+                            {% if form.data_reuniao.errors %}<div class="invalid-feedback d-block">{{ form.data_reuniao.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-12">
+                            <label for="id_observacoes" class="form-label">Observações</label>
+                            {{ form.observacoes }}
+                            <div class="form-text">Campo opcional para textos longos (contexto, notas, deliberações esperadas, etc.).</div>
+                            {% if form.observacoes.errors %}<div class="invalid-feedback d-block">{{ form.observacoes.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-12">
+                            <label for="id_arquivo" class="form-label">Arquivo anexo ao assunto</label>
+                            {{ form.arquivo }}
+                            <div class="form-text">Opcional. PDF, imagens ou planilhas para este item da pauta. Ao editar, deixe em branco para manter o arquivo atual ou marque “Limpar” para remover.</div>
+                            {% if form.arquivo.errors %}<div class="invalid-feedback d-block">{{ form.arquivo.errors.0 }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mt-4 d-flex flex-wrap gap-2">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Salvar</button>
+                        {% if editando %}
+                            <a href="{% url 'configuracao_reuniao_pcm' %}" class="btn btn-outline-secondary">Cancelar edição</a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h2 class="h5 mb-0"><i class="bi bi-list-ul me-2 text-secondary"></i>Assuntos cadastrados</h2>
+                <span class="badge bg-secondary">{{ assuntos|length }} total</span>
+            </div>
+            <div class="card-body p-0">
+                {% if assuntos %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-nowrap">Ordem</th>
+                                    <th>Título</th>
+                                    <th class="text-nowrap">Duração</th>
+                                    <th class="text-nowrap">Anexo</th>
+                                    <th class="text-nowrap">Data reunião</th>
+                                    <th class="text-end text-nowrap">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for a in assuntos %}
+                                    <tr>
+                                        <td>{{ a.ordem }}</td>
+                                        <td class="fw-medium">{{ a.titulo }}</td>
+                                        <td>{{ a.duracao_minutos }} min</td>
+                                        <td>
+                                            {% if a.arquivo %}
+                                                <a href="{{ a.arquivo.url }}" target="_blank" rel="noopener" class="text-decoration-none"><i class="bi bi-paperclip me-1"></i>{{ a.nome_arquivo_curto|truncatechars:32 }}</a>
+                                            {% else %}
+                                                <span class="text-muted small">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ a.data_reuniao|date:"d/m/Y" }}</td>
+                                        <td class="text-end">
+                                            <a href="{% url 'configuracao_reuniao_pcm' %}?edit={{ a.pk }}" class="btn btn-sm btn-outline-primary">Editar</a>
+                                            <form method="post" action="{% url 'configuracao_reuniao_pcm' %}" class="d-inline" onsubmit="return confirm('Remover este assunto?');">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="delete">
+                                                <input type="hidden" name="pk" value="{{ a.pk }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">Excluir</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="p-4 text-center text-muted">Nenhum assunto cadastrado ainda. Use o formulário acima para adicionar.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
