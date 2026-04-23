@@ -3,9 +3,11 @@ Utility functions for file uploads and data processing
 """
 import csv
 import io
+import unicodedata
 import warnings
 from typing import List, Dict, Tuple
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 
 # Suprimir aviso do openpyxl sobre Data Validation (não afeta a leitura)
@@ -1023,6 +1025,136 @@ def upload_ordens_lubrificacao_from_file(file, update_existing=False) -> Tuple[i
     except Exception as e:
         errors.append(f"Erro geral: {str(e)}")
         return 0, 0, errors
+
+
+def upload_ordens_geral_from_file(file, update_existing=False) -> Dict[str, object]:
+    """
+    Importa um único arquivo com ordens mistas e direciona para os importadores corretos.
+
+    Regras de roteamento por tipo:
+    - PREVENTIVA -> upload_ordens_preventivas_from_file
+    - CORRETIVA/OUTROS -> upload_ordens_corretivas_from_file
+    - LUBRIFICACAO/LUBRIFICAÇÃO -> upload_ordens_lubrificacao_from_file
+    """
+    file_name = file.name.lower()
+    errors: List[str] = []
+
+    if file_name.endswith(('.xlsx', '.xls', '.xlsm')):
+        data = read_excel_file(file)
+    elif file_name.endswith('.csv'):
+        data = None
+        for enc in ['latin-1', 'iso-8859-1', 'utf-8', 'cp1252']:
+            try:
+                file.seek(0)
+                data = read_csv_file(file, encoding=enc, delimiter=';')
+                break
+            except (UnicodeDecodeError, ValidationError):
+                if enc == 'cp1252':
+                    raise ValidationError("Erro ao ler CSV: não foi possível decodificar.")
+                continue
+        if data is None:
+            raise ValidationError("Erro ao ler arquivo CSV.")
+    else:
+        raise ValidationError("Formato não suportado. Use .xlsx, .xls, .xlsm ou .csv")
+
+    if not data:
+        raise ValidationError("Arquivo vazio ou sem dados válidos")
+
+    def _normalize_text(value) -> str:
+        if value is None:
+            return ''
+        text = str(value).strip()
+        if not text:
+            return ''
+        text = unicodedata.normalize('NFKD', text)
+        text = ''.join(c for c in text if not unicodedata.combining(c))
+        return text.upper()
+
+    def _resolve_target(row_data: Dict) -> str:
+        descr = row_data.get('DESCR_TPORDSERTV') or row_data.get('descr_tpordservtv') or row_data.get('Descr_Tpordservtv')
+        code = row_data.get('CD_TPORDSERTV') or row_data.get('cd_tpordservtv') or row_data.get('Cd_Tpordservtv')
+        descr_norm = _normalize_text(descr)
+        code_norm = _normalize_text(code)
+
+        if 'PREVENTIVA' in descr_norm or code_norm == '2':
+            return 'preventiva'
+        if 'LUBRIFICAC' in descr_norm:
+            return 'lubrificacao'
+        if 'CORRETIVA' in descr_norm or 'OUTROS' in descr_norm or code_norm in ('1', '3'):
+            return 'corretiva_outros'
+        return 'unknown'
+
+    rows_by_target = {
+        'corretiva_outros': [],
+        'preventiva': [],
+        'lubrificacao': [],
+    }
+    ignored_count = 0
+
+    for idx, row_data in enumerate(data, start=2):
+        if not any(str(v).strip() if v else '' for v in row_data.values()):
+            continue
+        target = _resolve_target(row_data)
+        if target in rows_by_target:
+            rows_by_target[target].append(row_data)
+        else:
+            ignored_count += 1
+            cd_ordemserv = row_data.get('CD_ORDEMSERV') or row_data.get('cd_ordemserv') or 'sem_cd_ordemserv'
+            errors.append(f"Linha {idx}: tipo de ordem não reconhecido para CD_ORDEMSERV {cd_ordemserv}.")
+
+    def _rows_to_uploaded_csv(rows: List[Dict], upload_name: str):
+        if not rows:
+            return None
+        headers: List[str] = []
+        for row in rows:
+            for key in row.keys():
+                if key not in headers:
+                    headers.append(key)
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, fieldnames=headers, delimiter=';', extrasaction='ignore')
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({k: '' if v is None else v for k, v in row.items()})
+        content = buffer.getvalue().encode('latin-1', errors='ignore')
+        return SimpleUploadedFile(upload_name, content, content_type='text/csv')
+
+    counts = {
+        'corretiva_outros': {'created': 0, 'updated': 0},
+        'preventiva': {'created': 0, 'updated': 0},
+        'lubrificacao': {'created': 0, 'updated': 0},
+    }
+
+    file_corretiva = _rows_to_uploaded_csv(rows_by_target['corretiva_outros'], 'ordens_corretivas_outros_auto.csv')
+    if file_corretiva:
+        created, updated, err = upload_ordens_corretivas_from_file(file_corretiva, update_existing=update_existing)
+        counts['corretiva_outros']['created'] += created
+        counts['corretiva_outros']['updated'] += updated
+        errors.extend(err)
+
+    file_preventiva = _rows_to_uploaded_csv(rows_by_target['preventiva'], 'ordens_preventivas_auto.csv')
+    if file_preventiva:
+        created, updated, err = upload_ordens_preventivas_from_file(file_preventiva, update_existing=update_existing)
+        counts['preventiva']['created'] += created
+        counts['preventiva']['updated'] += updated
+        errors.extend(err)
+
+    file_lubrificacao = _rows_to_uploaded_csv(rows_by_target['lubrificacao'], 'ordens_lubrificacao_auto.csv')
+    if file_lubrificacao:
+        created, updated, err = upload_ordens_lubrificacao_from_file(file_lubrificacao, update_existing=update_existing)
+        counts['lubrificacao']['created'] += created
+        counts['lubrificacao']['updated'] += updated
+        errors.extend(err)
+
+    created_total = sum(item['created'] for item in counts.values())
+    updated_total = sum(item['updated'] for item in counts.values())
+
+    return {
+        'created_total': created_total,
+        'updated_total': updated_total,
+        'ignored_count': ignored_count,
+        'counts': counts,
+        'errors': errors,
+    }
 
 
 def upload_maquinas_from_file(file, update_existing=False, update_fields=None) -> Tuple[int, int, List[str], List]:

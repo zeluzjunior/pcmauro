@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Importar Ordens de Serviço (Geral){% endblock %}
+
+{% block content %}
+<section class="py-5 text-white bg-success">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Importar Dados</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Importar Ordens de Serviço (Geral)</li>
+                    </ol>
+                </nav>
+                <h1 class="display-5 fw-bold mt-3">Importar Ordens de Serviço (Geral)</h1>
+                <p class="lead mb-0">Use um único arquivo misto e o sistema distribui automaticamente por tipo de OS.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="row mb-5">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-file-import me-2"></i>Selecionar Arquivo</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'importar_ordens_geral' %}" enctype="multipart/form-data" id="importarForm">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="fileInput" class="form-label">Arquivo para Importação</label>
+                                <input type="file" class="form-control" id="fileInput" name="file" accept=".xlsx,.xls,.xlsm,.csv" required>
+                                <div class="form-text">Formatos aceitos: Excel (.xlsx, .xls, .xlsm) ou CSV (.csv).</div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="updateExisting" name="update_existing">
+                                    <label class="form-check-label" for="updateExisting">
+                                        Atualizar registros existentes (se desmarcado, registros duplicados serão ignorados)
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-success btn-lg" id="submitBtn">
+                                    <i class="fas fa-upload me-2"></i>Importar Arquivo Geral
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Como Funciona</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-2">
+                            Esta tela aceita arquivo misto (como <strong>abertas 3.csv</strong>) e direciona cada linha pelo campo
+                            <strong>DESCR_TPORDSERTV</strong> (com fallback em <strong>CD_TPORDSERTV</strong>).
+                        </p>
+                        <ul class="mb-3">
+                            <li><strong>PREVENTIVA</strong> -> tabela de ordens preventivas</li>
+                            <li><strong>CORRETIVA</strong> e <strong>OUTROS</strong> -> tabela de ordens corretivas/outros</li>
+                            <li><strong>LUBRIFICAÇÃO</strong> -> tabela de ordens de lubrificação</li>
+                        </ul>
+                        <div class="alert alert-warning mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Linhas com tipo não reconhecido serão ignoradas e listadas nas mensagens ao final.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+window.addEventListener('load', function() {
+    const form = document.getElementById('importarForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const fileInput = document.getElementById('fileInput');
+    if (!form || !submitBtn || !fileInput) {
+        return;
+    }
+
+    form.addEventListener('submit', function() {
+        if (!fileInput.files || fileInput.files.length === 0) {
+            return;
+        }
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Importando...';
+    }, true);
+});
+</script>
+{% endblock %}

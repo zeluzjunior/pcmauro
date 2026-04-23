@@ -3365,6 +3365,73 @@ def importar_ordens_lubrificacao(request):
     return render(request, 'lubrificacao/importar_ordem_lubrificacao.html', context)
 
 
+def importar_ordens_geral(request):
+    """Importar Ordens de Serviço mistas (corretiva, preventiva, lubrificação) em um único arquivo."""
+    if request.method == 'POST':
+        if 'file' not in request.FILES:
+            messages.error(request, 'Por favor, selecione um arquivo para importar.')
+            context = {'page_title': 'Importar Ordens de Serviço (Geral)', 'active_page': 'importar_ordens_geral'}
+            return render(request, 'ordens_de_servico/importar_ordens_geral.html', context)
+
+        file = request.FILES['file']
+        allowed_extensions = ['.xlsx', '.xls', '.xlsm', '.csv']
+        file_extension = '.' + file.name.split('.')[-1].lower()
+        if file_extension not in allowed_extensions:
+            messages.error(request, f'Formato não suportado. Use: {", ".join(allowed_extensions)}')
+            context = {'page_title': 'Importar Ordens de Serviço (Geral)', 'active_page': 'importar_ordens_geral'}
+            return render(request, 'ordens_de_servico/importar_ordens_geral.html', context)
+
+        update_existing = request.POST.get('update_existing', 'off') == 'on'
+        try:
+            from app.utils import upload_ordens_geral_from_file
+            result = upload_ordens_geral_from_file(file, update_existing=update_existing)
+
+            created_total = result['created_total']
+            updated_total = result['updated_total']
+            errors = result['errors']
+            ignored_count = result['ignored_count']
+            counts = result['counts']
+
+            if errors:
+                for error in errors[:10]:
+                    messages.warning(request, error)
+                if len(errors) > 10:
+                    messages.warning(request, f'... e mais {len(errors) - 10} erro(s).')
+
+            messages.info(
+                request,
+                (
+                    f"Resumo por tipo: "
+                    f"Corretiva/Outros ({counts['corretiva_outros']['created']} criados, {counts['corretiva_outros']['updated']} atualizados), "
+                    f"Preventiva ({counts['preventiva']['created']} criados, {counts['preventiva']['updated']} atualizados), "
+                    f"Lubrificação ({counts['lubrificacao']['created']} criados, {counts['lubrificacao']['updated']} atualizados)."
+                )
+            )
+
+            if ignored_count > 0:
+                messages.warning(
+                    request,
+                    f'{ignored_count} linha(s) ignorada(s) por tipo de ordem não reconhecido (DESCR_TPORDSERTV/CD_TPORDSERTV).'
+                )
+
+            if created_total > 0 or updated_total > 0:
+                messages.success(
+                    request,
+                    f'Importação geral concluída! {created_total} criado(s), {updated_total} atualizado(s).'
+                )
+            elif not errors:
+                messages.info(request, 'Nenhum registro importado.')
+            else:
+                messages.warning(request, 'Importação concluída com erros.')
+
+            return redirect('importar_ordens_geral')
+        except Exception as e:
+            messages.error(request, f'Erro ao processar arquivo: {str(e)}')
+
+    context = {'page_title': 'Importar Ordens de Serviço (Geral)', 'active_page': 'importar_ordens_geral'}
+    return render(request, 'ordens_de_servico/importar_ordens_geral.html', context)
+
+
 def importar_plano_preventiva(request):
     """Importar Plano Preventiva page view"""
     context_extra = {}
@@ -10504,7 +10571,15 @@ def analise_geral_plano_preventiva_pcm(request):
 
 def analise_ordens_de_servico(request):
     """Análise de Ordens de Serviço - Dashboard com estatísticas e filtros"""
-    from app.models import OrdemServicoCorretiva, OrdemServicoPreventiva, OrdemServicoCorretivaFicha, OrdemServicoLubrificacao, CentroAtividade
+    from app.models import (
+        OrdemServicoCorretiva,
+        OrdemServicoPreventiva,
+        OrdemServicoLubrificacao,
+        OrdemServicoCorretivaFicha,
+        OrdemServicoPreventivaFicha,
+        OrdemServicoLubrificacaoFicha,
+        CentroAtividade,
+    )
     from django.db.models import Count, Q, Avg
     from datetime import datetime, timedelta
     from collections import defaultdict
@@ -10713,47 +10788,61 @@ def analise_ordens_de_servico(request):
     executores_labels = [item['nm_func_exec'][:30] for item in top_executores]
     executores_data = [item['total'] for item in top_executores]
     
-    # Ordens por dia do período filtrado (X=dias, Y=quantidade de ordens)
-    from calendar import monthrange
-    ordens_por_dia = defaultdict(int)
+    # Ordens por mês do período filtrado (base: DT_ABERTURA_SOLICITA)
+    ordens_por_mes = defaultdict(int)
     for ordem in ordens_filtradas:
         if ordem.dt_abertura_solicita:
             data_parseada = parse_dt_abertura_solicita(ordem.dt_abertura_solicita)
             if data_parseada and data_parseada.year == ano_filtro and data_parseada.month in meses_filtro_int:
-                chave_dia = (ano_filtro, data_parseada.month, data_parseada.day)
-                ordens_por_dia[chave_dia] += 1
-    
-    # Listar todos os dias do período filtrado (ordenados)
-    dias_ordenados = []
+                ordens_por_mes[data_parseada.month] += 1
+
+    # Listar todos os meses do período filtrado (ordenados)
+    meses_ordenados = sorted(meses_filtro_int)
     meses_abrev = {
         1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr', 5: 'Mai', 6: 'Jun',
         7: 'Jul', 8: 'Ago', 9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez'
     }
-    for mes in meses_filtro_int:
-        _, ultimo_dia = monthrange(ano_filtro, mes)
-        for dia in range(1, ultimo_dia + 1):
-            chave = (ano_filtro, mes, dia)
-            dias_ordenados.append(chave)
+    meses_labels = [f"{meses_abrev.get(mes, mes)}/{str(ano_filtro)[-2:]}" for mes in meses_ordenados]
+    meses_data = [ordens_por_mes.get(mes, 0) for mes in meses_ordenados]
     
-    meses_labels = [f"{dia:02d}/{meses_abrev.get(mes, mes)}" for ano, mes, dia in dias_ordenados]
-    meses_data = [ordens_por_dia.get((ano, mes, dia), 0) for ano, mes, dia in dias_ordenados]
-    
-    # ========== ESTATÍSTICAS ORDEMSERVICOCORRETIVAFICHA (FILTRADAS) ==========
-    # Obter IDs das ordens corretivas filtradas (fichas só existem para corretivas)
-    ordens_filtradas_ids = [ordem.id for ordem in ordens_corretivas_filtradas]
-    
-    # Fichas relacionadas às ordens corretivas filtradas
+    # ========== ESTATÍSTICAS DE FICHAS (TODOS OS TIPOS DE OS) ==========
+    ordens_corretivas_ids = [ordem.id for ordem in ordens_corretivas_filtradas]
+    ordens_preventivas_ids = [ordem.id for ordem in ordens_preventivas_filtradas]
+    ordens_lubrificacao_ids = [ordem.id for ordem in ordens_lubrificacao_filtradas]
+
+    # Mapa para recuperar dados da ordem no ranking de fichas
+    ordens_por_chave = {}
+    for ordem in ordens_corretivas_filtradas:
+        ordens_por_chave[('corretiva_outros', ordem.id)] = ordem
+    for ordem in ordens_preventivas_filtradas:
+        ordens_por_chave[('preventiva', ordem.id)] = ordem
+    for ordem in ordens_lubrificacao_filtradas:
+        ordens_por_chave[('lubrificacao', ordem.id)] = ordem
+
     # SQLite tem limite de 999 variáveis por query, então dividimos em chunks
-    fichas_filtradas_list = []
-    chunk_size = 500  # Usar 500 para estar bem abaixo do limite de 999
-    for i in range(0, len(ordens_filtradas_ids), chunk_size):
-        chunk_ids = ordens_filtradas_ids[i:i + chunk_size]
+    fichas_filtradas_chaveadas = []
+    chunk_size = 500  # Abaixo do limite de 999
+
+    for i in range(0, len(ordens_corretivas_ids), chunk_size):
+        chunk_ids = ordens_corretivas_ids[i:i + chunk_size]
         if chunk_ids:
-            chunk_fichas = OrdemServicoCorretivaFicha.objects.filter(ordem_servico_id__in=chunk_ids)
-            fichas_filtradas_list.extend(list(chunk_fichas))
-    
-    total_fichas = len(fichas_filtradas_list)
-    ordens_com_fichas = len(set(ficha.ordem_servico_id for ficha in fichas_filtradas_list))
+            for ficha in OrdemServicoCorretivaFicha.objects.filter(ordem_servico_id__in=chunk_ids):
+                fichas_filtradas_chaveadas.append(('corretiva_outros', ficha))
+
+    for i in range(0, len(ordens_preventivas_ids), chunk_size):
+        chunk_ids = ordens_preventivas_ids[i:i + chunk_size]
+        if chunk_ids:
+            for ficha in OrdemServicoPreventivaFicha.objects.filter(ordem_servico_id__in=chunk_ids):
+                fichas_filtradas_chaveadas.append(('preventiva', ficha))
+
+    for i in range(0, len(ordens_lubrificacao_ids), chunk_size):
+        chunk_ids = ordens_lubrificacao_ids[i:i + chunk_size]
+        if chunk_ids:
+            for ficha in OrdemServicoLubrificacaoFicha.objects.filter(ordem_servico_id__in=chunk_ids):
+                fichas_filtradas_chaveadas.append(('lubrificacao', ficha))
+
+    total_fichas = len(fichas_filtradas_chaveadas)
+    ordens_com_fichas = len(set((tipo, ficha.ordem_servico_id) for tipo, ficha in fichas_filtradas_chaveadas))
     ordens_sem_fichas = total_ordens - ordens_com_fichas
     
     # Média de fichas por ordem
@@ -10764,22 +10853,23 @@ def analise_ordens_de_servico(request):
     
     # Top 10 ordens com mais fichas
     ordens_com_fichas_dict = defaultdict(int)
-    for ficha in fichas_filtradas_list:
-        ordens_com_fichas_dict[ficha.ordem_servico_id] += 1
+    for tipo, ficha in fichas_filtradas_chaveadas:
+        ordens_com_fichas_dict[(tipo, ficha.ordem_servico_id)] += 1
     top_ordens_fichas_list = sorted(ordens_com_fichas_dict.items(), key=lambda x: x[1], reverse=True)[:10]
     top_ordens_fichas = []
-    for ordem_id, num_fichas in top_ordens_fichas_list:
-        ordem = ordens_corretivas_map.get(ordem_id)
+    for (tipo, ordem_id), num_fichas in top_ordens_fichas_list:
+        ordem = ordens_por_chave.get((tipo, ordem_id))
         if ordem:
             top_ordens_fichas.append({
                 'cd_ordemserv': ordem.cd_ordemserv,
                 'descr_maquina': ordem.descr_maquina or '-',
+                'tipo': tipo,
                 'num_fichas': num_fichas
             })
     
     # Top 10 funcionários executores de fichas
     executores_fichas_dict = defaultdict(int)
-    for ficha in fichas_filtradas_list:
+    for _, ficha in fichas_filtradas_chaveadas:
         if ficha.nm_func_exec_os:
             executores_fichas_dict[ficha.nm_func_exec_os] += 1
     top_executores_fichas_list = sorted(executores_fichas_dict.items(), key=lambda x: x[1], reverse=True)[:10]

@@ -23,6 +23,7 @@ urlpatterns = [
     path('importar/ordens-corretivas-e-outros/', views.importar_ordens_corretivas_e_outros, name="importar_ordens_corretivas_e_outros"),
     path('importar/ordens-preventivas/', views.importar_ordens_preventivas, name="importar_ordens_preventivas"),
     path('importar/ordens-lubrificacao/', views.importar_ordens_lubrificacao, name="importar_ordens_lubrificacao"),
+    path('importar/ordens-geral/', views.importar_ordens_geral, name="importar_ordens_geral"),
     path('importar/plano-preventiva/', views.importar_plano_preventiva, name="importar_plano_preventiva"),
     path('importar/roteiro-preventiva/', views.importar_roteiro_preventiva, name="importar_roteiro_preventiva"),
     path('importar/52-semanas/', views.importar_52_semanas, name="importar_52_semanas"),
