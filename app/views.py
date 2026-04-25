@@ -7248,6 +7248,13 @@ def consultar_paradas_maquina(request):
     col_turno = request.GET.get('col_turno', '').strip()
     col_motivo = request.GET.get('col_motivo', '').strip()
     col_acao = request.GET.get('col_acao', '').strip()
+    descr_linha_options = list(
+        ParadaMaquina.objects.exclude(descr_linha_producao__isnull=True)
+        .exclude(descr_linha_producao__exact='')
+        .values_list('descr_linha_producao', flat=True)
+        .distinct()
+        .order_by('descr_linha_producao')
+    )
     if col_descr_recurso:
         paradas_list = paradas_list.filter(descr_recurso__icontains=col_descr_recurso)
     if col_cod_parada:
@@ -7495,6 +7502,7 @@ def consultar_paradas_maquina(request):
         'col_turno': col_turno,
         'col_motivo': col_motivo,
         'col_acao': col_acao,
+        'descr_linha_options': descr_linha_options,
         'export_paradas_url': _build_export_url(request),
     }
     
@@ -8147,6 +8155,10 @@ def _analise_paradas_maquina_impl(request, template_name):
     projecao_dias_restantes_frig = None
     projecao_dias_passados_ind = None
     projecao_dias_restantes_ind = None
+    perda_max_media_restante_frig_dia = None
+    perda_max_media_restante_ind_dia = None
+    perda_restante_permitida_frig = None
+    perda_restante_permitida_ind = None
 
     def _dias_produtivos_passados_restantes(cfg, dia_ref, ultimo_dia_mes):
         """
@@ -8203,6 +8215,11 @@ def _analise_paradas_maquina_impl(request, template_name):
                 if suinos_projetado_frig and suinos_projetado_frig > 0:
                     projecao_indicador_frig_val = float((perda_projetada_frig / suinos_projetado_frig) * Decimal(str(fator_eficiencia_frig)))
                     projecao_indicador_frig = projecao_indicador_frig_val
+                    if perda_maximo_frig is not None and fator_eficiencia_frig is not None and Decimal(str(fator_eficiencia_frig)) > 0:
+                        perda_max_total_permitida_frig = (Decimal(str(perda_maximo_frig)) / Decimal(str(fator_eficiencia_frig))) * suinos_projetado_frig
+                        perda_restante_permitida_frig = perda_max_total_permitida_frig - soma_cap_frig_ref
+                        if n_rest_f > 0:
+                            perda_max_media_restante_frig_dia = float(perda_restante_permitida_frig / Decimal(str(n_rest_f)))
                 projecao_perda_frig_total = float(perda_projetada_frig)
                 projecao_suinos_frig_total = float(suinos_projetado_frig)
         if n_dias_com_producao_ind > 0 and n_rest_i >= 0:
@@ -8221,6 +8238,11 @@ def _analise_paradas_maquina_impl(request, template_name):
                 if prod_projetada_ind and prod_projetada_ind > 0:
                     projecao_indicador_ind_val = float((perda_projetada_ind / prod_projetada_ind) * Decimal(str(fator_eficiencia_industria)))
                     projecao_indicador_industria = projecao_indicador_ind_val
+                    if perda_maximo_industria is not None and fator_eficiencia_industria is not None and Decimal(str(fator_eficiencia_industria)) > 0:
+                        perda_max_total_permitida_ind = (Decimal(str(perda_maximo_industria)) / Decimal(str(fator_eficiencia_industria))) * prod_projetada_ind
+                        perda_restante_permitida_ind = perda_max_total_permitida_ind - soma_cap_ind_ref
+                        if n_rest_i > 0:
+                            perda_max_media_restante_ind_dia = float(perda_restante_permitida_ind / Decimal(str(n_rest_i)))
                 projecao_perda_ind_kg_total = float(perda_projetada_ind)
                 projecao_producao_ind_kg_total = float(prod_projetada_ind)
     
@@ -8887,6 +8909,10 @@ def _analise_paradas_maquina_impl(request, template_name):
         'projecao_suinos_frig_total': projecao_suinos_frig_total,
         'projecao_perda_ind_kg_total': projecao_perda_ind_kg_total,
         'projecao_producao_ind_kg_total': projecao_producao_ind_kg_total,
+        'perda_max_media_restante_frig_dia': perda_max_media_restante_frig_dia,
+        'perda_max_media_restante_ind_dia': perda_max_media_restante_ind_dia,
+        'perda_restante_permitida_frig': float(perda_restante_permitida_frig) if perda_restante_permitida_frig is not None else None,
+        'perda_restante_permitida_ind': float(perda_restante_permitida_ind) if perda_restante_permitida_ind is not None else None,
         'dias_uteis_total_frig': dias_uteis_total_frig,
         'dias_uteis_total_industria': dias_uteis_total_industria,
         'total_producao_planejada_industria': total_producao_planejada_industria,
@@ -15522,21 +15548,19 @@ def analise_corretiva_outros_com_parada(request):
     import re
     
     # Filtrar apenas ordens com dt_iniparmanu preenchido (não nulo e não vazio)
-    ordens_com_parada_qs = OrdemServicoCorretiva.objects.filter(
+    ordens_com_parada_base_qs = OrdemServicoCorretiva.objects.filter(
         Q(dt_iniparmanu__isnull=False) & ~Q(dt_iniparmanu='')
     )
-    
-    # Validar que dt_iniparmanu contém uma data válida
-    # Tentar parsear as datas para garantir que são válidas
-    def is_valid_date(date_str):
-        """Verifica se a string contém uma data válida"""
+
+    def parse_dt_iniparmanu(date_str):
+        """Tenta converter dt_iniparmanu para datetime."""
         if not date_str or not isinstance(date_str, str):
-            return False
-        
+            return None
+
         date_str = date_str.strip()
         if not date_str:
-            return False
-        
+            return None
+
         # Tentar diferentes formatos de data comuns
         formatos_data = [
             '%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y %H:%M:%S',
@@ -15545,25 +15569,67 @@ def analise_corretiva_outros_com_parada(request):
         ]
         for formato in formatos_data:
             try:
-                datetime.strptime(date_str, formato)
-                return True
+                return datetime.strptime(date_str, formato)
             except (ValueError, AttributeError):
                 continue
-        
-        # Se não encontrou formato padrão, verificar se contém padrão de data
-        if re.search(r'\d{1,2}[\s\-/]\d{1,2}[\s\-/]\d{2,4}', date_str):
-            return True
-        
-        return False
-    
-    # Filtrar apenas ordens com datas válidas usando values_list para eficiência
-    ordens_validas_ids = [
-        ordem_id for ordem_id, dt_iniparmanu in 
-        ordens_com_parada_qs.values_list('id', 'dt_iniparmanu')
-        if is_valid_date(dt_iniparmanu)
-    ]
-    
-    # Filtrar apenas ordens com datas válidas
+
+        # Fallback por regex para datas no padrão dd/mm/aaaa ou dd-mm-aaaa
+        match = re.search(r'(\d{1,2})[\s\-/](\d{1,2})[\s\-/](\d{2,4})', date_str)
+        if match:
+            dia_str, mes_str, ano_str = match.groups()
+            try:
+                dia = int(dia_str)
+                mes = int(mes_str)
+                ano = int(ano_str)
+                if ano < 100:
+                    ano += 2000 if ano < 50 else 1900
+                return datetime(ano, mes, dia)
+            except (ValueError, TypeError):
+                return None
+
+        return None
+
+    # Filtro de ano/mês (mesmo padrão da tela de análise geral)
+    ano_filtro = request.GET.get('ano')
+    meses_filtro = request.GET.getlist('mes')
+    hoje = datetime.now()
+    if not ano_filtro:
+        ano_filtro = str(hoje.year)
+    try:
+        ano_filtro = int(ano_filtro)
+    except (ValueError, TypeError):
+        ano_filtro = hoje.year
+
+    meses_filtro_int = []
+    if meses_filtro:
+        for mes in meses_filtro:
+            try:
+                mes_int = int(mes)
+                if 1 <= mes_int <= 12:
+                    meses_filtro_int.append(mes_int)
+            except (ValueError, TypeError):
+                continue
+        meses_filtro_int = sorted(list(set(meses_filtro_int)))
+    if not meses_filtro_int:
+        meses_filtro_int = list(range(1, 13))
+
+    # Filtrar apenas ordens com dt_iniparmanu válido e no período selecionado
+    ordens_validas_ids = []
+    anos_disponiveis_set = set()
+    for ordem_id, dt_iniparmanu in ordens_com_parada_base_qs.values_list('id', 'dt_iniparmanu'):
+        data_parada = parse_dt_iniparmanu(dt_iniparmanu)
+        if not data_parada:
+            continue
+        anos_disponiveis_set.add(data_parada.year)
+        if data_parada.year == ano_filtro and data_parada.month in meses_filtro_int:
+            ordens_validas_ids.append(ordem_id)
+
+    anos_disponiveis = sorted(list(anos_disponiveis_set), reverse=True)
+    if not anos_disponiveis:
+        anos_disponiveis = [hoje.year]
+    if hoje.year not in anos_disponiveis:
+        anos_disponiveis.insert(0, hoje.year)
+
     ordens_com_parada_qs = OrdemServicoCorretiva.objects.filter(id__in=ordens_validas_ids)
     
     total_com_parada = ordens_com_parada_qs.count()
@@ -15808,6 +15874,14 @@ def analise_corretiva_outros_com_parada(request):
     context = {
         'page_title': 'Análise Corretiva com Parada',
         'active_page': 'analise_corretiva_parada',
+        'ano_filtro': ano_filtro,
+        'meses_filtro': meses_filtro_int,
+        'anos_disponiveis': anos_disponiveis,
+        'meses_nomes': {
+            1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+            5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+            9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro',
+        },
         'total_com_parada': total_com_parada,
         'com_inicio_fim': com_inicio_fim,
         'apenas_inicio': apenas_inicio,

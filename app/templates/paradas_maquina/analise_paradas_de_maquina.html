@@ -403,6 +403,29 @@
                                     <div class="col-6 col-md-6"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Suínos projetados (fim do mês)</h6><h5 class="mb-0 fw-bold">{% if projecao_suinos_frig_total is not None %}{{ projecao_suinos_frig_total|number_br:0 }}{% else %}-{% endif %}</h5></div></div></div>
                                     <div class="col-12"><div class="card border-0 {% if projecao_indicador_frig is not None and perda_maximo_frig is not None and projecao_indicador_frig > perda_maximo_frig %}border-danger{% else %}border-success{% endif %} border-start border-4"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Indicador projetado (fim do mês)</h6><h5 class="mb-0 fw-bold {% if projecao_indicador_frig is not None and perda_maximo_frig is not None and projecao_indicador_frig > perda_maximo_frig %}text-danger{% else %}text-success{% endif %}">{% if projecao_indicador_frig is not None %}{{ projecao_indicador_frig|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
                                 </div>
+                                <div class="card mt-3 border-0 border-start border-4 {% if perda_max_media_restante_frig_dia is not None and perda_max_media_restante_frig_dia < 0 %}border-danger{% else %}border-primary{% endif %}">
+                                    <div class="card-body py-2">
+                                        <h6 class="text-muted mb-1 small">Necessário para manter indicador abaixo do limite</h6>
+                                        {% if perda_max_media_restante_frig_dia is not None %}
+                                            <div class="row g-2">
+                                                <div class="col-12 col-md-6">
+                                                    <small class="text-muted d-block">Média máxima de perda por dia restante</small>
+                                                    <h5 class="mb-0 fw-bold {% if perda_max_media_restante_frig_dia < 0 %}text-danger{% else %}text-primary{% endif %}">
+                                                        {{ perda_max_media_restante_frig_dia|number_br:2 }} carcaças/dia
+                                                    </h5>
+                                                </div>
+                                                <div class="col-12 col-md-6">
+                                                    <small class="text-muted d-block">Perda restante permitida no mês</small>
+                                                    <h6 class="mb-0 {% if perda_restante_permitida_frig is not None and perda_restante_permitida_frig < 0 %}text-danger{% else %}text-secondary{% endif %}">
+                                                        {% if perda_restante_permitida_frig is not None %}{{ perda_restante_permitida_frig|number_br:2 }} carcaças{% else %}-{% endif %}
+                                                    </h6>
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted small">Dados insuficientes para calcular a meta diária máxima.</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -424,6 +447,29 @@
                                     <div class="col-6 col-md-6"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Perda projetada (fim do mês)</h6><h5 class="mb-0 fw-bold">{% if projecao_perda_ind_kg_total is not None %}{{ projecao_perda_ind_kg_total|number_br:2 }}{% else %}-{% endif %}</h5><span class="text-muted small">kg</span></div></div></div>
                                     <div class="col-6 col-md-6"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Produção projetada (fim do mês)</h6><h5 class="mb-0 fw-bold">{% if projecao_producao_ind_kg_total is not None %}{{ projecao_producao_ind_kg_total|number_br:2 }}{% else %}-{% endif %}</h5><span class="text-muted small">kg</span></div></div></div>
                                     <div class="col-12"><div class="card border-0 {% if projecao_indicador_industria is not None and perda_maximo_industria is not None and projecao_indicador_industria > perda_maximo_industria %}border-danger{% else %}border-success{% endif %} border-start border-4"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Indicador projetado (fim do mês)</h6><h5 class="mb-0 fw-bold {% if projecao_indicador_industria is not None and perda_maximo_industria is not None and projecao_indicador_industria > perda_maximo_industria %}text-danger{% else %}text-success{% endif %}">{% if projecao_indicador_industria is not None %}{{ projecao_indicador_industria|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
+                                </div>
+                                <div class="card mt-3 border-0 border-start border-4 {% if perda_max_media_restante_ind_dia is not None and perda_max_media_restante_ind_dia < 0 %}border-danger{% else %}border-secondary{% endif %}">
+                                    <div class="card-body py-2">
+                                        <h6 class="text-muted mb-1 small">Necessário para manter indicador abaixo do limite</h6>
+                                        {% if perda_max_media_restante_ind_dia is not None %}
+                                            <div class="row g-2">
+                                                <div class="col-12 col-md-6">
+                                                    <small class="text-muted d-block">Média máxima de perda por dia restante</small>
+                                                    <h5 class="mb-0 fw-bold {% if perda_max_media_restante_ind_dia < 0 %}text-danger{% else %}text-secondary{% endif %}">
+                                                        {{ perda_max_media_restante_ind_dia|number_br:2 }} kg/dia
+                                                    </h5>
+                                                </div>
+                                                <div class="col-12 col-md-6">
+                                                    <small class="text-muted d-block">Perda restante permitida no mês</small>
+                                                    <h6 class="mb-0 {% if perda_restante_permitida_ind is not None and perda_restante_permitida_ind < 0 %}text-danger{% else %}text-secondary{% endif %}">
+                                                        {% if perda_restante_permitida_ind is not None %}{{ perda_restante_permitida_ind|number_br:2 }} kg{% else %}-{% endif %}
+                                                    </h6>
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted small">Dados insuficientes para calcular a meta diária máxima.</span>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </div>
                         </div>

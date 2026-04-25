@@ -65,6 +65,7 @@
     .col-data { min-width: 120px; }
     .col-hora { min-width: 100px; }
     .col-codigo { min-width: 100px; }
+    .col-maquina { min-width: 180px; }
     .col-descricao { min-width: 250px; }
     .col-numero { min-width: 80px; text-align: right; }
     .col-capacidade { min-width: 95px; text-align: center !important; }
@@ -287,7 +288,7 @@
                                             </a>
                                         </th>
                                         <th class="col-capacidade">Capacidade</th>
-                                        <th class="col-codigo">Máquina</th>
+                                        <th class="col-maquina">Máquina</th>
                                         <th class="col-hora">Horário Inicial</th>
                                         <th class="col-hora">Horário Final</th>
                                         <th class="col-descricao">Motivo</th>
@@ -309,7 +310,14 @@
                                         <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="4"></th>
                                         <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="5" name="col_motivo" form="columnFilterForm" value="{{ col_motivo|default:'' }}"></th>
                                         <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="6" name="col_acao" form="columnFilterForm" value="{{ col_acao|default:'' }}"></th>
-                                        <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="7" name="col_descr_linha" form="columnFilterForm" value="{{ col_descr_linha|default:'' }}"></th>
+                                        <th>
+                                            <select class="form-select form-select-sm column-filter" data-col="7" name="col_descr_linha" form="columnFilterForm">
+                                                <option value="">Todas</option>
+                                                {% for linha_option in descr_linha_options %}
+                                                    <option value="{{ linha_option }}" {% if col_descr_linha == linha_option %}selected{% endif %}>{{ linha_option }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </th>
                                         <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="8" name="col_descr_recurso" form="columnFilterForm" value="{{ col_descr_recurso|default:'' }}"></th>
                                         <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="9"></th>
                                         <th><input type="text" class="form-control form-control-sm column-filter" placeholder="Filtrar..." data-col="10" name="col_cod_parada" form="columnFilterForm" value="{{ col_cod_parada|default:'' }}"></th>
@@ -346,10 +354,10 @@
                                             {% if parada.maquina_info %}
                                                 {% if parada.maquina_info.maquina_id %}
                                                     <a href="{% url 'visualizar_maquina' parada.maquina_info.maquina_id %}" class="text-decoration-none" title="{{ parada.maquina_info.descr_maquina|default:'' }}">
-                                                        <span class="badge bg-secondary">{{ parada.maquina_info.cd_maquina }}</span>
+                                                        {{ parada.maquina_info.descr_maquina|default:"-"|truncatewords:12 }}
                                                     </a>
                                                 {% else %}
-                                                    <span class="badge bg-secondary">{{ parada.maquina_info.cd_maquina }}</span>
+                                                    {{ parada.maquina_info.descr_maquina|default:"-"|truncatewords:12 }}
                                                 {% endif %}
                                             {% else %}
                                                 -
@@ -519,6 +527,7 @@ document.addEventListener('DOMContentLoaded', function() {
         filters.forEach(function(input) {
             input.addEventListener('input', applyFilters);
             input.addEventListener('keyup', applyFilters);
+            input.addEventListener('change', applyFilters);
         });
         if (document.getElementById('totalsRow')) {
             updateTotals();

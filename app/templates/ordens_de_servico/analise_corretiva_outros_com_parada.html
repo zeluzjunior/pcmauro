@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load form_extras %}
 
 {% block title %}Análise Corretiva com Parada{% endblock %}
 
@@ -31,6 +32,17 @@
     .kpi-warning { border-left-color: #ffc107; }
     .kpi-info { border-left-color: #0dcaf0; }
     .kpi-danger { border-left-color: #dc3545; }
+    .kpi-row {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 1rem;
+        overflow-x: auto;
+        padding-bottom: 0.5rem;
+    }
+    .kpi-col {
+        flex: 1 0 230px;
+        min-width: 230px;
+    }
 </style>
 {% endblock %}
 
@@ -56,9 +68,76 @@
 <!-- Main Content -->
 <section class="py-5">
     <div class="container">
+        <!-- Filtro de Ano e Mês (Accordion) -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion filter-accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button {% if not meses_filtro %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if meses_filtro %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                                <i class="fas fa-filter me-2"></i>
+                                <strong>Filtros</strong>
+                                {% if meses_filtro or ano_filtro %}
+                                    <span class="badge bg-info ms-2">
+                                        {% if meses_filtro %}
+                                            {% if meses_filtro|length == 1 %}
+                                                {{ meses_nomes|get_item:meses_filtro.0 }} de {{ ano_filtro }}
+                                            {% else %}
+                                                {{ meses_filtro|length }} meses de {{ ano_filtro }}
+                                            {% endif %}
+                                        {% else %}
+                                            Todos os meses de {{ ano_filtro }}
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'analise_corretiva_outros_com_parada' %}" class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="ano" class="form-label">Ano</label>
+                                        <select class="form-select" id="ano" name="ano" required>
+                                            {% for ano in anos_disponiveis %}
+                                                <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Meses (Selecione múltiplos meses ou deixe todos desmarcados para todos os meses)</label>
+                                        <div class="row g-2">
+                                            {% for i in "123456789012" %}
+                                                {% with mes_num=forloop.counter %}
+                                                    <div class="col-md-3 col-sm-4 col-6">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="mes" value="{{ mes_num }}" id="mes{{ mes_num }}" {% if mes_num in meses_filtro %}checked{% endif %}>
+                                                            <label class="form-check-label" for="mes{{ mes_num }}">{{ meses_nomes|get_item:mes_num }}</label>
+                                                        </div>
+                                                    </div>
+                                                {% endwith %}
+                                            {% endfor %}
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosMeses()">Selecionar Todos</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">Desmarcar Todos</button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="fas fa-search me-2"></i>Filtrar
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- KPI Cards -->
-        <div class="row mb-5">
-            <div class="col-md-3 mb-4">
+        <div class="kpi-row mb-5">
+            <div class="kpi-col">
                 <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -71,7 +150,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
+            <div class="kpi-col">
                 <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -85,7 +164,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
+            <div class="kpi-col">
                 <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -99,7 +178,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
+            <div class="kpi-col">
                 <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -112,7 +191,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
+            <div class="kpi-col">
                 <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -125,7 +204,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
+            <div class="kpi-col">
                 <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -748,6 +827,17 @@ new Chart(dailyClassificacaoCtx, {
         }
     }
 });
+
+// Funções para selecionar/desmarcar todos os meses
+function selecionarTodosMeses() {
+    const checkboxes = document.querySelectorAll('input[name="mes"]');
+    checkboxes.forEach(cb => cb.checked = true);
+}
+
+function desmarcarTodosMeses() {
+    const checkboxes = document.querySelectorAll('input[name="mes"]');
+    checkboxes.forEach(cb => cb.checked = false);
+}
 </script>
 {% endblock %}
 
