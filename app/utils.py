@@ -5,15 +5,359 @@ import csv
 import io
 import unicodedata
 import warnings
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import transaction
+from django.db import transaction, OperationalError
 
 # Suprimir aviso do openpyxl sobre Data Validation (não afeta a leitura)
 warnings.filterwarnings('ignore', message='.*Data Validation.*')
 
 import openpyxl
+
+# Planilha única usada na importação «lista de peças por máquina» (demais abas do workbook são ignoradas).
+LISTA_PECAS_MAQUINA_WORKBOOK_SHEET = 'LISTA COMPLETA'
+
+
+def validate_lista_pecas_maquina_workbook(uploaded_file, extension: str) -> Tuple[bool, str | None]:
+    """
+    Garante que o workbook Excel contém a planilha LISTA COMPLETA.
+    Outras planilhas no arquivo não são lidas aqui; a importação futura usará só esta aba.
+    Aceita apenas .xlsx e .xlsm (Open XML). .xls binário não é suportado pelo openpyxl.
+    """
+    ext = (extension or '').lower()
+    if ext == '.xls':
+        return False, (
+            'Para conferir a planilha «LISTA COMPLETA», envie o arquivo como .xlsx ou .xlsm. '
+            'O formato .xls antigo não é suportado.'
+        )
+    if ext not in ('.xlsx', '.xlsm'):
+        return False, 'Extensão inválida para validação do workbook.'
+
+    raw = uploaded_file.read()
+    try:
+        uploaded_file.seek(0)
+    except (AttributeError, OSError):
+        pass
+
+    try:
+        wb = openpyxl.load_workbook(filename=io.BytesIO(raw), read_only=True, data_only=True)
+    except Exception as exc:
+        return False, f'Não foi possível abrir o arquivo Excel: {exc}'
+
+    try:
+        if LISTA_PECAS_MAQUINA_WORKBOOK_SHEET not in wb.sheetnames:
+            nomes = ', '.join(f'«{n}»' for n in wb.sheetnames)
+            return False, (
+                f'O arquivo deve conter a planilha «{LISTA_PECAS_MAQUINA_WORKBOOK_SHEET}». '
+                f'Planilhas encontradas: {nomes}. As outras abas serão ignoradas; só «{LISTA_PECAS_MAQUINA_WORKBOOK_SHEET}» será usada.'
+            )
+    finally:
+        wb.close()
+
+    return True, None
+
+
+def fold_lista_completa_header(value: Any) -> str:
+    """Normaliza cabeçalho da planilha LISTA COMPLETA para casar com o dicionário de mapeamento."""
+    if value is None:
+        return ''
+    s = str(value).replace('\n', ' ').replace('\xa0', ' ').replace('\u00a0', ' ').strip()
+    if not s:
+        return ''
+    s = unicodedata.normalize('NFKD', s)
+    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+    return ' '.join(s.split()).upper()
+
+
+# Um registro por coluna esperada: (rótulo legível, cabeçalho já «dobrado», destino lógico da importação).
+# Destinos no formato modelo.campo; import.skip = ignorar; import.unmapped = definir ao encontrar coluna nova.
+# Ordem = ordem típica das colunas no PCM (ajuste se o arquivo variar).
+LISTA_COMPLETA_IMPORT_SCHEMA: List[Tuple[str, str, str]] = [
+    ('Máquina (código da principal)', 'MAQUINA (CODIGO DA PRINCIPAL)', 'peca_maquina.maquina_cd'),
+    ('Posição (manual)', 'POSICAO (MANUAL)', 'peca_fornecedor.posicao_no_manual'),
+    ('Fabricante', 'FABRICANTE', 'peca_fornecedor.fabricante'),
+    ('Cód. do fabricante', 'COD. DO FABRICANTE', 'peca_fornecedor.codigo_item'),
+    ('Descrição do fabricante', 'DESCRICAO DO FABRICANTE', 'peca_fornecedor.descricao_fabricante'),
+    ('Quantidade', 'QTDE', 'peca_maquina.quantidade'),
+    ('Cód. Aurora', 'COD. AURORA', 'item_aurora.codigo_aurora'),
+    ('Descrição Aurora', 'DESCRICAO AURORA', 'item_aurora.descricao_aurora'),
+    ('Valor unitário', 'VALOR UNITARIO', 'item_aurora.valor_unitario'),
+    ('Estoque mínimo', 'ESTOQUE MINIMO', 'import.skip'),
+    ('Estoque máximo', 'ESTOQUE MAXIMO', 'import.skip'),
+    ('Valor est. mínimo', 'VALOR EST. MINIMO', 'import.skip'),
+    ('Valor est. máximo', 'VALOR EST. MAXIMO', 'import.skip'),
+    ('Status do item', 'STATUS DO ITEM', 'item_aurora.status_item'),
+    ('Vida útil (horas)', 'VIDA UTIL (HORAS)', 'import.skip'),
+    ('Qtde atual em estoque', 'QTDE ATUAL EM ESTOQUE', 'import.skip'),
+    ('Troca conforme', 'TROCA CONFORME:', 'import.skip'),
+    (
+        'Classificação de inclusão no almox.',
+        'CLASSIFICACAO DE INLCUSAO NO ALMOXARIFADO',
+        'import.skip',
+    ),
+    (
+        'Componente / parte na máquina',
+        'COMPONENTE, PARTE OU SISTEMA DA MAQUINA ONDE E USADO',
+        'peca_maquina.parte_maquina',
+    ),
+    ('Observação', 'OBSERVACAO', 'import.skip'),
+]
+
+LISTA_COMPLETA_COLUMN_TARGETS_BY_HEADER: Dict[str, str] = {
+    folded: target for _label, folded, target in LISTA_COMPLETA_IMPORT_SCHEMA
+}
+
+# Na importação, o mesmo valor da planilha pode preencher mais de um campo do modelo.
+LISTA_COMPLETA_IMPORT_COPY_SAME_VALUE: Dict[str, Tuple[str, ...]] = {
+    'peca_fornecedor.codigo_item': ('peca_maquina.codigo_fabricante',),
+    'peca_fornecedor.fabricante': ('peca_maquina.fabricante',),
+    'peca_fornecedor.posicao_no_manual': ('peca_maquina.posicao_no_manual',),
+}
+
+LISTA_COMPLETA_IMPORT_TARGET_LABELS: Dict[str, str] = {
+    'peca_maquina.maquina_cd': 'Máquina · cd_maquina (FK)',
+    'peca_maquina.codigo_fabricante': 'Peça máquina (manual) · codigo_fabricante',
+    'peca_maquina.parte_maquina': 'Peça máquina (manual) · parte_maquina',
+    'peca_maquina.quantidade': 'Peça máquina (manual) · quantidade',
+    'peca_maquina.fabricante': 'Peça máquina (manual) · fabricante',
+    'peca_maquina.posicao_no_manual': 'Peça máquina (manual) · posicao_no_manual',
+    'peca_fornecedor.fabricante': 'Peça Fornecedor · fabricante',
+    'peca_fornecedor.codigo_item': 'Peça Fornecedor · codigo_item',
+    'peca_fornecedor.posicao_no_manual': 'Peça Fornecedor · posicao_no_manual',
+    'peca_fornecedor.descricao_fabricante': 'Peça Fornecedor · descricao_fabricante',
+    'item_aurora.codigo_aurora': 'Item Aurora · codigo_aurora (PK)',
+    'item_aurora.descricao_aurora': 'Item Aurora · descricao_aurora',
+    'item_aurora.valor_unitario': 'Item Aurora · valor_unitario',
+    'item_aurora.status_item': 'Item Aurora · status_item',
+    'import.skip': 'Ignorado nesta importação',
+    'import.unmapped': 'Sem mapeamento (revisar utils ou planilha)',
+}
+
+
+def resolve_lista_completa_column_targets(header_cells: List[Any]) -> List[Tuple[int, str, str]]:
+    """
+    Dado o primeiro row da planilha LISTA COMPLETA, devolve (índice 0-based, texto do cabeçalho, target).
+    Colunas vazias são omitidas. Cabeçalho desconhecido → import.unmapped.
+    """
+    resolved: List[Tuple[int, str, str]] = []
+    for idx, raw in enumerate(header_cells):
+        if raw is None:
+            continue
+        if isinstance(raw, str) and not raw.strip():
+            continue
+        original = str(raw).strip().replace('\n', ' ')
+        folded = fold_lista_completa_header(raw)
+        target = LISTA_COMPLETA_COLUMN_TARGETS_BY_HEADER.get(folded, 'import.unmapped')
+        resolved.append((idx, original, target))
+    return resolved
+
+
+# Colunas fixas na planilha LISTA COMPLETA (índice 0-based = Excel coluna - 1).
+LISTA_COMPLETA_COL_A_MAQUINA_CD = 0
+LISTA_COMPLETA_COL_B_POS_MANUAL = 1
+LISTA_COMPLETA_COL_C_FABRICANTE = 2
+LISTA_COMPLETA_COL_D_COD_FABRICANTE = 3
+LISTA_COMPLETA_COL_E_DESCR_FABRICANTE = 4
+LISTA_COMPLETA_COL_F_QTDE = 5
+LISTA_COMPLETA_COL_S_PARTE_MAQUINA = 18  # coluna S
+
+
+def _lista_completa_row_get(row: Tuple[Any, ...], idx: int) -> Any:
+    if not row or idx >= len(row):
+        return None
+    return row[idx]
+
+
+def _lista_completa_optional_str(val: Any, max_len: int) -> str | None:
+    if val is None:
+        return None
+    if isinstance(val, float) and val == int(val):
+        s = str(int(val))
+    elif isinstance(val, int):
+        s = str(val)
+    else:
+        s = str(val).strip()
+        s = ' '.join(s.split())
+    if not s:
+        return None
+    if len(s) > max_len:
+        s = s[:max_len]
+    return s
+
+
+def _lista_completa_maquina_cd(val: Any) -> int | None:
+    from decimal import Decimal, InvalidOperation
+
+    if val is None or val == '':
+        return None
+    if isinstance(val, bool):
+        return None
+    if isinstance(val, int):
+        return val
+    if isinstance(val, float):
+        return int(val)
+    s = str(val).strip()
+    if not s:
+        return None
+    try:
+        return int(Decimal(s.replace(',', '.')))
+    except (InvalidOperation, ValueError):
+        pass
+    try:
+        return int(float(s))
+    except (ValueError, TypeError):
+        return None
+
+
+def _lista_completa_quantidade_cell(val: Any):
+    if val is None or val == '':
+        return None
+    if isinstance(val, str):
+        t = val.strip().upper()
+        if t in ('-', '#VALUE!', '#REF!', '#N/A', '#NUM!', ''):
+            return None
+    return _safe_decimal(val, default=None)
+
+
+def upload_lista_completa_pecas_maquina_citado(
+    file,
+    update_existing: bool = False,
+) -> Tuple[int, int, int, List[str]]:
+    """
+    Importa a aba LISTA COMPLETA para PecaMaquinaCitadoManual (+ PecaFornecedor).
+
+    Mapeamento por coluna Excel:
+      A → maquina (cd_maquina); B → posicao_no_manual; C → fabricante;
+      D → codigo_fabricante + codigo_item (Peça Fornecedor); E → descricao_fabricante (Peça Fornecedor);
+      F → quantidade; S → parte_maquina.
+
+    Retorno: (criados_peça_máquina, atualizados_peça_máquina, ignorados_duplicados, erros).
+    """
+    from app.models import Maquina, PecaFornecedor, PecaMaquinaCitadoManual
+
+    created_pm = 0
+    updated_pm = 0
+    skipped_pm = 0
+    errors: List[str] = []
+    max_errors = 120
+
+    try:
+        file.seek(0)
+    except Exception:
+        pass
+
+    wb = None
+    try:
+        wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
+    except Exception as exc:
+        return 0, 0, 0, [f'Erro ao abrir o arquivo Excel: {exc}']
+
+    try:
+        if LISTA_PECAS_MAQUINA_WORKBOOK_SHEET not in wb.sheetnames:
+            return (
+                0,
+                0,
+                0,
+                [f'Planilha «{LISTA_PECAS_MAQUINA_WORKBOOK_SHEET}» não encontrada no arquivo.'],
+            )
+
+        ws = wb[LISTA_PECAS_MAQUINA_WORKBOOK_SHEET]
+
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            if len(errors) >= max_errors:
+                errors.append('Limite de mensagens de erro atingido; interrompendo.')
+                break
+
+            row_t = tuple(row) if row is not None else tuple()
+            if not any(v is not None and str(v).strip() != '' for v in row_t):
+                continue
+
+            cd_mq = _lista_completa_maquina_cd(_lista_completa_row_get(row_t, LISTA_COMPLETA_COL_A_MAQUINA_CD))
+            if cd_mq is None:
+                errors.append(f'Linha {row_idx}: coluna A (código da máquina) vazia ou inválida.')
+                continue
+
+            maquina = Maquina.objects.filter(cd_maquina=cd_mq).first()
+            if maquina is None:
+                errors.append(f'Linha {row_idx}: máquina com cd_maquina={cd_mq} não encontrada no cadastro.')
+                continue
+
+            fab = _lista_completa_optional_str(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_C_FABRICANTE), 255
+            )
+            cod_item = _lista_completa_optional_str(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_D_COD_FABRICANTE), 120
+            )
+            if not fab or not cod_item:
+                errors.append(
+                    f'Linha {row_idx}: colunas C (fabricante) e D (cód. fabricante) são obrigatórias.'
+                )
+                continue
+
+            descr_fab = _lista_completa_optional_str(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_E_DESCR_FABRICANTE), 500
+            )
+
+            try:
+                pf, pf_created = PecaFornecedor.objects.get_or_create(
+                    fabricante=fab,
+                    codigo_item=cod_item,
+                    defaults={'descricao_fabricante': descr_fab},
+                )
+                if not pf_created and update_existing and descr_fab is not None:
+                    if pf.descricao_fabricante != descr_fab:
+                        pf.descricao_fabricante = descr_fab
+                        pf.save(update_fields=['descricao_fabricante', 'updated_at'])
+            except Exception as exc:
+                errors.append(f'Linha {row_idx}: Peça Fornecedor — {exc}')
+                continue
+
+            pos_manual = _lista_completa_optional_str(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_B_POS_MANUAL), 255
+            )
+            parte_mq = _lista_completa_optional_str(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_S_PARTE_MAQUINA), 500
+            )
+            qty = _lista_completa_quantidade_cell(_lista_completa_row_get(row_t, LISTA_COMPLETA_COL_F_QTDE))
+
+            pm_defaults = {
+                'codigo_fabricante': cod_item,
+                'fabricante': fab,
+                'posicao_no_manual': pos_manual,
+                'parte_maquina': parte_mq,
+                'quantidade': qty,
+            }
+
+            try:
+                if update_existing:
+                    _obj, created = PecaMaquinaCitadoManual.objects.update_or_create(
+                        maquina=maquina,
+                        peca_fornecedor=pf,
+                        defaults=pm_defaults,
+                    )
+                    if created:
+                        created_pm += 1
+                    else:
+                        updated_pm += 1
+                else:
+                    _obj, created = PecaMaquinaCitadoManual.objects.get_or_create(
+                        maquina=maquina,
+                        peca_fornecedor=pf,
+                        defaults=pm_defaults,
+                    )
+                    if created:
+                        created_pm += 1
+                    else:
+                        skipped_pm += 1
+            except Exception as exc:
+                errors.append(f'Linha {row_idx}: Peça máquina (manual) — {exc}')
+                continue
+
+        return created_pm, updated_pm, skipped_pm, errors
+    finally:
+        if wb is not None:
+            wb.close()
 
 
 def read_excel_file(file, sheet_name=None, sheet_index=None, header_row=1):
@@ -612,6 +956,13 @@ def upload_ordens_corretivas_from_file(file, update_existing=False) -> Tuple[int
                             errors.append(f"Linha {row_num}: Erro ao criar ficha de manutenÃ§Ã£o - {str(e)}")
                     
                 except Exception as e:
+                    # SQLite can fail under concurrent writes; fail-fast with a clear message
+                    # so the UI explains why updates did not apply.
+                    if isinstance(e, OperationalError) and 'database is locked' in str(e).lower():
+                        raise ValidationError(
+                            "Banco de dados ocupado (database is locked) durante a importação. "
+                            "Tente novamente em alguns segundos e evite importações concorrentes."
+                        )
                     error_msg = f"Linha {row_num}: Erro ao processar registro - {str(e)}"
                     errors.append(error_msg)
                     print(f"Erro na linha {row_num}: {e}")
@@ -1625,6 +1976,203 @@ def upload_itens_estoque_from_file(file, update_existing=False) -> Tuple[int, in
         print(f"Erro geral: {error_detail}")  # Debug
         import traceback
         traceback.print_exc()
+        return 0, 0, errors
+
+
+def upload_estoque_almoxarifado_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:
+    """
+    Importa posição de estoque para EstoqueAlmoxarifado (CSV/Excel ERP).
+    Suporta cabeçalhos com variações de encoding (ex.: DESCRIวรO, SITUAวรO, etc.).
+    """
+    import re
+    from datetime import datetime, date
+    from app.models import EstoqueAlmoxarifado
+
+    errors: List[str] = []
+    created_count = 0
+    updated_count = 0
+    file_name = file.name.lower()
+
+    def _norm_header(value) -> str:
+        if value is None:
+            return ''
+        text = unicodedata.normalize('NFKD', str(value)).encode('ascii', 'ignore').decode('ascii')
+        text = text.upper().strip()
+        text = re.sub(r'[^A-Z0-9]+', '_', text)
+        text = re.sub(r'_+', '_', text).strip('_')
+        return text
+
+    def _safe_datetime(value):
+        if value in (None, ''):
+            return None
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, date):
+            return datetime.combine(value, datetime.min.time())
+        text = str(value).strip()
+        for fmt in (
+            '%d/%m/%Y %H:%M:%S',
+            '%d/%m/%Y %H:%M',
+            '%d/%m/%Y',
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%d %H:%M',
+            '%Y-%m-%d',
+        ):
+            try:
+                return datetime.strptime(text, fmt)
+            except ValueError:
+                continue
+        return None
+
+    def _safe_date(value):
+        if value in (None, ''):
+            return None
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        dt_val = _safe_datetime(value)
+        return dt_val.date() if dt_val else None
+
+    try:
+        if file_name.endswith(('.xlsx', '.xls', '.xlsm')):
+            data = read_excel_file(file)
+        elif file_name.endswith('.csv'):
+            data = None
+            encodings_to_try = ['latin-1', 'iso-8859-1', 'utf-8', 'cp1252']
+            for encoding in encodings_to_try:
+                try:
+                    file.seek(0)
+                    data = read_csv_file(file, encoding=encoding, delimiter=';')
+                    break
+                except Exception:
+                    continue
+            if data is None:
+                raise ValidationError('Erro ao ler CSV com os encodings testados.')
+        else:
+            raise ValidationError('Formato de arquivo não suportado. Use .csv, .xlsx, .xls ou .xlsm.')
+
+        if not data:
+            raise ValidationError('Arquivo vazio ou sem dados válidos.')
+
+        with transaction.atomic():
+            for row_num, row_data in enumerate(data, start=2):
+                try:
+                    if not any(str(v).strip() if v is not None else '' for v in row_data.values()):
+                        continue
+
+                    normalized_row = {_norm_header(k): v for k, v in row_data.items()}
+
+                    def get(*keys):
+                        for key in keys:
+                            val = normalized_row.get(key)
+                            if val is not None and str(val).strip() != '':
+                                return val
+                        return None
+
+                    codigo_item = _safe_int(get('CODIGO_ITEM'))
+                    if not codigo_item:
+                        errors.append(f'Linha {row_num}: campo CODIGO ITEM é obrigatório.')
+                        continue
+
+                    item_data = {
+                        'codigo_unidade': _safe_int(get('CODIGO_UNIDADE')),
+                        'nome_unidade': _safe_str(get('NOME_UNIDADE'), max_length=255, default='') or None,
+                        'codigo_deposito': _safe_int(get('CODIGO_DEPOSITO')),
+                        'descricao_deposito': _safe_str(
+                            get('DESCRICAO_DEPOSITO', 'DESCRIO_DEPOSITO'),
+                            max_length=255,
+                            default='',
+                        ) or None,
+                        'codigo_local': _safe_int(get('CODIGO_LOCAL')),
+                        'descricao_local': _safe_str(
+                            get('DESCRICAO_LOCAL', 'DESCRIO_LOCAL'),
+                            max_length=255,
+                            default='',
+                        ) or None,
+                        'estante': _safe_int(get('ESTANTE')),
+                        'prateleira': _safe_int(get('PRATELEIRA')),
+                        'coluna': _safe_int(get('COLUNA')),
+                        'sequencia': _safe_int(get('SEQUENCIA')),
+                        'codigo_destino_uso': _safe_int(get('CODIGO_DEST_USO', 'CODIGO_DESTINO_USO')),
+                        'descricao_destino_uso': _safe_str(
+                            get('DESCRICAO_DEST_USO', 'DESCRIO_DEST_USO', 'DESCRICAO_DESTINO_USO'),
+                            max_length=255,
+                            default='',
+                        ) or None,
+                        'descricao_item': _safe_str(
+                            get('DESCRICAO_ITEM', 'DESCRIO_ITEM'),
+                            max_length=500,
+                            default='',
+                        ) or None,
+                        'codigo_grupo_estoque': _safe_int(get('CODIGO_GRUPO_DE_ESTOQUE', 'CODIGO_GRUPO_ESTOQUE')),
+                        'descricao_grupo_estoque': _safe_str(
+                            get('DESCRICAO_GRUPO_DE_ESTOQUE', 'DESCRIO_GRUPO_DE_ESTOQUE', 'DESCRICAO_GRUPO_ESTOQUE'),
+                            max_length=255,
+                            default='',
+                        ) or None,
+                        'codigo_subgrupo_estoque': _safe_int(
+                            get('CODIGO_SUBGRUPO_DE_ESTOQUE', 'CODIGO_SUBGRUPO_ESTOQUE')
+                        ),
+                        'descricao_subgrupo_estoque': _safe_str(
+                            get(
+                                'DESCRICAO_SUBGRUPO_DE_ESTOQUE',
+                                'DESCRIO_SUBGRUPO_DE_ESTOQUE',
+                                'DESCRICAO_SUBGRUPO_ESTOQUE',
+                            ),
+                            max_length=255,
+                            default='',
+                        ) or None,
+                        'unidade_medida': _safe_str(get('UNIDADE_MEDIDA'), max_length=50, default='') or None,
+                        'data_ultima_compra': _safe_date(get('DATA_ULTIMA_COMPRA')),
+                        'codigo_lote': _safe_str(get('CODIGO_LOTE'), max_length=100, default='') or None,
+                        'legenda_lote': _safe_str(get('LEGENDA_LOTE'), max_length=255, default='') or None,
+                        'quantidade': _safe_decimal(get('QUANTIDADE')),
+                        'valor': _safe_decimal(get('VALOR')),
+                        'situacao_pilha': _safe_str(
+                            get('SITUACAO_PILHA', 'SITUAO_PILHA'),
+                            max_length=100,
+                            default='',
+                        ) or None,
+                        'data_criacao_registro': _safe_datetime(get('DATA_CRIACAO', 'DATA_CRIAO')),
+                        'marca_referencia': _safe_str(get('MARCA_REFERENCIA'), max_length=255, default='') or None,
+                        'controla_estoque_minimo': _safe_str(get('CONTROLA_ESTOQUE_MINIMO'), max_length=10, default='') or None,
+                        'data_fechamento': _safe_datetime(get('DATA_FECHAMENTO')),
+                        'data_geracao': _safe_datetime(get('DATA_GERACAO')),
+                        'classificacao_tempo_sem_consumo': _safe_str(
+                            get('CLASSIFICACAO_TEMPO_SEM_CONSUMO', 'CLASSIFICAO_TEMPO_SEM_CONSUMO'),
+                            max_length=255,
+                            default='',
+                        ) or None,
+                    }
+
+                    if update_existing:
+                        _, created = EstoqueAlmoxarifado.objects.update_or_create(
+                            codigo_item=codigo_item,
+                            defaults=item_data,
+                        )
+                        if created:
+                            created_count += 1
+                        else:
+                            updated_count += 1
+                    else:
+                        _, created = EstoqueAlmoxarifado.objects.get_or_create(
+                            codigo_item=codigo_item,
+                            defaults=item_data,
+                        )
+                        if created:
+                            created_count += 1
+
+                except Exception as e:
+                    errors.append(f'Linha {row_num}: Erro ao processar registro - {str(e)}')
+
+        return created_count, updated_count, errors
+
+    except ValidationError as e:
+        errors.append(str(e))
+        return 0, 0, errors
+    except Exception as e:
+        errors.append(f'Erro geral ao processar arquivo: {str(e)}')
         return 0, 0, errors
 
 
@@ -3436,6 +3984,7 @@ def upload_roteiro_preventiva_from_file(file, update_existing=False) -> Tuple[in
                     
                     # Ordem de ServiÃ§o
                     dt_abertura = _safe_str(row_data.get('DT_ABERTURA') or row_data.get('dt_abertura') or row_data.get('Dt_Abertura'), max_length=50)
+                    dt_entrada = _safe_str(row_data.get('DT_ENTRADA') or row_data.get('dt_entrada') or row_data.get('Dt_Entrada'), max_length=50)
                     cd_ordemserv = _safe_int(row_data.get('CD_ORDEMSERV') or row_data.get('cd_ordemserv') or row_data.get('Cd_Ordemserv'))
                     ordemserv_id = _safe_int(row_data.get('ORDEMSERV_ID') or row_data.get('ordemserv_id') or row_data.get('Ordemserv_Id'))
                     
@@ -3516,6 +4065,7 @@ def upload_roteiro_preventiva_from_file(file, update_existing=False) -> Tuple[in
                         'cd_tpcentativ': cd_tpcentativ,
                         'descr_abrev_tpcentativ': descr_abrev_tpcentativ,
                         'dt_abertura': dt_abertura,
+                        'dt_entrada': dt_entrada or None,
                         'cd_ordemserv': cd_ordemserv,
                         'ordemserv_id': ordemserv_id,
                         'maquina': maquina,
@@ -4567,11 +5117,12 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
             sheet_used = None
             # Normalizar nome de coluna para detecção (permite acentos/encoding diferentes entre arquivos)
             def _header_has_required_keys(keys):
-                """Exige coluna exatamente 'ID' e coluna SETOR (ou CENTRO)."""
+                """Exige coluna SETOR (ou CENTRO) e ID (ou fallback de coluna S -> col_18)."""
                 if not keys:
                     return False
                 import unicodedata
                 has_id = False
+                has_col_s_fallback = False
                 has_setor = False
                 for k in keys:
                     if not k:
@@ -4582,9 +5133,11 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
                     n = re.sub(r'\s+', ' ', n).strip()
                     if n == 'ID':
                         has_id = True
+                    if n in {'COL_18', 'COL18'}:
+                        has_col_s_fallback = True
                     if n and ('SETOR' in n or 'CENTRO' in n):
                         has_setor = True
-                    if has_id and has_setor:
+                    if (has_id or has_col_s_fallback) and has_setor:
                         return True
                 return False
             def _accept_data(data_try, keys_try):
@@ -4721,14 +5274,18 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
                     if not any(str(v).strip() if v else '' for v in row_data.values()):
                         continue
                     
-                    # ID: apenas da coluna cujo cabeçalho é exatamente "ID" (case-insensitive, ignora espaços)
-                    id_excel_raw = find_column_value(row_data, ['ID', 'id', 'Id'])
+                    # ID: coluna "ID"; fallback para coluna S em layouts novos (col_18)
+                    id_excel_raw = find_column_value(row_data, ['ID', 'id', 'Id', 'col_18', 'COL_18', 'col18', 'COL18'])
                     if id_excel_raw is None or (isinstance(id_excel_raw, str) and not str(id_excel_raw).strip()):
                         errors.append(f"Linha {row_num}: coluna ID não encontrada ou vazia. Linha ignorada.")
                         continue
                     try:
                         s = str(id_excel_raw).strip()
-                        id_excel = int(float(s))
+                        # Suporta formatos como "ID01" (novo arquivo) e numérico puro.
+                        if re.match(r'^[A-Za-z]+\d+$', s):
+                            id_excel = int(re.sub(r'^\D+', '', s))
+                        else:
+                            id_excel = int(float(s))
                     except (ValueError, TypeError):
                         errors.append(f"Linha {row_num}: ID inválido '{id_excel_raw}'. Linha ignorada.")
                         continue
@@ -4778,7 +5335,7 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
                     fornecedor_cnpj = _safe_str(find_column_value(row_data, ['FORNECEDOR\nCNPJ', 'FORNECEDOR CNPJ']), max_length=20)
                     descricao = _safe_str(find_column_value(row_data, ['DESCRIÇÃO DO SERVIÇO', 'DESCRI��O DO SERVI�O', 'DESCRICAO DO SERVICO']), max_length=500)
                     valor_total = _safe_decimal(find_column_value(row_data, ['VALOR TOTAL', 'valor_total']))
-                    previsao_execucao = _safe_str(find_column_value(row_data, ['PREVISÃO \nP/ EXECUÇÃO', 'PREVISÃO P/ EXECUÇÃO', 'PREVIS�O \nP/ EXECU��O']), max_length=50)
+                    previsao_execucao = _safe_str(find_column_value(row_data, ['PREVISÃO \nP/ EXECUÇÃO', 'PREVISÃO P/ EXECUÇÃO', 'PREVIS�O \nP/ EXECU��O', 'MÊS', 'MES', 'MÊS ', 'MES ', 'M�S']), max_length=50)
                     uso_contabil = _safe_str(find_column_value(row_data, ['USO \nCONTÁBIL', 'USO CONTÁBIL', 'USO \nCONT�BIL']), max_length=100)
                     numero_nf = _safe_str(find_column_value(row_data, ['NÚMERO DA \nNOTA FISCAL', 'NÚMERO DA NOTA FISCAL', 'N�MERO DA \nNOTA FISCAL']), max_length=100)
                     tipo_solicitacao = _safe_str(find_column_value(row_data, ['TIPO DE \nSOLICITAÇÃO', 'TIPO DE SOLICITAÇÃO', 'TIPO DE \nSOLICITACAO', 'TIPO DE SOLICITACAO']), max_length=100)

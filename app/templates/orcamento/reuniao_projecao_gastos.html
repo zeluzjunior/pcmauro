@@ -1,0 +1,418 @@
+    {% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Reunião Projeção de Gastos{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1.25rem;
+    }
+    .stat-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .stat-card.border-primary { border-left-color: #0d6efd; }
+    .stat-card.border-success { border-left-color: #198754; }
+    .stat-card.border-info { border-left-color: #0dcaf0; }
+    .stat-card.border-warning { border-left-color: #ffc107; }
+    .stat-card.border-danger { border-left-color: #dc3545; }
+    .stat-card.border-secondary { border-left-color: #6c757d; }
+    .impact-indicador-atual {
+        border-left-width: 4px !important;
+    }
+    .impact-indicador-atual.impact-success {
+        background: linear-gradient(135deg, rgba(25, 135, 84, 0.14), rgba(25, 135, 84, 0.04));
+        border-left-color: #198754 !important;
+        box-shadow: 0 0 0.75rem rgba(25, 135, 84, 0.18);
+    }
+    .impact-indicador-atual.impact-warning {
+        background: linear-gradient(135deg, rgba(255, 193, 7, 0.2), rgba(255, 193, 7, 0.06));
+        border-left-color: #ffc107 !important;
+        box-shadow: 0 0 0.75rem rgba(255, 193, 7, 0.2);
+    }
+    .impact-indicador-atual.impact-orange {
+        background: linear-gradient(135deg, rgba(253, 126, 20, 0.2), rgba(253, 126, 20, 0.06));
+        border-left-color: #fd7e14 !important;
+        box-shadow: 0 0 0.75rem rgba(253, 126, 20, 0.2);
+    }
+    .impact-indicador-atual.impact-danger {
+        background: linear-gradient(135deg, rgba(220, 53, 69, 0.2), rgba(220, 53, 69, 0.06));
+        border-left-color: #dc3545 !important;
+        box-shadow: 0 0 0.75rem rgba(220, 53, 69, 0.2);
+    }
+    .impact-indicador-atual.impact-secondary {
+        background: linear-gradient(135deg, rgba(108, 117, 125, 0.18), rgba(108, 117, 125, 0.06));
+        border-left-color: #6c757d !important;
+        box-shadow: 0 0 0.75rem rgba(108, 117, 125, 0.18);
+    }
+    .table thead th {
+        white-space: nowrap;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.55), rgba(245, 124, 0, 0.65)), url('/static/images/aurora_coop_castro.jpg'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Orçamento e GMD</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Reunião - Projeção de Gastos</li>
+                    </ol>
+                </nav>
+                <h1 class="display-5 fw-bold mt-3 mb-2">Reunião - Projeção de Gastos</h1>
+                <p class="lead mb-0">Filtre por setor, mês e ano de referência para listar as projeções.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Filtros</h5>
+            </div>
+            <div class="card-body filter-card">
+                <form method="get" class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label for="setor" class="form-label">Setor</label>
+                        <select name="setor" id="setor" class="form-select">
+                            <option value="">Todos os setores</option>
+                            {% for s in setores_disponiveis %}
+                            <option value="{{ s }}" {% if setor == s %}selected{% endif %}>{{ s }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="uso_contabil" class="form-label">Uso contábil</label>
+                        <select name="uso_contabil" id="uso_contabil" class="form-select">
+                            <option value="">Todos os usos contábeis</option>
+                            {% for uso in usos_contabeis_disponiveis %}
+                            <option value="{{ uso }}" {% if uso_contabil == uso %}selected{% endif %}>{{ uso }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="mes_referencia" class="form-label">Mês referência</label>
+                        <select name="mes_referencia" id="mes_referencia" class="form-select">
+                            <option value="">Todos os meses</option>
+                            {% for m_num, m_label in meses_choices %}
+                            <option value="{{ m_num }}" {% if mes_referencia == m_num %}selected{% endif %}>{{ m_label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-1">
+                        <label for="ano_referencia" class="form-label">Ano referência</label>
+                        <select name="ano_referencia" id="ano_referencia" class="form-select">
+                            <option value="">Todos os anos</option>
+                            {% for a in anos_disponiveis %}
+                            <option value="{{ a }}" {% if ano_referencia == a|stringformat:'s' %}selected{% endif %}>{{ a }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                        <a href="{% url 'reuniao_projecao_gastos' %}" class="btn btn-outline-secondary w-100">Limpar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if filtros_aplicados %}
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card border-success shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Registros filtrados</h6>
+                                <h4 class="mb-0 fw-bold">{{ total_registros_filtrados }}</h4>
+                                <small class="text-muted">Resultados com os filtros atuais</small>
+                            </div>
+                            <i class="fas fa-list-ol fa-3x text-success opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card border-primary shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Valor total filtrado</h6>
+                                <h4 class="mb-0 fw-bold">{{ valor_total_filtrado|default_if_none:0|currency_br }}</h4>
+                                <small class="text-muted">Soma das projeções listadas</small>
+                            </div>
+                            <i class="fas fa-dollar-sign fa-3x text-primary opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card border-warning shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Classificadas</h6>
+                                <h4 class="mb-0 fw-bold">{{ total_classificadas }}</h4>
+                                <small class="text-muted">Não classificadas: {{ total_nao_classificadas }}</small>
+                            </div>
+                            <i class="fas fa-tags fa-3x text-warning opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card border-info shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Confirmadas</h6>
+                                <h4 class="mb-0 fw-bold">{{ total_confirmadas }}</h4>
+                                <small class="text-muted">Prioridade de execução alta</small>
+                            </div>
+                            <i class="fas fa-check-circle fa-3x text-info opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if filtros_aplicados %}
+        <div class="card shadow-sm mt-4 border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Análise de Impacto no Orçamento:</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-2 mb-3">
+                        <div class="card stat-card border-primary shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Orçamento do período</h6>
+                                        <h5 class="mb-0 fw-bold">{{ total_orcamento_periodo|default_if_none:0|currency_br }}</h5>
+                                    </div>
+                                    <i class="fas fa-wallet fa-2x text-primary opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <div class="card stat-card border-success shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Impacto das projeções</h6>
+                                        <h5 class="mb-0 fw-bold">
+                                            {% if percentual_impacto_orcamento is not None %}
+                                                {{ percentual_impacto_orcamento|floatformat:1 }}%
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </h5>
+                                    </div>
+                                    <i class="fas fa-percentage fa-2x text-success opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <div class="card stat-card border-warning shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Saldo estimado</h6>
+                                        <h5 class="mb-0 fw-bold">
+                                            {% if saldo_estimado_orcamento is not None %}
+                                                {{ saldo_estimado_orcamento|currency_br }}
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </h5>
+                                    </div>
+                                    <i class="fas fa-balance-scale fa-2x text-warning opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <div class="card stat-card border-info shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Exposição ponderada</h6>
+                                        <h5 class="mb-0 fw-bold">{{ exposicao_ponderada|default_if_none:0|currency_br }}</h5>
+                                    </div>
+                                    <i class="fas fa-layer-group fa-2x text-info opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card stat-card border-0 border-start shadow-sm h-100 impact-indicador-atual impact-{{ nivel_impacto_css }} {{ nivel_impacto_border_class }}">
+                            <div class="card-body py-2 d-flex flex-column justify-content-center">
+                                <h6 class="text-muted mb-0 small">Nível de Impacto Classificado</h6>
+                                <h5 class="mb-0 fw-bold {{ nivel_impacto_text_class }}">{{ nivel_impacto }}</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-lg-8">
+                        <div class="p-3 bg-light rounded border h-100">
+                            <h6 class="mb-2">Leitura executiva</h6>
+                            <p class="mb-2">
+                                Para o período analisado (anos: <strong>{% if anos_periodo %}{{ anos_periodo|join:", " }}{% else %}—{% endif %}</strong>,
+                                meses: <strong>{% if meses_periodo %}{{ meses_periodo|join:", " }}{% else %}—{% endif %}</strong>),
+                                o total filtrado de projeções é <strong>{{ valor_total_filtrado|default_if_none:0|currency_br }}</strong>,
+                                com nível de impacto classificado como <strong>{{ nivel_impacto }}</strong>.
+                            </p>
+                            <p class="mb-0">
+                                O desvio frente ao valor final desejado do orçamento é de
+                                <strong>{{ desvio_vs_final_desejado|default_if_none:0|currency_br }}</strong>.
+                                Valores sem classificação somam <strong>{{ valor_sem_classificacao|default_if_none:0|currency_br }}</strong>,
+                                indicando potencial de refinamento na priorização.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="p-3 bg-light rounded border h-100">
+                            <h6 class="mb-2">Indicadores de suporte</h6>
+                            <ul class="mb-0">
+                                <li>Contas orçamentárias no período: <strong>{{ contas_orcamentarias_periodo }}</strong></li>
+                                <li>Valor final desejado: <strong>{{ total_final_desejado_periodo|default_if_none:0|currency_br }}</strong></li>
+                                <li>Total classificado: <strong>{{ total_classificadas }}</strong></li>
+                                <li>Total não classificado: <strong>{{ total_nao_classificadas }}</strong></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card shadow-sm mt-4">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Lista de Projeções</h5>
+                <div class="d-flex align-items-center gap-2">
+                    {% if filtros_aplicados %}
+                    <span class="badge bg-light text-dark">{{ projecoes|length }} registro{{ projecoes|length|pluralize }}</span>
+                    {% endif %}
+                    {% if filtros_aplicados and projecoes %}
+                    <div class="m-0">
+                        <button
+                            type="submit"
+                            form="form-salvar-classificacoes"
+                            name="action"
+                            value="salvar_todas_classificacoes"
+                            class="btn btn-sm btn-light text-success fw-semibold"
+                            onclick="return confirm('Confirma salvar todas as classificações selecionadas no filtro atual?');">
+                            Salvar todas classificações
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body p-0">
+                {% if filtros_aplicados %}
+                    {% if projecoes %}
+                    <form method="post" id="form-salvar-classificacoes">
+                        {% csrf_token %}
+                        <input type="hidden" name="setor" value="{{ setor }}">
+                        <input type="hidden" name="mes_referencia" value="{{ mes_referencia }}">
+                        <input type="hidden" name="ano_referencia" value="{{ ano_referencia }}">
+                        <input type="hidden" name="uso_contabil" value="{{ uso_contabil }}">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID Excel</th>
+                                    <th>Setor</th>
+                                    <th>Mês</th>
+                                    <th>Ano</th>
+                                    <th>Descrição</th>
+                                    <th>Valor Total</th>
+                                    <th>OS</th>
+                                    <th>Classificação</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in projecoes %}
+                                <tr>
+                                    <td><strong>{{ p.id_excel }}</strong></td>
+                                    <td class="text-nowrap">
+                                        <span class="badge setor-badge" data-setor-color="{{ p.setor_cor }}">
+                                            {{ p.setor|default:"-" }}
+                                        </span>
+                                    </td>
+                                    <td>{{ p.mes_referencia_label|default:"-" }}</td>
+                                    <td>{{ p.ano_referencia|default:"-" }}</td>
+                                    <td>
+                                        <a href="{% url 'visualizar_projecao_gasto' p.id %}" target="_blank" rel="noopener noreferrer">
+                                            {{ p.descricao|default:"-" }}
+                                        </a>
+                                    </td>
+                                    <td>{{ p.valor_total|default_if_none:0|currency_br }}</td>
+                                    <td>{{ p.numero_ordem_servico|default:"-" }}</td>
+                                    <td>
+                                        <div class="d-flex gap-2 align-items-center">
+                                            <input type="hidden" name="projecao_ids" value="{{ p.id }}">
+                                            <select name="classificacao_{{ p.id }}" class="form-select form-select-sm" style="min-width: 170px;">
+                                                <option value="">Sem classificação</option>
+                                                {% for key, label in classificacao_choices %}
+                                                <option value="{{ key }}" {% if p.classificacao_reuniao == key %}selected{% endif %}>{{ label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <button type="submit" name="action" value="salvar_individual:{{ p.id }}" class="btn btn-sm btn-outline-primary">Salvar</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    </form>
+                    {% else %}
+                    <div class="p-4 text-center text-muted">
+                        Nenhuma projeção encontrada com esses filtros.
+                    </div>
+                    {% endif %}
+                {% else %}
+                <div class="p-4 text-center text-muted">
+                    Selecione ao menos um filtro e clique em <strong>Filtrar</strong> para listar as projeções.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.setor-badge[data-setor-color]').forEach(function(element) {
+            const color = element.getAttribute('data-setor-color');
+            if (color) {
+                element.style.backgroundColor = color;
+                element.style.color = '#fff';
+            }
+        });
+    });
+</script>
+{% endblock %}

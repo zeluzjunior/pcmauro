@@ -536,7 +536,6 @@ class Manutentor(models.Model):
     def __str__(self):
         return f"{self.Matricula} - {self.Nome or 'Sem nome'}"
 
-
 class ParametrosMaoDeObra(models.Model):
     """
     Parâmetros globais de mão de obra (registro único, pk=1).
@@ -570,7 +569,6 @@ class ParametrosMaoDeObra(models.Model):
 
     def __str__(self):
         return 'Parâmetros de Mão de Obra'
-
 
 class ManutentorMaquina(models.Model):
     """Modelo para relacionar manutentores com máquinas"""
@@ -622,6 +620,195 @@ class ItemEstoque(models.Model):
         """Calcula o valor total (quantidade * valor unitário)"""
         from decimal import Decimal
         return Decimal(str(self.quantidade)) * Decimal(str(self.valor))
+
+
+class EstoqueAlmoxarifado(models.Model):
+    """Posição de estoque importada do ERP (export tipo ESTOQUE *.csv)."""
+
+    codigo_unidade = models.IntegerField('Código Unidade', blank=True, null=True)
+    nome_unidade = models.CharField('Nome Unidade', max_length=255, blank=True, null=True)
+    codigo_deposito = models.IntegerField('Código Depósito', blank=True, null=True)
+    descricao_deposito = models.CharField('Descrição Depósito', max_length=255, blank=True, null=True)
+    codigo_local = models.IntegerField('Código Local', blank=True, null=True)
+    descricao_local = models.CharField('Descrição Local', max_length=255, blank=True, null=True)
+    estante = models.IntegerField('Estante', blank=True, null=True)
+    prateleira = models.IntegerField('Prateleira', blank=True, null=True)
+    coluna = models.IntegerField('Coluna', blank=True, null=True)
+    sequencia = models.IntegerField('Sequência', blank=True, null=True)
+    codigo_destino_uso = models.IntegerField('Código Destino Uso', blank=True, null=True)
+    descricao_destino_uso = models.CharField('Descrição Destino Uso', max_length=255, blank=True, null=True)
+    codigo_item = models.BigIntegerField('Código Item', primary_key=True)
+    descricao_item = models.CharField('Descrição Item', max_length=500, blank=True, null=True)
+    codigo_grupo_estoque = models.IntegerField('Código Grupo Estoque', blank=True, null=True)
+    descricao_grupo_estoque = models.CharField('Descrição Grupo Estoque', max_length=255, blank=True, null=True)
+    codigo_subgrupo_estoque = models.IntegerField('Código Subgrupo Estoque', blank=True, null=True)
+    descricao_subgrupo_estoque = models.CharField('Descrição Subgrupo Estoque', max_length=255, blank=True, null=True)
+    unidade_medida = models.CharField('Unidade Medida', max_length=50, blank=True, null=True)
+    data_ultima_compra = models.DateField('Data Última Compra', blank=True, null=True)
+    codigo_lote = models.CharField('Código Lote', max_length=100, blank=True, null=True)
+    legenda_lote = models.CharField('Legenda Lote', max_length=255, blank=True, null=True)
+    quantidade = models.DecimalField('Quantidade', max_digits=15, decimal_places=2, blank=True, null=True)
+    valor = models.DecimalField('Valor', max_digits=15, decimal_places=2, blank=True, null=True)
+    situacao_pilha = models.CharField('Situação Pilha', max_length=100, blank=True, null=True)
+    data_criacao_registro = models.DateTimeField('Data Criação (ERP)', blank=True, null=True)
+    marca_referencia = models.CharField('Marca Referência', max_length=255, blank=True, null=True)
+    controla_estoque_minimo = models.CharField('Controla Estoque Mínimo', max_length=10, blank=True, null=True)
+    data_fechamento = models.DateTimeField('Data Fechamento', blank=True, null=True)
+    data_geracao = models.DateTimeField('Data Geração', blank=True, null=True)
+    classificacao_tempo_sem_consumo = models.CharField(
+        'Classificação Tempo Sem Consumo', max_length=255, blank=True, null=True
+    )
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Estoque Almoxarifado'
+        verbose_name_plural = 'Estoques Almoxarifado'
+        ordering = ['codigo_item']
+
+    def __str__(self):
+        return f"{self.codigo_item} - {self.descricao_item or 'Sem descrição'}"
+
+
+class ItemAurora(models.Model):
+    """Catálogo de itens Aurora (código, descrição e valor unitário importados ou digitados)."""
+    codigo_aurora = models.CharField('Código Aurora', max_length=100, primary_key=True)
+    descricao_aurora = models.CharField('Descrição Aurora', max_length=500, blank=True, null=True)
+    valor_unitario = models.DecimalField(
+        'Valor Unitário',
+        max_digits=15,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+    status_item = models.CharField(
+        'Status do Item',
+        max_length=120,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text='Situação do item no catálogo (ex.: ativo, obsoleto, bloqueado — texto livre ou código interno)',
+    )
+    ativo = models.BooleanField('Ativo', default=True, db_index=True, help_text='Excluir da lista sem apagar o registro')
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Item Aurora'
+        verbose_name_plural = 'Itens Aurora'
+        ordering = ['codigo_aurora']
+        indexes = [
+            models.Index(fields=['ativo']),
+        ]
+
+    def __str__(self):
+        return f"{self.codigo_aurora} - {self.descricao_aurora or 'Sem descrição'}"
+
+
+class PecaFornecedor(models.Model):
+    """Referência de peça pelo fabricante (manual / catálogo do fornecedor)."""
+
+    fabricante = models.CharField('Fabricante', max_length=255, db_index=True)
+    codigo_item = models.CharField('Código do item', max_length=120, db_index=True)
+    posicao_no_manual = models.CharField(
+        'Posição no manual',
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text='Ex.: página, figura ou seção do manual do fabricante',
+    )
+    descricao_fabricante = models.CharField(
+        'Descrição do fabricante',
+        max_length=500,
+        blank=True,
+        null=True,
+    )
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Peça Fornecedor'
+        verbose_name_plural = 'Peças Fornecedor'
+        ordering = ['fabricante', 'codigo_item']
+        indexes = [
+            models.Index(fields=['fabricante', 'codigo_item']),
+        ]
+
+    def __str__(self):
+        return f"{self.fabricante} — {self.codigo_item}"
+
+
+class PecaMaquinaCitadoManual(models.Model):
+    """
+    Peça citada no manual de uma máquina específica, relacionada ao catálogo PecaFornecedor
+    (fabricante + código do item no catálogo).
+    """
+
+    maquina = models.ForeignKey(
+        Maquina,
+        to_field='cd_maquina',
+        on_delete=models.CASCADE,
+        related_name='pecas_maquina_manual',
+        verbose_name='Máquina',
+        db_index=True,
+    )
+    peca_fornecedor = models.ForeignKey(
+        PecaFornecedor,
+        on_delete=models.PROTECT,
+        related_name='pecas_maquina',
+        verbose_name='Peça fornecedor',
+        help_text='Nome ou Descrição em Peça Fornecedor (fabricante e código do item)',
+    )
+    codigo_fabricante = models.CharField(
+        'Código do fabricante',
+        max_length=120,
+        db_index=True,
+        help_text='Código como aparece no manual da máquina (geralmente igual ao código em Peça Fornecedor)',
+    )
+    fabricante = models.CharField(
+        'Fabricante',
+        max_length=255,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text='Fabricante conforme a lista/manual (cópia desnormalizada; pode coincidir com Peça Fornecedor)',
+    )
+    posicao_no_manual = models.CharField(
+        'Posição no manual',
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text='Posição no manual da peça neste contexto de máquina (ex.: coluna «Posição (manual)» na lista)',
+    )
+    parte_maquina = models.CharField(
+        'Parte da máquina',
+        max_length=500,
+        blank=True,
+        null=True,
+        help_text='Denominação ou posição da peça no manual da máquina',
+    )
+    quantidade = models.DecimalField(
+        'Quantidade',
+        max_digits=15,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text='Quantidade indicada na lista de peças (ex.: coluna QTDE no manual)',
+    )
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Peça da máquina citada no manual'
+        verbose_name_plural = 'Peças da máquina citadas no manual'
+        ordering = ['maquina__cd_maquina', 'codigo_fabricante']
+        indexes = [
+            models.Index(fields=['maquina', 'peca_fornecedor']),
+        ]
+
+    def __str__(self):
+        return f"{self.maquina.cd_maquina} · {self.codigo_fabricante}"
+
 
 class ManutencaoCsv(models.Model):
     """Modelo temporário para referência de OS importada - ajustar conforme necessário"""
@@ -1082,7 +1269,14 @@ class RoteiroPreventiva(models.Model):
     descr_abrev_tpcentativ = models.CharField('Descrição Abreviada Tipo Centro Atividade', max_length=255, blank=True, null=True) 
     
     # Ordem de Serviço
-    dt_abertura = models.CharField('Data Abertura', max_length=50, blank=True, null=True, help_text='Data no formato DD/MM/YYYY') 
+    dt_abertura = models.CharField('Data Abertura', max_length=50, blank=True, null=True, help_text='Data no formato DD/MM/YYYY')
+    dt_entrada = models.CharField(
+        'Data Entrada',
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text='Próxima data da ação (import CSV DT_ENTRADA); usada no calendário da máquina com período do PlanoPreventiva',
+    )
     cd_ordemserv = models.IntegerField('Código Ordem Serviço', blank=True, null=True) 
     ordemserv_id = models.IntegerField('ID Ordem Serviço', blank=True, null=True) 
     
@@ -1352,8 +1546,51 @@ class Visitas(models.Model):
     def __str__(self):
         return f"{self.titulo} - {self.data.strftime('%d/%m/%Y') if self.data else 'Sem data'}"
 
+
+class SetorProjecaoCor(models.Model):
+    """Configuração de cores para setores utilizados em Projeção de Gastos."""
+    nome_setor = models.CharField('Nome do Setor', max_length=100, unique=True, db_index=True)
+    nome_setor_normalizado = models.CharField('Nome do Setor (normalizado)', max_length=100, unique=True, db_index=True)
+    cor_hex = models.CharField('Cor HEX', max_length=7, default='#6c757d', help_text='Formato #RRGGBB')
+    ativo = models.BooleanField('Ativo', default=True, db_index=True)
+    ordem = models.PositiveIntegerField('Ordem', default=0)
+
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Cor de Setor (Projeção)'
+        verbose_name_plural = 'Cores de Setores (Projeção)'
+        ordering = ['ordem', 'nome_setor']
+        indexes = [
+            models.Index(fields=['nome_setor_normalizado'], name='app_setorpr_nome_se_5df9e8_idx'),
+            models.Index(fields=['ativo', 'ordem'], name='app_setorpr_ativo_1813e1_idx'),
+        ]
+
+    @staticmethod
+    def normalizar_nome(valor):
+        if not valor:
+            return ''
+        texto = str(valor).strip().upper()
+        return ' '.join(texto.split())
+
+    def save(self, *args, **kwargs):
+        self.nome_setor_normalizado = self.normalizar_nome(self.nome_setor)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.nome_setor} ({self.cor_hex})"
+
 class ProjecaoGasto(models.Model):
     """Modelo para armazenar informações de projeções de gastos e requisições de serviço"""
+    CLASSIFICACAO_REUNIAO_CHOICES = [
+        ('confirmada', 'Confirmada'),
+        ('possivel', 'Possível'),
+        ('reprogramar', 'Reprogramar'),
+        ('ja_executada', 'Já executada'),
+        ('cancelada', 'Cancelada'),
+    ]
+
     # ID do Excel (identificador único do Excel combinado com setor)
     id_excel = models.IntegerField('ID Excel', db_index=True, null=False)  # ID do Excel - usado em combinação com setor para identificação única
     
@@ -1383,6 +1620,15 @@ class ProjecaoGasto(models.Model):
     numero_requisicao_compra = models.CharField('Número da Requisição de Compra', max_length=100, blank=True, null=True, db_index=True)  # NÚMERO DA REQUISIÇÃO DE COMPRA
     numero_pedido_compra = models.CharField('Número do Pedido de Compra', max_length=100, blank=True, null=True)  # NÚMERO DO PEDIDO DE COMPRA
     servico_concluido = models.CharField('Serviço Concluído', max_length=255, blank=True, null=True)  # SERVIÇO CONCLUÍDO (texto)
+    classificacao_reuniao = models.CharField(
+        'Classificação Reunião',
+        max_length=20,
+        choices=CLASSIFICACAO_REUNIAO_CHOICES,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text='Classificação definida na reunião de projeções de gastos'
+    )
     nf_servico_recebida = models.CharField('NF de Serviço Recebida', max_length=255, blank=True, null=True)  # NF DE SERVIÇO RECEBIDA (texto)
     nf_enviada_lancamento = models.CharField('NF Enviada para Lançamento', max_length=255, blank=True, null=True)  # NF ENVIADA PARA LANÇAMENTO (texto)
     observacoes = models.TextField('Observações', blank=True, null=True)  # OBSERVAÇÕES do Excel
@@ -1527,6 +1773,78 @@ class DadosOrcamento(models.Model):
     
     def __str__(self):
         return f"{self.ano}/{self.mes:02d} - {self.conta_orcamentaria}"
+
+
+class OrigemImpactoOrcamento(models.Model):
+    """Catálogo de origens para alocação percentual de orçamento."""
+    TIPO_SETOR_PROJECAO = 'SETOR_PROJECAO'
+    TIPO_REQUISICOES = 'REQUISICOES'
+    TIPO_NOTAS_FISCAIS = 'NOTAS_FISCAIS'
+    TIPO_OUTROS = 'OUTROS'
+    TIPO_CHOICES = [
+        (TIPO_SETOR_PROJECAO, 'Setor de Projeção'),
+        (TIPO_REQUISICOES, 'Requisições'),
+        (TIPO_NOTAS_FISCAIS, 'Notas Fiscais'),
+        (TIPO_OUTROS, 'Outros'),
+    ]
+
+    nome = models.CharField('Nome da Origem', max_length=120, unique=True, db_index=True)
+    tipo_origem = models.CharField(
+        'Tipo da Origem',
+        max_length=20,
+        choices=TIPO_CHOICES,
+        default=TIPO_OUTROS,
+        db_index=True
+    )
+    setor_projecao = models.CharField('Setor no Projeção de Gasto', max_length=100, blank=True, null=True, db_index=True)
+    ativo = models.BooleanField('Ativo', default=True, db_index=True)
+
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Origem de Impacto no Orçamento'
+        verbose_name_plural = 'Origens de Impacto no Orçamento'
+        ordering = ['nome']
+        indexes = [
+            models.Index(fields=['tipo_origem', 'ativo']),
+            models.Index(fields=['setor_projecao']),
+        ]
+
+    def __str__(self):
+        return self.nome
+
+
+class PercentualImpactoSetor(models.Model):
+    """Alocação percentual do orçamento por setor/origem de gasto."""
+    origem = models.ForeignKey(
+        OrigemImpactoOrcamento,
+        on_delete=models.SET_NULL,
+        related_name='percentuais',
+        verbose_name='Origem',
+        blank=True,
+        null=True,
+    )
+    origem_setor = models.CharField('Setor/Origem', max_length=120, db_index=True)
+    percentual_alocado = models.DecimalField('Percentual Alocado (%)', max_digits=5, decimal_places=2, default=0)
+    observacao = models.CharField('Observação', max_length=255, blank=True, null=True)
+    ativo = models.BooleanField('Ativo', default=True, db_index=True)
+
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Percentual de Impacto por Setor'
+        verbose_name_plural = 'Percentuais de Impacto por Setor'
+        ordering = ['origem_setor']
+        indexes = [
+            models.Index(fields=['origem_setor']),
+            models.Index(fields=['ativo']),
+        ]
+
+    def __str__(self):
+        nome_origem = self.origem.nome if self.origem_id and self.origem else self.origem_setor
+        return f"{nome_origem} - {self.percentual_alocado}%"
 
 class SaldoOrcamentarioSemanal(models.Model):
     """Modelo para armazenar o saldo orçamentário desejado por semana"""

@@ -292,6 +292,33 @@
             </div>
         </div>
 
+        <div class="row mb-4 g-3">
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Valor total filtrado</h6>
+                        <h4 class="mb-0 fw-bold">{{ total_valor_filtrado|default_if_none:0|currency_br }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Registros filtrados</h6>
+                        <h4 class="mb-0 fw-bold">{{ total_registros_filtrados }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Ticket médio filtrado</h6>
+                        <h4 class="mb-0 fw-bold">{{ ticket_medio_filtrado|default_if_none:0|currency_br }}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Table -->
         <div class="row">
             <div class="col-12">
@@ -391,10 +418,14 @@
                                                 <strong>{{ projecao.id_excel|default:"-" }}</strong>
                                             </td>
                                             <td class="col-setor">
-                                                <strong>{{ projecao.setor|default:"-" }}</strong>
+                                                <span class="badge setor-badge" data-setor-color="{{ projecao.setor_cor }}">
+                                                    {{ projecao.setor|default:"-" }}
+                                                </span>
                                             </td>
                                             <td class="col-descricao">
-                                                {{ projecao.descricao|default:"-" }}
+                                                <a href="{% url 'visualizar_projecao_gasto' projecao.id %}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
+                                                    {{ projecao.descricao|default:"-" }}
+                                                </a>
                                             </td>
                                             <td class="col-fornecedor">
                                                 {{ projecao.fornecedor_nome_fantasia|default:"-" }}
@@ -524,6 +555,14 @@
 
     // Aplicar formatação quando a página carregar
     document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.setor-badge[data-setor-color]').forEach(function(element) {
+            const color = element.getAttribute('data-setor-color');
+            if (color) {
+                element.style.backgroundColor = color;
+                element.style.color = '#fff';
+            }
+        });
+
         // Formatar números simples
         document.querySelectorAll('.format-number').forEach(function(element) {
             const texto = element.textContent.trim();

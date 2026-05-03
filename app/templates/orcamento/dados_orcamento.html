@@ -7,11 +7,17 @@
 {% block extra_css %}
 <style>
     .stat-card {
-        transition: transform 0.2s;
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
     }
     .stat-card:hover {
         transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
     }
+    .stat-card.border-primary { border-left-color: #0d6efd; }
+    .stat-card.border-success { border-left-color: #198754; }
+    .stat-card.border-info { border-left-color: #0dcaf0; }
+    .stat-card.border-warning { border-left-color: #ffc107; }
     .month-section {
         border: 1px solid #dee2e6;
         border-radius: 8px;
@@ -93,36 +99,204 @@
 
         <!-- Statistics Cards -->
         <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white stat-card">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card border-primary shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Total Projeções</h5>
-                        <p class="card-text display-6">{{ total_projecoes|default:0 }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total Projeções</h6>
+                                <h4 class="mb-0 fw-bold">{{ total_projecoes|default:0 }}</h4>
+                                <small class="text-muted">Registros de projeções de gastos</small>
+                            </div>
+                            <i class="fas fa-chart-line fa-3x text-primary opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card bg-info text-white stat-card">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card border-info shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Total Notas Fiscais</h5>
-                        <p class="card-text display-6">{{ total_notas_fiscais|default:0 }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total Notas Fiscais</h6>
+                                <h4 class="mb-0 fw-bold">{{ total_notas_fiscais|default:0 }}</h4>
+                                <small class="text-muted">Notas fiscais importadas no sistema</small>
+                            </div>
+                            <i class="fas fa-file-invoice fa-3x text-info opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card bg-success text-white stat-card">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card border-success shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Total Requisições</h5>
-                        <p class="card-text display-6">{{ total_requisicoes|default:0 }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total Requisições</h6>
+                                <h4 class="mb-0 fw-bold">{{ total_requisicoes|default:0 }}</h4>
+                                <small class="text-muted">Requisições de compra relacionadas</small>
+                            </div>
+                            <i class="fas fa-clipboard-list fa-3x text-success opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card bg-warning text-white stat-card">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card border-warning shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">Relações Confirmadas</h5>
-                        <p class="card-text display-6">{{ total_relacoes_confirmadas|default:0 }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Relações Confirmadas</h6>
+                                <h4 class="mb-0 fw-bold">{{ total_relacoes_confirmadas|default:0 }}</h4>
+                                <small class="text-muted">Vínculos projeção x nota validados</small>
+                            </div>
+                            <i class="fas fa-link fa-3x text-warning opacity-25"></i>
+                        </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Percentual de Impacto por Setor -->
+        <div class="card shadow-sm mb-4 border-primary" id="percentual-impacto-setor">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-percentage me-2"></i>Percentual de Impacto por Setor
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <div class="card stat-card border-primary shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-2">Total alocado</h6>
+                                <h4 class="mb-0 fw-bold">{{ total_percentual_alocado|floatformat:2 }}%</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card {% if percentual_disponivel < 0 %}border-warning{% else %}border-success{% endif %} shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-2">Percentual disponível</h6>
+                                <h4 class="mb-0 fw-bold">{{ percentual_disponivel|floatformat:2 }}%</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card stat-card {% if total_percentual_alocado > 100 %}border-danger{% else %}border-info{% endif %} shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-2">Status</h6>
+                                <h5 class="mb-0 fw-bold">
+                                    {% if total_percentual_alocado > 100 %}
+                                        Acima de 100%
+                                    {% elif total_percentual_alocado == 100 %}
+                                        Totalmente alocado
+                                    {% else %}
+                                        Espaço para alocar
+                                    {% endif %}
+                                </h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3 border-light">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0">
+                            <i class="fas fa-plus-circle me-2"></i>
+                            {% if percentual_editando %}Editar alocação{% else %}Adicionar nova alocação{% endif %}
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" class="row g-3 align-items-end">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="save_percentual_impacto">
+                            {% if percentual_editando %}
+                            <input type="hidden" name="impacto_id" value="{{ percentual_editando.id }}">
+                            {% endif %}
+                            <div class="col-md-4">
+                                <label class="form-label"><strong>Origem cadastrada</strong></label>
+                                <select name="origem_id" class="form-select">
+                                    <option value="">Selecionar origem existente</option>
+                                    {% for origem in origens_impacto_opcoes %}
+                                    <option value="{{ origem.id }}" {% if percentual_editando and percentual_editando.origem_id == origem.id %}selected{% endif %}>
+                                        {{ origem.nome }} ({{ origem.get_tipo_origem_display }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">Se selecionar, os campos abaixo de nova origem podem ficar em branco.</small>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label"><strong>Nova origem</strong></label>
+                                <input type="text" name="nova_origem" class="form-control" placeholder="Ex: Requisições, Turno A, Projeto Y">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label"><strong>Tipo</strong></label>
+                                <select name="novo_tipo_origem" class="form-select">
+                                    {% for tipo_key, tipo_label in origens_tipo_choices %}
+                                    <option value="{{ tipo_key }}" {% if percentual_editando and percentual_editando.origem and percentual_editando.origem.tipo_origem == tipo_key %}selected{% endif %}>{{ tipo_label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label"><strong>Percentual alocado (%)</strong></label>
+                                <input type="text" name="percentual_alocado" class="form-control" required placeholder="Ex: 12,50" value="{% if percentual_editando %}{{ percentual_editando.percentual_alocado|floatformat:2 }}{% endif %}">
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label"><strong>Observação</strong></label>
+                                <input type="text" name="observacao" class="form-control" placeholder="Opcional" value="{% if percentual_editando %}{{ percentual_editando.observacao|default:'' }}{% endif %}">
+                            </div>
+                            <div class="col-md-4">
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-save me-1"></i>{% if percentual_editando %}Atualizar{% else %}Salvar{% endif %}
+                                </button>
+                                {% if percentual_editando %}
+                                <a href="{% url 'dados_orcamento' %}#percentual-impacto-setor" class="btn btn-outline-secondary w-100 mt-2">Cancelar edição</a>
+                                {% endif %}
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Origem</th>
+                                <th>Tipo</th>
+                                <th class="text-end">Percentual (%)</th>
+                                <th>Observação</th>
+                                <th class="text-center" style="min-width: 110px;">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in percentuais_impacto %}
+                            <tr>
+                                <td><strong>{{ item.origem_nome_exibicao }}</strong></td>
+                                <td>{{ item.tipo_origem_exibicao }}</td>
+                                <td class="text-end">{{ item.percentual_alocado|floatformat:2 }}%</td>
+                                <td>{{ item.observacao|default:"-" }}</td>
+                                <td class="text-center">
+                                    <a href="{% url 'dados_orcamento' %}?edit_impacto_id={{ item.id }}#percentual-impacto-setor" class="btn btn-sm btn-outline-primary me-1" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <form method="post" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete_percentual_impacto">
+                                        <input type="hidden" name="impacto_id" value="{{ item.id }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remover esta alocação percentual?');">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-3">Nenhuma alocação percentual cadastrada ainda.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

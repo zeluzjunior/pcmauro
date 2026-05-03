@@ -240,20 +240,23 @@
                     </div>
                 </div>
 
-                <!-- Calendário de preventivas (mesmo dado que /meus-planos-preventiva/calendario — RoteiroPreventiva) -->
+                <!-- Calendário: OrdemServicoPreventiva (API com maquina_id) -->
                 <div class="card shadow-sm visualizar-maquina-section">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
                             <i class="fas fa-calendar-alt me-2"></i>Calendário de Preventivas — Esta Máquina
                         </h5>
-                        <small class="d-block mt-1 opacity-90">Previsão com base em dt_abertura e intervalo (cs_qtde_periodo_max) do RoteiroPreventiva, como em Meus Planos Preventiva → Calendário.</small>
+                        <small class="d-block mt-1 opacity-90">OS preventivas (Manutenções Preventivas): verde = fechada; laranja = aberta/outras. Roxo = projeção recorrente (âncora DT_ENTRADA ou DT_ABERTURA no Roteiro + período em dias do PlanoPreventiva).</small>
                     </div>
                     <div class="card-body">
                         <div id="calendar" style="min-height: 600px;"></div>
-                        <div class="mt-3">
+                        <div class="mt-3 d-flex flex-wrap gap-3 align-items-center">
+                            <span class="badge rounded-pill" style="background-color:#198754;">OS fechada</span>
+                            <span class="badge rounded-pill" style="background-color:#fd7e14;">OS aberta</span>
+                            <span class="badge rounded-pill" style="background-color:#6f42c1;">Projeção Plano+Roteiro</span>
                             <small class="text-muted">
                                 <i class="fas fa-info-circle me-1"></i>
-                                Clique em um evento para abrir o roteiro preventiva. Use os botões de navegação para mudar de mês/semana.
+                                Clique: OS abre a consulta de ordens; projeção roxa abre o roteiro preventiva. Reimporte o CSV de roteiro após incluir a coluna DT_ENTRADA no arquivo.
                             </small>
                         </div>
                     </div>
@@ -267,7 +270,7 @@
                             <i class="fas fa-calendar-alt me-2"></i>Calendário de Preventivas — Máquinas Secundárias
                             <span class="badge bg-light text-dark ms-2">{{ relacionamentos_como_primaria.count }} máquinas</span>
                         </h5>
-                        <small class="d-block mt-1 opacity-90">Mesma fonte de dados do calendário geral (RoteiroPreventiva), agregando as máquinas secundárias desta principal.</small>
+                        <small class="d-block mt-1 opacity-90">Mesmas legendas: OS (verde/laranja) + projeção Plano+Roteiro (roxo).</small>
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
@@ -970,7 +973,7 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
-    // Calendário principal — mesmos eventos que /meus-planos-preventiva/calendario (RoteiroPreventiva)
+    // Calendário principal — OrdemServicoPreventiva (API com maquina_id)
     const calendarEl = document.getElementById('calendar');
     if (calendarEl) {
         const calendar = new FullCalendar.Calendar(calendarEl, {
@@ -1038,7 +1041,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const escolha = confirm(
                         info.event.title + '\n\n' +
                         (info.event.extendedProps.descricao || '') +
-                        '\n\nOK = abrir roteiro preventiva\nCancelar = abrir página da máquina'
+                        '\n\nOK = abrir consulta de ordens (OS)\nCancelar = abrir página da máquina'
                     );
                     if (escolha) {
                         window.open(roteiroUrl, '_blank');

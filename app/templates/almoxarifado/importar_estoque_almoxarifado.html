@@ -40,8 +40,8 @@
                             {% csrf_token %}
                             <div class="mb-3">
                                 <label for="fileInput" class="form-label">Arquivo para Importação</label>
-                                <input type="file" class="form-control" id="fileInput" name="file" accept=".xlsx,.xls,.csv" required>
-                                <div class="form-text">Formatos aceitos: Excel (.xlsx, .xls) ou CSV (.csv)</div>
+                                <input type="file" class="form-control" id="fileInput" name="file" accept=".xlsx,.xls,.xlsm,.csv" required>
+                                <div class="form-text">Formatos aceitos: CSV delimitado por ; (recomendado) ou Excel (.xlsx, .xls, .xlsm)</div>
                             </div>
                             <div class="mb-3">
                                 <div class="form-check">
@@ -83,27 +83,35 @@
                     </div>
                     <div class="card-body">
                         <h6 class="fw-bold">Formato do Arquivo</h6>
-                        <p>O arquivo Excel deve conter as seguintes colunas (primeira linha como cabeçalho):</p>
+                        <p>O arquivo deve conter cabeçalho ERP de estoque (ex.: <code>ESTOQUE - DOMINGO.csv</code>) com as colunas abaixo:</p>
                         <ul>
+                            <li><strong>CODIGO UNIDADE</strong> / <strong>NOME UNIDADE</strong></li>
+                            <li><strong>CODIGO DEPOSITO</strong> / <strong>DESCRIÇÃO DEPOSITO</strong></li>
+                            <li><strong>CODIGO LOCAL</strong> / <strong>DESCRIÇÃO LOCAL</strong></li>
                             <li><strong>ESTANTE</strong> - Número da estante</li>
                             <li><strong>PRATELEIRA</strong> - Número da prateleira</li>
                             <li><strong>COLUNA</strong> - Número da coluna</li>
                             <li><strong>SEQUENCIA</strong> - Sequência</li>
-                            <li><strong>DESCRIÇÃO DEST. USO</strong> - Descrição do destino de uso</li>
+                            <li><strong>CODIGO DEST. USO</strong> / <strong>DESCRIÇÃO DEST. USO</strong></li>
                             <li><strong>CODIGO ITEM</strong> - Código do item (obrigatório)</li>
                             <li><strong>DESCRIÇÃO ITEM</strong> - Descrição do item</li>
+                            <li><strong>CODIGO GRUPO DE ESTOQUE</strong> / <strong>DESCRIÇÃO GRUPO DE ESTOQUE</strong></li>
+                            <li><strong>CODIGO SUBGRUPO DE ESTOQUE</strong> / <strong>DESCRIÇÃO SUBGRUPO DE ESTOQUE</strong></li>
                             <li><strong>UNIDADE MEDIDA</strong> - Unidade de medida</li>
+                            <li><strong>DATA ULTIMA COMPRA</strong>, <strong>CODIGO LOTE</strong>, <strong>LEGENDA LOTE</strong></li>
                             <li><strong>QUANTIDADE</strong> - Quantidade em estoque</li>
                             <li><strong>VALOR</strong> - Valor do item</li>
+                            <li><strong>SITUAÇÃO PILHA</strong>, <strong>DATA CRIAÇÃO</strong>, <strong>MARCA REFERENCIA</strong></li>
                             <li><strong>CONTROLA ESTOQUE MINIMO</strong> - Controla estoque mínimo (SIM/NÃO)</li>
+                            <li><strong>DATA FECHAMENTO</strong> e <strong>DATA GERAÇÃO</strong></li>
                             <li><strong>CLASSIFICAÇÃO TEMPO SEM CONSUMO</strong> - Classificação do tempo sem consumo</li>
                         </ul>
                         <hr>
                         <h6 class="fw-bold">Formato Aceito</h6>
-                        <p>Excel (.xlsx, .xls, .xlsm) ou CSV (.csv) com a primeira linha como cabeçalho.</p>
+                        <p>Preferencialmente CSV <strong>delimitado por ponto e vírgula (;)</strong> com a primeira linha como cabeçalho.</p>
                         <div class="alert alert-warning">
                             <i class="fas fa-exclamation-triangle me-2"></i>
-                            <strong>Importante:</strong> O campo "CODIGO ITEM" é obrigatório e deve ser único. Certifique-se de que o arquivo está no formato correto antes de importar.
+                            <strong>Importante:</strong> O campo "CODIGO ITEM" é obrigatório. Marque "Atualizar registros existentes" para sobrescrever itens já cadastrados na tabela de estoque do almoxarifado.
                         </div>
                     </div>
                 </div>
@@ -162,4 +170,3 @@ window.addEventListener('load', function() {
 });
 </script>
 {% endblock %}
-

@@ -1,10 +1,29 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load form_extras %}
 
 {% block title %}Consultar Estoque{% endblock %}
 
 {% block extra_css %}
 <style>
+    /* Alinhado ao padrão de /ordens-de-servico/analise/ */
+    .stat-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .kpi-card {
+        border-left: 4px solid;
+    }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+
     .table-container {
         max-height: 600px;
         overflow-y: auto;
@@ -40,7 +59,7 @@
 
 {% block content %}
 <!-- Page Header -->
-<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 153, 0, 0.171)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
     <div class="container">
         <div class="row">
             <div class="col-12">
@@ -52,7 +71,7 @@
                     </ol>
                 </nav>
                 <h1 class="display-4 fw-bold mt-3">Consultar Estoque</h1>
-                <p class="lead">Visualize todos os itens de estoque cadastrados no sistema</p>
+                <p class="lead">Posições importadas do ERP — tabela <strong>EstoqueAlmoxarifado</strong></p>
             </div>
         </div>
     </div>
@@ -65,7 +84,7 @@
         <div class="row mb-4">
             <div class="col-md-12">
                 <form method="get" action="{% url 'consultar_estoque' %}" class="d-flex">
-                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por código, descrição, unidade de medida..." value="{{ request.GET.search }}">
+                    <input type="text" name="search" class="form-control me-2" placeholder="Código, descrição, local, unidade, grupo, classificação..." value="{{ request.GET.search }}">
                     <button type="submit" class="btn btn-outline-primary">
                         <i class="fas fa-search"></i> Buscar
                     </button>
@@ -73,20 +92,19 @@
             </div>
         </div>
 
-        <!-- Filtros Avançados -->
+        <!-- Filtros Avançados (accordion — mesmo padrão da análise de OS) -->
         <div class="row mb-4">
             <div class="col-12">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-secondary text-white">
-                        <button class="btn btn-link text-white text-decoration-none p-0 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="false" aria-controls="filtrosCollapse">
-                            <h5 class="mb-0">
-                                <i class="fas fa-filter me-2"></i>Filtros Avançados
-                                <i class="fas fa-chevron-down float-end"></i>
-                            </h5>
-                        </button>
-                    </div>
-                    <div class="collapse" id="filtrosCollapse">
-                        <div class="card-body">
+                <div class="accordion filter-accordion" id="filtrosAccordionEstoque">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtrosHeadingEstoque">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapseEstoque" aria-expanded="false" aria-controls="filtrosCollapseEstoque">
+                                <i class="fas fa-filter me-2"></i>
+                                <strong>Filtros avançados</strong>
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapseEstoque" class="accordion-collapse collapse" aria-labelledby="filtrosHeadingEstoque" data-bs-parent="#filtrosAccordionEstoque">
+                            <div class="accordion-body">
                             <form method="get" id="filtrosForm">
                                 <!-- Preservar busca geral -->
                                 <input type="hidden" name="search" value="{{ request.GET.search }}">
@@ -170,53 +188,81 @@
                                     </div>
                                 </div>
                             </form>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Statistics -->
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white">
+        <!-- KPIs — análise do recorte EstoqueAlmoxarifado -->
+        <div class="row mb-2">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
                     <div class="card-body">
-                        <h5 class="card-title">Total</h5>
-                        <p class="card-text display-6">{{ total_count }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total no sistema</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_count|number_br:0 }}</h2>
+                                <small class="text-muted">Registros cadastrados (ERP)</small>
+                            </div>
+                            <i class="fas fa-database fa-3x text-primary opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card bg-info text-white">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
                     <div class="card-body">
-                        <h5 class="card-title">Mostrando</h5>
-                        <p class="card-text display-6">{{ itens|length }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Com filtros atuais</h6>
+                                <h2 class="mb-0 fw-bold">{{ filtered_count|number_br:0 }}</h2>
+                                <small class="text-muted">{{ locais_distintos_filtrado|number_br:0 }} locais · {{ unidades_medida_distintas_filtrado|number_br:0 }} UMs distintas</small>
+                            </div>
+                            <i class="fas fa-filter fa-3x text-info opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card bg-success text-white">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
                     <div class="card-body">
-                        <h5 class="card-title">Unidades de Medida</h5>
-                        <p class="card-text display-6">{{ unidades_count }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Σ Valor (filtro)</h6>
+                                <h2 class="mb-0 fw-bold">{{ sum_valor_filtrado|currency_br }}</h2>
+                                <small class="text-muted">Soma do campo valor no recorte</small>
+                            </div>
+                            <i class="fas fa-coins fa-3x text-success opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card bg-warning text-white">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
                     <div class="card-body">
-                        <h5 class="card-title">Destinos de Uso</h5>
-                        <p class="card-text display-6">{{ destinos_count }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Σ Quantidade (filtro)</h6>
+                                <h2 class="mb-0 fw-bold">{{ sum_qtd_filtrado|number_br:2 }}</h2>
+                                <small class="text-muted">UM mistas no conjunto — uso indicativo</small>
+                            </div>
+                            <i class="fas fa-balance-scale fa-3x text-warning opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+        {% if itens.paginator.count %}
+        <p class="text-muted small mb-3">Listagem paginada: página {{ itens.number }} de {{ itens.paginator.num_pages }} ({{ itens.paginator.per_page }} por página).</p>
+        {% endif %}
 
         <!-- Table -->
-        <div class="card shadow-sm">
+        <div class="card shadow-sm border-0">
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0">
-                    <i class="fas fa-list me-2"></i>Lista de Itens de Estoque
+                    <i class="fas fa-list me-2"></i>Estoque Almoxarifado (ERP)
                 </h5>
             </div>
             <div class="card-body p-0">
@@ -226,7 +272,7 @@
                             <tr>
                                 <th>Código Item</th>
                                 <th>Descrição</th>
-                                <th>Localização</th>
+                                <th>Local (almox.)</th>
                                 <th>Unidade Medida</th>
                                 <th>Quantidade</th>
                                 <th>Valor</th>
@@ -243,7 +289,7 @@
                                     <input type="text" class="filter-input" placeholder="Filtrar Descrição..." data-column="1">
                                 </th>
                                 <th class="filter-header">
-                                    <input type="text" class="filter-input" placeholder="Filtrar Localização..." data-column="2">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Local..." data-column="2">
                                 </th>
                                 <th class="filter-header">
                                     <input type="text" class="filter-input" placeholder="Filtrar Unidade..." data-column="3">
@@ -274,22 +320,27 @@
                                 <tr>
                                     <td>
                                         <strong>
-                                            <a href="{% url 'visualizar_item_estoque' item.id %}" class="text-decoration-none">
+                                            <a href="{% url 'visualizar_estoque_almoxarifado' item.codigo_item %}" class="text-decoration-none">
                                                 {{ item.codigo_item }}
                                             </a>
                                         </strong>
                                     </td>
                                     <td>
-                                        <a href="{% url 'visualizar_item_estoque' item.id %}" class="text-decoration-none">
+                                        <a href="{% url 'visualizar_estoque_almoxarifado' item.codigo_item %}" class="text-decoration-none">
                                             {{ item.descricao_item|default:"-"|truncatewords:8 }}
                                         </a>
                                     </td>
                                     <td>
-                                        {% if item.estante or item.prateleira or item.coluna %}
+                                        {% if item.descricao_local %}
+                                            <small>{{ item.descricao_local|truncatechars:42 }}</small>
+                                            {% if item.estante or item.prateleira or item.coluna %}
+                                            <span class="badge bg-secondary ms-1">
+                                                {% if item.estante %}E{{ item.estante }}{% endif %}{% if item.prateleira %}·P{{ item.prateleira }}{% endif %}{% if item.coluna %}·C{{ item.coluna }}{% endif %}
+                                            </span>
+                                            {% endif %}
+                                        {% elif item.estante or item.prateleira or item.coluna %}
                                             <span class="badge bg-secondary">
-                                                {% if item.estante %}E:{{ item.estante }}{% endif %}
-                                                {% if item.prateleira %} P:{{ item.prateleira }}{% endif %}
-                                                {% if item.coluna %} C:{{ item.coluna }}{% endif %}
+                                                {% if item.estante %}E{{ item.estante }}{% endif %}{% if item.prateleira %} P{{ item.prateleira }}{% endif %}{% if item.coluna %} C{{ item.coluna }}{% endif %}
                                             </span>
                                         {% else %}
                                             -
@@ -303,22 +354,14 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if item.quantidade %}
-                                            <strong>{{ item.quantidade }}</strong>
-                                        {% else %}
-                                            0
-                                        {% endif %}
+                                        {% if item.quantidade is not None %}<strong>{{ item.quantidade|number_br:2 }}</strong>{% else %}—{% endif %}
                                     </td>
                                     <td>
-                                        {% if item.valor %}
-                                            R$ {{ item.valor|floatformat:2 }}
-                                        {% else %}
-                                            R$ 0,00
-                                        {% endif %}
+                                        {% if item.valor is not None %}{{ item.valor|currency_br }}{% else %}—{% endif %}
                                     </td>
                                     <td>
-                                        {% if item.descricao_dest_uso %}
-                                            {{ item.descricao_dest_uso|truncatewords:5 }}
+                                        {% if item.descricao_destino_uso %}
+                                            {{ item.descricao_destino_uso|truncatewords:5 }}
                                         {% else %}
                                             -
                                         {% endif %}
@@ -340,7 +383,7 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-center">
-                                        <a href="{% url 'visualizar_item_estoque' item.id %}" class="btn btn-sm btn-primary" title="Visualizar detalhes">
+                                        <a href="{% url 'visualizar_estoque_almoxarifado' item.codigo_item %}" class="btn btn-sm btn-primary" title="Visualizar detalhes">
                                             <i class="fas fa-eye"></i>
                                         </a>
                                     </td>

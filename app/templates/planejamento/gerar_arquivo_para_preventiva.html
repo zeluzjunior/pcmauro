@@ -6,6 +6,50 @@
 {% block extra_css %}
 <style>
     .filter-card { background: #f8f9fa; border-radius: 8px; padding: 1.25rem; }
+    .machine-search-wrap { position: relative; }
+    .machine-search-input { padding-right: 2.2rem; }
+    .machine-search-icon {
+        position: absolute;
+        right: 0.75rem;
+        top: 2.5rem;
+        color: #6c757d;
+        pointer-events: none;
+    }
+    .machine-options {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: calc(100% + 0.25rem);
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        max-height: 280px;
+        overflow-y: auto;
+        z-index: 40;
+        display: none;
+    }
+    .machine-options.show { display: block; }
+    .machine-option {
+        padding: 0.6rem 0.75rem;
+        cursor: pointer;
+        border-bottom: 1px solid #f1f3f5;
+    }
+    .machine-option:last-child { border-bottom: 0; }
+    .machine-option:hover,
+    .machine-option.active {
+        background: #e9f2ff;
+    }
+    .machine-option small {
+        display: block;
+        color: #6c757d;
+        margin-top: 0.15rem;
+    }
+    .machine-empty {
+        padding: 0.75rem;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
 </style>
 {% endblock %}
 
@@ -38,7 +82,7 @@
             <div class="card-body filter-card">
                 <form method="get" action="{% url 'gerar_arquivo_para_preventiva' %}" id="formFiltros">
                     <div class="row g-3 align-items-end">
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label for="filter_cd_setormanut" class="form-label">Código setor manutenção (cd_setormanut)</label>
                             <select name="cd_setormanut" id="filter_cd_setormanut" class="form-select">
                                 <option value="">Selecione o setor…</option>
@@ -47,7 +91,7 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label for="filter_descr_gerenc" class="form-label">Descrição gerência (descr_gerenc)</label>
                             <select name="descr_gerenc" id="filter_descr_gerenc" class="form-select" {% if not selected_cd_setormanut %}disabled{% endif %}>
                                 <option value="">{% if selected_cd_setormanut %}Selecione a gerência…{% else %}Selecione o setor primeiro{% endif %}</option>
@@ -56,14 +100,21 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-4">
-                            <label for="filter_maquina_id" class="form-label">Máquina (descr_maquina)</label>
-                            <select name="maquina_id" id="filter_maquina_id" class="form-select" {% if not selected_cd_setormanut or not selected_descr_gerenc %}disabled{% endif %}>
-                                <option value="">Todas neste setor e gerência</option>
-                                {% for m in maquina_choices %}
-                                <option value="{{ m.id }}" {% if selected_maquina_id == m.id|stringformat:"s" %}selected{% endif %}>{{ m.cd_maquina }} — {{ m.descr_maquina|default:"Sem descrição" }}</option>
-                                {% endfor %}
-                            </select>
+                        <div class="col-12 machine-search-wrap">
+                            <label for="filter_maquina_busca" class="form-label">Máquina (descr_maquina)</label>
+                            <input
+                                type="text"
+                                id="filter_maquina_busca"
+                                class="form-control machine-search-input"
+                                placeholder="Digite código ou descrição da máquina"
+                                autocomplete="off"
+                                {% if not selected_cd_setormanut or not selected_descr_gerenc %}disabled{% endif %}
+                                value="{% for m in maquina_choices %}{% if selected_maquina_id == m.id|stringformat:'s' %}{{ m.cd_maquina }} — {{ m.descr_maquina|default:'Sem descrição' }}{% endif %}{% endfor %}"
+                            >
+                            <i class="bi bi-search machine-search-icon"></i>
+                            <div id="machine_options" class="machine-options"></div>
+                            <input type="hidden" name="maquina_id" id="filter_maquina_id" value="{{ selected_maquina_id }}">
+                            <div class="form-text">Digite para filtrar as máquinas deste setor e gerência e clique em uma opção da lista.</div>
                         </div>
                     </div>
                     <div class="mt-3 d-flex flex-wrap gap-2">
@@ -81,59 +132,59 @@
         </div>
 
         <div class="card shadow-sm">
-            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <h5 class="mb-0"><i class="bi bi-table me-2"></i>Resultado</h5>
-                {% if resultados %}
-                <span class="badge bg-light text-dark">{{ resultados|length }} registro{{ resultados|length|pluralize }}</span>
-                {% endif %}
-            </div>
-            <div class="card-body p-0">
-                {% if selected_cd_setormanut and selected_descr_gerenc %}
-                    {% if resultados %}
-                    <div class="table-responsive">
-                        <table class="table table-hover table-striped mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Cód. máquina</th>
-                                    <th>Descrição (descr_maquina)</th>
-                                    <th>cd_setormanut</th>
-                                    <th>Setor (descr_setormanut)</th>
-                                    <th>descr_gerenc</th>
-                                    <th>Patrimônio</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for m in resultados %}
-                                <tr>
-                                    <td><strong>{{ m.cd_maquina }}</strong></td>
-                                    <td>{{ m.descr_maquina|default:"—" }}</td>
-                                    <td>{{ m.cd_setormanut|default:"—" }}</td>
-                                    <td>{{ m.descr_setormanut|default:"—" }}</td>
-                                    <td>{{ m.descr_gerenc|default:"—" }}</td>
-                                    <td>{{ m.nro_patrimonio|default:"—" }}</td>
-                                    <td class="text-nowrap">
-                                        <a href="{% url 'visualizar_maquina' m.id %}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">Ver máquina</a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="mb-0"><i class="bi bi-table me-2"></i>Resultado</h5>
+                        {% if resultados %}
+                        <span class="badge bg-light text-dark">{{ resultados|length }} registro{{ resultados|length|pluralize }}</span>
+                        {% endif %}
                     </div>
-                    {% else %}
-                    <div class="p-4 text-center text-muted">
-                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                        Nenhuma máquina encontrada para os filtros (incluindo máquina específica, se informada).
+                    <div class="card-body p-0">
+                        {% if selected_cd_setormanut and selected_descr_gerenc %}
+                            {% if resultados %}
+                            <div class="table-responsive">
+                                <table class="table table-hover table-striped mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Cód. máquina</th>
+                                            <th>Descrição (descr_maquina)</th>
+                                            <th>cd_setormanut</th>
+                                            <th>Setor (descr_setormanut)</th>
+                                            <th>descr_gerenc</th>
+                                            <th>Patrimônio</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for m in resultados %}
+                                        <tr>
+                                            <td><strong>{{ m.cd_maquina }}</strong></td>
+                                            <td>{{ m.descr_maquina|default:"—" }}</td>
+                                            <td>{{ m.cd_setormanut|default:"—" }}</td>
+                                            <td>{{ m.descr_setormanut|default:"—" }}</td>
+                                            <td>{{ m.descr_gerenc|default:"—" }}</td>
+                                            <td>{{ m.nro_patrimonio|default:"—" }}</td>
+                                            <td class="text-nowrap">
+                                                <a href="{% url 'visualizar_maquina' m.id %}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">Ver máquina</a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="p-4 text-center text-muted">
+                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                Nenhuma máquina encontrada para os filtros (incluindo máquina específica, se informada).
+                            </div>
+                            {% endif %}
+                        {% else %}
+                            <div class="p-4 text-center text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Selecione <strong>setor</strong> e <strong>gerência</strong>, depois clique em <strong>Aplicar filtros</strong>. A lista de máquinas (descr_maquina) depende desses dois campos.
+                            </div>
+                        {% endif %}
                     </div>
-                    {% endif %}
-                {% else %}
-                    <div class="p-4 text-center text-muted">
-                        <i class="bi bi-info-circle me-1"></i>
-                        Selecione <strong>setor</strong> e <strong>gerência</strong>, depois clique em <strong>Aplicar filtros</strong>. A lista de máquinas (descr_maquina) depende desses dois campos.
-                    </div>
-                {% endif %}
-            </div>
-        </div>
+                </div>
 
         {% if mostrar_secundarias_da_principal and maquina_principal_selecionada %}
         <div class="card shadow-sm mt-4 border-info">
@@ -191,6 +242,199 @@
             </div>
         </div>
         {% endif %}
+
+        {% if selected_cd_setormanut and selected_descr_gerenc %}
+        <div class="card shadow-sm mt-4 border-primary">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0">
+                    <i class="bi bi-folder2-open me-2"></i>Arquivos das Máquinas do Filtro
+                </h5>
+                <span class="badge bg-light text-dark">
+                    {{ documentos_por_maquina|length }} máquina{{ documentos_por_maquina|length|pluralize }} com arquivo{{ documentos_por_maquina|length|pluralize }}
+                </span>
+            </div>
+            <div class="card-body p-0">
+                {% if documentos_por_maquina %}
+                    {% for bloco in documentos_por_maquina %}
+                    <div class="{% if not forloop.first %}border-top{% endif %}">
+                        <div class="px-3 py-2 bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <strong>{{ bloco.maquina.cd_maquina }}</strong>
+                                — {{ bloco.maquina.descr_maquina|default:"Sem descrição" }}
+                            </div>
+                            <span class="badge text-bg-secondary">
+                                {{ bloco.documentos|length }} arquivo{{ bloco.documentos|length|pluralize }}
+                            </span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Arquivo</th>
+                                        <th>Comentário</th>
+                                        <th>Upload</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for doc in bloco.documentos %}
+                                    <tr>
+                                        <td>
+                                            <a href="{{ doc.arquivo.url }}" target="_blank" rel="noopener noreferrer">
+                                                {{ doc.arquivo.name|cut:"maquinas/documentos/" }}
+                                            </a>
+                                        </td>
+                                        <td>{{ doc.comentario|default:"—"|truncatechars:120 }}</td>
+                                        <td>{{ doc.created_at|date:"d/m/Y H:i" }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="p-4 text-center text-muted">
+                    <i class="bi bi-folder-x fs-1 d-block mb-2"></i>
+                    Nenhum arquivo encontrado em <strong>MaquinaDocumento</strong> para as máquinas retornadas pelo filtro (incluindo secundárias relacionadas, quando houver).
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if maquina_selecionada %}
+        <div class="card shadow-sm mt-4 border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history me-2"></i>Próximas Ordens de Serviço Preventivas
+                </h5>
+                <small class="d-block mt-1">
+                    Máquina selecionada: <strong>{{ maquina_selecionada.cd_maquina }}</strong>
+                    — {{ maquina_selecionada.descr_maquina|default:"Sem descrição" }}
+                </small>
+            </div>
+            <div class="card-body p-0">
+                {% if proximas_ordens_preventivas %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>OS</th>
+                                <th>Data prevista</th>
+                                <th>Dias restantes</th>
+                                <th>Intervalo (dias)</th>
+                                <th>Plano/Tarefa</th>
+                                <th>Executor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in proximas_ordens_preventivas %}
+                            <tr>
+                                <td><strong>{{ item.roteiro.cd_ordemserv|default:"—" }}</strong></td>
+                                <td>{{ item.dt_prev|date:"d/m/Y" }}</td>
+                                <td>
+                                    {% if item.dias_restantes == 0 %}
+                                        <span class="badge bg-warning text-dark">Hoje</span>
+                                    {% elif item.dias_restantes == 1 %}
+                                        <span class="badge bg-info text-dark">Amanhã</span>
+                                    {% else %}
+                                        <span class="badge bg-primary">{{ item.dias_restantes }} dias</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.intervalo_dias }}</td>
+                                <td>
+                                    {{ item.roteiro.descr_tarefamanu|default:item.roteiro.descr_seqplamanu|default:item.roteiro.descr_planmanut|default:"—"|truncatechars:90 }}
+                                </td>
+                                <td>{{ item.roteiro.nome_funciomanu|default:"—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-muted">
+                    <i class="bi bi-calendar-x fs-1 d-block mb-2"></i>
+                    Não encontramos próximas OS preventivas para esta máquina com data prevista futura.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if maquina_selecionada %}
+        <div class="card shadow-sm mt-4 border-success">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-download me-2"></i>Gerar Arquivo dos Documentos da Máquina Selecionada
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">
+                    Máquina selecionada: <strong>{{ maquina_selecionada.cd_maquina }}</strong>
+                    — {{ maquina_selecionada.descr_maquina|default:"Sem descrição" }}
+                </p>
+                <form method="get" action="{% url 'baixar_documentos_maquina_preventiva' %}" id="formGerarPdfDocumentos">
+                    <input type="hidden" name="cd_setormanut" value="{{ selected_cd_setormanut }}">
+                    <input type="hidden" name="descr_gerenc" value="{{ selected_descr_gerenc }}">
+                    <input type="hidden" name="maquina_id" value="{{ maquina_selecionada.id }}">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <button type="submit" class="btn btn-success" {% if documentos_maquina_selecionada_total == 0 %}disabled{% endif %}>
+                            <i class="bi bi-file-earmark-pdf me-1"></i>
+                            Baixar PDF com arquivos selecionados
+                        </button>
+                        <span class="badge text-bg-secondary">
+                            {{ documentos_maquina_selecionada_total }} arquivo{{ documentos_maquina_selecionada_total|pluralize }}
+                        </span>
+                    </div>
+                    {% if documentos_maquina_selecionada_total == 0 %}
+                    <p class="text-muted small mb-0 mt-2">
+                        Nenhum documento encontrado para a máquina selecionada.
+                    </p>
+                    {% endif %}
+
+                    {% if documentos_para_pdf %}
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                        <h6 class="mb-0">Selecione os arquivos para gerar o PDF final</h6>
+                        <div class="form-check m-0">
+                            <input class="form-check-input" type="checkbox" id="selecionar_todos_documentos_pdf" checked>
+                            <label class="form-check-label small" for="selecionar_todos_documentos_pdf">
+                                Selecionar todos
+                            </label>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 48px;">Sel.</th>
+                                    <th>Arquivo</th>
+                                    <th>Como será usado no PDF</th>
+                                    <th>Comentário</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for d in documentos_para_pdf %}
+                                <tr>
+                                    <td>
+                                        <div class="form-check m-0">
+                                            <input class="form-check-input doc-pdf-checkbox" type="checkbox" name="documento_id" value="{{ d.id }}" id="doc_pdf_{{ d.id }}" checked>
+                                        </div>
+                                    </td>
+                                    <td><label class="mb-0" for="doc_pdf_{{ d.id }}">{{ d.nome_arquivo }}</label></td>
+                                    <td>{{ d.modo_pdf }}</td>
+                                    <td>{{ d.comentario|default:"—"|truncatechars:120 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-muted small mb-0 mt-2">Apenas os arquivos marcados serão usados na geração do PDF.</p>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </section>
 {% endblock %}
@@ -202,7 +446,11 @@
     const urlMaquinas = '{% url "api_maquinas_por_setor_gerenc" %}';
     const selSetor = document.getElementById('filter_cd_setormanut');
     const selGerenc = document.getElementById('filter_descr_gerenc');
-    const selMaquina = document.getElementById('filter_maquina_id');
+    const inpMaquinaBusca = document.getElementById('filter_maquina_busca');
+    const machineOptions = document.getElementById('machine_options');
+    const inpMaquinaId = document.getElementById('filter_maquina_id');
+    let maquinaRowsCache = [];
+    let activeOptionIndex = -1;
 
     function fillGerenc(options, keepValue) {
         const v = keepValue || '';
@@ -219,23 +467,108 @@
 
     function fillMaquinas(rows, keepId) {
         const kid = keepId ? String(keepId) : '';
-        selMaquina.innerHTML = '<option value="">Todas neste setor e gerência</option>';
+        maquinaRowsCache = rows.slice();
+        let selectedLabel = '';
+
         rows.forEach(function(row) {
-            const opt = document.createElement('option');
-            opt.value = row.id;
             const d = (row.descr_maquina || 'Sem descrição').substring(0, 120);
-            opt.textContent = row.cd_maquina + ' — ' + d;
-            if (String(row.id) === kid) opt.selected = true;
-            selMaquina.appendChild(opt);
+            const label = row.cd_maquina + ' — ' + d;
+            if (String(row.id) === kid) selectedLabel = label;
         });
-        selMaquina.disabled = false;
+
+        inpMaquinaBusca.disabled = false;
+        if (kid && selectedLabel) {
+            inpMaquinaBusca.value = selectedLabel;
+            inpMaquinaId.value = kid;
+        } else {
+            inpMaquinaBusca.value = '';
+            inpMaquinaId.value = '';
+        }
+        renderMachineOptions('');
+    }
+
+    function filteredRows(term) {
+        const t = (term || '').trim().toLowerCase();
+        if (!t) return maquinaRowsCache.slice(0, 80);
+        return maquinaRowsCache.filter(function(row) {
+            const code = String(row.cd_maquina || '').toLowerCase();
+            const desc = String(row.descr_maquina || '').toLowerCase();
+            return code.indexOf(t) !== -1 || desc.indexOf(t) !== -1;
+        }).slice(0, 80);
+    }
+
+    function renderMachineOptions(term) {
+        if (inpMaquinaBusca.disabled) {
+            machineOptions.classList.remove('show');
+            machineOptions.innerHTML = '';
+            activeOptionIndex = -1;
+            return;
+        }
+        const rows = filteredRows(term);
+        if (!rows.length) {
+            machineOptions.innerHTML = '<div class="machine-empty">Nenhuma máquina encontrada para esse texto.</div>';
+            machineOptions.classList.add('show');
+            activeOptionIndex = -1;
+            return;
+        }
+
+        machineOptions.innerHTML = '';
+        rows.forEach(function(row, idx) {
+            const d = (row.descr_maquina || 'Sem descrição').substring(0, 120);
+            const label = row.cd_maquina + ' — ' + d;
+            const item = document.createElement('div');
+            item.className = 'machine-option';
+            item.setAttribute('data-id', String(row.id));
+            item.setAttribute('data-label', label);
+            item.setAttribute('data-index', String(idx));
+            item.innerHTML = '<strong>' + row.cd_maquina + '</strong><small>' + d + '</small>';
+            item.addEventListener('mousedown', function(evt) {
+                evt.preventDefault();
+                chooseMachineOption(String(row.id), label);
+            });
+            machineOptions.appendChild(item);
+        });
+        machineOptions.classList.add('show');
+        activeOptionIndex = -1;
+    }
+
+    function chooseMachineOption(id, label) {
+        inpMaquinaBusca.value = label;
+        inpMaquinaId.value = String(id);
+        machineOptions.classList.remove('show');
+    }
+
+    function syncActiveOption() {
+        const options = Array.from(machineOptions.querySelectorAll('.machine-option'));
+        options.forEach(function(opt, idx) {
+            if (idx === activeOptionIndex) opt.classList.add('active');
+            else opt.classList.remove('active');
+        });
+    }
+
+    function syncMaquinaIdFromText() {
+        const typed = (inpMaquinaBusca.value || '').trim();
+        if (!typed) {
+            inpMaquinaId.value = '';
+            return;
+        }
+
+        const exact = maquinaRowsCache.find(function(row) {
+            const d = (row.descr_maquina || 'Sem descrição').substring(0, 120);
+            return (row.cd_maquina + ' — ' + d) === typed;
+        });
+        inpMaquinaId.value = exact ? String(exact.id) : '';
     }
 
     function resetGerencMaquina() {
         selGerenc.innerHTML = '<option value="">Selecione o setor primeiro</option>';
         selGerenc.disabled = true;
-        selMaquina.innerHTML = '<option value="">Todas neste setor e gerência</option>';
-        selMaquina.disabled = true;
+        machineOptions.innerHTML = '';
+        machineOptions.classList.remove('show');
+        maquinaRowsCache = [];
+        inpMaquinaBusca.value = '';
+        inpMaquinaBusca.disabled = true;
+        inpMaquinaId.value = '';
     }
 
     if (selSetor) {
@@ -249,8 +582,12 @@
                 .then(function(r) { return r.json(); })
                 .then(function(list) {
                     fillGerenc(list, '');
-                    selMaquina.innerHTML = '<option value="">Todas neste setor e gerência</option>';
-                    selMaquina.disabled = true;
+                    machineOptions.innerHTML = '';
+                    machineOptions.classList.remove('show');
+                    maquinaRowsCache = [];
+                    inpMaquinaBusca.value = '';
+                    inpMaquinaBusca.disabled = true;
+                    inpMaquinaId.value = '';
                 })
                 .catch(function() {
                     fillGerenc([], '');
@@ -263,8 +600,12 @@
             const cd = selSetor.value;
             const ger = selGerenc.value;
             if (!cd || !ger) {
-                selMaquina.innerHTML = '<option value="">Todas neste setor e gerência</option>';
-                selMaquina.disabled = !cd;
+                machineOptions.innerHTML = '';
+                machineOptions.classList.remove('show');
+                maquinaRowsCache = [];
+                inpMaquinaBusca.value = '';
+                inpMaquinaBusca.disabled = !cd;
+                inpMaquinaId.value = '';
                 return;
             }
             fetch(urlMaquinas + '?cd_setormanut=' + encodeURIComponent(cd) + '&descr_gerenc=' + encodeURIComponent(ger))
@@ -275,6 +616,96 @@
                 .catch(function() {
                     fillMaquinas([], '');
                 });
+        });
+    }
+
+    if (inpMaquinaBusca) {
+        maquinaRowsCache = [{% for m in maquina_choices %}
+            { id: {{ m.id }}, cd_maquina: "{{ m.cd_maquina|escapejs }}", descr_maquina: "{{ m.descr_maquina|default:'Sem descrição'|escapejs }}" }{% if not forloop.last %},{% endif %}
+        {% endfor %}];
+
+        inpMaquinaBusca.addEventListener('focus', function() {
+            renderMachineOptions(inpMaquinaBusca.value);
+        });
+        inpMaquinaBusca.addEventListener('input', function() {
+            syncMaquinaIdFromText();
+            renderMachineOptions(inpMaquinaBusca.value);
+        });
+        inpMaquinaBusca.addEventListener('keydown', function(evt) {
+            const options = Array.from(machineOptions.querySelectorAll('.machine-option'));
+            if (!options.length) return;
+
+            if (evt.key === 'ArrowDown') {
+                evt.preventDefault();
+                activeOptionIndex = Math.min(activeOptionIndex + 1, options.length - 1);
+                syncActiveOption();
+            } else if (evt.key === 'ArrowUp') {
+                evt.preventDefault();
+                activeOptionIndex = Math.max(activeOptionIndex - 1, 0);
+                syncActiveOption();
+            } else if (evt.key === 'Enter' && activeOptionIndex >= 0) {
+                evt.preventDefault();
+                const chosen = options[activeOptionIndex];
+                chooseMachineOption(chosen.getAttribute('data-id'), chosen.getAttribute('data-label'));
+            } else if (evt.key === 'Escape') {
+                machineOptions.classList.remove('show');
+            }
+        });
+        inpMaquinaBusca.addEventListener('blur', function() {
+            syncMaquinaIdFromText();
+            setTimeout(function() {
+                machineOptions.classList.remove('show');
+            }, 120);
+        });
+        inpMaquinaBusca.addEventListener('change', syncMaquinaIdFromText);
+    }
+
+    document.addEventListener('click', function(evt) {
+        if (!evt.target.closest('.machine-search-wrap')) {
+            machineOptions.classList.remove('show');
+        }
+    });
+
+    if (inpMaquinaId.value && inpMaquinaBusca.value) {
+        syncMaquinaIdFromText();
+    }
+
+    const formFiltros = document.getElementById('formFiltros');
+    if (formFiltros) {
+        formFiltros.addEventListener('submit', function() {
+            syncMaquinaIdFromText();
+        });
+    }
+
+    const formGerarPdf = document.getElementById('formGerarPdfDocumentos');
+    const chkSelecionarTodos = document.getElementById('selecionar_todos_documentos_pdf');
+    const docChecks = Array.from(document.querySelectorAll('.doc-pdf-checkbox'));
+
+    if (chkSelecionarTodos && docChecks.length) {
+        chkSelecionarTodos.addEventListener('change', function() {
+            docChecks.forEach(function(chk) {
+                chk.checked = chkSelecionarTodos.checked;
+            });
+        });
+
+        docChecks.forEach(function(chk) {
+            chk.addEventListener('change', function() {
+                chkSelecionarTodos.checked = docChecks.every(function(item) {
+                    return item.checked;
+                });
+            });
+        });
+    }
+
+    if (formGerarPdf) {
+        formGerarPdf.addEventListener('submit', function(evt) {
+            const anyChecked = Array.from(formGerarPdf.querySelectorAll('.doc-pdf-checkbox')).some(function(chk) {
+                return chk.checked;
+            });
+            if (!anyChecked) {
+                evt.preventDefault();
+                window.alert('Selecione pelo menos um arquivo para gerar o PDF.');
+            }
         });
     }
 })();

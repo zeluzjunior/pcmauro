@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Importar tabela de peças por máquina{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Importar tabela de peças por máquina</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Importar tabela de peças por máquina</h1>
+                <p class="lead mb-0">Envio de planilhas no formato da lista de peças por máquina (Excel)</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-upload me-2"></i>Enviar arquivo</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'importar_pecas_maquina' %}" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="pecasMaquinaFile" class="form-label">Arquivo Excel</label>
+                                <input type="file" class="form-control" id="pecasMaquinaFile" name="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" required>
+                                <div class="form-text">
+                                    Workbook no estilo <strong>«LISTA DE PEÇAS POR MÁQUINA»</strong>
+                                    (ex.: <em>LISTA DE PEÇAS POR MÁQUINA - TRIMMER 1500M2.xlsx</em>), em <code>.xlsx</code> ou <code>.xlsm</code>.
+                                    Somente a aba <strong>«LISTA COMPLETA»</strong> é lida. Colunas usadas:
+                                    <strong>A</strong> máquina, <strong>B</strong> posição (manual), <strong>C</strong> fabricante,
+                                    <strong>D</strong> cód. fabricante, <strong>E</strong> descrição (Peça Fornecedor),
+                                    <strong>F</strong> quantidade, <strong>S</strong> parte/componente na máquina.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="updateExistingPecas" name="update_existing">
+                                    <label class="form-check-label" for="updateExistingPecas">
+                                        Atualizar registros já existentes (mesma máquina + mesma peça fornecedor)
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-file-upload me-2"></i>Importar arquivo
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="row mb-4">
+            <div class="col-lg-10 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-columns me-2"></i>Mapeamento colunas → tabelas (planilha «LISTA COMPLETA»)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">
+                            Cada coluna esperada é associada a um <strong>destino lógico</strong> (<code>modelo.campo</code> ou ignorado).
+                            O código está em <code>app/utils.py</code> (<code>LISTA_COMPLETA_IMPORT_SCHEMA</code>).
+                            Depois dá para trocar por telas no admin ou por arquivo de configuração sem mudar a planilha.
+                        </p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th scope="col">Coluna (rótulo)</th>
+                                        <th scope="col">Destino no sistema</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in lista_completa_import_schema %}
+                                        <tr>
+                                            <td>{{ row.label_pt }}</td>
+                                            <td><span class="text-muted font-monospace small">{{ row.target }}</span><br>{{ row.target_desc }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% if lista_completa_import_copies %}
+                            <p class="small text-muted mt-3 mb-0"><strong>Mesmo valor em mais de um campo:</strong></p>
+                            <ul class="small text-muted mb-0">
+                                {% for c in lista_completa_import_copies %}
+                                    <li>{{ c.from_desc }} → também {{ c.to_desc }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Sobre esta página</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-0 text-muted">
+                            A importação grava <strong>Peça máquina (citada no manual)</strong> e cria/vincula <strong>Peça Fornecedor</strong>
+                            quando necessário. É preciso que o código da máquina da coluna <strong>A</strong> já exista em <strong>Máquinas</strong>.
+                            Item Aurora e demais colunas podem ser tratados em etapas futuras.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

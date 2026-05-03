@@ -251,31 +251,54 @@
                         </div>
                     </div>
                     
-                    <!-- Campos de Nome do Grupo, Data e Periodicidade -->
-                    <div class="row mb-3">
-                        <div class="col-md-12">
-                            <label for="nomeGrupo" class="form-label">Nome do Grupo de Agendamento</label>
-                            <input type="text" class="form-control" id="nomeGrupo" name="nome_grupo" placeholder="Ex: Manutenção Preventiva - Setor A, Revisão Mensal, etc." maxlength="255">
-                            <small class="form-text text-muted">Dê um nome identificador para este grupo de agendamentos (opcional, mas recomendado)</small>
+                    <!-- Configuração de periodicidade -->
+                    <div class="card border-secondary mb-3">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">
+                                <i class="fas fa-sync-alt me-2"></i>Configuração de Periodicidade
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3 align-items-end">
+                                <div class="col-md-5">
+                                    <label for="nomeGrupo" class="form-label">Nome do Grupo de Agendamento</label>
+                                    <input type="text" class="form-control" id="nomeGrupo" name="nome_grupo" placeholder="Ex: Manutenção Preventiva - Setor A, Revisão Mensal, etc." maxlength="255">
+                                    <small class="form-text text-muted">Nome identificador do grupo (opcional)</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="periodicidade" class="form-label">Periodicidade (dias)</label>
+                                    <input type="number" class="form-control" id="periodicidade" name="periodicidade" min="1" placeholder="Ex: 30 para mensal, 7 para semanal" onchange="window.refreshPreviewCronograma && window.refreshPreviewCronograma()" oninput="window.refreshPreviewCronograma && window.refreshPreviewCronograma()">
+                                    <small class="form-text text-muted">Dias entre repetições (em branco = agendamento único)</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="button" class="btn btn-success w-100" id="salvarAgendamentos" disabled>
+                                        <i class="fas fa-save me-2"></i>Salvar Agendamentos
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label for="dataPlanejada" class="form-label">Data Planejada para Execução</label>
-                            <input type="date" class="form-control" id="dataPlanejada" name="data_planejada" required onchange="window.refreshPreviewCronograma && window.refreshPreviewCronograma()" oninput="window.refreshPreviewCronograma && window.refreshPreviewCronograma()">
-                            <small class="form-text text-muted">Data inicial para associar todos os itens selecionados</small>
+
+                    <!-- Nova seção: Data Planejada para Execução -->
+                    <div class="card border-primary mb-3">
+                        <div class="card-header bg-primary text-white">
+                            <h6 class="mb-0">
+                                <i class="fas fa-calendar-day me-2"></i>Data Planejada para Execução
+                            </h6>
                         </div>
-                        <div class="col-md-4">
-                            <label for="periodicidade" class="form-label">Periodicidade (dias)</label>
-                            <input type="number" class="form-control" id="periodicidade" name="periodicidade" min="1" placeholder="Ex: 30 para mensal, 7 para semanal" onchange="window.refreshPreviewCronograma && window.refreshPreviewCronograma()" oninput="window.refreshPreviewCronograma && window.refreshPreviewCronograma()">
-                            <small class="form-text text-muted">Número de dias entre cada repetição até o final do ano (deixe em branco para agendamento único)</small>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">&nbsp;</label>
-                            <div>
-                                <button type="button" class="btn btn-success w-100" id="salvarAgendamentos" disabled>
-                                    <i class="fas fa-save me-2"></i>Salvar Agendamentos
-                                </button>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-5">
+                                    <label for="dataPlanejada" class="form-label">Data Planejada para Execução</label>
+                                    <input type="date" class="form-control" id="dataPlanejada" name="data_planejada" required onchange="window.refreshPreviewCronograma && window.refreshPreviewCronograma()" oninput="window.refreshPreviewCronograma && window.refreshPreviewCronograma()">
+                                    <small class="form-text text-muted">Data base usada para criar o cronograma dos itens selecionados</small>
+                                </div>
+                                <div class="col-md-7">
+                                    <label class="form-label">Sugestões de Data Base (pelas manutenções das máquinas selecionadas)</label>
+                                    <div id="dataBaseSuggestions" class="border rounded p-2 bg-light">
+                                        <small class="text-muted">Selecione máquinas na lista acima para carregar sugestões.</small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -855,6 +878,63 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Função para atualizar a lista de seleções
+    async function updateDataBaseSuggestions() {
+        const target = document.getElementById('dataBaseSuggestions');
+        if (!target) return;
+
+        const machineIds = selectedItems
+            .filter(item => item.tipo === 'maquina')
+            .map(item => String(item.id))
+            .filter(Boolean);
+
+        if (machineIds.length === 0) {
+            target.innerHTML = '<small class="text-muted">Selecione máquinas na lista acima para carregar sugestões.</small>';
+            return;
+        }
+
+        target.innerHTML = '<small class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Carregando sugestões...</small>';
+        try {
+            const url = new URL('{% url "api_sugestoes_data_base_cronograma" %}', window.location.origin);
+            url.searchParams.append('maquina_ids', machineIds.join(','));
+            const resp = await fetch(url.toString());
+            const data = await resp.json();
+            const suggestions = (data && data.suggestions) ? data.suggestions : [];
+
+            if (!suggestions.length) {
+                target.innerHTML = '<small class="text-muted">Sem sugestões de data encontradas para as máquinas selecionadas.</small>';
+                return;
+            }
+
+            const chips = suggestions.map(function(s, idx) {
+                const sources = (s.sources || []).slice(0, 2).join(' / ');
+                return `
+                    <button type="button" class="btn btn-sm btn-outline-primary me-2 mb-2 suggestion-date-btn" data-date="${s.date}" title="${sources}">
+                        ${idx === 0 ? '<i class="fas fa-star text-warning me-1"></i>' : ''}${s.label}
+                        <span class="badge bg-secondary ms-1">${s.frequency}</span>
+                    </button>
+                `;
+            }).join('');
+
+            target.innerHTML = `
+                <div class="mb-2">
+                    <small class="text-muted">Clique em uma sugestão para usar como Data Planejada para Execução.</small>
+                </div>
+                ${chips}
+            `;
+
+            target.querySelectorAll('.suggestion-date-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    const dataPlanejadaEl = document.getElementById('dataPlanejada');
+                    if (!dataPlanejadaEl) return;
+                    dataPlanejadaEl.value = this.getAttribute('data-date') || '';
+                    if (window.refreshPreviewCronograma) window.refreshPreviewCronograma();
+                });
+            });
+        } catch (err) {
+            target.innerHTML = '<small class="text-danger">Erro ao carregar sugestões de data.</small>';
+        }
+    }
+
     function updateSelectedItemsList() {
         const listContainer = document.getElementById('selectedItemsList');
         const countBadge = document.getElementById('selectedCount');
@@ -888,6 +968,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Atualizar preview do cronograma
         updateSchedulePreview();
+        updateDataBaseSuggestions();
     }
     
     // Função para remover item da lista
@@ -1299,6 +1380,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Inicializar lista vazia
     updateSelectedItemsList();
+    updateDataBaseSuggestions();
     
     // Inicializar visibilidade das máquinas
     updateMaquinasVisibility();

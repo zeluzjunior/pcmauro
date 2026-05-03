@@ -97,6 +97,50 @@
     .col-valor-correlacao { min-width: 120px; text-align: right; }
     .col-status { min-width: 130px; }
     .col-score { min-width: 150px; }
+    .impacto-track {
+        width: 100%;
+        padding: 6px;
+        border-radius: 999px;
+        border: 1px solid #d3dae3;
+        background: #eef2f6;
+    }
+    .impacto-track-inner {
+        width: 100%;
+        height: 26px;
+        border-radius: 999px;
+        overflow: hidden;
+        display: flex;
+        align-items: stretch;
+        background: #d7dee7;
+    }
+    .impacto-segment {
+        flex: 0 0 auto;
+        min-width: 0;
+    }
+    .impacto-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin-right: 0.9rem;
+        margin-bottom: 0.35rem;
+        font-size: 0.82rem;
+    }
+    .impacto-legend-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+    .kpi-section {
+        margin-bottom: 2rem !important;
+    }
+    .kpi-row-tight {
+        margin-bottom: 0.5rem !important;
+    }
+    .kpi-row-tight:last-child {
+        margin-bottom: 0 !important;
+    }
 </style>
 {% endblock %}
 
@@ -129,18 +173,21 @@
                 <div class="accordion filter-accordion" id="filterAccordion">
                     <div class="accordion-item shadow-sm border-0">
                         <h2 class="accordion-header" id="headingFilter">
-                            <button class="accordion-button {% if mostrar_todos or ano_selecionado or meses_selecionados or setores_selecionados or uso_contabil_filtro %}{% else %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if mostrar_todos or ano_selecionado or meses_selecionados or setores_selecionados or uso_contabil_filtro %}true{% else %}false{% endif %}" aria-controls="collapseFilter">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="false" aria-controls="collapseFilter">
                                 <i class="fas fa-sliders-h me-2"></i>Filtros de Análise
-                                {% if mostrar_todos or ano_selecionado or meses_selecionados or setores_selecionados or uso_contabil_filtro %}
+                                {% if mostrar_todos or ano_selecionado or meses_selecionados or setores_selecionados or uso_contabil_filtro or classificacao_reuniao_filtro %}
                                     {% if mostrar_todos %}<span class="badge bg-success ms-2">Todos os registros</span>{% endif %}
                                     <span class="badge bg-light text-dark ms-2">{% if meses_selecionados %}{{ meses_selecionados|length }}{% else %}12{% endif %} mês(es)</span>
                                     {% if setores_selecionados %}
                                     <span class="badge bg-light text-dark ms-1">{{ setores_selecionados|length }} setor(es)</span>
                                     {% endif %}
+                                    {% if classificacao_reuniao_filtro %}
+                                    <span class="badge bg-light text-dark ms-1">Classificação aplicada</span>
+                                    {% endif %}
                                 {% endif %}
                             </button>
                         </h2>
-                        <div id="collapseFilter" class="accordion-collapse collapse {% if mostrar_todos or ano_selecionado or meses_selecionados or setores_selecionados or uso_contabil_filtro %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
+                        <div id="collapseFilter" class="accordion-collapse collapse" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
                             <div class="accordion-body">
                                 <form method="GET" action="{% url 'analise_projecao_gastos' %}">
                                     <!-- Mostrar todos (sem filtros de ano/mês) -->
@@ -170,6 +217,15 @@
                                                         <option value="">Todos os Usos Contábeis</option>
                                                         {% for uso_contabil in uso_contabil_disponiveis %}
                                                             <option value="{{ uso_contabil }}" {% if uso_contabil == uso_contabil_filtro %}selected{% endif %}>{{ uso_contabil }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <div class="filter-group-label"><i class="fas fa-tags"></i>Classificação (Reunião)</div>
+                                                    <select class="form-select form-select-sm" id="classificacao_reuniao_filtro" name="classificacao_reuniao">
+                                                        <option value="">Todas as classificações</option>
+                                                        {% for key, label in classificacao_reuniao_choices %}
+                                                            <option value="{{ key }}" {% if key == classificacao_reuniao_filtro %}selected{% endif %}>{{ label }}</option>
                                                         {% endfor %}
                                                     </select>
                                                 </div>
@@ -227,9 +283,9 @@
         </div>
 
         <!-- KPI Cards -->
-        <div class="mb-5">
+        <div class="kpi-section mb-5">
             <!-- Cards Gerais -->
-            <div class="row mb-3">
+            <div class="row kpi-row-tight mb-3">
                 <div class="col-md-3 mb-3">
                     <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
                         <div class="card-body">
@@ -288,7 +344,7 @@
                 </div>
             </div>
             <!-- Cards Adicionais (3 boxes) -->
-            <div class="row mb-3">
+            <div class="row kpi-row-tight mb-3">
                 <div class="col-md-4 mb-3">
                     <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
                         <div class="card-body">
@@ -329,6 +385,90 @@
                                 <i class="fas fa-percentage fa-3x text-success opacity-25"></i>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Análise de Impacto por Setor no Orçamento -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header text-white" style="background-color: #0d6efd;">
+                        <h5 class="mb-0">
+                            <i class="fas fa-layer-group me-2"></i>Análise de Impacto
+                        </h5>
+                        <small class="opacity-90">Linha completa representa o orçamento do período; cada faixa mostra o impacto de um setor.</small>
+                    </div>
+                    <div class="card-body">
+                        {% if valor_orcamento_periodo and valor_orcamento_periodo > 0 %}
+                            <div class="d-flex flex-wrap gap-3 mb-3">
+                                <span class="badge bg-light text-dark border">Orçamento: {{ valor_orcamento_periodo|currency_br }}</span>
+                                <span class="badge bg-primary">Projetado: {{ valor_total_projetado|currency_br }}</span>
+                                <span class="badge {% if impacto_orcamento_total_pct > 100 %}bg-danger{% elif impacto_orcamento_total_pct > 85 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                    Impacto total: {{ impacto_orcamento_total_pct|floatformat:1 }}%
+                                </span>
+                            </div>
+
+                            <div class="impacto-track mb-2" role="img" aria-label="Composição do impacto por setor no orçamento">
+                                <div class="impacto-track-inner">
+                                    {% for item in impacto_setores_barras %}
+                                        <div class="impacto-segment" style="width: {{ item.width_pct_css }}%; background-color: {{ item.color_hex }};" title="{{ item.setor }} - {{ item.impacto_pct|floatformat:2 }}% do orçamento ({{ item.valor_total|currency_br }})"></div>
+                                    {% endfor %}
+                                    {% if impacto_orcamento_restante_pct > 0 %}
+                                        <div class="impacto-segment" style="width: calc(100% - {{ impacto_setores_width_total_css }}%); background-color: #cfd6df;" title="Orçamento ainda disponível"></div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                {% for item in impacto_setores_barras %}
+                                    <span class="impacto-legend-item" title="{{ item.valor_total|currency_br }} ({{ item.impacto_pct|floatformat:2 }}% do orçamento)">
+                                        <span class="impacto-legend-dot" style="background-color: {{ item.color_hex }};"></span>
+                                        <span><strong>{{ item.setor }}</strong> {{ item.impacto_pct|floatformat:1 }}%</span>
+                                    </span>
+                                {% endfor %}
+                                {% if impacto_orcamento_restante_pct > 0 %}
+                                    <span class="impacto-legend-item">
+                                        <span class="impacto-legend-dot" style="background-color: #cfd6df;"></span>
+                                        <span><strong>Disponível</strong> {{ impacto_orcamento_restante_pct|floatformat:1 }}%</span>
+                                    </span>
+                                {% endif %}
+                            </div>
+
+                            {% if impacto_orcamento_escala_aplicada %}
+                                <div class="alert alert-warning py-2 mb-3">
+                                    A barra foi escalada visualmente para caber em 100% do orçamento. O impacto real total é <strong>{{ impacto_orcamento_total_pct|floatformat:1 }}%</strong>
+                                    (excedente de <strong>{{ impacto_orcamento_excedente_pct|floatformat:1 }}%</strong>).
+                                </div>
+                            {% endif %}
+
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Setor</th>
+                                            <th class="text-end">Valor Projetado</th>
+                                            <th class="text-end">% do Orçamento</th>
+                                            <th class="text-end">% do Projetado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in impacto_setores_barras %}
+                                            <tr>
+                                                <td>{{ item.setor }}</td>
+                                                <td class="text-end">{{ item.valor_total|currency_br }}</td>
+                                                <td class="text-end">{{ item.impacto_pct|floatformat:2 }}%</td>
+                                                <td class="text-end">{{ item.participacao_pct|floatformat:2 }}%</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info mb-0">
+                                Não há orçamento cadastrado para o período filtrado em `DadosOrcamento`; por isso a análise de impacto por setor não pode ser calculada.
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>

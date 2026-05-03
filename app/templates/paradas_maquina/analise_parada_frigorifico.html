@@ -16,9 +16,7 @@
     .kpi-warning { border-left-color: #ffc107; }
     .kpi-info { border-left-color: #0dcaf0; }
     .kpi-danger { border-left-color: #dc3545; }
-    #mesSelecionadoFrig { transition: all 0.3s ease; cursor: pointer; font-weight: 500; }
-    #mesSelecionadoFrig:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); transform: translateY(-1px); }
-    #mesSelecionadoFrig:focus { box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.25); border-color: #198754; outline: none; }
+    .frig-sum-cap { font-weight: 600; color: #0d47a1; }
 </style>
 {% endblock %}
 
@@ -132,16 +130,16 @@
         </div>
 
         <!-- Evolução Diária -->
-        <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><div class="d-flex justify-content-between align-items-center flex-wrap"><h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Evolução Diária (Frigorífico)</h5><div class="input-group" style="max-width: 220px;"><span class="input-group-text bg-white border-end-0"><i class="fas fa-calendar-alt text-primary"></i></span><input type="month" class="form-control border-start-0" id="mesSelecionadoFrig" value="{{ mes_selecionado }}" style="font-weight: 500;"></div></div></div><div class="card-body"><div class="chart-container-large"><canvas id="dailyChartFrig"></canvas></div></div></div></div></div>
+        <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><div class="d-flex justify-content-between align-items-center flex-wrap gap-2"><h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Evolução Diária (Frigorífico)</h5><span class="small opacity-90">Ano {{ ano_filtro }}{% if meses_filtro %} · {{ meses_filtro|length }} mês(es){% else %} · todos os meses{% endif %}</span></div></div><div class="card-body"><p class="text-muted small mb-2">Quantidade e capacidade por dia (Frigorífico), alinhado aos filtros da página.</p><p class="small mb-2">Σ capacidade (soma dos pontos da série <strong>Capacidade</strong>): <span class="frig-sum-cap" id="frigDailySumCapDisplay">{{ frig_chart_total_cap_diaria|number_br:2 }}</span></p><div class="chart-container-large"><canvas id="dailyChartFrig"></canvas></div></div></div></div></div>
         <!-- Paradas por Máquina -->
-        <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Paradas por Máquina (Frigorífico)</h5></div><div class="card-body"><p class="text-muted small mb-2">Quantidade de paradas associadas a cada máquina via Ordem de Serviço. <strong>Clique na barra</strong> para abrir a página da máquina.</p><div class="chart-container-large"><canvas id="maquinasChartFrig"></canvas></div></div></div></div></div>
+        <div class="row mb-4"><div class="col-12"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Paradas por Máquina (Frigorífico)</h5></div><div class="card-body"><p class="text-muted small mb-2">Soma de <strong>capacidade</strong> por máquina no período filtrado (cada parada uma vez; repartição entre máquinas quando há várias OS). <strong>Clique na barra</strong> para abrir a máquina.</p><p class="small mb-2">Σ capacidade (soma das barras exibidas): <span class="frig-sum-cap">{{ frig_chart_total_cap_maquinas|number_br:2 }}</span></p><div class="chart-container-large"><canvas id="maquinasChartFrig"></canvas></div></div></div></div></div>
         <!-- Top Paradas / Turnos -->
-        <div class="row mb-4"><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-info text-white"><h5 class="mb-0">Top 10 Paradas (Frigorífico)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="paradasChartFrig"></canvas></div></div></div></div><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-warning text-white"><h5 class="mb-0">Turnos (Frigorífico)</h5></div><div class="card-body"><div class="chart-container-large"><canvas id="turnosChartFrig"></canvas></div></div></div></div></div>
+        <div class="row mb-4"><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-info text-white"><h5 class="mb-0">Top 10 Paradas (Frigorífico)</h5></div><div class="card-body"><p class="text-muted small mb-2">Top 10 tipos de parada por soma de capacidade no período filtrado.</p><p class="small mb-2">Σ capacidade (top 10): <span class="frig-sum-cap">{{ frig_chart_total_cap_top10_tipos|number_br:2 }}</span></p><div class="chart-container-large"><canvas id="paradasChartFrig"></canvas></div></div></div></div><div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-warning text-dark"><h5 class="mb-0">Turnos (Frigorífico)</h5></div><div class="card-body"><p class="text-muted small mb-2">Distribuição da <strong>capacidade</strong> por turno (paradas com turno informado).</p><p class="small mb-2">Σ capacidade (fatias exibidas): <span class="frig-sum-cap">{{ frig_chart_total_cap_turnos|number_br:2 }}</span> <span class="text-muted small">(paradas sem turno não entram)</span></p><div class="chart-container-large"><canvas id="turnosChartFrig"></canvas></div></div></div></div></div>
         <!-- Pareto -->
-        <div class="row mb-4"><div class="col-12 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Pareto – Paradas por Máquina (Frigorífico)</h5></div><div class="card-body"><p class="text-muted small mb-2">Barras ordenadas por quantidade de paradas com linha de percentual acumulado (80/20).</p><div class="chart-container-large"><canvas id="paretoMaquinasChartFrig"></canvas></div></div></div></div></div>
+        <div class="row mb-4"><div class="col-12 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-primary text-white"><h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Pareto – Paradas por Máquina (Frigorífico)</h5></div><div class="card-body"><p class="text-muted small mb-2">Mesmas barras de capacidade por máquina; % acumulado sobre o total <strong>deste gráfico</strong>.</p><p class="small mb-2">Σ capacidade (barras): <span class="frig-sum-cap">{{ frig_chart_total_cap_maquinas|number_br:2 }}</span></p><div class="chart-container-large"><canvas id="paretoMaquinasChartFrig"></canvas></div></div></div></div></div>
         <div class="row mb-4">
-            <div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-info text-white"><h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Pareto – Top 10 Paradas (Frigorífico)</h5></div><div class="card-body"><p class="text-muted small mb-2">Top 10 paradas com linha de percentual acumulado (80/20).</p><div class="chart-container-large"><canvas id="paretoParadasChartFrig"></canvas></div></div></div></div>
-            <div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Pareto – Paradas por Setor de Manutenção (Frigorífico)</h5></div><div class="card-body"><p class="text-muted small mb-2">Paradas agrupadas pelo <strong>cd_setormanut</strong> da OS relacionada.</p><div class="chart-container-large"><canvas id="paretoSetormanutChartFrig"></canvas></div></div></div></div>
+            <div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-info text-white"><h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Pareto – Top 10 Paradas (Frigorífico)</h5></div><div class="card-body"><p class="text-muted small mb-2">Mesmo top 10 por capacidade; % acumulado sobre o total <strong>deste gráfico</strong>.</p><p class="small mb-2">Σ capacidade (barras): <span class="frig-sum-cap">{{ frig_chart_total_cap_top10_tipos|number_br:2 }}</span></p><div class="chart-container-large"><canvas id="paretoParadasChartFrig"></canvas></div></div></div></div>
+            <div class="col-md-6 mb-4"><div class="card shadow-sm border-0"><div class="card-header bg-secondary text-white"><h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Pareto – Paradas por Setor de Manutenção (Frigorífico)</h5></div><div class="card-body"><p class="text-muted small mb-2">Capacidade por <strong>cd_setormanut</strong> (OS associada), período filtrado.</p><p class="small mb-2">Σ capacidade (barras): <span class="frig-sum-cap">{{ frig_chart_total_cap_pareto_setor|number_br:2 }}</span></p><div class="chart-container-large"><canvas id="paretoSetormanutChartFrig"></canvas></div></div></div></div>
         </div>
         <!-- Análise Prédio do Abate -->
         <div class="row mb-4">
@@ -169,52 +167,63 @@ function waitForChartJS(cb, max) { max = max || 100; var n = 0; function chk() {
 document.addEventListener('DOMContentLoaded', function() {
     waitForChartJS(function() {
         if (typeof Chart === 'undefined') return;
-        function createDailySectionChart(canvasId, mesInputId, secao) {
-            const ctx = document.getElementById(canvasId), inp = document.getElementById(mesInputId);
-            if (!ctx || !inp) return;
-            let ch = null;
-            function upd(mesAno) { if (ch) ch.destroy(); const [ano, mes] = mesAno.split('-').map(Number);
-                fetch('/api/dados-diarios-paradas/?ano=' + ano + '&mes=' + mes + '&secao=' + secao).then(r => r.json()).then(data => {
-                    if (!data.labels || !data.labels.length) { ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
-                    ch = new Chart(ctx.getContext('2d'), { type: 'line', data: { labels: data.labels, datasets: [
-                        { label: 'Quantidade', data: data.data, borderColor: '#198754', backgroundColor: 'rgba(25, 135, 84, 0.1)', tension: 0.4, fill: true, yAxisID: 'y' },
-                        { label: 'Capacidade', data: data.capacidade, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.4, fill: true, yAxisID: 'y1' }
-                    ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } }, scales: { y: { type: 'linear', display: true, position: 'left', beginAtZero: true }, y1: { type: 'linear', display: true, position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } } } } });
-                }).catch(() => { ctx.parentElement.innerHTML = '<div class="alert alert-danger m-3">Erro ao carregar.</div>'; });
-            }
-            inp.addEventListener('change', function() { upd(this.value); }); upd(inp.value);
+        function fmtCapPT(val) {
+            if (val === null || val === undefined || (typeof val === 'number' && isNaN(val))) return '-';
+            return Number(val).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
         }
-        createDailySectionChart('dailyChartFrig', 'mesSelecionadoFrig', 'frigorifico');
+        function loadDailyFrigAlignedWithFilter(canvasId, secao) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+            const ano = {{ ano_filtro }};
+            const meses = {{ meses_filtro_json|safe }};
+            let url = '/api/dados-diarios-paradas/?ano=' + encodeURIComponent(ano) + '&secao=' + encodeURIComponent(secao);
+            if (meses && meses.length) meses.forEach(function(m) { url += '&mes=' + encodeURIComponent(m); });
+            fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+                if (!data.labels || !data.labels.length) { ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados para o período filtrado.</div>'; return; }
+                if (data.total_capacidade != null) {
+                    var el = document.getElementById('frigDailySumCapDisplay');
+                    if (el) el.textContent = fmtCapPT(data.total_capacidade);
+                }
+                new Chart(ctx.getContext('2d'), { type: 'line', data: { labels: data.labels, datasets: [
+                    { label: 'Quantidade', data: data.data, borderColor: '#198754', backgroundColor: 'rgba(25, 135, 84, 0.1)', tension: 0.4, fill: true, yAxisID: 'y' },
+                    { label: 'Capacidade', data: data.capacidade, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', tension: 0.4, fill: true, yAxisID: 'y1' }
+                ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } }, scales: { y: { type: 'linear', display: true, position: 'left', beginAtZero: true }, y1: { type: 'linear', display: true, position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } } } } });
+            }).catch(function() { ctx.parentElement.innerHTML = '<div class="alert alert-danger m-3">Erro ao carregar.</div>'; });
+        }
+        loadDailyFrigAlignedWithFilter('dailyChartFrig', 'frigorifico');
         function createMaquinasBarChart(canvasId, labels, data, urls, bgColor) {
             const ctx = document.getElementById(canvasId); if (!ctx || !labels || !labels.length) { if (ctx) ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
             ctx.style.cursor = 'pointer';
-            new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: labels, datasets: [{ label: '', data: data, backgroundColor: bgColor }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } }, onClick: function(evt, els) { if (els.length && urls && urls[els[0].index]) window.location.href = urls[els[0].index]; } } });
+            new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: labels, datasets: [{ label: 'Soma capacidade', data: data, backgroundColor: bgColor }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return 'Capacidade: ' + fmtCapPT(c.parsed.x); } } } }, scales: { x: { beginAtZero: true, ticks: { callback: function(v) { return fmtCapPT(v); } } } }, onClick: function(evt, els) { if (els.length && urls && urls[els[0].index]) window.location.href = urls[els[0].index]; } } });
         }
         function createBarSectionChart(canvasId, labels, data, bgColor) {
             const ctx = document.getElementById(canvasId); if (!ctx || !labels || !labels.length) { if (ctx) ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
-            new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: labels, datasets: [{ label: '', data: data, backgroundColor: bgColor }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } } });
+            new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: labels, datasets: [{ label: 'Soma capacidade', data: data, backgroundColor: bgColor }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return 'Capacidade: ' + fmtCapPT(c.parsed.x); } } } }, scales: { x: { beginAtZero: true, ticks: { callback: function(v) { return fmtCapPT(v); } } } } } });
         }
-        function createParetoChart(canvasId, labels, data, barColor) {
+        function createParetoChart(canvasId, labels, data, barColor, barDatasetLabel, barValueKind) {
+            barDatasetLabel = barDatasetLabel || 'Quantidade';
+            barValueKind = barValueKind || 'count';
+            const fmtBar = function(v) { return barValueKind === 'capacidade' ? fmtCapPT(v) : String(v); };
             const ctx = document.getElementById(canvasId); if (!ctx || !labels || !labels.length) { if (ctx) ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
             const total = data.reduce((a,b)=>a+b,0), cumul = []; let s=0; for (let i=0;i<data.length;i++) { s+=data[i]; cumul.push(total>0?s/total*100:0); }
             new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: labels, datasets: [
-                { label: 'Quantidade', data: data, backgroundColor: barColor, yAxisID: 'y' },
+                { label: barDatasetLabel, data: data, backgroundColor: barColor, yAxisID: 'y' },
                 { label: '% Acumulado', data: cumul, type: 'line', borderColor: '#dc3545', fill: false, tension: 0.3, pointRadius: 4, yAxisID: 'y1' }
-            ]}, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true } }, scales: { y: { type: 'linear', position: 'left', beginAtZero: true }, y1: { type: 'linear', position: 'right', min: 0, max: 100, grid: { drawOnChartArea: false }, ticks: { callback: v => v + '%' } } } } });
+            ]}, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true }, tooltip: { callbacks: { label: function(c) { if (c.datasetIndex === 0) return barDatasetLabel + ': ' + fmtBar(c.parsed.y); return '% Acumulado: ' + (c.parsed.y != null ? c.parsed.y.toFixed(1) + '%' : '-'); } } } }, scales: { y: { type: 'linear', position: 'left', beginAtZero: true, ticks: { callback: function(v) { return fmtBar(v); } } }, y1: { type: 'linear', position: 'right', min: 0, max: 100, grid: { drawOnChartArea: false }, ticks: { callback: v => v + '%' } } } } });
         }
-        function createDoughnutSectionChart(canvasId, labels, dataCount, dataHoras) {
+        function createTurnosCapDoughnut(canvasId, labels, capData) {
             const ctx = document.getElementById(canvasId); if (!ctx || !labels || !labels.length) { if (ctx) ctx.parentElement.innerHTML = '<div class="alert alert-info m-3">Não há dados.</div>'; return; }
+            const cols = ['#0d6efd','#198754','#ffc107','#dc3545','#0dcaf0','#6f42c1','#fd7e14','#20c997'];
             new Chart(ctx.getContext('2d'), { type: 'doughnut', data: { labels: labels, datasets: [
-                { label: 'Quantidade', data: dataCount, backgroundColor: ['#0d6efd','#198754','#ffc107','#dc3545','#0dcaf0','#6f42c1'] },
-                { label: 'Horas', data: dataHoras, backgroundColor: ['#0d6efd','#198754','#ffc107','#dc3545','#0dcaf0','#6f42c1'] }
-            ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } } } });
+                { label: 'Capacidade', data: capData, backgroundColor: labels.map(function(_, i) { return cols[i % cols.length]; }) }
+            ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true }, tooltip: { callbacks: { label: function(ctx) { return (ctx.label || '') + ': ' + fmtCapPT(ctx.raw); } } } } } });
         }
-        createBarSectionChart('paradasChartFrig', {{ section_frig_top_paradas_labels|safe }}, {{ section_frig_top_paradas_data|safe }}, '#0dcaf0');
-        createMaquinasBarChart('maquinasChartFrig', {{ section_frig_maquinas_labels|safe }}, {{ section_frig_maquinas_data|safe }}, {{ section_frig_maquinas_urls|safe }}, '#0d6efd');
-        createParetoChart('paretoMaquinasChartFrig', {{ section_frig_maquinas_labels|safe }}, {{ section_frig_maquinas_data|safe }}, '#0d6efd');
-        createParetoChart('paretoParadasChartFrig', {{ section_frig_top_paradas_labels|safe }}, {{ section_frig_top_paradas_data|safe }}, '#0dcaf0');
-        createParetoChart('paretoSetormanutChartFrig', {{ section_frig_setormanut_labels|safe }}, {{ section_frig_setormanut_data|safe }}, '#6c757d');
-        createDoughnutSectionChart('turnosChartFrig', {{ section_frig_turnos_labels|safe }}, {{ section_frig_turnos_data_count|safe }}, {{ section_frig_turnos_data_horas|safe }});
+        createBarSectionChart('paradasChartFrig', {{ section_frig_top_paradas_labels|safe }}, {{ section_frig_top_paradas_capacidade|safe }}, '#0dcaf0');
+        createMaquinasBarChart('maquinasChartFrig', {{ section_frig_maquinas_labels|safe }}, {{ section_frig_maquinas_capacidade|safe }}, {{ section_frig_maquinas_urls|safe }}, '#0d6efd');
+        createParetoChart('paretoMaquinasChartFrig', {{ section_frig_maquinas_labels|safe }}, {{ section_frig_maquinas_capacidade|safe }}, '#0d6efd', 'Soma capacidade', 'capacidade');
+        createParetoChart('paretoParadasChartFrig', {{ section_frig_top_paradas_labels|safe }}, {{ section_frig_top_paradas_capacidade|safe }}, '#0dcaf0', 'Soma capacidade', 'capacidade');
+        createParetoChart('paretoSetormanutChartFrig', {{ section_frig_setormanut_labels|safe }}, {{ section_frig_setormanut_capacidade|safe }}, '#6c757d', 'Soma capacidade', 'capacidade');
+        createTurnosCapDoughnut('turnosChartFrig', {{ section_frig_turnos_labels|safe }}, {{ section_frig_turnos_data_capacidade|safe }});
     });
 });
 </script>

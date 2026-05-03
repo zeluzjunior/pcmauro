@@ -34,6 +34,7 @@ urlpatterns = [
     path('importar/locais-e-cas/', views.importar_locais_e_cas, name="importar_locais_e_cas"),
     path('importar/estoque/', views.importar_estoque, name="importar_estoque"),
     path('importar/projecao-gastos/', views.importar_projecao_gastos, name="importar_projecao_gastos"),
+    path('importar/pecas-maquina/', views.importar_pecas_maquina, name="importar_pecas_maquina"),
 
     # Exportar Dados
     path('exportar/maquinas/', views.exportar_maquinas, name="exportar_maquinas"),
@@ -50,6 +51,7 @@ urlpatterns = [
     
     # Estoque
     path('estoque/consultar/', views.consultar_estoque, name="consultar_estoque"),
+    path('estoque/almoxarifado/<int:codigo_item>/', views.visualizar_estoque_almoxarifado, name="visualizar_estoque_almoxarifado"),
     path('estoque/visualizar/<int:item_id>/', views.visualizar_item_estoque, name="visualizar_item_estoque"),
     
     # Manutenções Preventivas
@@ -71,6 +73,7 @@ urlpatterns = [
     path('paradas-maquina/relacionar-ordem-com-parada/', views.relacionar_ordem_com_parada, name="relacionar_ordem_com_parada"),
     path('paradas-maquina/configuracao/', views.configuracao_parada_maquina, name="configuracao_parada_maquina"),
     path('almoxarifado/analise-requisicoes-data-importada/', views.analise_requisicoes_data_importada, name="analise_requisicoes_data_importada"),
+    path('almoxarifado/analise-estoque/', views.analise_estoque_almoxarifado, name="analise_estoque_almoxarifado"),
     path('consultar/notas-fiscais/', views.consultar_notas_fiscais, name="consultar_notas_fiscais"),
     path('notas-fiscais/visualizar/<int:nota_id>/', views.visualizar_nota_fiscal, name="visualizar_nota_fiscal"),
     path('orcamento/dados-orcamento/', views.dados_orcamento, name="dados_orcamento"),
@@ -79,6 +82,7 @@ urlpatterns = [
     path('orcamento/consultar-projecao-gastos/', views.consultar_projecao_gastos, name="consultar_projecao_gastos"),
     path('orcamento/visualizar-projecao-gasto/<int:projecao_id>/', views.visualizar_projecao_gasto, name="visualizar_projecao_gasto"),
     path('orcamento/analise-projecao-gastos/', views.analise_projecao_gastos, name="analise_projecao_gastos"),
+    path('orcamento/reuniao-projecao-gastos/', views.reuniao_projecao_gastos, name="reuniao_projecao_gastos"),
     path('orcamento/visualizar-projecoes-gastos-por-setor/', views.visualizar_projecoes_gastos_por_setor, name="visualizar_projecoes_gastos_por_setor"),
     path('orcamento/analise-notas-fiscais/', views.analise_notas_fiscais, name="analise_notas_fiscais"),
     path('orcamento/relacionar-projecao-nota-fiscal/', views.relacionar_projecao_nota_fiscal, name="relacionar_projecao_nota_fiscal"),
@@ -95,6 +99,7 @@ urlpatterns = [
     path('planejamento/agrupar-acoes-plano-por-data/', views.agrupar_acoes_do_plano_por_data, name="agrupar_acoes_do_plano_por_data"),
     path('planejamento/criar-cronograma-planejado-preventiva/', views.criar_cronograma_planejado_preventiva, name="criar_cronograma_planejado_preventiva"),
     path('planejamento/gerar-arquivo-documento-preventivas/', views.gerar_arquivo_para_preventiva, name="gerar_arquivo_para_preventiva"),
+    path('planejamento/gerar-arquivo-documento-preventivas/baixar-documentos-maquina/', views.baixar_documentos_maquina_preventiva, name="baixar_documentos_maquina_preventiva"),
     path('api/maquinas-filtros-gerenc/', views.api_gerenc_por_setor_maquina, name="api_gerenc_por_setor_maquina"),
     path('api/maquinas-filtros-lista/', views.api_maquinas_por_setor_gerenc, name="api_maquinas_por_setor_gerenc"),
     path('plano-preventiva/visualizar/<int:plano_id>/', views.visualizar_manutencao_preventiva, name="visualizar_manutencao_preventiva"),
@@ -220,6 +225,7 @@ urlpatterns = [
     path('api/search-maquinas/', views.api_search_maquinas, name="api_search_maquinas"),
     path('api/maquina-primaria/<int:maquina_id>/secundarias/', views.api_maquina_primaria_secundarias, name="api_maquina_primaria_secundarias"),
     path('api/search-planos-pcm/', views.api_search_planos_pcm, name="api_search_planos_pcm"),
+    path('api/sugestoes-data-base-cronograma/', views.api_sugestoes_data_base_cronograma, name="api_sugestoes_data_base_cronograma"),
     path('api/salvar-agendamentos-cronograma/', views.salvar_agendamentos_cronograma, name="salvar_agendamentos_cronograma"),
     path('api/dados-diarios-requisicoes/', views.api_dados_diarios_requisicoes, name="api_dados_diarios_requisicoes"),
     path('api/dados-diarios-paradas/', views.api_dados_diarios_paradas, name="api_dados_diarios_paradas"),

@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Estoque ERP {{ item.codigo_item }}{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center;">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'consultar_estoque' %}" class="text-white">Consultar Estoque</a></li>
+                <li class="breadcrumb-item active text-white">{{ item.codigo_item }}</li>
+            </ol>
+        </nav>
+        <h1 class="display-6 fw-bold mt-3">Item {{ item.codigo_item }}</h1>
+        <p class="lead mb-0">{{ item.descricao_item|default:'Sem descrição' }}</p>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="row mb-3">
+            <div class="col">
+                <a href="{% url 'consultar_estoque' %}" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-2"></i>Voltar à lista</a>
+                <a href="{% url 'analise_estoque_almoxarifado' %}" class="btn btn-outline-primary"><i class="fas fa-chart-pie me-2"></i>Análise</a>
+            </div>
+        </div>
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white"><strong>Dados do ERP (EstoqueAlmoxarifado)</strong></div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">Unidade</dt><dd class="col-sm-7">{{ item.nome_unidade|default:'—' }} {% if item.codigo_unidade %}({{ item.codigo_unidade }}){% endif %}</dd>
+                            <dt class="col-sm-5">Depósito</dt><dd class="col-sm-7">{{ item.descricao_deposito|default:'—' }}</dd>
+                            <dt class="col-sm-5">Local</dt><dd class="col-sm-7">{{ item.descricao_local|default:'—' }}</dd>
+                            <dt class="col-sm-5">Endereço</dt><dd class="col-sm-7">E {{ item.estante|default:'—' }} · P {{ item.prateleira|default:'—' }} · C {{ item.coluna|default:'—' }} · Seq {{ item.sequencia|default:'—' }}</dd>
+                            <dt class="col-sm-5">Destino uso</dt><dd class="col-sm-7">{{ item.descricao_destino_uso|default:'—' }}</dd>
+                            <dt class="col-sm-5">Grupo / Subgrupo</dt><dd class="col-sm-7">{{ item.descricao_grupo_estoque|default:'—' }} · {{ item.descricao_subgrupo_estoque|default:'—' }}</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-6">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">UM</dt><dd class="col-sm-7">{{ item.unidade_medida|default:'—' }}</dd>
+                            <dt class="col-sm-5">Quantidade</dt><dd class="col-sm-7">{{ item.quantidade|number_br:2 }}</dd>
+                            <dt class="col-sm-5">Valor</dt><dd class="col-sm-7">{{ item.valor|currency_br }}</dd>
+                            <dt class="col-sm-5">Classificação</dt><dd class="col-sm-7">{{ item.classificacao_tempo_sem_consumo|default:'—' }}</dd>
+                            <dt class="col-sm-5">Ctrl. est. mín.</dt><dd class="col-sm-7">{{ item.controla_estoque_minimo|default:'—' }}</dd>
+                            <dt class="col-sm-5">Datas ERP</dt><dd class="col-sm-7"><small>Geração: {{ item.data_geracao|default:'—' }} · Import atualizado: {{ item.updated_at|date:'d/m/Y H:i' }}</small></dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

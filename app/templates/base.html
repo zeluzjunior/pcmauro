@@ -85,21 +85,50 @@
             transition: margin-left 0.3s ease;
         }
         
-        /* Ensure sidebar text doesn't wrap too early */
+        /* Sidebar text should wrap instead of being clipped */
         .btn-toggle-text {
-            white-space: nowrap;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            line-height: 1.2;
+            text-align: left;
         }
         
         /* Make sidebar items more readable */
-        .btn-toggle-nav a {
+        .btn-toggle-nav a,
+        .btn-toggle-nav-sub a {
             padding: 0.5rem 1rem;
             font-size: 0.95rem;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            line-height: 1.25;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.4rem;
+            text-align: left;
+        }
+
+        .btn-toggle-nav a i,
+        .btn-toggle-nav-sub a i {
+            flex: 0 0 1.1rem;
+            margin-top: 0.15rem;
         }
         
         /* Better spacing for sidebar buttons */
         .btn-toggle {
             padding: 0.5rem 0.75rem;
             font-size: 0.95rem;
+            white-space: normal;
+            text-align: left;
+        }
+
+        .btn-toggle-sub {
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            text-align: left;
+            line-height: 1.25;
         }
 
         /* Global filter accordion styling - applied to .filter-accordion */
@@ -484,6 +513,17 @@
                                     <li><a href="{% url 'consultar_meu_plano' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Meus Planos Preventiva do PCM</a></li>
                                     <li><a href="{% url 'criar_cronograma_planejado_preventiva' %}" class="link-dark rounded"><i class="bi bi-calendar-plus me-2"></i>Criar Calendário Plenejado de Preventivas</a></li>
                                     <li><a href="{% url 'calendario_plano_e_roteiro' %}" class="link-dark rounded"><i class="bi bi-calendar3 me-2"></i>Calendário de Preventivas</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#arquivos-manutencoes-preventivas-collapse" aria-expanded="false">
+                                <i class="bi bi-file-earmark-arrow-up me-2"></i>
+                                <span class="btn-toggle-text">Arquivos para Manutenções Preventivas</span>
+                            </button>
+                            <div class="collapse" id="arquivos-manutencoes-preventivas-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'gerar_arquivo_para_preventiva' %}" class="link-dark rounded"><i class="bi bi-file-earmark-arrow-up me-2"></i>Gerar Arquivo de Documento para Preventivas</a></li>
                                 </ul>
                             </div>
@@ -584,7 +624,7 @@
                             </button>
                             <div class="collapse" id="estoque-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                    <li><a href="#" class="link-dark rounded"><i class="bi bi-bar-chart me-2"></i>Análise de Estoque</a></li>
+                                    <li><a href="{% url 'analise_estoque_almoxarifado' %}" class="link-dark rounded"><i class="bi bi-bar-chart me-2"></i>Análise de Estoque</a></li>
                                     <li><a href="{% url 'consultar_estoque' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Estoque</a></li>
                                     <li><a href="{% url 'importar_estoque' %}" class="link-dark rounded"><i class="bi bi-upload me-2"></i>Importar Estoque</a></li>
                                 </ul>
@@ -629,6 +669,7 @@
                                             <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
                                                 <li><a href="{% url 'analise_projecao_gastos' %}" class="link-dark rounded"><i class="fas fa-chart-pie me-2"></i>Análise de Projeções de Gastos</a></li>
                                                 <li><a href="{% url 'consultar_projecao_gastos' %}" class="link-dark rounded"><i class="bi bi-clipboard2-data me-2"></i>Consultar Projeção de Gastos</a></li>
+                                                <li><a href="{% url 'reuniao_projecao_gastos' %}" class="link-dark rounded"><i class="fas fa-users me-2"></i>Reunião Projeção de Gastos</a></li>
                                             </ul>
                                         </div>
                                     </li>
@@ -678,6 +719,19 @@
                                     <li><a href="{% url 'cadastrar_centro_de_atividade' %}" class="link-dark rounded"><i class="bi bi-building-add me-2"></i>Cadastrar Centros de Atividade</a></li>
                                     <li><a href="{% url 'consultar_locais_e_cas' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Centros de Atividade</a></li>
                                     <li><a href="{% url 'consultar_locais' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Locais ou Salas</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
+                        <!-- Peças e Máquinas -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#pecas-maquinas-collapse" aria-expanded="false">
+                                <i class="fas fa-puzzle-piece me-2"></i>
+                                <span class="btn-toggle-text">Peças e Máquinas</span>
+                            </button>
+                            <div class="collapse" id="pecas-maquinas-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'importar_pecas_maquina' %}" class="link-dark rounded"><i class="fas fa-file-upload me-2"></i>Importar tabela de peças por máquina</a></li>
                                 </ul>
                             </div>
                         </li>

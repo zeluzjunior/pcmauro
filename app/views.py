@@ -379,6 +379,89 @@ def em_desenvolvimento(request):
     return render(request, 'em_desenvolvimento.html', context)
 
 
+def importar_pecas_maquina(request):
+    """Upload e importação da planilha «LISTA COMPLETA» para PecaMaquinaCitadoManual (+ Peça Fornecedor)."""
+    from app.utils import (
+        LISTA_COMPLETA_IMPORT_COPY_SAME_VALUE,
+        LISTA_COMPLETA_IMPORT_SCHEMA,
+        LISTA_COMPLETA_IMPORT_TARGET_LABELS,
+    )
+
+    template = 'maquinas/importar_tabela_pecas_maquina.html'
+    context = {
+        'page_title': 'Importar tabela de peças por máquina',
+        'active_page': 'importar_pecas_maquina',
+        'lista_completa_import_schema': [
+            {
+                'label_pt': label_pt,
+                'target': target,
+                'target_desc': LISTA_COMPLETA_IMPORT_TARGET_LABELS.get(target, target),
+            }
+            for label_pt, _folded, target in LISTA_COMPLETA_IMPORT_SCHEMA
+        ],
+        'lista_completa_import_copies': [
+            {
+                'from_desc': LISTA_COMPLETA_IMPORT_TARGET_LABELS.get(src, src),
+                'to_desc': ', '.join(
+                    LISTA_COMPLETA_IMPORT_TARGET_LABELS.get(t, t) for t in extras
+                ),
+            }
+            for src, extras in LISTA_COMPLETA_IMPORT_COPY_SAME_VALUE.items()
+        ],
+    }
+
+    if request.method == 'POST':
+        if 'file' not in request.FILES:
+            messages.error(request, 'Selecione um arquivo Excel para enviar.')
+            return render(request, template, context)
+
+        file = request.FILES['file']
+        allowed = ('.xlsx', '.xlsm')
+        parts = file.name.rsplit('.', 1)
+        ext = '.' + parts[1].lower() if len(parts) == 2 else ''
+
+        if ext not in allowed:
+            messages.error(
+                request,
+                f'Formato não aceito. Use um arquivo Excel: {", ".join(allowed)}.',
+            )
+            return render(request, template, context)
+
+        from app.utils import validate_lista_pecas_maquina_workbook
+
+        ok, err = validate_lista_pecas_maquina_workbook(file, ext)
+        if not ok:
+            messages.error(request, err)
+            return render(request, template, context)
+
+        update_existing = request.POST.get('update_existing') == 'on'
+
+        from app.utils import upload_lista_completa_pecas_maquina_citado
+
+        criados, atualizados, ignorados, errs = upload_lista_completa_pecas_maquina_citado(
+            file,
+            update_existing=update_existing,
+        )
+
+        if criados or atualizados or ignorados:
+            messages.success(
+                request,
+                f'Importação concluída: {criados} novo(s), {atualizados} atualizado(s)'
+                f'{f", {ignorados} ignorado(s) (já existiam)" if ignorados else ""}.',
+            )
+        elif not errs:
+            messages.warning(request, 'Nenhuma linha de dados foi importada (planilha vazia ou só linhas em branco).')
+
+        for e in errs[:25]:
+            messages.warning(request, e)
+        if len(errs) > 25:
+            messages.warning(request, f'… e mais {len(errs) - 25} aviso(s)/erro(s).')
+
+        return render(request, template, context)
+
+    return render(request, template, context)
+
+
 def dados_producao_diaria(request):
     """Página de Dados de Produção Diária: accordion por mês com Suínos Abatidos e Produção Indústria por dia.
     Relaciona cada dia com o nome do dia da semana (PT-BR) e com a Semana52."""
@@ -4861,7 +4944,7 @@ def importar_estoque(request):
                 'page_title': 'Importar Estoque',
                 'active_page': 'importar_estoque'
             }
-            return render(request, 'importar/estoque.html', context)
+            return render(request, 'almoxarifado/importar_estoque_almoxarifado.html', context)
         
         file = request.FILES['file']
         
@@ -4878,16 +4961,16 @@ def importar_estoque(request):
                 'page_title': 'Importar Estoque',
                 'active_page': 'importar_estoque'
             }
-            return render(request, 'importar/estoque.html', context)
+            return render(request, 'almoxarifado/importar_estoque_almoxarifado.html', context)
         
         # Verificar se deve atualizar registros existentes
         update_existing = request.POST.get('update_existing', 'off') == 'on'
         
         try:
-            from app.utils import upload_itens_estoque_from_file
+            from app.utils import upload_estoque_almoxarifado_from_file
             
             # Fazer upload dos dados
-            created_count, updated_count, errors = upload_itens_estoque_from_file(
+            created_count, updated_count, errors = upload_estoque_almoxarifado_from_file(
                 file,
                 update_existing=update_existing
             )
@@ -4924,142 +5007,144 @@ def importar_estoque(request):
         'page_title': 'Importar Estoque',
         'active_page': 'importar_estoque'
     }
-    return render(request, 'importar/estoque.html', context)
+    return render(request, 'almoxarifado/importar_estoque_almoxarifado.html', context)
 
 
 def consultar_estoque(request):
-    """Consultar/listar itens de estoque cadastrados com filtros avançados"""
-    from app.models import ItemEstoque
+    """Consultar/listar posições de estoque ERP (EstoqueAlmoxarifado) com filtros e KPIs."""
     from decimal import Decimal
-    
-    # Buscar todos os itens de estoque
-    itens_list = ItemEstoque.objects.all()
-    
-    # Filtro de busca geral (texto)
+    from django.db.models import Sum, F, Value, DecimalField
+    from django.db.models.functions import Coalesce
+    from app.models import EstoqueAlmoxarifado
+
+    qs = EstoqueAlmoxarifado.objects.all()
+
     search_query = request.GET.get('search', '').strip()
-    print(f"DEBUG consultar_estoque - search_query: '{search_query}'")
-    print(f"DEBUG consultar_estoque - request.GET: {dict(request.GET)}")
     if search_query:
-        # Criar lista de condições Q
-        search_conditions = Q()
-        
-        # Para campos numéricos, tentar converter e fazer busca exata
+        search_conditions = (
+            Q(descricao_item__icontains=search_query)
+            | Q(unidade_medida__icontains=search_query)
+            | Q(descricao_destino_uso__icontains=search_query)
+            | Q(classificacao_tempo_sem_consumo__icontains=search_query)
+            | Q(nome_unidade__icontains=search_query)
+            | Q(descricao_local__icontains=search_query)
+            | Q(descricao_grupo_estoque__icontains=search_query)
+            | Q(descricao_subgrupo_estoque__icontains=search_query)
+        )
         try:
             search_num = int(float(search_query))
             search_conditions |= Q(codigo_item=search_num)
-            print(f"DEBUG consultar_estoque - Added numeric search for codigo_item={search_num}")
         except (ValueError, TypeError):
-            print(f"DEBUG consultar_estoque - Could not convert '{search_query}' to number")
             pass
-        
-        # Para campos de texto, usar icontains
-        text_conditions = (
-            Q(descricao_item__icontains=search_query) |
-            Q(unidade_medida__icontains=search_query) |
-            Q(descricao_dest_uso__icontains=search_query) |
-            Q(classificacao_tempo_sem_consumo__icontains=search_query)
-        )
-        search_conditions |= text_conditions
-        print(f"DEBUG consultar_estoque - Added text search conditions")
-        
-        itens_list = itens_list.filter(search_conditions)
-        print(f"DEBUG consultar_estoque - Filtered count: {itens_list.count()}")
-    
-    # Filtros específicos
-    # Filtro por Unidade de Medida
+        qs = qs.filter(search_conditions)
+
     filtro_unidade_medida = request.GET.get('filtro_unidade_medida', '')
     if filtro_unidade_medida:
-        itens_list = itens_list.filter(unidade_medida__icontains=filtro_unidade_medida)
-    
-    # Filtro por Destino de Uso
+        qs = qs.filter(unidade_medida__icontains=filtro_unidade_medida)
+
     filtro_destino_uso = request.GET.get('filtro_destino_uso', '')
     if filtro_destino_uso:
-        itens_list = itens_list.filter(descricao_dest_uso__icontains=filtro_destino_uso)
-    
-    # Filtro por Controla Estoque Mínimo
+        qs = qs.filter(descricao_destino_uso__icontains=filtro_destino_uso)
+
     filtro_controla_estoque = request.GET.get('filtro_controla_estoque', '')
     if filtro_controla_estoque:
-        itens_list = itens_list.filter(controla_estoque_minimo__icontains=filtro_controla_estoque)
-    
-    # Filtro por Classificação Tempo Sem Consumo
+        qs = qs.filter(controla_estoque_minimo__icontains=filtro_controla_estoque)
+
     filtro_classificacao = request.GET.get('filtro_classificacao', '')
     if filtro_classificacao:
-        itens_list = itens_list.filter(classificacao_tempo_sem_consumo__icontains=filtro_classificacao)
-    
-    # Filtro por Estante
+        qs = qs.filter(classificacao_tempo_sem_consumo__icontains=filtro_classificacao)
+
     filtro_estante = request.GET.get('filtro_estante', '')
     if filtro_estante:
         try:
-            estante_num = int(filtro_estante)
-            itens_list = itens_list.filter(estante=estante_num)
+            qs = qs.filter(estante=int(filtro_estante))
         except ValueError:
             pass
-    
-    # Filtro por Prateleira
+
     filtro_prateleira = request.GET.get('filtro_prateleira', '')
     if filtro_prateleira:
         try:
-            prateleira_num = int(filtro_prateleira)
-            itens_list = itens_list.filter(prateleira=prateleira_num)
+            qs = qs.filter(prateleira=int(filtro_prateleira))
         except ValueError:
             pass
-    
-    # Filtro por Quantidade (mínima e máxima)
+
     quantidade_min = request.GET.get('quantidade_min', '')
     quantidade_max = request.GET.get('quantidade_max', '')
     if quantidade_min:
         try:
-            qtd_min = Decimal(quantidade_min)
-            itens_list = itens_list.filter(quantidade__gte=qtd_min)
+            qs = qs.filter(quantidade__gte=Decimal(quantidade_min))
         except (ValueError, TypeError):
             pass
     if quantidade_max:
         try:
-            qtd_max = Decimal(quantidade_max)
-            itens_list = itens_list.filter(quantidade__lte=qtd_max)
+            qs = qs.filter(quantidade__lte=Decimal(quantidade_max))
         except (ValueError, TypeError):
             pass
-    
-    # Ordenar por código do item
-    itens_list = itens_list.order_by('codigo_item')
-    
-    # Paginação
-    paginator = Paginator(itens_list, 50)  # 50 itens por página
+
+    qs_ordered = qs.order_by('codigo_item')
+
+    zero_dec = Value(Decimal('0'), output_field=DecimalField(max_digits=18, decimal_places=2))
+    agg = qs_ordered.aggregate(
+        sum_valor=Sum(Coalesce(F('valor'), zero_dec)),
+        sum_qtd=Sum(Coalesce(F('quantidade'), zero_dec)),
+    )
+    sum_valor_filtrado = agg['sum_valor'] if agg['sum_valor'] is not None else Decimal('0')
+    sum_qtd_filtrado = agg['sum_qtd'] if agg['sum_qtd'] is not None else Decimal('0')
+
+    total_sistema = EstoqueAlmoxarifado.objects.count()
+    filtered_count = qs_ordered.count()
+    locais_distintos_filtrado = (
+        qs_ordered.exclude(descricao_local__isnull=True)
+        .exclude(descricao_local='')
+        .values('descricao_local')
+        .distinct()
+        .count()
+    )
+    unidades_medida_distintas_filtrado = (
+        qs_ordered.exclude(unidade_medida__isnull=True)
+        .exclude(unidade_medida='')
+        .values('unidade_medida')
+        .distinct()
+        .count()
+    )
+
+    paginator = Paginator(qs_ordered, 50)
     page_number = request.GET.get('page', 1)
     itens = paginator.get_page(page_number)
-    
-    # Estatísticas
-    total_count = ItemEstoque.objects.count()
-    unidades_count = ItemEstoque.objects.exclude(unidade_medida__isnull=True).exclude(unidade_medida='').values('unidade_medida').distinct().count()
-    destinos_count = ItemEstoque.objects.exclude(descricao_dest_uso__isnull=True).exclude(descricao_dest_uso='').values('descricao_dest_uso').distinct().count()
-    
-    # Obter valores únicos para os dropdowns de filtros
-    unidades_medida_unicas = ItemEstoque.objects.exclude(
-        unidade_medida__isnull=True
-    ).exclude(
-        unidade_medida=''
-    ).values_list('unidade_medida', flat=True).distinct().order_by('unidade_medida')
-    
-    destinos_uso_unicos = ItemEstoque.objects.exclude(
-        descricao_dest_uso__isnull=True
-    ).exclude(
-        descricao_dest_uso=''
-    ).values_list('descricao_dest_uso', flat=True).distinct().order_by('descricao_dest_uso')
-    
-    classificacoes_unicas = ItemEstoque.objects.exclude(
-        classificacao_tempo_sem_consumo__isnull=True
-    ).exclude(
-        classificacao_tempo_sem_consumo=''
-    ).values_list('classificacao_tempo_sem_consumo', flat=True).distinct().order_by('classificacao_tempo_sem_consumo')
-    
+
+    base_meta = EstoqueAlmoxarifado.objects
+    unidades_medida_unicas = (
+        base_meta.exclude(unidade_medida__isnull=True)
+        .exclude(unidade_medida='')
+        .values_list('unidade_medida', flat=True)
+        .distinct()
+        .order_by('unidade_medida')
+    )
+    destinos_uso_unicos = (
+        base_meta.exclude(descricao_destino_uso__isnull=True)
+        .exclude(descricao_destino_uso='')
+        .values_list('descricao_destino_uso', flat=True)
+        .distinct()
+        .order_by('descricao_destino_uso')
+    )
+    classificacoes_unicas = (
+        base_meta.exclude(classificacao_tempo_sem_consumo__isnull=True)
+        .exclude(classificacao_tempo_sem_consumo='')
+        .values_list('classificacao_tempo_sem_consumo', flat=True)
+        .distinct()
+        .order_by('classificacao_tempo_sem_consumo')
+    )
+
     context = {
         'page_title': 'Consultar Estoque',
         'active_page': 'consultar_estoque',
         'itens': itens,
-        'total_count': total_count,
-        'unidades_count': unidades_count,
-        'destinos_count': destinos_count,
-        # Valores dos filtros ativos
+        'total_count': total_sistema,
+        'filtered_count': filtered_count,
+        'sum_valor_filtrado': sum_valor_filtrado,
+        'sum_qtd_filtrado': sum_qtd_filtrado,
+        'locais_distintos_filtrado': locais_distintos_filtrado,
+        'unidades_medida_distintas_filtrado': unidades_medida_distintas_filtrado,
         'filtro_unidade_medida': filtro_unidade_medida,
         'filtro_destino_uso': filtro_destino_uso,
         'filtro_controla_estoque': filtro_controla_estoque,
@@ -5068,7 +5153,6 @@ def consultar_estoque(request):
         'filtro_prateleira': filtro_prateleira,
         'quantidade_min': quantidade_min,
         'quantidade_max': quantidade_max,
-        # Valores únicos para dropdowns
         'unidades_medida_unicas': unidades_medida_unicas,
         'destinos_uso_unicos': destinos_uso_unicos,
         'classificacoes_unicas': classificacoes_unicas,
@@ -8498,118 +8582,162 @@ def _analise_paradas_maquina_impl(request, template_name):
             l_capacidade.append(float(dados['capacidade']))
         recentes = list(qs.order_by('-data', '-horario_inicial')[:20])
 
-        # Paradas por Máquina (via ParadaMaquinaOS -> OrdemServicoCorretiva, ou fallback: extrair OS de motivo/acao)
-        maquina_paradas_d = defaultdict(lambda: {'count': 0, 'descr': '', 'capacidade': Decimal('0.00')})
+        # Paradas por Máquina / por Setor: sempre a partir do queryset JÁ filtrado (ano/mês/etc.).
+        # Cada registro ParadaMaquina contribui no máximo uma vez com sua capacidade no período:
+        # capacidade repartida entre máquinas (ou setores) distintos inferidos pelas OS (sem duplicar
+        # a mesma cap por várias linhas ParadaMaquinaOS). Fallback texto nos campos motivo/ação e,
+        # para máquina, cod_recurso correspondente a Maquina.cd_maquina quando não há OS.
+        import re as _re_os_paradas
+        os_standalone_pm = _re_os_paradas.compile(r'\b\d{5,6}\b')
+        os_com_prefixo_pm = _re_os_paradas.compile(
+            r'(?:OS|ordem|n[°º]|#|ref|numero|número)(?:\s*:?\s*)?(\d{5,6})\b',
+            _re_os_paradas.IGNORECASE,
+        )
+
+        def extract_os_parada(text):
+            if not text or not isinstance(text, str):
+                return []
+            found = set()
+            found.update(os_standalone_pm.findall(text))
+            found.update(os_com_prefixo_pm.findall(text))
+            found.update(_re_os_paradas.findall(r'[\s\-_\.\/\(]\s*(\d{5,6})(?=[\s\-_\.\/\)]|$)', text))
+            return list(found)
+
+        maquina_paradas_d = defaultdict(lambda: {'count': Decimal('0'), 'descr': '', 'capacidade': Decimal('0.00')})
+        setormanut_d = defaultdict(lambda: {'count': Decimal('0'), 'descr': '', 'capacidade': Decimal('0.00')})
+
         parada_ids = list(qs.values_list('id', flat=True))
-        
-        def _add_maquina_from_os(os_num_str, capacidade=Decimal('0.00')):
-            try:
-                if not os_num_str or not str(os_num_str).strip().isdigit():
-                    return
-                os_int = int(str(os_num_str).strip())
-                os_obj = OrdemServicoCorretiva.objects.filter(cd_ordemserv=os_int).first()
-                if os_obj and os_obj.cd_maquina is not None:
-                    maquina_paradas_d[os_obj.cd_maquina]['count'] += 1
-                    maquina_paradas_d[os_obj.cd_maquina]['descr'] = os_obj.descr_maquina or ''
-                    maquina_paradas_d[os_obj.cd_maquina]['capacidade'] += capacidade
-            except (ValueError, TypeError):
-                pass
-        
+        pmo_by_pid = defaultdict(list)
         if parada_ids:
-            # 1) Usar ParadaMaquinaOS (associações confirmadas)
-            for pmo in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=parada_ids).select_related('parada_maquina'):
-                cap = Decimal(str(pmo.parada_maquina.capacidade or 0))
-                _add_maquina_from_os(pmo.os_numero, capacidade=cap)
-        
-        # 2) Fallback: se não há dados em ParadaMaquinaOS, extrair OS de motivo/acao (mesma lógica da página Analise Máquina por Parada)
-        if not maquina_paradas_d:
-            import re
-            os_standalone = re.compile(r'\b\d{5,6}\b')
-            os_com_prefixo = re.compile(
-                r'(?:OS|ordem|n[°º]|#|ref|numero|número)(?:\s*:?\s*)?(\d{5,6})\b',
-                re.IGNORECASE
-            )
-            def extract_os(text):
-                if not text or not isinstance(text, str):
-                    return []
-                found = set()
-                found.update(os_standalone.findall(text))
-                found.update(os_com_prefixo.findall(text))
-                found.update(re.findall(r'[\s\-_\.\/\(]\s*(\d{5,6})(?=[\s\-_\.\/\)]|$)', text))
-                return list(found)
-            
-            for parada in qs:
-                cap = Decimal(str(parada.capacidade or 0))
-                texto = ' '.join(filter(None, [
+            for pid, onum in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=parada_ids).values_list(
+                'parada_maquina_id', 'os_numero'
+            ):
+                if onum:
+                    pmo_by_pid[pid].append(str(onum).strip())
+
+        paradas_list = list(qs)
+        os_nums_needed = set()
+        for parada in paradas_list:
+            seen_os = set()
+            ordered_os = []
+            for onum in pmo_by_pid.get(parada.id, []):
+                if onum and onum not in seen_os:
+                    seen_os.add(onum)
+                    ordered_os.append(onum)
+            if not ordered_os:
+                texto_pm = ' '.join(filter(None, [
                     str(parada.motivo or ''), str(parada.acao or ''),
-                    str(parada.nro or ''), str(parada.descr_parada or '')
+                    str(parada.nro or ''), str(parada.descr_parada or ''),
                 ]))
-                for os_num in extract_os(texto):
-                    if len(os_num) in (5, 6):
-                        _add_maquina_from_os(os_num, capacidade=cap)
-        
+                for os_num in extract_os_parada(texto_pm):
+                    if len(os_num) in (5, 6) and os_num not in seen_os:
+                        seen_os.add(os_num)
+                        ordered_os.append(os_num)
+            for onum in ordered_os:
+                if str(onum).strip().isdigit():
+                    os_nums_needed.add(int(str(onum).strip()))
+
+        os_by_cd = {}
+        if os_nums_needed:
+            for o in OrdemServicoCorretiva.objects.filter(cd_ordemserv__in=os_nums_needed):
+                os_by_cd[o.cd_ordemserv] = o
+
+        recurso_maquina_ok = set()
+        maq_descr_by_cd = {}
+        recurso_candidates = {p.cod_recurso for p in paradas_list if p.cod_recurso is not None}
+        if recurso_candidates:
+            for m in Maquina.objects.filter(cd_maquina__in=recurso_candidates).only('cd_maquina', 'descr_maquina'):
+                recurso_maquina_ok.add(m.cd_maquina)
+                maq_descr_by_cd[m.cd_maquina] = m.descr_maquina or ''
+
+        for parada in paradas_list:
+            cap = Decimal(str(parada.capacidade or 0))
+            seen_os = set()
+            ordered_os = []
+            for onum in pmo_by_pid.get(parada.id, []):
+                if onum and onum not in seen_os:
+                    seen_os.add(onum)
+                    ordered_os.append(onum)
+            if not ordered_os:
+                texto_pm = ' '.join(filter(None, [
+                    str(parada.motivo or ''), str(parada.acao or ''),
+                    str(parada.nro or ''), str(parada.descr_parada or ''),
+                ]))
+                for os_num in extract_os_parada(texto_pm):
+                    if len(os_num) in (5, 6) and os_num not in seen_os:
+                        seen_os.add(os_num)
+                        ordered_os.append(os_num)
+
+            cd_maq_os = set()
+            descr_maq_os = ''
+            setor_keys = set()
+            descr_setor = ''
+            for onum in ordered_os:
+                if not str(onum).strip().isdigit():
+                    continue
+                oi = int(str(onum).strip())
+                os_obj = os_by_cd.get(oi)
+                if not os_obj:
+                    continue
+                if os_obj.cd_maquina is not None:
+                    cd_maq_os.add(os_obj.cd_maquina)
+                    descr_maq_os = os_obj.descr_maquina or descr_maq_os
+                if os_obj.cd_setormanut:
+                    sk = str(os_obj.cd_setormanut).strip()
+                    setor_keys.add(sk)
+                    descr_setor = os_obj.descr_setormanut or descr_setor
+
+            # Máquina: recurso da parada (equipamento onde houve parada) tem prioridade sobre a OS,
+            # para que Σ(capacidade) por máquina coincida com somar ParadaMaquina no período filtrado
+            # por cod_recurso → Maquina.cd_maquina (evita dividir capacidade entre várias OS).
+            if parada.cod_recurso is not None and parada.cod_recurso in recurso_maquina_ok:
+                cd_maquinas = {parada.cod_recurso}
+                descr_maq = maq_descr_by_cd.get(parada.cod_recurso, '') or ''
+            else:
+                cd_maquinas = set(cd_maq_os)
+                descr_maq = descr_maq_os
+
+            if cd_maquinas:
+                n_m = len(cd_maquinas)
+                share_cap_m = cap / n_m
+                share_cnt_m = Decimal('1') / Decimal(n_m)
+                for cd_maq in cd_maquinas:
+                    maquina_paradas_d[cd_maq]['capacidade'] += share_cap_m
+                    maquina_paradas_d[cd_maq]['count'] += share_cnt_m
+                    if descr_maq:
+                        maquina_paradas_d[cd_maq]['descr'] = descr_maq
+
+            if setor_keys:
+                n_s = len(setor_keys)
+                share_cap_s = cap / n_s
+                share_cnt_s = Decimal('1') / Decimal(n_s)
+                for sk in setor_keys:
+                    setormanut_d[sk]['capacidade'] += share_cap_s
+                    setormanut_d[sk]['count'] += share_cnt_s
+                    if descr_setor:
+                        setormanut_d[sk]['descr'] = descr_setor
+
         sort_maq_key = (lambda x: x[1]['capacidade']) if use_capacidade else (lambda x: x[1]['count'])
         sorted_maq = sorted(maquina_paradas_d.items(), key=sort_maq_key, reverse=True)
         maq_labels = []
         maq_data = []
         maq_capacidade = []
         maq_urls = []
+        maquina_ids_resolve = set()
         for cd_maq, d in sorted_maq:
             descr = (d['descr'] or '')[:40]
             if d['descr'] and len(d['descr']) > 40:
                 descr += "..."
             maq_labels.append(f"{cd_maq} - {descr}" if descr else str(cd_maq))
-            maq_data.append(float(d['capacidade']) if use_capacidade else d['count'])
+            maq_data.append(float(d['capacidade']) if use_capacidade else float(d['count']))
             maq_capacidade.append(float(d['capacidade']))
-            # Link para página da máquina (visualizar_maquina usa maquina_id)
-            m_obj = Maquina.objects.filter(cd_maquina=cd_maq).first()
-            maq_urls.append(f"/maquinas/visualizar/{m_obj.id}/" if m_obj else "")
-
-        # Paradas por cd_setormanut (via ParadaMaquinaOS -> OrdemServicoCorretiva, ou fallback: extrair OS de motivo/acao)
-        setormanut_d = defaultdict(lambda: {'count': 0, 'descr': '', 'capacidade': Decimal('0.00')})
-
-        def _add_setormanut_from_os(os_num_str, capacidade=Decimal('0.00')):
-            try:
-                if not os_num_str or not str(os_num_str).strip().isdigit():
-                    return
-                os_int = int(str(os_num_str).strip())
-                os_obj = OrdemServicoCorretiva.objects.filter(cd_ordemserv=os_int).first()
-                if os_obj and os_obj.cd_setormanut:
-                    key = str(os_obj.cd_setormanut).strip()
-                    setormanut_d[key]['count'] += 1
-                    setormanut_d[key]['descr'] = os_obj.descr_setormanut or ''
-                    setormanut_d[key]['capacidade'] += capacidade
-            except (ValueError, TypeError):
-                pass
-
-        if parada_ids:
-            for pmo in ParadaMaquinaOS.objects.filter(parada_maquina_id__in=parada_ids).select_related('parada_maquina'):
-                cap = Decimal(str(pmo.parada_maquina.capacidade or 0))
-                _add_setormanut_from_os(pmo.os_numero, capacidade=cap)
-        if not setormanut_d:
-            import re
-            os_standalone = re.compile(r'\b\d{5,6}\b')
-            os_com_prefixo = re.compile(
-                r'(?:OS|ordem|n[°º]|#|ref|numero|número)(?:\s*:?\s*)?(\d{5,6})\b',
-                re.IGNORECASE
-            )
-            def extract_os(text):
-                if not text or not isinstance(text, str):
-                    return []
-                found = set()
-                found.update(os_standalone.findall(text))
-                found.update(os_com_prefixo.findall(text))
-                found.update(re.findall(r'[\s\-_\.\/\(]\s*(\d{5,6})(?=[\s\-_\.\/\)]|$)', text))
-                return list(found)
-            for parada in qs:
-                cap = Decimal(str(parada.capacidade or 0))
-                texto = ' '.join(filter(None, [
-                    str(parada.motivo or ''), str(parada.acao or ''),
-                    str(parada.nro or ''), str(parada.descr_parada or '')
-                ]))
-                for os_num in extract_os(texto):
-                    if len(os_num) in (5, 6):
-                        _add_setormanut_from_os(os_num, capacidade=cap)
+            maquina_ids_resolve.add(cd_maq)
+        maquina_url_by_cd = {}
+        if maquina_ids_resolve:
+            for m in Maquina.objects.filter(cd_maquina__in=maquina_ids_resolve).only('id', 'cd_maquina'):
+                maquina_url_by_cd[m.cd_maquina] = f"/maquinas/visualizar/{m.id}/"
+        for cd_maq, _d in sorted_maq:
+            maq_urls.append(maquina_url_by_cd.get(cd_maq, ''))
 
         sort_setor_key = (lambda x: x[1]['capacidade']) if use_capacidade else (lambda x: x[1]['count'])
         sorted_setor = sorted(setormanut_d.items(), key=sort_setor_key, reverse=True)
@@ -8621,7 +8749,7 @@ def _analise_paradas_maquina_impl(request, template_name):
             if d['descr'] and len(d['descr']) > 35:
                 descr += "..."
             setormanut_labels.append(f"{key} - {descr}" if descr else str(key))
-            setormanut_data.append(float(d['capacidade']) if use_capacidade else d['count'])
+            setormanut_data.append(float(d['capacidade']) if use_capacidade else float(d['count']))
             setormanut_capacidade.append(float(d['capacidade']))
 
         return {
@@ -8656,8 +8784,24 @@ def _analise_paradas_maquina_impl(request, template_name):
         }
 
     section_frig = _build_section_charts(qs_frigorifico) if recursos_frigorifico else _build_section_charts(ParadaMaquina.objects.none())
+    section_frig_cap = (
+        _build_section_charts(qs_frigorifico, use_capacidade=True)
+        if recursos_frigorifico
+        else _build_section_charts(ParadaMaquina.objects.none())
+    )
     section_ind = _build_section_charts(qs_industria, use_capacidade=True) if recursos_industria else _build_section_charts(ParadaMaquina.objects.none())
     section_ind_924 = _build_section_charts(qs_industria, use_capacidade=True) if recursos_industria else _build_section_charts(ParadaMaquina.objects.none())
+
+    def _sum_chart_cap_series(values):
+        if not values:
+            return 0.0
+        return float(sum(Decimal(str(v or 0)) for v in values))
+
+    frig_chart_total_cap_diaria = _sum_chart_cap_series(temporal_frig_perda)
+    frig_chart_total_cap_maquinas = _sum_chart_cap_series(section_frig_cap['maquinas_capacidade'])
+    frig_chart_total_cap_top10_tipos = _sum_chart_cap_series(section_frig_cap['top_paradas_capacidade'])
+    frig_chart_total_cap_turnos = _sum_chart_cap_series(section_frig['turnos_data_capacidade'])
+    frig_chart_total_cap_pareto_setor = _sum_chart_cap_series(section_frig['setormanut_capacidade'])
 
     # Análise de Máquina atribuída ao Prédio do Abate: cod_recurso/linha 99985342 ou OS com cd_setormanut=99985342
     analise_predio_abate = []
@@ -8959,11 +9103,13 @@ def _analise_paradas_maquina_impl(request, template_name):
         'section_frig_top_recursos_data': json.dumps(section_frig['top_recursos_data']),
         'section_frig_top_recursos_horas_labels': json.dumps(section_frig['top_recursos_horas_labels']),
         'section_frig_top_recursos_horas_data': json.dumps(section_frig['top_recursos_horas_data']),
-        'section_frig_top_paradas_labels': json.dumps(section_frig['top_paradas_labels']),
+        'section_frig_top_paradas_labels': json.dumps(section_frig_cap['top_paradas_labels']),
         'section_frig_top_paradas_data': json.dumps(section_frig['top_paradas_data']),
+        'section_frig_top_paradas_capacidade': json.dumps(section_frig_cap['top_paradas_capacidade']),
         'section_frig_turnos_labels': json.dumps(section_frig['turnos_labels']),
         'section_frig_turnos_data_count': json.dumps(section_frig['turnos_data_count']),
         'section_frig_turnos_data_horas': json.dumps(section_frig['turnos_data_horas']),
+        'section_frig_turnos_data_capacidade': json.dumps(section_frig['turnos_data_capacidade']),
         'section_frig_linhas_labels': json.dumps(section_frig['linhas_labels']),
         'section_frig_linhas_data_count': json.dumps(section_frig['linhas_data_count']),
         'section_frig_linhas_data_horas': json.dumps(section_frig['linhas_data_horas']),
@@ -8979,11 +9125,13 @@ def _analise_paradas_maquina_impl(request, template_name):
         'section_ind_linhas_labels': json.dumps(section_ind['linhas_labels']),
         'section_ind_linhas_data_count': json.dumps(section_ind['linhas_data_count']),
         'section_ind_linhas_data_horas': json.dumps(section_ind['linhas_data_horas']),
-        'section_frig_maquinas_labels': json.dumps(section_frig['maquinas_labels']),
+        'section_frig_maquinas_labels': json.dumps(section_frig_cap['maquinas_labels']),
         'section_frig_maquinas_data': json.dumps(section_frig['maquinas_data']),
-        'section_frig_maquinas_urls': json.dumps(section_frig['maquinas_urls']),
+        'section_frig_maquinas_capacidade': json.dumps(section_frig_cap['maquinas_capacidade']),
+        'section_frig_maquinas_urls': json.dumps(section_frig_cap['maquinas_urls']),
         'section_frig_setormanut_labels': json.dumps(section_frig['setormanut_labels']),
         'section_frig_setormanut_data': json.dumps(section_frig['setormanut_data']),
+        'section_frig_setormanut_capacidade': json.dumps(section_frig['setormanut_capacidade']),
         'section_ind_maquinas_labels': json.dumps(section_ind['maquinas_labels']),
         'section_ind_maquinas_data': json.dumps(section_ind['maquinas_data']),
         'section_ind_maquinas_urls': json.dumps(section_ind['maquinas_urls']),
@@ -9018,7 +9166,13 @@ def _analise_paradas_maquina_impl(request, template_name):
         'meses_nomes': meses_nomes,
         'ano_filtro': ano_filtro,
         'meses_filtro': meses_filtro_int,
+        'meses_filtro_json': json.dumps(meses_filtro_int),
         'periodo_chart_label': periodo_chart_label,
+        'frig_chart_total_cap_diaria': frig_chart_total_cap_diaria,
+        'frig_chart_total_cap_maquinas': frig_chart_total_cap_maquinas,
+        'frig_chart_total_cap_top10_tipos': frig_chart_total_cap_top10_tipos,
+        'frig_chart_total_cap_turnos': frig_chart_total_cap_turnos,
+        'frig_chart_total_cap_pareto_setor': frig_chart_total_cap_pareto_setor,
     }
     return render(request, template_name, context)
 
@@ -9709,72 +9863,106 @@ def api_dados_diarios_paradas(request):
     
     try:
         ano = int(request.GET.get('ano', datetime.now().year))
-        mes = int(request.GET.get('mes', datetime.now().month))
-        
-        primeiro_dia = datetime(ano, mes, 1).date()
-        ultimo_dia = datetime(ano, mes, monthrange(ano, mes)[1]).date()
-        
         hoje = datetime.now().date()
-        if ultimo_dia > hoje:
-            ultimo_dia = hoje
-        
+
+        meses_param = request.GET.getlist('mes')
+        meses_iter = []
+        if meses_param:
+            for raw in meses_param:
+                try:
+                    mi = int(raw)
+                    if 1 <= mi <= 12:
+                        meses_iter.append(mi)
+                except (ValueError, TypeError):
+                    continue
+            meses_iter = sorted(set(meses_iter))
+            if not meses_iter:
+                meses_iter = list(range(1, 13))
+        else:
+            mes_single = request.GET.get('mes')
+            if mes_single is not None and str(mes_single).strip() != '':
+                try:
+                    mi = int(mes_single)
+                    meses_iter = [mi] if 1 <= mi <= 12 else list(range(1, 13))
+                except (ValueError, TypeError):
+                    meses_iter = list(range(1, 13))
+            else:
+                meses_iter = list(range(1, 13))
+
         recursos_frigorifico = set(
             ConfigRecursoParadaMaquina.objects.filter(secao='frigorifico').values_list('descr_recurso', flat=True)
         )
         recursos_industria = set(
             ConfigRecursoParadaMaquina.objects.filter(secao='industria').values_list('descr_recurso', flat=True)
         )
-        
+
         dias_labels = []
         dias_data = []
         dias_data_frig = []
         dias_capacidade_frig = []
         dias_data_ind = []
         dias_capacidade_ind = []
-        
-        for dia in range(1, ultimo_dia.day + 1):
-            data_dia = primeiro_dia.replace(day=dia)
-            
-            qs_dia = ParadaMaquina.objects.filter(data=data_dia)
-            count = qs_dia.count()
-            count_frig = qs_dia.filter(descr_linha_producao__in=recursos_frigorifico).count() if recursos_frigorifico else 0
-            cap_frig = Decimal('0.00')
-            for parada in qs_dia.filter(descr_linha_producao__in=recursos_frigorifico) if recursos_frigorifico else []:
-                if parada.capacidade is not None:
-                    cap_frig += Decimal(str(parada.capacidade))
-            count_ind = qs_dia.filter(descr_linha_producao__in=recursos_industria).count() if recursos_industria else 0
-            cap_ind = Decimal('0.00')
-            for parada in qs_dia.filter(descr_linha_producao__in=recursos_industria) if recursos_industria else []:
-                if parada.capacidade is not None:
-                    cap_ind += Decimal(str(parada.capacidade))
-            
-            dias_labels.append(data_dia.strftime('%d/%m'))
-            dias_data.append(count)
-            dias_data_frig.append(count_frig)
-            dias_capacidade_frig.append(float(cap_frig))
-            dias_data_ind.append(count_ind)
-            dias_capacidade_ind.append(float(cap_ind))
+
+        for mes in meses_iter:
+            primeiro_dia_m = datetime(ano, mes, 1).date()
+            ultimo_dia_m = datetime(ano, mes, monthrange(ano, mes)[1]).date()
+            if primeiro_dia_m > hoje:
+                continue
+            if ultimo_dia_m > hoje:
+                ultimo_dia_m = hoje
+
+            for dia in range(1, ultimo_dia_m.day + 1):
+                data_dia = primeiro_dia_m.replace(day=dia)
+                if data_dia > hoje:
+                    break
+
+                qs_dia = ParadaMaquina.objects.filter(data=data_dia)
+                count = qs_dia.count()
+                count_frig = qs_dia.filter(descr_linha_producao__in=recursos_frigorifico).count() if recursos_frigorifico else 0
+                cap_frig = Decimal('0.00')
+                for parada in qs_dia.filter(descr_linha_producao__in=recursos_frigorifico) if recursos_frigorifico else []:
+                    if parada.capacidade is not None:
+                        cap_frig += Decimal(str(parada.capacidade))
+                count_ind = qs_dia.filter(descr_linha_producao__in=recursos_industria).count() if recursos_industria else 0
+                cap_ind = Decimal('0.00')
+                for parada in qs_dia.filter(descr_linha_producao__in=recursos_industria) if recursos_industria else []:
+                    if parada.capacidade is not None:
+                        cap_ind += Decimal(str(parada.capacidade))
+
+                dias_labels.append(data_dia.strftime('%d/%m'))
+                dias_data.append(count)
+                dias_data_frig.append(count_frig)
+                dias_capacidade_frig.append(float(cap_frig))
+                dias_data_ind.append(count_ind)
+                dias_capacidade_ind.append(float(cap_ind))
+
+        total_cap_frig = float(sum(Decimal(str(x)) for x in dias_capacidade_frig))
+        total_cap_ind = float(sum(Decimal(str(x)) for x in dias_capacidade_ind))
         
         secao = request.GET.get('secao', '').strip().lower()
         if secao == 'frigorifico':
             return JsonResponse({
                 'labels': dias_labels,
                 'data': dias_data_frig,
-                'capacidade': dias_capacidade_frig
+                'capacidade': dias_capacidade_frig,
+                'total_capacidade': total_cap_frig,
             })
         if secao == 'industria':
             return JsonResponse({
                 'labels': dias_labels,
                 'data': dias_data_ind,
-                'capacidade': dias_capacidade_ind
+                'capacidade': dias_capacidade_ind,
+                'total_capacidade': total_cap_ind,
             })
         return JsonResponse({
             'labels': dias_labels,
             'data': dias_data,
             'data_frig': dias_data_frig,
             'capacidade_frig': dias_capacidade_frig,
+            'total_capacidade_frig': total_cap_frig,
             'data_ind': dias_data_ind,
-            'capacidade_ind': dias_capacidade_ind
+            'capacidade_ind': dias_capacidade_ind,
+            'total_capacidade_ind': total_cap_ind,
         })
         
     except (ValueError, TypeError) as e:
@@ -9872,7 +10060,7 @@ def deletar_requisicoes_almoxarifado(request):
 def analise_requisicoes_data_importada(request):
     """Análise de datas importadas - Verifica quais dias têm dados de requisições"""
     from app.models import RequisicaoAlmoxarifado
-    from datetime import datetime, date
+    from datetime import datetime, date, timedelta
     from calendar import monthrange
     from collections import defaultdict
     
@@ -9977,6 +10165,160 @@ def analise_requisicoes_data_importada(request):
     }
     
     return render(request, 'almoxarifado/analise_requisicoes_data_importada.html', context)
+
+
+def analise_estoque_almoxarifado(request):
+    """Análise agregada da posição de estoque ERP (modelo EstoqueAlmoxarifado)."""
+    import json
+    from decimal import Decimal
+    from django.db.models import Sum, Count, F, Value, DecimalField, ExpressionWrapper, Max
+    from django.db.models.functions import Coalesce
+    from app.models import EstoqueAlmoxarifado
+
+    zero_dec = Value(Decimal('0'), output_field=DecimalField(max_digits=18, decimal_places=2))
+    qs = EstoqueAlmoxarifado.objects.all()
+
+    nome_unidade_sel = (request.GET.get('nome_unidade') or '').strip()
+    local_sel = (request.GET.get('descricao_local') or '').strip()
+
+    if nome_unidade_sel:
+        qs = qs.filter(nome_unidade=nome_unidade_sel)
+    if local_sel:
+        qs = qs.filter(descricao_local=local_sel)
+
+    agg = qs.aggregate(
+        total_itens=Count('codigo_item'),
+        sum_qtd=Sum(Coalesce(F('quantidade'), zero_dec)),
+        sum_valor_campo=Sum(Coalesce(F('valor'), zero_dec)),
+        sum_qtd_vezes_valor=Sum(
+            ExpressionWrapper(
+                Coalesce(F('quantidade'), zero_dec) * Coalesce(F('valor'), zero_dec),
+                output_field=DecimalField(max_digits=22, decimal_places=2),
+            )
+        ),
+        max_data_geracao=Max('data_geracao'),
+        max_updated=Max('updated_at'),
+    )
+
+    total_itens = agg['total_itens'] or 0
+    sum_qtd = agg['sum_qtd'] if agg['sum_qtd'] is not None else Decimal('0')
+    sum_valor_campo = agg['sum_valor_campo'] if agg['sum_valor_campo'] is not None else Decimal('0')
+    sum_qtd_vezes_valor = agg['sum_qtd_vezes_valor'] if agg['sum_qtd_vezes_valor'] is not None else Decimal('0')
+
+    unidades_opcoes = (
+        EstoqueAlmoxarifado.objects.exclude(nome_unidade__isnull=True)
+        .exclude(nome_unidade='')
+        .values_list('nome_unidade', flat=True)
+        .distinct()
+        .order_by('nome_unidade')
+    )
+    locais_opcoes = (
+        EstoqueAlmoxarifado.objects.exclude(descricao_local__isnull=True)
+        .exclude(descricao_local='')
+        .values_list('descricao_local', flat=True)
+        .distinct()
+        .order_by('descricao_local')
+    )
+
+    n_locais_filtrado = (
+        qs.exclude(descricao_local__isnull=True)
+        .exclude(descricao_local='')
+        .values('descricao_local')
+        .distinct()
+        .count()
+    )
+    n_grupos_filtrado = (
+        qs.exclude(descricao_grupo_estoque__isnull=True)
+        .exclude(descricao_grupo_estoque='')
+        .values('descricao_grupo_estoque')
+        .distinct()
+        .count()
+    )
+
+    por_classificacao = []
+    for row in (
+        qs.values('classificacao_tempo_sem_consumo')
+        .annotate(itens=Count('codigo_item'), valor_soma=Sum(Coalesce(F('valor'), zero_dec)))
+        .order_by('-itens')
+    ):
+        label = row['classificacao_tempo_sem_consumo'] or '(sem classificação)'
+        por_classificacao.append({
+            'label': label,
+            'itens': row['itens'],
+            'valor': row['valor_soma'] if row['valor_soma'] is not None else Decimal('0'),
+        })
+
+    por_grupo = []
+    for row in (
+        qs.exclude(descricao_grupo_estoque__isnull=True)
+        .exclude(descricao_grupo_estoque='')
+        .values('descricao_grupo_estoque')
+        .annotate(itens=Count('codigo_item'), valor_soma=Sum(Coalesce(F('valor'), zero_dec)))
+        .order_by('-valor_soma')[:15]
+    ):
+        por_grupo.append({
+            'label': (row['descricao_grupo_estoque'] or '')[:100],
+            'itens': row['itens'],
+            'valor': row['valor_soma'] if row['valor_soma'] is not None else Decimal('0'),
+        })
+
+    por_local = []
+    for row in (
+        qs.exclude(descricao_local__isnull=True)
+        .exclude(descricao_local='')
+        .values('descricao_local')
+        .annotate(itens=Count('codigo_item'), valor_soma=Sum(Coalesce(F('valor'), zero_dec)))
+        .order_by('-valor_soma')[:12]
+    ):
+        por_local.append({
+            'label': (row['descricao_local'] or '')[:100],
+            'itens': row['itens'],
+            'valor': row['valor_soma'] if row['valor_soma'] is not None else Decimal('0'),
+        })
+
+    ord_val = Coalesce(
+        F('valor'),
+        Value(Decimal('0'), output_field=DecimalField(max_digits=15, decimal_places=2)),
+    )
+    top_por_valor_campo = list(qs.annotate(_ord_val=ord_val).order_by('-_ord_val')[:20])
+
+    def _f(d):
+        return float(d) if isinstance(d, Decimal) else d
+
+    class_labels_json = json.dumps([r['label'] for r in por_classificacao], ensure_ascii=False)
+    class_valores_json = json.dumps([_f(r['valor']) for r in por_classificacao], ensure_ascii=False)
+    grupo_labels_json = json.dumps([r['label'] for r in por_grupo], ensure_ascii=False)
+    grupo_valores_json = json.dumps([_f(r['valor']) for r in por_grupo], ensure_ascii=False)
+    local_labels_json = json.dumps([r['label'] for r in por_local], ensure_ascii=False)
+    local_valores_json = json.dumps([_f(r['valor']) for r in por_local], ensure_ascii=False)
+
+    context = {
+        'page_title': 'Análise de Estoque (Almoxarifado)',
+        'active_page': 'analise_estoque_almoxarifado',
+        'nome_unidade_sel': nome_unidade_sel,
+        'local_sel': local_sel,
+        'unidades_opcoes': unidades_opcoes,
+        'locais_opcoes': locais_opcoes,
+        'total_itens': total_itens,
+        'sum_qtd': sum_qtd,
+        'sum_valor_campo': sum_valor_campo,
+        'sum_qtd_vezes_valor': sum_qtd_vezes_valor,
+        'n_locais_filtrado': n_locais_filtrado,
+        'n_grupos_filtrado': n_grupos_filtrado,
+        'ultima_data_geracao': agg['max_data_geracao'],
+        'ultima_atualizacao_registro': agg['max_updated'],
+        'por_classificacao': por_classificacao,
+        'por_grupo': por_grupo,
+        'por_local': por_local,
+        'top_por_valor_campo': top_por_valor_campo,
+        'class_labels_json': class_labels_json,
+        'class_valores_json': class_valores_json,
+        'grupo_labels_json': grupo_labels_json,
+        'grupo_valores_json': grupo_valores_json,
+        'local_labels_json': local_labels_json,
+        'local_valores_json': local_valores_json,
+    }
+    return render(request, 'almoxarifado/analise_estoque_almoxarifado.html', context)
 
 
 def consultar_notas_fiscais(request):
@@ -11645,7 +11987,7 @@ def criar_cronograma_planejado_preventiva(request):
     """Criar cronograma planejado de preventivas"""
     from app.models import MeuPlanoPreventiva, Semana52, Maquina
     from django.db.models import Q
-    from datetime import datetime, date
+    from datetime import datetime, date, timedelta
     from collections import defaultdict
     
     # Parâmetros de seleção (para a nova função)
@@ -11905,6 +12247,113 @@ def api_search_planos_pcm(request):
         })
     
     return JsonResponse({'results': results})
+
+
+def api_sugestoes_data_base_cronograma(request):
+    """API endpoint para sugerir datas base a partir das manutenções das máquinas selecionadas."""
+    from app.models import Maquina, RoteiroPreventiva, OrdemServicoPreventiva
+    from django.http import JsonResponse
+    from collections import Counter
+    from datetime import datetime
+
+    maquina_ids_raw = request.GET.get('maquina_ids', '').strip()
+    if not maquina_ids_raw:
+        return JsonResponse({'success': True, 'suggestions': [], 'total_machines': 0})
+
+    try:
+        maquina_ids = [int(x) for x in maquina_ids_raw.split(',') if str(x).strip().isdigit()]
+    except Exception:
+        maquina_ids = []
+
+    if not maquina_ids:
+        return JsonResponse({'success': True, 'suggestions': [], 'total_machines': 0})
+
+    maquinas = list(Maquina.objects.filter(id__in=maquina_ids).only('id', 'cd_maquina'))
+    codigos = [m.cd_maquina for m in maquinas if m.cd_maquina is not None]
+    if not codigos:
+        return JsonResponse({'success': True, 'suggestions': [], 'total_machines': len(maquinas)})
+
+    def parse_any_date(s):
+        if not s or not str(s).strip():
+            return None
+        s = str(s).strip()
+        if len(s) > 80:
+            return None
+        formats = (
+            '%d/%m/%Y %H:%M',
+            '%d/%m/%Y %H:%M:%S',
+            '%d/%m/%Y',
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%d %H:%M',
+            '%Y-%m-%d',
+            '%d-%m-%Y',
+        )
+        for fmt in formats:
+            try:
+                chunk = s[:19] if '%H' in fmt and len(s) > 10 else s
+                return datetime.strptime(chunk, fmt).date()
+            except ValueError:
+                continue
+        if len(s) >= 10 and s[2:3] == '/' and s[5:6] == '/':
+            try:
+                return datetime.strptime(s[:10], '%d/%m/%Y').date()
+            except ValueError:
+                return None
+        return None
+
+    counter = Counter()
+    fontes_por_data = {}
+
+    roteiros = RoteiroPreventiva.objects.filter(cd_maquina__in=codigos).only(
+        'dt_entrada', 'dt_abertura', 'cd_maquina'
+    )
+    for r in roteiros.iterator(chunk_size=500):
+        for campo, origem in ((r.dt_entrada, 'Roteiro dt_entrada'), (r.dt_abertura, 'Roteiro dt_abertura')):
+            d = parse_any_date(campo)
+            if not d:
+                continue
+            iso = d.isoformat()
+            counter[iso] += 1
+            fontes_por_data.setdefault(iso, set()).add(origem)
+
+    ordens = OrdemServicoPreventiva.objects.filter(cd_maquina__in=codigos).only(
+        'dt_prev_exec', 'dt_entrada', 'dt_abertura_solicita', 'dt_iniparmanu', 'dt_fimparmanu', 'dt_encordmanu'
+    )
+    for o in ordens.iterator(chunk_size=500):
+        for campo, origem in (
+            (o.dt_prev_exec, 'OS dt_prev_exec'),
+            (o.dt_entrada, 'OS dt_entrada'),
+            (o.dt_abertura_solicita, 'OS dt_abertura_solicita'),
+            (o.dt_iniparmanu, 'OS dt_iniparmanu'),
+            (o.dt_fimparmanu, 'OS dt_fimparmanu'),
+            (o.dt_encordmanu, 'OS dt_encordmanu'),
+        ):
+            d = parse_any_date(campo)
+            if not d:
+                continue
+            iso = d.isoformat()
+            counter[iso] += 1
+            fontes_por_data.setdefault(iso, set()).add(origem)
+
+    if not counter:
+        return JsonResponse({'success': True, 'suggestions': [], 'total_machines': len(maquinas)})
+
+    top_dates = sorted(counter.items(), key=lambda kv: (kv[0], kv[1]), reverse=True)[:12]
+    suggestions = []
+    for iso, freq in top_dates:
+        d = datetime.strptime(iso, '%Y-%m-%d').date()
+        suggestions.append({
+            'date': iso,
+            'label': d.strftime('%d/%m/%Y'),
+            'frequency': freq,
+            'sources': sorted(list(fontes_por_data.get(iso, set()))),
+        })
+
+    return JsonResponse({
+        'success': True,
+        'total_machines': len(maquinas),
+        'suggestions': suggestions,
+    })
 
 
 def salvar_agendamentos_cronograma(request):
@@ -12236,8 +12685,8 @@ def consultar_roteiro_preventiva(request):
     # Ordenar por máquina, plano, sequência e tarefa
     roteiros_list = roteiros_list.order_by('cd_maquina', 'cd_planmanut', 'seq_seqplamanu', 'cd_tarefamanu')
     
-    # Paginação
-    paginator = Paginator(roteiros_list, 100)  # 100 itens por página
+    # Paginação (mais linhas por página = menos necessidade de “virar página”)
+    paginator = Paginator(roteiros_list, 200)
     page_number = request.GET.get('page', 1)
     roteiros = paginator.get_page(page_number)
     
@@ -12970,7 +13419,7 @@ def gerar_pdf_plano_pcm(request, plano_id):
     """Gerar PDF com informações do MeuPlanoPreventiva e documentos associados"""
     from app.models import MeuPlanoPreventiva, MeuPlanoPreventivaDocumento
     from django.http import HttpResponse
-    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.units import cm
     from reportlab.lib import colors
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
@@ -13355,7 +13804,7 @@ def editar_plano_pcm(request, plano_id):
     roteiros = RoteiroPreventiva.objects.all().order_by('cd_maquina', 'cd_planmanut')[:100]  # Limitar para performance
     
     # Buscar documentos da máquina associada (se houver)
-    documentos_maquina = []
+    documentos_por_maquina = []
     documentos_associados = []
     associacoes = []
     documentos_associados_ids = []
@@ -18750,6 +19199,306 @@ def calendario_plano_e_roteiro(request):
     return render(request, 'planejamento/calendario_plano_e_roteiro.html', context)
 
 
+def _eventos_ordem_servico_preventiva_calendario_list(request, start, end, maquina_pk='', maquina_principal_pk=''):
+    """Eventos do calendário a partir de OrdemServicoPreventiva (uma OS = um evento, sem recorrência)."""
+    from app.models import OrdemServicoPreventiva, Maquina, MaquinaPrimariaSecundaria
+    from datetime import datetime
+
+    def parse_any_date(s):
+        """Aceita DD/MM/YYYY e variações com hora; ignora texto que não pareça data."""
+        if not s or not str(s).strip():
+            return None
+        s = str(s).strip()
+        if len(s) > 80:
+            return None
+        formats = (
+            '%d/%m/%Y %H:%M',
+            '%d/%m/%Y %H:%M:%S',
+            '%d/%m/%Y',
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%d %H:%M',
+            '%Y-%m-%d',
+            '%d-%m-%Y',
+        )
+        for fmt in formats:
+            try:
+                chunk = s[:19] if '%H' in fmt and len(s) > 10 else s
+                return datetime.strptime(chunk, fmt).date()
+            except ValueError:
+                continue
+        if len(s) >= 10 and s[2:3] == '/' and s[5:6] == '/':
+            try:
+                return datetime.strptime(s[:10], '%d/%m/%Y').date()
+            except ValueError:
+                pass
+        return None
+
+    def situacao_texto_fechada(descr):
+        if not descr:
+            return False
+        u = descr.strip().upper()
+        if len(u) > 80:
+            return False
+        return 'FECHAD' in u or 'ENCERRAD' in u
+
+    def ordem_eh_fechada(o):
+        if situacao_texto_fechada(o.descr_sitordsetv):
+            return True
+        if parse_any_date(o.dt_encordmanu):
+            return True
+        if parse_any_date(o.dt_fimparmanu):
+            return True
+        return False
+
+    def data_exibicao_ordem(o):
+        fechada = ordem_eh_fechada(o)
+        if fechada:
+            for fld in (o.dt_encordmanu, o.dt_fimparmanu, o.dt_prev_exec):
+                d = parse_any_date(fld)
+                if d:
+                    return d
+        else:
+            for fld in (o.dt_prev_exec, o.dt_abertura_solicita, o.dt_iniparmanu, o.dt_entrada, o.dt_aberordser):
+                d = parse_any_date(fld)
+                if d:
+                    return d
+        for fld in (
+            o.dt_prev_exec,
+            o.dt_abertura_solicita,
+            o.dt_iniparmanu,
+            o.dt_entrada,
+            o.dt_encordmanu,
+            o.dt_fimparmanu,
+            o.dt_aberordser,
+        ):
+            d = parse_any_date(fld)
+            if d:
+                return d
+        return None
+
+    qs = OrdemServicoPreventiva.objects.all()
+
+    if maquina_principal_pk:
+        try:
+            principal = Maquina.objects.get(id=int(maquina_principal_pk))
+            is_principal = principal.descr_gerenc and 'MÁQUINAS PRINCIPAL' in principal.descr_gerenc.upper()
+            if not is_principal:
+                qs = qs.none()
+            else:
+                rels = MaquinaPrimariaSecundaria.objects.filter(maquina_primaria=principal)
+                sec_codigos = list(rels.values_list('maquina_secundaria__cd_maquina', flat=True))
+                if sec_codigos:
+                    qs = qs.filter(cd_maquina__in=sec_codigos)
+                else:
+                    qs = qs.none()
+        except (ValueError, Maquina.DoesNotExist):
+            qs = qs.none()
+    elif maquina_pk:
+        try:
+            m = Maquina.objects.get(id=int(maquina_pk))
+            qs = qs.filter(cd_maquina=m.cd_maquina)
+        except (ValueError, Maquina.DoesNotExist):
+            qs = qs.none()
+    else:
+        return []
+
+    eventos = []
+    consultar_url = '/manutencoes-preventivas/consultar/'
+    for o in qs.iterator(chunk_size=500):
+        d = data_exibicao_ordem(o)
+        if not d or d < start or d > end:
+            continue
+        fechada = ordem_eh_fechada(o)
+        if fechada:
+            cor = '#198754'
+        else:
+            cor = '#fd7e14'
+        titulo = f"OS {o.cd_ordemserv} — {o.descr_maquina or o.cd_maquina or 'Preventiva'}"
+        titulo += f" [{'Fechada' if fechada else 'Aberta'}]"
+        desc_parts = []
+        if o.descr_seqplamanu:
+            desc_parts.append(o.descr_seqplamanu)
+        if o.nm_func_exec:
+            desc_parts.append(f"Executor: {o.nm_func_exec}")
+        if o.descr_sitordsetv and str(o.descr_sitordsetv).strip():
+            desc_parts.append(f"Situação (import): {o.descr_sitordsetv}")
+        descricao = '\n'.join(desc_parts)
+        q = str(o.cd_ordemserv)
+        url_os = f'{consultar_url}?search={q}'
+        eventos.append({
+            'id': f'osp_{o.id}',
+            'title': titulo[:100] + ('...' if len(titulo) > 100 else ''),
+            'start': datetime.combine(d, datetime.min.time()).isoformat(),
+            'allDay': True,
+            'color': cor,
+            'backgroundColor': cor,
+            'borderColor': cor,
+            'textColor': '#fff',
+            'extendedProps': {
+                'tipo': 'ordem_preventiva',
+                'ordem_id': o.id,
+                'cd_ordemserv': o.cd_ordemserv,
+                'fechada': fechada,
+                'maquina': o.descr_maquina or str(o.cd_maquina or ''),
+                'descricao': descricao,
+                'url': request.build_absolute_uri(url_os),
+            }
+        })
+    return eventos
+
+
+def _eventos_projecao_plano_roteiro_calendario_list(request, start, end, maquina_pk='', maquina_principal_pk=''):
+    """
+    Recorrência no calendário: âncora em RoteiroPreventiva.dt_entrada (senão dt_abertura)
+    e intervalo em dias de PlanoPreventiva.quantidade_periodo (senão qtde_periodo / roteiro).
+    """
+    from app.models import RoteiroPreventiva, PlanoPreventiva, Maquina, MaquinaPrimariaSecundaria
+    from django.db.models import Q
+    from django.urls import reverse
+    from datetime import datetime, timedelta
+
+    def parse_any_date(s):
+        if not s or not str(s).strip():
+            return None
+        s = str(s).strip()
+        if len(s) > 80:
+            return None
+        formats = (
+            '%d/%m/%Y %H:%M',
+            '%d/%m/%Y %H:%M:%S',
+            '%d/%m/%Y',
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%d %H:%M',
+            '%Y-%m-%d',
+            '%d-%m-%Y',
+        )
+        for fmt in formats:
+            try:
+                chunk = s[:19] if '%H' in fmt and len(s) > 10 else s
+                return datetime.strptime(chunk, fmt).date()
+            except ValueError:
+                continue
+        if len(s) >= 10 and s[2:3] == '/' and s[5:6] == '/':
+            try:
+                return datetime.strptime(s[:10], '%d/%m/%Y').date()
+            except ValueError:
+                pass
+        return None
+
+    def resolve_plano(r, cache):
+        key = (r.cd_maquina, r.cd_planmanut, r.seq_seqplamanu)
+        if key in cache:
+            return cache[key]
+        p = PlanoPreventiva.objects.filter(roteiro_preventiva=r).first()
+        if not p:
+            p = PlanoPreventiva.objects.filter(
+                cd_maquina=r.cd_maquina,
+                numero_plano=r.cd_planmanut,
+                sequencia_manutencao=r.seq_seqplamanu,
+            ).first()
+        cache[key] = p
+        return p
+
+    def resolve_interval(r, plano):
+        if plano and plano.quantidade_periodo and int(plano.quantidade_periodo) > 0:
+            return int(plano.quantidade_periodo)
+        for x in (r.qtde_periodo, r.cs_qtde_periodo_max):
+            if x and int(x) > 0:
+                return int(x)
+        return 30
+
+    roteiros = RoteiroPreventiva.objects.all()
+    if maquina_principal_pk:
+        try:
+            principal = Maquina.objects.get(id=int(maquina_principal_pk))
+            is_principal = principal.descr_gerenc and 'MÁQUINAS PRINCIPAL' in principal.descr_gerenc.upper()
+            if not is_principal:
+                roteiros = roteiros.none()
+            else:
+                rels = MaquinaPrimariaSecundaria.objects.filter(maquina_primaria=principal)
+                sec_ids = list(rels.values_list('maquina_secundaria_id', flat=True))
+                sec_codigos = list(rels.values_list('maquina_secundaria__cd_maquina', flat=True))
+                q = Q()
+                if sec_ids:
+                    q |= Q(maquina_id__in=sec_ids)
+                if sec_codigos:
+                    q |= Q(cd_maquina__in=sec_codigos)
+                roteiros = roteiros.filter(q) if q else roteiros.none()
+        except (ValueError, Maquina.DoesNotExist):
+            roteiros = roteiros.none()
+    elif maquina_pk:
+        try:
+            m = Maquina.objects.get(id=int(maquina_pk))
+            roteiros = roteiros.filter(Q(cd_maquina=m.cd_maquina) | Q(maquina_id=m.id))
+        except (ValueError, Maquina.DoesNotExist):
+            roteiros = roteiros.none()
+    else:
+        return []
+
+    roteiros = roteiros.select_related('maquina')
+    plano_cache = {}
+    cds_sem_fk = {r.cd_maquina for r in roteiros if not r.maquina_id and r.cd_maquina is not None}
+    cd_para_id = {
+        m.cd_maquina: m.id
+        for m in Maquina.objects.filter(cd_maquina__in=cds_sem_fk).only('id', 'cd_maquina')
+    }
+
+    cor_proj = '#6f42c1'
+    eventos = []
+    for r in roteiros.iterator(chunk_size=200):
+        plano = resolve_plano(r, plano_cache)
+        base = parse_any_date(r.dt_entrada) or parse_any_date(r.dt_abertura)
+        if not base:
+            continue
+        interval = resolve_interval(r, plano)
+        if interval <= 0:
+            interval = 30
+        d = base
+        while d > start:
+            d = d - timedelta(days=interval)
+        while d <= end:
+            if d >= start:
+                titulo = f"Proj. — {r.descr_maquina or r.cd_maquina or 'Máq.'} — {r.descr_tarefamanu or r.descr_seqplamanu or 'Preventiva'}"
+                if plano and plano.numero_plano is not None:
+                    titulo = f"[Plano {plano.numero_plano}] " + titulo
+                if r.nome_funciomanu:
+                    titulo += f" ({r.nome_funciomanu})"
+                vid = r.maquina_id or cd_para_id.get(r.cd_maquina)
+                maquina_url = (
+                    request.build_absolute_uri(reverse('visualizar_maquina', args=[vid]))
+                    if vid else None
+                )
+                dias_plano = plano.quantidade_periodo if plano and plano.quantidade_periodo else None
+                descricao = []
+                if dias_plano:
+                    descricao.append(f'Período (Plano): {dias_plano} dias')
+                else:
+                    descricao.append(f'Período (roteiro): {interval} dias')
+                if r.descr_seqplamanu:
+                    descricao.append(r.descr_seqplamanu)
+                eventos.append({
+                    'id': f'proj_{r.id}_{d.isoformat()}',
+                    'title': titulo[:88] + ('...' if len(titulo) > 88 else ''),
+                    'start': datetime.combine(d, datetime.min.time()).isoformat(),
+                    'allDay': True,
+                    'color': cor_proj,
+                    'backgroundColor': cor_proj,
+                    'borderColor': cor_proj,
+                    'textColor': '#fff',
+                    'extendedProps': {
+                        'tipo': 'projecao_plano_roteiro',
+                        'roteiro_id': r.id,
+                        'plano_id': plano.id if plano else None,
+                        'intervalo_dias': interval,
+                        'descricao': '\n'.join(descricao),
+                        'url': request.build_absolute_uri(reverse('visualizar_roteiro_preventiva', args=[r.id])),
+                        'maquina_url': maquina_url,
+                    },
+                })
+            d = d + timedelta(days=interval)
+    return eventos
+
+
 def _eventos_preventivas_calendario_list(
     request,
     start,
@@ -18776,6 +19525,15 @@ def _eventos_preventivas_calendario_list(
             except ValueError:
                 continue
         return None
+
+    if maquina_pk or maquina_principal_pk:
+        ev_os = _eventos_ordem_servico_preventiva_calendario_list(
+            request, start, end, maquina_pk=maquina_pk, maquina_principal_pk=maquina_principal_pk
+        )
+        ev_proj = _eventos_projecao_plano_roteiro_calendario_list(
+            request, start, end, maquina_pk=maquina_pk, maquina_principal_pk=maquina_principal_pk
+        )
+        return ev_os + ev_proj
 
     roteiros = RoteiroPreventiva.objects.all()
 
@@ -18871,7 +19629,7 @@ def export_calendario_preventivas_pdf(request):
     import io
     from calendar import monthcalendar
     from collections import defaultdict
-    from datetime import datetime, date
+    from datetime import datetime, date, timedelta
     from xml.sax.saxutils import escape
 
     from reportlab.lib import colors
@@ -19037,7 +19795,8 @@ def export_calendario_preventivas_pdf(request):
 
 def gerar_arquivo_para_preventiva(request):
     """Filtros por setor (cd_setormanut), gerência e máquina — base em Maquina ativa."""
-    from app.models import Maquina, MaquinaPrimariaSecundaria
+    from datetime import datetime, date, timedelta
+    from app.models import Maquina, MaquinaPrimariaSecundaria, RoteiroPreventiva, PlanoPreventiva, MaquinaDocumento
 
     base_qs = Maquina.objects.filter(ativo=True)
 
@@ -19081,6 +19840,27 @@ def gerar_arquivo_para_preventiva(request):
     mostrar_secundarias_da_principal = False
     maquina_principal_selecionada = None
     maquinas_secundarias_relacionadas = []
+    maquinas_relacionadas_para_documentos = []
+    maquina_selecionada = None
+    proximas_ordens_preventivas = []
+    documentos_por_maquina = []
+    documentos_maquina_selecionada_total = 0
+    documentos_para_pdf = []
+
+    def _parse_date_safe(raw_value):
+        if not raw_value:
+            return None
+        value = str(raw_value).strip()
+        if not value:
+            return None
+        value = value.split(' ')[0]
+        for fmt in ('%d/%m/%Y', '%d-%m-%Y', '%d.%m.%Y', '%Y-%m-%d', '%Y/%m/%d', '%d/%m/%y', '%d-%m-%y'):
+            try:
+                return datetime.strptime(value, fmt).date()
+            except ValueError:
+                continue
+        return None
+
     if selected_maquina_id:
         try:
             sel = base_qs.filter(id=int(selected_maquina_id)).first()
@@ -19089,15 +19869,166 @@ def gerar_arquivo_para_preventiva(request):
         if sel and selected_cd and selected_gerenc:
             if sel.cd_setormanut != selected_cd or sel.descr_gerenc != selected_gerenc:
                 sel = None
-        if sel and sel.descr_gerenc and 'MÁQUINAS PRINCIPAL' in sel.descr_gerenc.upper():
-            mostrar_secundarias_da_principal = True
-            maquina_principal_selecionada = sel
+        maquina_selecionada = sel
+        if sel:
             rels = (
                 MaquinaPrimariaSecundaria.objects.filter(maquina_primaria=sel)
                 .select_related('maquina_secundaria')
                 .order_by('maquina_secundaria__cd_maquina')
             )
-            maquinas_secundarias_relacionadas = [r.maquina_secundaria for r in rels]
+            maquinas_relacionadas_para_documentos = [r.maquina_secundaria for r in rels if r.maquina_secundaria_id]
+            if maquinas_relacionadas_para_documentos:
+                mostrar_secundarias_da_principal = True
+                maquina_principal_selecionada = sel
+                maquinas_secundarias_relacionadas = maquinas_relacionadas_para_documentos
+        if sel and sel.cd_maquina:
+            plano_intervalo_por_chave = {}
+            planos_da_maquina = (
+                PlanoPreventiva.objects.filter(cd_maquina=sel.cd_maquina)
+                .only(
+                    'numero_plano',
+                    'sequencia_manutencao',
+                    'sequencia_tarefa',
+                    'quantidade_periodo',
+                )
+            )
+            for plano in planos_da_maquina:
+                if plano.quantidade_periodo is None:
+                    continue
+                chave_plano = (
+                    plano.numero_plano,
+                    plano.sequencia_manutencao,
+                    plano.sequencia_tarefa,
+                )
+                plano_intervalo_por_chave[chave_plano] = plano.quantidade_periodo
+
+            roteiros_da_maquina = (
+                RoteiroPreventiva.objects.filter(cd_maquina=sel.cd_maquina)
+                .only(
+                    'id',
+                    'cd_ordemserv',
+                    'cd_planmanut',
+                    'seq_seqplamanu',
+                    'cd_tarefamanu',
+                    'dt_abertura',
+                    'cs_qtde_periodo_max',
+                    'qtde_periodo',
+                    'descr_tarefamanu',
+                    'descr_seqplamanu',
+                    'descr_planmanut',
+                    'nome_funciomanu',
+                )
+            )
+            hoje = date.today()
+            proximas = []
+            for roteiro in roteiros_da_maquina:
+                dt_base = _parse_date_safe(roteiro.dt_abertura)
+                if not dt_base:
+                    continue
+                chave_roteiro = (
+                    roteiro.cd_planmanut,
+                    roteiro.seq_seqplamanu,
+                    roteiro.cd_tarefamanu,
+                )
+                intervalo = (
+                    plano_intervalo_por_chave.get(chave_roteiro)
+                    or roteiro.cs_qtde_periodo_max
+                    or roteiro.qtde_periodo
+                    or 30
+                )
+                try:
+                    intervalo = int(intervalo)
+                except (TypeError, ValueError):
+                    intervalo = 30
+                if intervalo <= 0:
+                    intervalo = 30
+
+                dt_proxima = dt_base
+                while dt_proxima < hoje:
+                    dt_proxima = dt_proxima + timedelta(days=intervalo)
+
+                proximas.append({
+                    'roteiro': roteiro,
+                    'dt_prev': dt_proxima,
+                    'dias_restantes': (dt_proxima - hoje).days,
+                    'intervalo_dias': intervalo,
+                })
+
+            proximas.sort(key=lambda x: (x['dt_prev'], x['roteiro'].cd_ordemserv or 0, x['roteiro'].id))
+            proximas_ordens_preventivas = proximas[:20]
+
+    maquinas_docs_ids = set()
+    if resultados:
+        maquinas_docs_ids.update(m.id for m in resultados)
+    if maquinas_secundarias_relacionadas:
+        maquinas_docs_ids.update(m.id for m in maquinas_secundarias_relacionadas if m and m.id)
+    if maquinas_relacionadas_para_documentos:
+        maquinas_docs_ids.update(m.id for m in maquinas_relacionadas_para_documentos if m and m.id)
+    if maquina_selecionada and maquina_selecionada.id:
+        maquinas_docs_ids.add(maquina_selecionada.id)
+
+    if maquinas_docs_ids:
+        docs_qs = (
+            MaquinaDocumento.objects.filter(maquina_id__in=maquinas_docs_ids)
+            .select_related('maquina')
+            .only(
+                'id',
+                'arquivo',
+                'comentario',
+                'created_at',
+                'maquina_id',
+                'maquina__cd_maquina',
+                'maquina__descr_maquina',
+            )
+            .order_by('maquina__cd_maquina', '-created_at')
+        )
+        grouped_docs = {}
+        for doc in docs_qs:
+            m = doc.maquina
+            if not m:
+                continue
+            grouped_docs.setdefault(m.id, {'maquina': m, 'documentos': []})
+            grouped_docs[m.id]['documentos'].append(doc)
+
+        maquinas_ordenadas = []
+        for mid in sorted(grouped_docs.keys(), key=lambda x: grouped_docs[x]['maquina'].cd_maquina or 0):
+            maquinas_ordenadas.append(grouped_docs[mid])
+        documentos_por_maquina = maquinas_ordenadas
+        if maquina_selecionada and maquina_selecionada.id:
+            maquinas_ids_documentos_pdf = {maquina_selecionada.id}
+            maquinas_ids_documentos_pdf.update(
+                m.id for m in maquinas_relacionadas_para_documentos if m and m.id
+            )
+            docs_maquina = []
+            for mid in maquinas_ids_documentos_pdf:
+                if mid in grouped_docs:
+                    docs_maquina.extend(grouped_docs[mid]['documentos'])
+            docs_maquina.sort(
+                key=lambda d: (
+                    getattr(d.maquina, 'cd_maquina', 0) or 0,
+                    d.created_at if d.created_at else d.id,
+                )
+            )
+            documentos_maquina_selecionada_total = len(docs_maquina)
+            image_exts = {'.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.tif', '.tiff'}
+            for doc in docs_maquina:
+                nome_arquivo = os.path.basename(doc.arquivo.name or '') if doc.arquivo else 'Sem arquivo'
+                ext = os.path.splitext(nome_arquivo)[1].lower()
+                if ext == '.pdf':
+                    modo_pdf = 'PDF (mesclado diretamente)'
+                elif ext in image_exts:
+                    modo_pdf = 'Imagem (convertida para página PDF)'
+                else:
+                    modo_pdf = f'Não PDF/Imagem ({ext or "sem extensão"}) - entra como página informativa'
+                documentos_para_pdf.append({
+                    'id': doc.id,
+                    'nome_arquivo': nome_arquivo,
+                    'comentario': doc.comentario or '',
+                    'created_at': doc.created_at,
+                    'modo_pdf': modo_pdf,
+                    'maquina_codigo': getattr(doc.maquina, 'cd_maquina', None),
+                    'maquina_descricao': getattr(doc.maquina, 'descr_maquina', ''),
+                })
 
     context = {
         'page_title': 'Gerar Arquivo de Documento para Preventivas',
@@ -19112,8 +20043,570 @@ def gerar_arquivo_para_preventiva(request):
         'mostrar_secundarias_da_principal': mostrar_secundarias_da_principal,
         'maquina_principal_selecionada': maquina_principal_selecionada,
         'maquinas_secundarias_relacionadas': maquinas_secundarias_relacionadas,
+        'maquina_selecionada': maquina_selecionada,
+        'proximas_ordens_preventivas': proximas_ordens_preventivas,
+        'documentos_por_maquina': documentos_por_maquina,
+        'documentos_maquina_selecionada_total': documentos_maquina_selecionada_total,
+        'documentos_para_pdf': documentos_para_pdf,
     }
     return render(request, 'planejamento/gerar_arquivo_para_preventiva.html', context)
+
+
+def baixar_documentos_maquina_preventiva(request):
+    """Gera um PDF único com todos os arquivos da máquina selecionada no filtro."""
+    import io
+    from datetime import datetime, date, timedelta
+    from django.urls import reverse
+    from app.models import Maquina, MaquinaDocumento, RoteiroPreventiva, PlanoPreventiva, MaquinaPrimariaSecundaria
+    from PyPDF2 import PdfReader, PdfWriter
+    from PIL import Image, ImageOps
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.utils import ImageReader
+    from reportlab.lib import colors
+
+    redirect_url = reverse('gerar_arquivo_para_preventiva')
+    if request.GET:
+        redirect_url = f"{redirect_url}?{request.GET.urlencode()}"
+
+    maquina_id_raw = request.GET.get('maquina_id', '').strip()
+    selected_cd = request.GET.get('cd_setormanut', '').strip()
+    selected_gerenc = request.GET.get('descr_gerenc', '').strip()
+    documento_ids_raw = request.GET.getlist('documento_id')
+
+    try:
+        maquina_id = int(maquina_id_raw)
+    except (TypeError, ValueError):
+        messages.error(request, 'Selecione uma máquina válida para gerar o arquivo de documentos.')
+        return redirect(redirect_url)
+
+    maquina = Maquina.objects.filter(ativo=True, id=maquina_id).first()
+    if not maquina:
+        messages.error(request, 'Máquina não encontrada ou inativa.')
+        return redirect(redirect_url)
+
+    if selected_cd and str(maquina.cd_setormanut or '') != selected_cd:
+        messages.error(request, 'A máquina selecionada não pertence ao setor informado nos filtros.')
+        return redirect(redirect_url)
+    if selected_gerenc and str(maquina.descr_gerenc or '') != selected_gerenc:
+        messages.error(request, 'A máquina selecionada não pertence à gerência informada nos filtros.')
+        return redirect(redirect_url)
+
+    maquinas_documentos_ids = {maquina.id}
+    rels_sec = MaquinaPrimariaSecundaria.objects.filter(maquina_primaria=maquina).values_list(
+        'maquina_secundaria_id', flat=True
+    )
+    maquinas_documentos_ids.update(mid for mid in rels_sec if mid)
+
+    docs_qs = (
+        MaquinaDocumento.objects.filter(maquina_id__in=maquinas_documentos_ids)
+        .exclude(arquivo__isnull=True)
+        .exclude(arquivo='')
+        .select_related('maquina')
+        .order_by('maquina__cd_maquina', 'created_at', 'id')
+    )
+    if documento_ids_raw:
+        documento_ids = []
+        for raw in documento_ids_raw:
+            try:
+                documento_ids.append(int(raw))
+            except (TypeError, ValueError):
+                continue
+        documento_ids = list(set(documento_ids))
+        if documento_ids:
+            docs_qs = docs_qs.filter(id__in=documento_ids)
+        else:
+            messages.error(request, 'Selecione pelo menos um documento válido para gerar o PDF.')
+            return redirect(redirect_url)
+    if not docs_qs.exists():
+        messages.warning(request, 'Não há documentos selecionados/associados à máquina para gerar o PDF.')
+        return redirect(redirect_url)
+
+    def _build_info_page(doc_nome, observacao):
+        page_buffer = io.BytesIO()
+        c = canvas.Canvas(page_buffer, pagesize=A4)
+        width, height = A4
+        y = height - 80
+        c.setFont('Helvetica-Bold', 14)
+        c.drawString(50, y, 'Documento não incorporado diretamente')
+        y -= 30
+        c.setFont('Helvetica', 11)
+        c.drawString(50, y, f'Arquivo: {doc_nome}')
+        y -= 20
+        c.drawString(50, y, observacao)
+        y -= 20
+        c.drawString(50, y, 'Esse arquivo foi listado para manter rastreabilidade na geração do PDF final.')
+        c.showPage()
+        c.save()
+        page_buffer.seek(0)
+        return page_buffer
+
+    def _parse_date_safe(raw_value):
+        if not raw_value:
+            return None
+        value = str(raw_value).strip()
+        if not value:
+            return None
+        value = value.split(' ')[0]
+        for fmt in ('%d/%m/%Y', '%d-%m-%Y', '%d.%m.%Y', '%Y-%m-%d', '%Y/%m/%d', '%d/%m/%y', '%d-%m-%y'):
+            try:
+                return datetime.strptime(value, fmt).date()
+            except ValueError:
+                continue
+        return None
+
+    def _build_header_page():
+        page_buffer = io.BytesIO()
+        c = canvas.Canvas(page_buffer, pagesize=A4)
+        page_w, page_h = A4
+        margin = 34
+
+        def _safe(value):
+            return str(value).strip() if value is not None and str(value).strip() else '-'
+
+        def _draw_label_value(x, y, label, value, label_w=66, max_len=52):
+            c.setFont('Helvetica-Bold', 8)
+            c.setFillColor(colors.HexColor('#334155'))
+            c.drawString(x, y, f"{label}:")
+            c.setFont('Helvetica', 8)
+            c.setFillColor(colors.HexColor('#0f172a'))
+            c.drawString(x + label_w, y, str(value)[:max_len])
+
+        docs_total = docs_qs.count()
+        docs_pdf = docs_qs.filter(arquivo__iendswith='.pdf').count()
+        docs_img = 0
+        for ext in ('.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.tif', '.tiff'):
+            docs_img += docs_qs.filter(arquivo__iendswith=ext).count()
+        docs_outros = max(docs_total - docs_pdf - docs_img, 0)
+        docs_com_comentario = docs_qs.exclude(comentario__isnull=True).exclude(comentario='').count()
+
+        # Top header
+        c.setFillColor(colors.HexColor('#0b5ed7'))
+        c.roundRect(margin, page_h - 70, page_w - (2 * margin), 26, 6, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.setFont('Helvetica-Bold', 11)
+        c.drawString(margin + 10, page_h - 54, 'DOCUMENTACAO DA MAQUINA - PREVENTIVAS')
+        c.setFont('Helvetica', 8)
+        c.drawRightString(page_w - margin - 10, page_h - 54, f"Gerado em: {date.today().strftime('%d/%m/%Y')}")
+
+        # Section 1 title
+        c.setFillColor(colors.HexColor('#1e3a8a'))
+        c.setFont('Helvetica-Bold', 10)
+        c.drawString(margin, page_h - 94, '1. Informacoes gerais da Maquina:')
+
+        # Machine block (left)
+        box_top = page_h - 82
+        left_x = margin
+        left_w = 315
+        right_gap = 10
+        right_x = left_x + left_w + right_gap
+        right_w = page_w - margin - right_x
+        box_h = 176
+        c.setStrokeColor(colors.HexColor('#cbd5e1'))
+        c.setFillColor(colors.HexColor('#f8fafc'))
+        c.roundRect(left_x, box_top - box_h, left_w, box_h, 6, stroke=1, fill=1)
+        c.setFont('Helvetica-Bold', 9)
+        c.setFillColor(colors.HexColor('#1e293b'))
+        c.drawString(left_x + 10, box_top - 15, '1.1 Dados da Maquina')
+
+        y = box_top - 32
+        step = 13
+        _draw_label_value(left_x + 10, y, 'Codigo', _safe(maquina.cd_maquina), max_len=28); y -= step
+        _draw_label_value(left_x + 10, y, 'Descricao', _safe(maquina.descr_maquina), max_len=58); y -= step
+        _draw_label_value(left_x + 10, y, 'Setor', f"{_safe(maquina.cd_setormanut)} - {_safe(maquina.descr_setormanut)}", max_len=58); y -= step
+        _draw_label_value(left_x + 10, y, 'Gerencia', _safe(maquina.descr_gerenc), max_len=58); y -= step
+        _draw_label_value(left_x + 10, y, 'Unidade', f"{_safe(maquina.cd_unid)} - {_safe(maquina.nome_unid)}", max_len=58); y -= step
+        _draw_label_value(left_x + 10, y, 'Patrimonio', _safe(maquina.nro_patrimonio), max_len=58); y -= step
+        _draw_label_value(left_x + 10, y, 'Modelo/Grupo', f"{_safe(maquina.cd_modelo)} / {_safe(maquina.cd_grupo)}", max_len=58); y -= step
+        _draw_label_value(left_x + 10, y, 'Prioridade', _safe(maquina.cd_priomaqutv), max_len=58); y -= step
+        _draw_label_value(left_x + 10, y, 'Tipo C. Ativ.', _safe(maquina.cd_tpcentativ), max_len=58); y -= step
+        _draw_label_value(left_x + 10, y, 'Centro Ativ.', _safe(getattr(maquina.centro_atividade, 'descr_centativ', None) or getattr(maquina.centro_atividade, 'nome_centativ', None)), max_len=58); y -= step
+        _draw_label_value(left_x + 10, y, 'Cadastro', _safe(maquina.created_at.strftime('%d/%m/%Y') if maquina.created_at else None), max_len=30); y -= step
+        _draw_label_value(left_x + 10, y, 'Atualizacao', _safe(maquina.updated_at.strftime('%d/%m/%Y') if maquina.updated_at else None), max_len=30)
+
+        # Documents block (right)
+        c.setStrokeColor(colors.HexColor('#cbd5e1'))
+        c.setFillColor(colors.HexColor('#f8fafc'))
+        c.roundRect(right_x, box_top - box_h, right_w, box_h, 6, stroke=1, fill=1)
+        c.setFillColor(colors.HexColor('#1e293b'))
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(right_x + 10, box_top - 15, '1.2 Resumo dos Documentos')
+
+        y_docs = box_top - 32
+        docs_step = 13
+        _draw_label_value(right_x + 10, y_docs, 'Total', docs_total, label_w=48, max_len=20); y_docs -= docs_step
+        _draw_label_value(right_x + 10, y_docs, 'PDF', docs_pdf, label_w=48, max_len=20); y_docs -= docs_step
+        _draw_label_value(right_x + 10, y_docs, 'Imagens', docs_img, label_w=48, max_len=20); y_docs -= docs_step
+        _draw_label_value(right_x + 10, y_docs, 'Outros', docs_outros, label_w=48, max_len=20); y_docs -= docs_step
+        _draw_label_value(right_x + 10, y_docs, 'C/ comentario', docs_com_comentario, label_w=48, max_len=20); y_docs -= docs_step
+        _draw_label_value(right_x + 10, y_docs, 'Ativa', 'Sim' if maquina.ativo else 'Nao', label_w=48, max_len=20); y_docs -= docs_step
+
+        c.setFont('Helvetica-Bold', 8)
+        c.setFillColor(colors.HexColor('#334155'))
+        c.drawString(right_x + 10, y_docs - 3, 'Ultimos arquivos selecionados:')
+        y_docs -= 15
+        c.setFont('Helvetica', 7)
+        c.setFillColor(colors.HexColor('#0f172a'))
+        for idx, nome in enumerate(list(docs_qs.values_list('arquivo', flat=True)[:7])):
+            nome_curto = os.path.basename(nome or '-')[:35]
+            c.drawString(right_x + 12, y_docs, f"- {nome_curto}")
+            y_docs -= 10
+            if y_docs < (box_top - box_h + 8):
+                break
+
+        # Preventive schedule block
+        sched_top = box_top - box_h - 10
+        sched_h = 282
+        c.setStrokeColor(colors.HexColor('#cbd5e1'))
+        c.setFillColor(colors.white)
+        c.roundRect(margin, sched_top - sched_h, page_w - (2 * margin), sched_h, 6, stroke=1, fill=1)
+        c.setFillColor(colors.HexColor('#0f5132'))
+        c.rect(margin, sched_top - 20, page_w - (2 * margin), 20, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(margin + 10, sched_top - 14, 'Proximas Ordens de Servico Preventivas')
+
+        y = sched_top - 33
+        c.setFillColor(colors.HexColor('#1e293b'))
+        c.setFont('Helvetica-Bold', 8)
+        c.drawString(margin + 10, y, 'OS')
+        c.drawString(margin + 58, y, 'Data prevista')
+        c.drawString(margin + 128, y, 'Dias')
+        c.drawString(margin + 166, y, 'Periodo')
+        c.drawString(margin + 214, y, 'Plano/Tarefa')
+        c.drawString(margin + 505, y, 'Resp.')
+        y -= 8
+        c.setStrokeColor(colors.HexColor('#dbe4ef'))
+        c.line(margin + 8, y, page_w - margin - 8, y)
+        y -= 9
+
+        plano_intervalo_por_chave = {}
+        for plano in PlanoPreventiva.objects.filter(cd_maquina=maquina.cd_maquina).only(
+            'numero_plano', 'sequencia_manutencao', 'sequencia_tarefa', 'quantidade_periodo'
+        ):
+            if plano.quantidade_periodo is None:
+                continue
+            plano_intervalo_por_chave[(plano.numero_plano, plano.sequencia_manutencao, plano.sequencia_tarefa)] = plano.quantidade_periodo
+
+        hoje = date.today()
+        proximas = []
+        roteiros = RoteiroPreventiva.objects.filter(cd_maquina=maquina.cd_maquina).only(
+            'id', 'cd_ordemserv', 'cd_planmanut', 'seq_seqplamanu', 'cd_tarefamanu',
+            'dt_abertura', 'cs_qtde_periodo_max', 'qtde_periodo', 'descr_tarefamanu', 'descr_seqplamanu', 'descr_planmanut',
+            'nome_funciomanu'
+        )
+        for roteiro in roteiros:
+            dt_base = _parse_date_safe(roteiro.dt_abertura)
+            if not dt_base:
+                continue
+            chave = (roteiro.cd_planmanut, roteiro.seq_seqplamanu, roteiro.cd_tarefamanu)
+            intervalo = plano_intervalo_por_chave.get(chave) or roteiro.cs_qtde_periodo_max or roteiro.qtde_periodo or 30
+            try:
+                intervalo = int(intervalo)
+            except (TypeError, ValueError):
+                intervalo = 30
+            if intervalo <= 0:
+                intervalo = 30
+            dt_prev = dt_base
+            while dt_prev < hoje:
+                dt_prev = dt_prev + timedelta(days=intervalo)
+            proximas.append({
+                'os': roteiro.cd_ordemserv or '-',
+                'dt_prev': dt_prev,
+                'dias': (dt_prev - hoje).days,
+                'intervalo': intervalo,
+                'tarefa': roteiro.descr_tarefamanu or roteiro.descr_seqplamanu or roteiro.descr_planmanut or '-',
+                'resp': roteiro.nome_funciomanu or '-',
+            })
+
+        proximas.sort(key=lambda x: (x['dt_prev'], x['os']))
+        if not proximas:
+            c.setFont('Helvetica', 9)
+            c.setFillColor(colors.HexColor('#475569'))
+            c.drawString(margin + 10, y, 'Nenhuma proxima OS preventiva encontrada.')
+        else:
+            c.setFont('Helvetica', 8)
+            for item in proximas[:16]:
+                if y < (margin + 8):
+                    break
+                c.setFillColor(colors.HexColor('#0f172a'))
+                c.drawString(margin + 10, y, str(item['os'])[:9])
+                c.drawString(margin + 58, y, item['dt_prev'].strftime('%d/%m/%Y'))
+                c.drawString(margin + 128, y, str(item['dias'])[:4])
+                c.drawString(margin + 166, y, str(item['intervalo'])[:4])
+                c.drawString(margin + 214, y, str(item['tarefa'])[:52])
+                c.drawString(margin + 505, y, str(item['resp'])[:13])
+                y -= 11
+
+        c.save()
+        page_buffer.seek(0)
+        return page_buffer
+
+    pdf_writer = PdfWriter()
+    arquivos_processados = 0
+    image_exts = {'.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.tif', '.tiff'}
+    imagens_para_grade = []
+    imagens_pagina_unica = []
+
+    def _is_large_detail_image(image_width, image_height):
+        """Decide if image should use a full page based on original size/detail."""
+        if not image_width or not image_height:
+            return False
+        megapixels = (image_width * image_height) / 1_000_000.0
+        longest_side = max(image_width, image_height)
+        shortest_side = min(image_width, image_height)
+        return megapixels >= 2.6 or longest_side >= 2100 or shortest_side >= 1300
+
+    def _append_imagens_pagina_unica(image_items):
+        if not image_items:
+            return 0
+        pages_added = 0
+        for idx, item in enumerate(image_items):
+            iw = item.get('iw') or 0
+            ih = item.get('ih') or 0
+            page_size = landscape(A4) if iw > ih else A4
+            page_w, page_h = page_size
+            page_buffer = io.BytesIO()
+            c = canvas.Canvas(page_buffer, pagesize=page_size)
+
+            margem = 26
+            header_h = 28
+            padding = 14
+            card_w = page_w - (2 * margem)
+            card_h = page_h - (2 * margem)
+            x = margem
+            y = margem
+            filename = item['nome'][:82]
+
+            c.setLineWidth(0.9)
+            c.setStrokeColor(colors.HexColor('#aebfd2'))
+            c.setFillColor(colors.white)
+            c.roundRect(x, y, card_w, card_h, 8, stroke=1, fill=1)
+
+            c.setFillColor(colors.HexColor('#eaf2fc'))
+            c.roundRect(x, y + card_h - header_h, card_w, header_h, 8, stroke=0, fill=1)
+            c.setFillColor(colors.HexColor('#264a73'))
+            c.setFont('Helvetica-Bold', 9)
+            c.drawString(x + 10, y + card_h - 18, filename)
+            c.setFillColor(colors.HexColor('#64748b'))
+            c.setFont('Helvetica', 8)
+            orient_label = 'Landscape' if iw > ih else 'Portrait'
+            c.drawRightString(x + card_w - 10, y + card_h - 18, f"{orient_label} | Anexo {idx + 1}/{len(image_items)}")
+
+            try:
+                with Image.open(io.BytesIO(item['bytes'])) as img:
+                    img = ImageOps.exif_transpose(img)
+                    if img.mode not in ('RGB', 'L'):
+                        img = img.convert('RGB')
+                    img.thumbnail((2600, 2600), Image.Resampling.LANCZOS)
+                    compact = io.BytesIO()
+                    img.save(compact, format='JPEG', quality=70, optimize=True)
+                    compact.seek(0)
+                    rw, rh = img.size
+            except Exception:
+                c.setFillColor(colors.HexColor('#8b0000'))
+                c.setFont('Helvetica', 10)
+                c.drawString(x + 12, y + card_h - 48, f"Falha ao processar imagem: {filename}")
+                c.save()
+                page_buffer.seek(0)
+                src_reader = PdfReader(page_buffer)
+                for page in src_reader.pages:
+                    pdf_writer.add_page(page)
+                    pages_added += 1
+                continue
+
+            content_x = x + padding
+            content_y = y + padding
+            content_w = card_w - (2 * padding)
+            content_h = card_h - header_h - (2 * padding) - 6
+            c.setLineWidth(0.5)
+            c.setStrokeColor(colors.HexColor('#d8e1ec'))
+            c.setFillColor(colors.HexColor('#fbfdff'))
+            c.rect(content_x, content_y, content_w, content_h, stroke=1, fill=1)
+
+            scale = min(content_w / max(rw, 1), content_h / max(rh, 1))
+            draw_w = rw * scale
+            draw_h = rh * scale
+            draw_x = content_x + (content_w - draw_w) / 2
+            draw_y = content_y + (content_h - draw_h) / 2
+            c.drawImage(ImageReader(compact), draw_x, draw_y, width=draw_w, height=draw_h, preserveAspectRatio=True, mask='auto')
+
+            c.save()
+            page_buffer.seek(0)
+            src_reader = PdfReader(page_buffer)
+            for page in src_reader.pages:
+                pdf_writer.add_page(page)
+                pages_added += 1
+        return pages_added
+
+    def _append_grade_imagens(image_items):
+        if not image_items:
+            return 0
+        pages_added = 0
+        page_buffer = io.BytesIO()
+        c = canvas.Canvas(page_buffer, pagesize=A4)
+        page_w, page_h = A4
+        margem = 28
+        gap = 12
+        cols = 2
+        rows = 2
+        area_w = page_w - (2 * margem) - ((cols - 1) * gap)
+        area_h = page_h - (2 * margem) - ((rows - 1) * gap)
+        box_w = area_w / cols
+        box_h = area_h / rows
+        header_h = 22
+        padding = 10
+        content_gap = 8
+
+        for idx, item in enumerate(image_items):
+            if idx > 0 and idx % (cols * rows) == 0:
+                c.showPage()
+            pos = idx % (cols * rows)
+            col = pos % cols
+            row = pos // cols
+            x = margem + col * (box_w + gap)
+            y = page_h - margem - (row + 1) * box_h - row * gap
+            card_border_color = colors.HexColor('#b9c7d8')
+            card_header_bg = colors.HexColor('#eef4fb')
+            card_content_bg = colors.white
+            card_radius = 6
+            filename = item['nome'][:56]
+
+            # Card container: gives each uploaded file a clear visual block.
+            c.setLineWidth(0.8)
+            c.setStrokeColor(card_border_color)
+            c.setFillColor(card_content_bg)
+            c.roundRect(x, y, box_w, box_h, card_radius, stroke=1, fill=1)
+
+            # Header strip with filename.
+            c.setFillColor(card_header_bg)
+            c.roundRect(x, y + box_h - header_h, box_w, header_h, card_radius, stroke=0, fill=1)
+            c.setFillColor(colors.HexColor('#355070'))
+            c.setFont('Helvetica-Bold', 8)
+            c.drawString(x + 7, y + box_h - 14, filename)
+
+            try:
+                with Image.open(io.BytesIO(item['bytes'])) as img:
+                    img = ImageOps.exif_transpose(img)
+                    if img.mode not in ('RGB', 'L'):
+                        img = img.convert('RGB')
+                    img.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
+                    compact = io.BytesIO()
+                    img.save(compact, format='JPEG', quality=60, optimize=True)
+                    compact.seek(0)
+                    iw, ih = img.size
+            except Exception:
+                c.setFillColor(colors.HexColor('#8b0000'))
+                c.setFont('Helvetica', 10)
+                c.drawString(x + 8, y + box_h - 40, f"Falha ao processar imagem: {filename}")
+                continue
+
+            content_x = x + padding
+            content_y = y + padding
+            content_w = box_w - (2 * padding)
+            content_h = box_h - header_h - (2 * padding) - content_gap
+
+            c.setLineWidth(0.4)
+            c.setStrokeColor(colors.HexColor('#d9e2ec'))
+            c.setFillColor(colors.HexColor('#fbfdff'))
+            c.rect(content_x, content_y, content_w, content_h, stroke=1, fill=1)
+
+            scale = min(content_w / max(iw, 1), content_h / max(ih, 1))
+            draw_w = iw * scale
+            draw_h = ih * scale
+            draw_x = content_x + (content_w - draw_w) / 2
+            draw_y = content_y + (content_h - draw_h) / 2
+            c.drawImage(ImageReader(compact), draw_x, draw_y, width=draw_w, height=draw_h, preserveAspectRatio=True, mask='auto')
+            c.setFillColor(colors.HexColor('#64748b'))
+            c.setFont('Helvetica', 7)
+            c.drawRightString(x + box_w - 7, y + 5, f"Anexo {idx + 1}/{len(image_items)}")
+
+        c.save()
+        page_buffer.seek(0)
+        grid_reader = PdfReader(page_buffer)
+        for page in grid_reader.pages:
+            pdf_writer.add_page(page)
+            pages_added += 1
+        return pages_added
+
+    header_reader = PdfReader(_build_header_page())
+    for page in header_reader.pages:
+        pdf_writer.add_page(page)
+
+    for doc in docs_qs:
+        if not doc.arquivo:
+            continue
+        nome_arquivo = os.path.basename(doc.arquivo.name or '') or 'arquivo_sem_nome'
+        ext = os.path.splitext(nome_arquivo)[1].lower()
+
+        try:
+            doc.arquivo.open('rb')
+            file_bytes = doc.arquivo.read()
+            doc.arquivo.close()
+        except Exception:
+            file_bytes = b''
+
+        if not file_bytes:
+            info_reader = PdfReader(_build_info_page(nome_arquivo, 'Falha ao ler o arquivo no servidor.'))
+            for page in info_reader.pages:
+                pdf_writer.add_page(page)
+            arquivos_processados += 1
+            continue
+
+        try:
+            if ext == '.pdf':
+                src_reader = PdfReader(io.BytesIO(file_bytes))
+                for page in src_reader.pages:
+                    pdf_writer.add_page(page)
+                arquivos_processados += 1
+            elif ext in image_exts:
+                iw, ih = 0, 0
+                try:
+                    with Image.open(io.BytesIO(file_bytes)) as src_img:
+                        src_img = ImageOps.exif_transpose(src_img)
+                        iw, ih = src_img.size
+                except Exception:
+                    pass
+                payload = {'nome': nome_arquivo, 'bytes': file_bytes, 'iw': iw, 'ih': ih}
+                if _is_large_detail_image(iw, ih):
+                    imagens_pagina_unica.append(payload)
+                else:
+                    imagens_para_grade.append(payload)
+                arquivos_processados += 1
+            else:
+                info_reader = PdfReader(
+                    _build_info_page(
+                        nome_arquivo,
+                        f'Tipo não suportado para incorporação direta em PDF ({ext or "sem extensão"}).',
+                    )
+                )
+                for page in info_reader.pages:
+                    pdf_writer.add_page(page)
+                arquivos_processados += 1
+        except Exception:
+            info_reader = PdfReader(_build_info_page(nome_arquivo, 'Erro ao processar o arquivo durante a geração do PDF.'))
+            for page in info_reader.pages:
+                pdf_writer.add_page(page)
+            arquivos_processados += 1
+
+    if imagens_pagina_unica:
+        _append_imagens_pagina_unica(imagens_pagina_unica)
+    if imagens_para_grade:
+        _append_grade_imagens(imagens_para_grade)
+
+    if arquivos_processados == 0 or not pdf_writer.pages:
+        messages.error(request, 'Não foi possível gerar o PDF da máquina selecionada.')
+        return redirect(redirect_url)
+
+    pdf_buffer = io.BytesIO()
+    pdf_writer.write(pdf_buffer)
+    pdf_buffer.seek(0)
+    codigo_maquina = str(maquina.cd_maquina or maquina.id)
+    filename = f"documentos_maquina_{codigo_maquina}.pdf"
+
+    response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 def api_gerenc_por_setor_maquina(request):
@@ -19153,7 +20646,7 @@ def api_maquinas_por_setor_gerenc(request):
 
 
 def api_eventos_preventivas_calendario(request):
-    """API: eventos de manutenção preventiva para o calendário (dt_abertura + intervalo cs_qtde_periodo_max)"""
+    """API: eventos preventivas para o calendário. Com maquina_id / maquina_principal_id: OrdemServicoPreventiva (1 evento/OS). Caso contrário: RoteiroPreventiva (recorrência a partir de dt_abertura)."""
     from django.http import JsonResponse
     from datetime import datetime, timedelta, date
 
@@ -20343,6 +21836,19 @@ def visualizar_item_estoque(request, item_id):
     return render(request, 'visualizar/visualizar_item_peca.html', context)
 
 
+def visualizar_estoque_almoxarifado(request, codigo_item):
+    """Detalhe de uma linha de EstoqueAlmoxarifado (ERP)."""
+    from app.models import EstoqueAlmoxarifado
+
+    item = get_object_or_404(EstoqueAlmoxarifado, pk=codigo_item)
+    context = {
+        'page_title': f'Estoque ERP — item {item.codigo_item}',
+        'active_page': 'consultar_estoque',
+        'item': item,
+    }
+    return render(request, 'consultar/visualizar_estoque_almoxarifado.html', context)
+
+
 def atualizar_foto_item(request, item_id):
     """Atualizar foto do item de estoque"""
     from app.models import ItemEstoque
@@ -20459,12 +21965,44 @@ def atualizar_foto_detalhada(request, item_id):
 
 def dados_orcamento(request):
     """Página para gerenciar dados de orçamento por ano, mês e conta orçamentária"""
-    from app.models import DadosOrcamento, ProjecaoGasto, NotaFiscal, Semana52, SaldoOrcamentarioSemanal
+    from app.models import (
+        DadosOrcamento,
+        ProjecaoGasto,
+        NotaFiscal,
+        Semana52,
+        SaldoOrcamentarioSemanal,
+        PercentualImpactoSetor,
+        OrigemImpactoOrcamento,
+    )
     from django.db.models import Count, Sum
     from collections import defaultdict
     from decimal import Decimal
     from datetime import datetime, date
     from calendar import monthrange
+
+    def _sync_origens_from_projecao_setores():
+        """Garante que todos os setores de ProjecaoGasto existam como origem cadastrada."""
+        setores_distintos = (
+            ProjecaoGasto.objects.exclude(setor__isnull=True)
+            .exclude(setor='')
+            .values_list('setor', flat=True)
+            .distinct()
+        )
+        for setor in setores_distintos:
+            nome_setor = str(setor).strip()
+            if not nome_setor:
+                continue
+            OrigemImpactoOrcamento.objects.get_or_create(
+                nome=nome_setor,
+                defaults={
+                    'tipo_origem': OrigemImpactoOrcamento.TIPO_SETOR_PROJECAO,
+                    'setor_projecao': nome_setor,
+                    'ativo': True,
+                }
+            )
+
+    # Sempre sincroniza as origens de setor antes de renderizar/salvar.
+    _sync_origens_from_projecao_setores()
     
     # Processar POST para criar/atualizar registro mensal
     if request.method == 'POST' and 'action' not in request.POST:
@@ -20540,6 +22078,86 @@ def dados_orcamento(request):
         except (ValueError, TypeError) as e:
             messages.error(request, f'Erro ao processar dados: {str(e)}')
         
+        return redirect('dados_orcamento')
+
+    # Processar POST para salvar percentual de impacto por setor/origem
+    if request.method == 'POST' and request.POST.get('action') == 'save_percentual_impacto':
+        try:
+            origem_id = request.POST.get('origem_id', '').strip()
+            nova_origem = request.POST.get('nova_origem', '').strip()
+            novo_tipo_origem = request.POST.get('novo_tipo_origem', '').strip() or OrigemImpactoOrcamento.TIPO_OUTROS
+            percentual_str = request.POST.get('percentual_alocado', '0').replace(',', '.').strip()
+            observacao = request.POST.get('observacao', '').strip()
+
+            origem_obj = None
+            if origem_id:
+                try:
+                    origem_obj = OrigemImpactoOrcamento.objects.get(id=int(origem_id), ativo=True)
+                except (ValueError, TypeError, OrigemImpactoOrcamento.DoesNotExist):
+                    origem_obj = None
+            elif nova_origem:
+                setor_projecao = nova_origem if novo_tipo_origem == OrigemImpactoOrcamento.TIPO_SETOR_PROJECAO else None
+                origem_obj, _ = OrigemImpactoOrcamento.objects.get_or_create(
+                    nome=nova_origem,
+                    defaults={
+                        'tipo_origem': novo_tipo_origem,
+                        'setor_projecao': setor_projecao,
+                        'ativo': True,
+                    }
+                )
+                if origem_obj.tipo_origem != novo_tipo_origem or (setor_projecao and not origem_obj.setor_projecao):
+                    origem_obj.tipo_origem = novo_tipo_origem
+                    if setor_projecao and not origem_obj.setor_projecao:
+                        origem_obj.setor_projecao = setor_projecao
+                    origem_obj.save(update_fields=['tipo_origem', 'setor_projecao', 'updated_at'])
+
+            if not origem_obj:
+                messages.error(request, 'Selecione uma origem existente ou informe uma nova origem.')
+                return redirect('dados_orcamento')
+
+            percentual = Decimal(percentual_str or '0')
+            if percentual < 0:
+                messages.error(request, 'O percentual não pode ser negativo.')
+                return redirect('dados_orcamento')
+            if percentual > 100:
+                messages.error(request, 'O percentual não pode ser maior que 100%.')
+                return redirect('dados_orcamento')
+
+            impacto_id = request.POST.get('impacto_id', '').strip()
+            if impacto_id:
+                try:
+                    impacto = PercentualImpactoSetor.objects.get(id=int(impacto_id))
+                    impacto.origem = origem_obj
+                    impacto.origem_setor = origem_obj.nome
+                    impacto.percentual_alocado = percentual
+                    impacto.observacao = observacao or None
+                    impacto.save()
+                    messages.success(request, 'Percentual de impacto atualizado com sucesso.')
+                except (ValueError, TypeError, PercentualImpactoSetor.DoesNotExist):
+                    messages.error(request, 'Registro de percentual não encontrado para atualização.')
+            else:
+                PercentualImpactoSetor.objects.create(
+                    origem=origem_obj,
+                    origem_setor=origem_obj.nome,
+                    percentual_alocado=percentual,
+                    observacao=observacao or None,
+                    ativo=True,
+                )
+                messages.success(request, 'Percentual de impacto adicionado com sucesso.')
+        except Exception as e:
+            messages.error(request, f'Erro ao salvar percentual de impacto: {str(e)}')
+
+        return redirect('dados_orcamento')
+
+    # Processar POST para excluir percentual de impacto
+    if request.method == 'POST' and request.POST.get('action') == 'delete_percentual_impacto':
+        impacto_id = request.POST.get('impacto_id', '').strip()
+        try:
+            impacto = PercentualImpactoSetor.objects.get(id=int(impacto_id))
+            impacto.delete()
+            messages.success(request, 'Percentual de impacto removido com sucesso.')
+        except (ValueError, TypeError, PercentualImpactoSetor.DoesNotExist):
+            messages.error(request, 'Registro de percentual não encontrado para exclusão.')
         return redirect('dados_orcamento')
     
     # Buscar todos os dados de orçamento
@@ -20625,6 +22243,35 @@ def dados_orcamento(request):
     total_notas_fiscais = NotaFiscal.objects.count()
     total_requisicoes = DadosOrcamento.objects.count()
     total_relacoes_confirmadas = 0  # Placeholder - ajustar conforme necessário
+
+    # Percentual de impacto por setor/origem (nova seção)
+    from django.db.utils import OperationalError, ProgrammingError
+    try:
+        percentuais_impacto = list(
+            PercentualImpactoSetor.objects.filter(ativo=True)
+            .select_related('origem')
+            .order_by('origem__nome', 'origem_setor')
+        )
+        for item in percentuais_impacto:
+            item.origem_nome_exibicao = item.origem.nome if item.origem_id and item.origem else item.origem_setor
+            item.tipo_origem_exibicao = item.origem.get_tipo_origem_display() if item.origem_id and item.origem else 'Outros'
+        total_percentual_alocado = sum((item.percentual_alocado or Decimal('0')) for item in percentuais_impacto)
+        percentual_disponivel = Decimal('100') - total_percentual_alocado
+        origens_impacto_opcoes = list(OrigemImpactoOrcamento.objects.filter(ativo=True).order_by('nome'))
+    except (OperationalError, ProgrammingError):
+        percentuais_impacto = []
+        total_percentual_alocado = Decimal('0')
+        percentual_disponivel = Decimal('100')
+        origens_impacto_opcoes = []
+
+    # Modo edição de percentual de impacto (via querystring)
+    edit_impacto_id = (request.GET.get('edit_impacto_id') or '').strip()
+    percentual_editando = None
+    if edit_impacto_id:
+        try:
+            percentual_editando = PercentualImpactoSetor.objects.select_related('origem').get(id=int(edit_impacto_id))
+        except (ValueError, TypeError, PercentualImpactoSetor.DoesNotExist):
+            percentual_editando = None
     
     context = {
         'page_title': 'Dados de Orçamento',
@@ -20634,6 +22281,12 @@ def dados_orcamento(request):
         'total_notas_fiscais': total_notas_fiscais,
         'total_requisicoes': total_requisicoes,
         'total_relacoes_confirmadas': total_relacoes_confirmadas,
+        'percentuais_impacto': percentuais_impacto,
+        'total_percentual_alocado': total_percentual_alocado,
+        'percentual_disponivel': percentual_disponivel,
+        'origens_impacto_opcoes': origens_impacto_opcoes,
+        'origens_tipo_choices': OrigemImpactoOrcamento.TIPO_CHOICES,
+        'percentual_editando': percentual_editando,
     }
     
     return render(request, 'orcamento/dados_orcamento.html', context)
@@ -21340,11 +22993,56 @@ def analise_geral_orcamento(request):
     return render(request, 'orcamento/analise_geral_orcamento.html', context)
 
 
+def _get_setor_cores_map():
+    """Mapa normalizado de cores para setor (chave em MAIÚSCULO)."""
+    from django.db.utils import OperationalError, ProgrammingError
+    from app.models import SetorProjecaoCor
+
+    cores = {}
+    try:
+        for item in SetorProjecaoCor.objects.filter(ativo=True).order_by('ordem', 'nome_setor'):
+            key = SetorProjecaoCor.normalizar_nome(item.nome_setor)
+            cor = item.cor_hex or '#6c757d'
+            if key and key not in cores:
+                cores[key] = cor
+            nome_original = (item.nome_setor or '').strip()
+            if nome_original and nome_original not in cores:
+                cores[nome_original] = cor
+            if nome_original.upper() and nome_original.upper() not in cores:
+                cores[nome_original.upper()] = cor
+    except (OperationalError, ProgrammingError):
+        # Fallback enquanto a migration da tabela de cores ainda não foi aplicada.
+        cores = {
+            'TURNO A': '#0d6efd',
+            '1. TURNO A': '#0d6efd',
+            'TURNO B': '#198754',
+            '2. TURNO B': '#198754',
+            'TURNO C': '#0dcaf0',
+            '3. TURNO C': '#0dcaf0',
+            'EXTERNA': '#fd7e14',
+            '4. EXTERNA': '#fd7e14',
+            'UTILIDADES': '#6f42c1',
+            '5. UTILIDADES': '#6f42c1',
+            'ETA / ETE / BIO': '#20c997',
+            '6. ETA / ETE / BIO': '#20c997',
+            'PROJETOS': '#6610f2',
+            '8. PROJETOS': '#6610f2',
+            'PCM': '#d63384',
+            '9. PCM': '#d63384',
+            'AUTOMAÇÃO': '#17a2b8',
+            '7. AUTOMAÇÃO': '#17a2b8',
+            'INDEFINIDO': '#6c757d',
+            'SEM SETOR': '#6c757d',
+            'OUTROS': '#495057',
+        }
+    return cores
+
+
 def consultar_projecao_gastos(request):
     """Consultar/listar projeções de gastos com filtros avançados - apenas tabela"""
     from app.models import ProjecaoGasto
     from decimal import Decimal
-    from django.db.models import Q
+    from django.db.models import Q, Sum
     from django.core.paginator import Paginator
     from datetime import datetime
     
@@ -21644,6 +23342,14 @@ def consultar_projecao_gastos(request):
             projecoes_list = projecoes_list.order_by('-created_at', '-id')
         except Exception:
             pass
+
+    # Indicadores do conjunto filtrado (antes da paginação)
+    total_registros_filtrados = projecoes_list.count()
+    total_valor_filtrado = projecoes_list.aggregate(total=Sum('valor_total')).get('total') or Decimal('0')
+    ticket_medio_filtrado = (
+        (total_valor_filtrado / total_registros_filtrados)
+        if total_registros_filtrados > 0 else Decimal('0')
+    )
     
     # Paginação (150 itens por página para ver mais registros de uma vez)
     try:
@@ -21694,6 +23400,10 @@ def consultar_projecao_gastos(request):
     get_copy_desc['order_id'] = 'desc'
     url_ordenar_id_asc = request.path + '?' + urlencode(get_copy_asc)
     url_ordenar_id_desc = request.path + '?' + urlencode(get_copy_desc)
+    setor_cores = _get_setor_cores_map()
+    for item in projecoes:
+        setor_nome = (item.setor or '').strip()
+        item.setor_cor = setor_cores.get(setor_nome) or setor_cores.get(setor_nome.upper()) or '#6c757d'
     
     context = {
         'page_title': 'Consultar Projeção de Gastos',
@@ -21723,6 +23433,11 @@ def consultar_projecao_gastos(request):
         'order_id': order_id,
         'url_ordenar_id_asc': url_ordenar_id_asc,
         'url_ordenar_id_desc': url_ordenar_id_desc,
+        'setor_cores': setor_cores,
+        'setor_default_color': '#6c757d',
+        'total_registros_filtrados': total_registros_filtrados,
+        'total_valor_filtrado': total_valor_filtrado,
+        'ticket_medio_filtrado': ticket_medio_filtrado,
     }
     
     return render(request, 'orcamento/consultar_projecao_gastos.html', context)
@@ -21947,7 +23662,7 @@ def visualizar_projecoes_gastos_por_setor(request):
 
 def analise_projecao_gastos(request):
     """Página de análise detalhada de projeções de gastos com filtros e gráficos"""
-    from app.models import ProjecaoGasto, RelacaoProjecaoNotaFiscal, DadosOrcamento
+    from app.models import ProjecaoGasto, RelacaoProjecaoNotaFiscal, DadosOrcamento, SetorProjecaoCor
     from django.db.models import Sum, Count, Q
     from datetime import datetime, timedelta
     from decimal import Decimal
@@ -21960,6 +23675,7 @@ def analise_projecao_gastos(request):
     setores_filtro = request.GET.getlist('setor')
     setores_filtro = [s.strip() for s in setores_filtro if s and s.strip()]
     uso_contabil_filtro = request.GET.get('uso_contabil', '').strip()
+    classificacao_reuniao_filtro = request.GET.get('classificacao_reuniao', '').strip()
 
     hoje = datetime.now()
     
@@ -22124,6 +23840,11 @@ def analise_projecao_gastos(request):
     if uso_contabil_filtro:
         projecoes_qs = projecoes_qs.filter(uso_contabil=uso_contabil_filtro)
         projecoes_grafico_previsao = projecoes_grafico_previsao.filter(uso_contabil=uso_contabil_filtro)
+    
+    # Aplicar filtro de classificação da reunião
+    if classificacao_reuniao_filtro:
+        projecoes_qs = projecoes_qs.filter(classificacao_reuniao=classificacao_reuniao_filtro)
+        projecoes_grafico_previsao = projecoes_grafico_previsao.filter(classificacao_reuniao=classificacao_reuniao_filtro)
 
     # --- KPIs ---
     total_projecoes = projecoes_qs.count()
@@ -22252,6 +23973,66 @@ def analise_projecao_gastos(request):
         percentual_impacto_orcamento = float((valor_total_projetado / valor_orcamento_periodo) * 100)
     else:
         percentual_impacto_orcamento = None  # sem orçamento cadastrado para o período
+
+    setor_cores = _get_setor_cores_map()
+
+    # Análise de impacto por setor no orçamento (para barra múltipla)
+    impacto_setores_barras = []
+    impacto_setores_width_total = 0.0
+    impacto_orcamento_restante_pct = 0.0
+    impacto_orcamento_excedente_pct = 0.0
+    impacto_orcamento_total_pct = percentual_impacto_orcamento or 0.0
+    impacto_orcamento_escala_aplicada = False
+
+    if valor_orcamento_periodo and valor_orcamento_periodo > 0:
+        setores_impacto_agregados = list(
+            projecoes_qs.exclude(setor__isnull=True)
+            .exclude(setor='')
+            .values('setor')
+            .annotate(valor_total=Sum('valor_total'))
+            .order_by('-valor_total')
+        )
+
+        max_setores_barra = 12
+        setores_principais = setores_impacto_agregados[:max_setores_barra]
+        outros_setores_valor = sum((item.get('valor_total') or Decimal('0')) for item in setores_impacto_agregados[max_setores_barra:])
+        if outros_setores_valor > 0:
+            setores_principais.append({'setor': 'Outros setores', 'valor_total': outros_setores_valor})
+
+        cores_impacto = [
+            'bg-primary', 'bg-success', 'bg-info', 'bg-warning', 'bg-danger',
+            'bg-secondary', 'text-bg-primary', 'text-bg-success', 'text-bg-info',
+            'text-bg-warning', 'text-bg-danger', 'text-bg-secondary'
+        ]
+
+        escala_visual = 1.0
+        if impacto_orcamento_total_pct > 100:
+            escala_visual = 100.0 / impacto_orcamento_total_pct
+            impacto_orcamento_escala_aplicada = True
+
+        for idx, item in enumerate(setores_principais):
+            valor_setor = item.get('valor_total') or Decimal('0')
+            impacto_pct = float((valor_setor / valor_orcamento_periodo) * 100) if valor_orcamento_periodo else 0.0
+            participacao_pct = float((valor_setor / valor_total_projetado) * 100) if valor_total_projetado else 0.0
+            width_pct = max(0.0, impacto_pct * escala_visual)
+            impacto_setores_barras.append({
+                'setor': item.get('setor') or 'Não informado',
+                'valor_total': valor_setor,
+                'impacto_pct': impacto_pct,
+                'participacao_pct': participacao_pct,
+                'width_pct': width_pct,
+                'width_pct_css': f'{width_pct:.6f}',
+                'color_class': cores_impacto[idx % len(cores_impacto)],
+                'color_hex': setor_cores.get(SetorProjecaoCor.normalizar_nome(item.get('setor')), '#6c757d'),
+            })
+
+        width_total_barras = sum(item['width_pct'] for item in impacto_setores_barras)
+        impacto_setores_width_total = min(100.0, max(0.0, width_total_barras))
+        impacto_setores_width_total_css = f'{impacto_setores_width_total:.6f}'
+        impacto_orcamento_restante_pct = max(0.0, 100.0 - impacto_setores_width_total)
+        impacto_orcamento_excedente_pct = max(0.0, impacto_orcamento_total_pct - 100.0)
+    else:
+        impacto_setores_width_total_css = '0.000000'
 
     # Setores únicos
     setores_unicos = projecoes_qs.exclude(setor__isnull=True).exclude(setor='').values('setor').distinct().count()
@@ -22500,8 +24281,10 @@ def analise_projecao_gastos(request):
         'meses_selecionados': meses_filtro_int,
         'setores_disponiveis': setores_disponiveis,
         'uso_contabil_disponiveis': uso_contabil_disponiveis,
+        'classificacao_reuniao_choices': ProjecaoGasto.CLASSIFICACAO_REUNIAO_CHOICES,
         'setores_selecionados': setores_filtro,
         'uso_contabil_filtro': uso_contabil_filtro,
+        'classificacao_reuniao_filtro': classificacao_reuniao_filtro,
         'mostrar_todos': mostrar_todos,
 
         # KPIs
@@ -22530,6 +24313,15 @@ def analise_projecao_gastos(request):
         'percentual_pendentes': percentual_pendentes,
         'percentual_impacto_orcamento': percentual_impacto_orcamento,
         'valor_orcamento_periodo': valor_orcamento_periodo,
+        'impacto_setores_barras': impacto_setores_barras,
+        'impacto_setores_width_total': impacto_setores_width_total,
+        'impacto_setores_width_total_css': impacto_setores_width_total_css,
+        'impacto_orcamento_total_pct': impacto_orcamento_total_pct,
+        'impacto_orcamento_restante_pct': impacto_orcamento_restante_pct,
+        'impacto_orcamento_excedente_pct': impacto_orcamento_excedente_pct,
+        'impacto_orcamento_escala_aplicada': impacto_orcamento_escala_aplicada,
+        'setor_cores': setor_cores,
+        'setor_default_color': '#6c757d',
         'setores_unicos': setores_unicos,
         # Correlação Projeções e Notas Fiscais
         'projecoes_com_nota_match': projecoes_com_nota_match,
@@ -22585,6 +24377,301 @@ def analise_projecao_gastos(request):
     }
 
     return render(request, 'orcamento/analise_projecao_gastos.html', context)
+
+
+def reuniao_projecao_gastos(request):
+    """Página de reunião para projeções de gastos com filtro por setor/mês/ano/uso contábil."""
+    from app.models import ProjecaoGasto, DadosOrcamento, SetorProjecaoCor
+    from django.db.models import Q, Sum
+    from decimal import Decimal
+
+    if request.method == 'POST':
+        action = request.POST.get('action', '').strip()
+        setor_post = request.POST.get('setor', '').strip()
+        mes_post = request.POST.get('mes_referencia', '').strip()
+        ano_post = request.POST.get('ano_referencia', '').strip()
+        uso_contabil_post = request.POST.get('uso_contabil', '').strip()
+
+        redirect_url = (
+            f"{request.path}?setor={setor_post}"
+            f"&mes_referencia={mes_post}"
+            f"&ano_referencia={ano_post}"
+            f"&uso_contabil={uso_contabil_post}"
+        )
+        choices_validos = {k for k, _ in ProjecaoGasto.CLASSIFICACAO_REUNIAO_CHOICES}
+
+        if action == 'salvar_todas_classificacoes':
+            ids_postados = request.POST.getlist('projecao_ids')
+            total_atualizadas = 0
+            for proj_id in ids_postados:
+                try:
+                    proj_id_int = int(proj_id)
+                except (TypeError, ValueError):
+                    continue
+                classificacao_linha = request.POST.get(f'classificacao_{proj_id_int}', '').strip()
+                if classificacao_linha and classificacao_linha not in choices_validos:
+                    messages.error(request, f'Classificação inválida detectada para a projeção #{proj_id_int}.')
+                    return redirect(redirect_url)
+                total_atualizadas += ProjecaoGasto.objects.filter(id=proj_id_int).update(
+                    classificacao_reuniao=classificacao_linha or None
+                )
+            messages.success(request, f'{total_atualizadas} classificação(ões) foram salvas de uma vez.')
+            return redirect(redirect_url)
+
+        if action.startswith('salvar_individual:'):
+            projecao_id = action.split(':', 1)[1].strip()
+            try:
+                proj = ProjecaoGasto.objects.get(id=int(projecao_id))
+            except (TypeError, ValueError, ProjecaoGasto.DoesNotExist):
+                messages.error(request, 'Projeção não encontrada para classificar.')
+                return redirect(redirect_url)
+
+            classificacao = request.POST.get(f'classificacao_{proj.id}', '').strip()
+            if classificacao and classificacao not in choices_validos:
+                messages.error(request, 'Classificação inválida.')
+                return redirect(redirect_url)
+
+            proj.classificacao_reuniao = classificacao or None
+            proj.save(update_fields=['classificacao_reuniao', 'updated_at'])
+            messages.success(request, f'Classificação salva para a projeção ID Excel {proj.id_excel}.')
+            return redirect(redirect_url)
+
+        try:
+            projecao_id = request.POST.get('projecao_id', '').strip()
+            proj = ProjecaoGasto.objects.get(id=int(projecao_id))
+        except (TypeError, ValueError, ProjecaoGasto.DoesNotExist):
+            messages.error(request, 'Projeção não encontrada para classificar.')
+            return redirect(redirect_url)
+
+        classificacao = request.POST.get('classificacao_reuniao', '').strip()
+        if classificacao and classificacao not in choices_validos:
+            messages.error(request, 'Classificação inválida.')
+            return redirect(redirect_url)
+
+        proj.classificacao_reuniao = classificacao or None
+        proj.save(update_fields=['classificacao_reuniao', 'updated_at'])
+        messages.success(request, f'Classificação salva para a projeção ID Excel {proj.id_excel}.')
+        return redirect(redirect_url)
+
+    setor = request.GET.get('setor', '').strip()
+    mes_referencia = request.GET.get('mes_referencia', '').strip()
+    ano_referencia = request.GET.get('ano_referencia', '').strip()
+    uso_contabil = request.GET.get('uso_contabil', '').strip()
+
+    meses_choices = [
+        ('1', 'Janeiro'),
+        ('2', 'Fevereiro'),
+        ('3', 'Março'),
+        ('4', 'Abril'),
+        ('5', 'Maio'),
+        ('6', 'Junho'),
+        ('7', 'Julho'),
+        ('8', 'Agosto'),
+        ('9', 'Setembro'),
+        ('10', 'Outubro'),
+        ('11', 'Novembro'),
+        ('12', 'Dezembro'),
+    ]
+    meses_aliases = {
+        '1': ['1', '01', 'JANEIRO'],
+        '2': ['2', '02', 'FEVEREIRO'],
+        '3': ['3', '03', 'MARÇO', 'MARCO'],
+        '4': ['4', '04', 'ABRIL'],
+        '5': ['5', '05', 'MAIO'],
+        '6': ['6', '06', 'JUNHO'],
+        '7': ['7', '07', 'JULHO'],
+        '8': ['8', '08', 'AGOSTO'],
+        '9': ['9', '09', 'SETEMBRO'],
+        '10': ['10', 'OUTUBRO'],
+        '11': ['11', 'NOVEMBRO'],
+        '12': ['12', 'DEZEMBRO'],
+    }
+    meses_label_por_num = {num: label for num, label in meses_choices}
+
+    def _mes_para_num(raw_mes):
+        if not raw_mes:
+            return None
+        texto = str(raw_mes).strip().upper()
+        for num, aliases in meses_aliases.items():
+            if texto in aliases:
+                return num
+        return None
+
+    projecoes_qs = ProjecaoGasto.objects.all()
+    if setor:
+        projecoes_qs = projecoes_qs.filter(setor__iexact=setor)
+    if mes_referencia:
+        mes_num = _mes_para_num(mes_referencia) or mes_referencia
+        aliases = meses_aliases.get(mes_num, [])
+        if aliases:
+            q_mes = Q()
+            for alias in aliases:
+                q_mes |= Q(mes_referencia__iexact=alias)
+            projecoes_qs = projecoes_qs.filter(q_mes)
+    if ano_referencia:
+        try:
+            projecoes_qs = projecoes_qs.filter(ano_referencia=int(ano_referencia))
+        except (TypeError, ValueError):
+            pass
+    if uso_contabil:
+        projecoes_qs = projecoes_qs.filter(uso_contabil__iexact=uso_contabil)
+
+    projecoes_qs = projecoes_qs.order_by('-ano_referencia', 'mes_referencia', 'setor', '-created_at')
+
+    setores_brutos = ProjecaoGasto.objects.exclude(setor__isnull=True).exclude(setor='').values_list('setor', flat=True)
+    setores_disponiveis = sorted({str(s).strip() for s in setores_brutos if str(s).strip()})
+    usos_contabeis_brutos = ProjecaoGasto.objects.exclude(uso_contabil__isnull=True).exclude(uso_contabil='').values_list('uso_contabil', flat=True)
+    usos_contabeis_disponiveis = sorted({str(u).strip() for u in usos_contabeis_brutos if str(u).strip()})
+    anos_disponiveis = list(
+        ProjecaoGasto.objects.exclude(ano_referencia__isnull=True)
+        .values_list('ano_referencia', flat=True)
+        .distinct()
+        .order_by('-ano_referencia')
+    )
+
+    # Evita listar tudo de primeira; mostra após aplicar algum filtro.
+    filtros_aplicados = bool(setor or mes_referencia or ano_referencia or uso_contabil)
+    projecoes = list(projecoes_qs[:500]) if filtros_aplicados else []
+    setor_cores = _get_setor_cores_map()
+    for p in projecoes:
+        mes_num = _mes_para_num(p.mes_referencia)
+        p.mes_referencia_label = meses_label_por_num.get(mes_num, p.mes_referencia or '-')
+        p.setor_cor = setor_cores.get(SetorProjecaoCor.normalizar_nome(p.setor), '#6c757d')
+
+    total_registros_filtrados = projecoes_qs.count() if filtros_aplicados else 0
+    valor_total_filtrado = projecoes_qs.aggregate(total=Sum('valor_total')).get('total') if filtros_aplicados else Decimal('0')
+    if valor_total_filtrado is None:
+        valor_total_filtrado = Decimal('0')
+    total_classificadas = projecoes_qs.exclude(classificacao_reuniao__isnull=True).exclude(classificacao_reuniao='').count() if filtros_aplicados else 0
+    total_nao_classificadas = max(total_registros_filtrados - total_classificadas, 0)
+    total_confirmadas = projecoes_qs.filter(classificacao_reuniao='confirmada').count() if filtros_aplicados else 0
+
+    # ===== Análise de Impacto no Orçamento (DadosOrcamento) =====
+    anos_periodo = []
+    meses_periodo = []
+    if filtros_aplicados:
+        try:
+            if ano_referencia:
+                anos_periodo = [int(ano_referencia)]
+        except (TypeError, ValueError):
+            anos_periodo = []
+        try:
+            if mes_referencia:
+                mes_int = int(mes_referencia)
+                if 1 <= mes_int <= 12:
+                    meses_periodo = [mes_int]
+        except (TypeError, ValueError):
+            meses_periodo = []
+
+        # Se não vier explícito no filtro, inferir dos dados filtrados
+        if not anos_periodo:
+            anos_periodo = sorted({
+                int(a) for a in projecoes_qs.exclude(ano_referencia__isnull=True).values_list('ano_referencia', flat=True)
+            })
+        if not meses_periodo:
+            meses_inferidos = set()
+            for m in projecoes_qs.exclude(mes_referencia__isnull=True).exclude(mes_referencia='').values_list('mes_referencia', flat=True):
+                mn = _mes_para_num(m)
+                if mn:
+                    meses_inferidos.add(int(mn))
+            meses_periodo = sorted(meses_inferidos)
+
+    orcamento_qs = DadosOrcamento.objects.all()
+    if anos_periodo:
+        orcamento_qs = orcamento_qs.filter(ano__in=anos_periodo)
+    if meses_periodo:
+        orcamento_qs = orcamento_qs.filter(mes__in=meses_periodo)
+
+    total_orcamento_periodo = orcamento_qs.aggregate(total=Sum('valor_orcamento')).get('total') if filtros_aplicados else Decimal('0')
+    total_final_desejado_periodo = orcamento_qs.aggregate(total=Sum('valor_final_desejado')).get('total') if filtros_aplicados else Decimal('0')
+    if total_orcamento_periodo is None:
+        total_orcamento_periodo = Decimal('0')
+    if total_final_desejado_periodo is None:
+        total_final_desejado_periodo = Decimal('0')
+    contas_orcamentarias_periodo = orcamento_qs.values('conta_orcamentaria').distinct().count() if filtros_aplicados else 0
+
+    percentual_impacto_orcamento = None
+    saldo_estimado_orcamento = None
+    if filtros_aplicados and total_orcamento_periodo > 0:
+        percentual_impacto_orcamento = float((valor_total_filtrado / total_orcamento_periodo) * 100)
+        saldo_estimado_orcamento = total_orcamento_periodo - valor_total_filtrado
+
+    desvio_vs_final_desejado = valor_total_filtrado - total_final_desejado_periodo if filtros_aplicados else Decimal('0')
+
+    pesos_classificacao = {
+        'confirmada': Decimal('1.0'),
+        'ja_executada': Decimal('1.0'),
+        'possivel': Decimal('0.6'),
+        'reprogramar': Decimal('0.3'),
+        'cancelada': Decimal('0.0'),
+    }
+    exposicao_ponderada = Decimal('0')
+    valor_sem_classificacao = Decimal('0')
+    if filtros_aplicados:
+        for item in projecoes_qs.values('classificacao_reuniao', 'valor_total'):
+            valor = item.get('valor_total') or Decimal('0')
+            cls = item.get('classificacao_reuniao')
+            if not cls:
+                valor_sem_classificacao += valor
+            peso = pesos_classificacao.get(cls, Decimal('0.5'))
+            exposicao_ponderada += (valor * peso)
+
+    if percentual_impacto_orcamento is None:
+        nivel_impacto = 'Sem orçamento cadastrado para o período selecionado'
+        nivel_impacto_css = 'secondary'
+    elif percentual_impacto_orcamento < 40:
+        nivel_impacto = 'Impacto baixo'
+        nivel_impacto_css = 'success'
+    elif percentual_impacto_orcamento < 75:
+        nivel_impacto = 'Impacto moderado'
+        nivel_impacto_css = 'warning'
+    elif percentual_impacto_orcamento < 100:
+        nivel_impacto = 'Impacto alto'
+        nivel_impacto_css = 'orange'
+    else:
+        nivel_impacto = 'Impacto crítico (acima do orçamento)'
+        nivel_impacto_css = 'danger'
+
+    nivel_impacto_border_class = f'border-{nivel_impacto_css}' if nivel_impacto_css != 'orange' else 'border-warning'
+    nivel_impacto_text_class = f'text-{nivel_impacto_css}' if nivel_impacto_css != 'orange' else 'text-warning'
+
+    context = {
+        'page_title': 'Reunião Projeção de Gastos',
+        'active_page': 'reuniao_projecao_gastos',
+        'setores_disponiveis': setores_disponiveis,
+        'usos_contabeis_disponiveis': usos_contabeis_disponiveis,
+        'meses_choices': meses_choices,
+        'anos_disponiveis': anos_disponiveis,
+        'setor': setor,
+        'mes_referencia': mes_referencia,
+        'ano_referencia': ano_referencia,
+        'uso_contabil': uso_contabil,
+        'projecoes': projecoes,
+        'filtros_aplicados': filtros_aplicados,
+        'classificacao_choices': ProjecaoGasto.CLASSIFICACAO_REUNIAO_CHOICES,
+        'total_registros_filtrados': total_registros_filtrados,
+        'valor_total_filtrado': valor_total_filtrado,
+        'total_classificadas': total_classificadas,
+        'total_nao_classificadas': total_nao_classificadas,
+        'total_confirmadas': total_confirmadas,
+        'total_orcamento_periodo': total_orcamento_periodo,
+        'total_final_desejado_periodo': total_final_desejado_periodo,
+        'contas_orcamentarias_periodo': contas_orcamentarias_periodo,
+        'percentual_impacto_orcamento': percentual_impacto_orcamento,
+        'saldo_estimado_orcamento': saldo_estimado_orcamento,
+        'desvio_vs_final_desejado': desvio_vs_final_desejado,
+        'exposicao_ponderada': exposicao_ponderada,
+        'valor_sem_classificacao': valor_sem_classificacao,
+        'nivel_impacto': nivel_impacto,
+        'nivel_impacto_css': nivel_impacto_css,
+        'nivel_impacto_border_class': nivel_impacto_border_class,
+        'nivel_impacto_text_class': nivel_impacto_text_class,
+        'anos_periodo': anos_periodo,
+        'meses_periodo': meses_periodo,
+        'setor_cores': setor_cores,
+        'setor_default_color': '#6c757d',
+    }
+    return render(request, 'orcamento/reuniao_projecao_gastos.html', context)
 
 
 def analise_notas_fiscais(request):

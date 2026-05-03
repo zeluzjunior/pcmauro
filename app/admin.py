@@ -10,7 +10,11 @@ from .models import (
     Manutentor,
     ParametrosMaoDeObra,
     ManutentorMaquina,
-    ItemEstoque, 
+    ItemEstoque,
+    EstoqueAlmoxarifado,
+    ItemAurora,
+    PecaFornecedor,
+    PecaMaquinaCitadoManual,
     ManutencaoCsv, 
     ManutencaoTerceiro,
     MaquinaPeca,
@@ -190,6 +194,68 @@ class ItemEstoqueAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+@admin.register(EstoqueAlmoxarifado)
+class EstoqueAlmoxarifadoAdmin(admin.ModelAdmin):
+    list_display = (
+        'codigo_item',
+        'descricao_item',
+        'nome_unidade',
+        'descricao_local',
+        'quantidade',
+        'valor',
+        'classificacao_tempo_sem_consumo',
+        'updated_at',
+    )
+    list_filter = ('nome_unidade', 'descricao_local', 'classificacao_tempo_sem_consumo')
+    search_fields = ('codigo_item', 'descricao_item', 'descricao_grupo_estoque', 'marca_referencia')
+    readonly_fields = ('created_at', 'updated_at')
+    list_per_page = 50
+
+
+@admin.register(ItemAurora)
+class ItemAuroraAdmin(admin.ModelAdmin):
+    list_display = ('codigo_aurora', 'descricao_aurora', 'valor_unitario', 'status_item', 'ativo', 'updated_at')
+    list_filter = ('ativo', 'status_item', 'created_at')
+    search_fields = ('codigo_aurora', 'descricao_aurora', 'status_item')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(PecaFornecedor)
+class PecaFornecedorAdmin(admin.ModelAdmin):
+    list_display = ('fabricante', 'codigo_item', 'posicao_no_manual', 'descricao_fabricante', 'updated_at')
+    list_filter = ('fabricante', 'created_at')
+    search_fields = ('fabricante', 'codigo_item', 'posicao_no_manual', 'descricao_fabricante')
+    readonly_fields = ('created_at', 'updated_at')
+    list_per_page = 50
+
+
+@admin.register(PecaMaquinaCitadoManual)
+class PecaMaquinaCitadoManualAdmin(admin.ModelAdmin):
+    list_display = (
+        'maquina',
+        'fabricante',
+        'codigo_fabricante',
+        'posicao_no_manual',
+        'quantidade',
+        'parte_maquina',
+        'peca_fornecedor',
+        'updated_at',
+    )
+    list_filter = ('maquina', 'created_at')
+    search_fields = (
+        'fabricante',
+        'codigo_fabricante',
+        'posicao_no_manual',
+        'parte_maquina',
+        'maquina__cd_maquina',
+        'maquina__descr_maquina',
+    )
+    autocomplete_fields = ('maquina', 'peca_fornecedor')
+    readonly_fields = ('created_at', 'updated_at')
+    list_per_page = 50
+    list_select_related = ('maquina', 'peca_fornecedor')
 
 
 @admin.register(ManutencaoCsv)

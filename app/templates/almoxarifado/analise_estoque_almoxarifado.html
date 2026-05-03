@@ -1,0 +1,425 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Análise de Estoque — Almoxarifado{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .stat-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
+    }
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.12) !important;
+    }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .chart-wrap { position: relative; height: 320px; }
+    .chart-wrap-sm { position: relative; height: 280px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white">Estoque e Almoxarifado</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise de Estoque</li>
+                    </ol>
+                </nav>
+                <h1 class="display-5 fw-bold mt-3">
+                    <i class="fas fa-chart-pie me-2"></i>Análise de Estoque (ERP)
+                </h1>
+                <p class="lead mb-0">Indicadores e distribuições com base na tabela <strong>EstoqueAlmoxarifado</strong> (importação CSV/Excel).</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <!-- Filtros -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button {% if not nome_unidade_sel and not local_sel %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse">
+                                <i class="fas fa-filter me-2"></i><strong>Recortes</strong>
+                                {% if nome_unidade_sel or local_sel %}
+                                    <span class="badge bg-primary ms-2">filtro ativo</span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if nome_unidade_sel or local_sel %}show{% endif %}">
+                            <div class="accordion-body">
+                                <form method="get" class="row g-3 align-items-end">
+                                    <div class="col-md-5">
+                                        <label class="form-label">Nome da unidade</label>
+                                        <select name="nome_unidade" class="form-select">
+                                            <option value="">Todas</option>
+                                            {% for u in unidades_opcoes %}
+                                                <option value="{{ u }}" {% if nome_unidade_sel == u %}selected{% endif %}>{{ u }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label">Local (almoxarifado)</label>
+                                        <select name="descricao_local" class="form-select">
+                                            <option value="">Todos</option>
+                                            {% for loc in locais_opcoes %}
+                                                <option value="{{ loc }}" {% if local_sel == loc %}selected{% endif %}>{{ loc|truncatechars:80 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 d-flex gap-2">
+                                        <button type="submit" class="btn btn-primary flex-grow-1"><i class="fas fa-search me-1"></i>Aplicar</button>
+                                        <a href="{% url 'analise_estoque_almoxarifado' %}" class="btn btn-outline-secondary">Limpar</a>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if total_itens == 0 %}
+            <div class="alert alert-info shadow-sm">
+                <i class="fas fa-info-circle me-2"></i>Não há registros em <strong>EstoqueAlmoxarifado</strong>.
+                <a href="{% url 'importar_estoque' %}" class="alert-link">Importar estoque</a>
+            </div>
+        {% else %}
+
+        <!-- KPIs -->
+        <div class="row mb-2">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Itens (linhas)</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_itens|number_br:0 }}</h2>
+                                <small class="text-muted">{{ n_grupos_filtrado|number_br:0 }} grupos · {{ n_locais_filtrado|number_br:0 }} locais distintos</small>
+                            </div>
+                            <i class="fas fa-boxes fa-2x text-primary opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Soma das quantidades</h6>
+                                <h2 class="mb-0 fw-bold">{{ sum_qtd|number_br:2 }}</h2>
+                                <small class="text-muted">Σ quantidade (UM mistas no conjunto)</small>
+                            </div>
+                            <i class="fas fa-balance-scale fa-2x text-info opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Soma do campo Valor</h6>
+                                <h2 class="mb-0 fw-bold">{{ sum_valor_campo|currency_br }}</h2>
+                                <small class="text-muted">Como exportado pelo ERP</small>
+                            </div>
+                            <i class="fas fa-coins fa-2x text-success opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted mb-2">Σ (Qtd × Valor)</h6>
+                                <h2 class="mb-0 fw-bold">{{ sum_qtd_vezes_valor|currency_br }}</h2>
+                                <small class="text-muted">Útil se Valor for unitário</small>
+                            </div>
+                            <i class="fas fa-calculator fa-2x text-warning opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if ultima_data_geracao or ultima_atualizacao_registro %}
+        <p class="text-muted small mb-4">
+            {% if ultima_data_geracao %}<i class="far fa-clock me-1"></i>Última <strong>data geração</strong> nos dados: {{ ultima_data_geracao }}{% endif %}
+            {% if ultima_atualizacao_registro %} · Última <strong>atualização</strong> no sistema: {{ ultima_atualizacao_registro|date:'d/m/Y H:i' }}{% endif %}
+        </p>
+        {% endif %}
+
+        <!-- Gráficos -->
+        <div class="row mb-4">
+            <div class="col-lg-5 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <strong><i class="fas fa-chart-pie me-2 text-primary"></i>Valor por classificação (tempo sem consumo)</strong>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-wrap-sm mx-auto" style="max-width: 380px;">
+                            <canvas id="chartClassificacao"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <strong><i class="fas fa-chart-bar me-2 text-success"></i>Valor por grupo de estoque (top 15)</strong>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-wrap">
+                            <canvas id="chartGrupo"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <strong><i class="fas fa-warehouse me-2 text-info"></i>Valor por local (top 12)</strong>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-wrap">
+                            <canvas id="chartLocal"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabelas -->
+        <div class="row mb-4">
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-light"><strong>Detalhe — classificação</strong></div>
+                    <div class="card-body p-0 table-responsive">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead><tr><th>Classificação</th><th class="text-end">Itens</th><th class="text-end">Σ Valor</th></tr></thead>
+                            <tbody>
+                                {% for r in por_classificacao %}
+                                <tr>
+                                    <td>{{ r.label|truncatechars:60 }}</td>
+                                    <td class="text-end">{{ r.itens|number_br:0 }}</td>
+                                    <td class="text-end">{{ r.valor|currency_br }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-light"><strong>Detalhe — grupo (top 15)</strong></div>
+                    <div class="card-body p-0 table-responsive">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead><tr><th>Grupo</th><th class="text-end">Itens</th><th class="text-end">Σ Valor</th></tr></thead>
+                            <tbody>
+                                {% for r in por_grupo %}
+                                <tr>
+                                    <td>{{ r.label|truncatechars:70 }}</td>
+                                    <td class="text-end">{{ r.itens|number_br:0 }}</td>
+                                    <td class="text-end">{{ r.valor|currency_br }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-5">
+            <div class="card-header bg-primary text-white">
+                <strong><i class="fas fa-list-ol me-2"></i>Maiores posições pelo campo Valor (top 20)</strong>
+            </div>
+            <div class="card-body p-0 table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Código</th>
+                            <th>Descrição</th>
+                            <th>Local</th>
+                            <th class="text-end">Qtd</th>
+                            <th class="text-end">Valor</th>
+                            <th>Classificação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for it in top_por_valor_campo %}
+                        <tr>
+                            <td><code>{{ it.codigo_item }}</code></td>
+                            <td>{{ it.descricao_item|default:'—'|truncatechars:55 }}</td>
+                            <td><small>{{ it.descricao_local|default:'—'|truncatechars:40 }}</small></td>
+                            <td class="text-end">{% if it.quantidade is not None %}{{ it.quantidade|number_br:2 }}{% else %}—{% endif %}</td>
+                            <td class="text-end">{% if it.valor is not None %}{{ it.valor|currency_br }}{% else %}—{% endif %}</td>
+                            <td><span class="badge bg-secondary">{{ it.classificacao_tempo_sem_consumo|default:'—'|truncatechars:24 }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const palette = ['#0d6efd','#198754','#0dcaf0','#ffc107','#dc3545','#6f42c1','#fd7e14','#20c997','#6c757d','#e83e8c','#6610f2','#0aa2c0'];
+
+    function safeChart(callback) {
+        if (typeof Chart === 'undefined') return;
+        callback();
+    }
+
+    const classLabels = {{ class_labels_json|safe }};
+    const classData = {{ class_valores_json|safe }};
+    const grupoLabels = {{ grupo_labels_json|safe }};
+    const grupoData = {{ grupo_valores_json|safe }};
+    const localLabels = {{ local_labels_json|safe }};
+    const localData = {{ local_valores_json|safe }};
+
+    safeChart(function() {
+        const ctx1 = document.getElementById('chartClassificacao');
+        if (ctx1 && classLabels.length) {
+            new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: classLabels,
+                    datasets: [{
+                        data: classData,
+                        backgroundColor: palette,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    const v = ctx.raw || 0;
+                                    return ' ' + Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        const ctx2 = document.getElementById('chartGrupo');
+        if (ctx2 && grupoLabels.length) {
+            new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: grupoLabels,
+                    datasets: [{
+                        label: 'Σ Valor',
+                        data: grupoData,
+                        backgroundColor: palette,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            ticks: {
+                                callback: function(val) {
+                                    return Number(val).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    const v = ctx.raw || 0;
+                                    return ' ' + Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        const ctx3 = document.getElementById('chartLocal');
+        if (ctx3 && localLabels.length) {
+            new Chart(ctx3, {
+                type: 'bar',
+                data: {
+                    labels: localLabels,
+                    datasets: [{
+                        label: 'Σ Valor',
+                        data: localData,
+                        backgroundColor: '#0dcaf0',
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            ticks: {
+                                callback: function(val) {
+                                    return Number(val).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    const v = ctx.raw || 0;
+                                    return ' ' + Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    });
+})();
+</script>
+{% endblock %}
