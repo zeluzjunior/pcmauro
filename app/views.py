@@ -380,7 +380,7 @@ def em_desenvolvimento(request):
 
 
 def importar_pecas_maquina(request):
-    """Upload e importação da planilha «LISTA COMPLETA» para PecaMaquinaCitadoManual (+ Peça Fornecedor)."""
+    """Upload e importação da planilha «LISTA COMPLETA» para catálogo + PecaMaquinaCitadoManual."""
     from app.utils import (
         LISTA_COMPLETA_IMPORT_COPY_SAME_VALUE,
         LISTA_COMPLETA_IMPORT_SCHEMA,
@@ -460,6 +460,112 @@ def importar_pecas_maquina(request):
         return render(request, template, context)
 
     return render(request, template, context)
+
+
+def consultar_pecas_maquinas_manual(request):
+    """Lista dados importados da planilha LISTA COMPLETA (modelo PecaMaquinaCitadoManual)."""
+    from app.models import PecaMaquinaCitadoManual
+
+    qs = PecaMaquinaCitadoManual.objects.select_related('maquina', 'peca_catalogo').order_by(
+        'maquina__cd_maquina', 'peca_catalogo__codigo_fabricante'
+    )
+
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        try:
+            snum = int(float(search_query.replace(',', '.')))
+        except (ValueError, TypeError):
+            snum = None
+        cond = (
+            Q(peca_catalogo__codigo_fabricante__icontains=search_query)
+            | Q(peca_catalogo__fabricante__icontains=search_query)
+            | Q(peca_catalogo__peca_fornecedor__icontains=search_query)
+            | Q(posicao_no_manual__icontains=search_query)
+            | Q(parte_maquina__icontains=search_query)
+            | Q(maquina__descr_maquina__icontains=search_query)
+        )
+        if snum is not None:
+            cond |= Q(maquina__cd_maquina=snum)
+        qs = qs.filter(cond)
+
+    filter_cd_maquina = request.GET.get('filter_cd_maquina', '').strip()
+    if filter_cd_maquina:
+        try:
+            n = int(float(filter_cd_maquina.replace(',', '.')))
+            qs = qs.filter(maquina__cd_maquina=n)
+        except (ValueError, TypeError):
+            pass
+
+    filter_descr_maquina = request.GET.get('filter_descr_maquina', '').strip()
+    if filter_descr_maquina:
+        qs = qs.filter(maquina__descr_maquina__icontains=filter_descr_maquina)
+
+    filter_posicao = request.GET.get('filter_posicao', '').strip()
+    if filter_posicao:
+        qs = qs.filter(posicao_no_manual__icontains=filter_posicao)
+
+    filter_fabricante = request.GET.get('filter_fabricante', '').strip()
+    if filter_fabricante:
+        qs = qs.filter(peca_catalogo__fabricante__icontains=filter_fabricante)
+
+    filter_cod_fabricante = request.GET.get('filter_cod_fabricante', '').strip()
+    if filter_cod_fabricante:
+        qs = qs.filter(peca_catalogo__codigo_fabricante__icontains=filter_cod_fabricante)
+
+    filter_desc_fabricante = request.GET.get('filter_desc_fabricante', '').strip()
+    if filter_desc_fabricante:
+        qs = qs.filter(peca_catalogo__peca_fornecedor__icontains=filter_desc_fabricante)
+
+    filter_parte_maquina = request.GET.get('filter_parte_maquina', '').strip()
+    if filter_parte_maquina:
+        qs = qs.filter(parte_maquina__icontains=filter_parte_maquina)
+
+    total = qs.count()
+    maquinas_distintas = (
+        qs.values('maquina__cd_maquina').distinct().count() if total else 0
+    )
+
+    paginator = Paginator(qs, 75)
+    page_number = request.GET.get('page') or 1
+    pecas = paginator.get_page(page_number)
+
+    get_copy = request.GET.copy()
+    get_copy.pop('page', None)
+    qs_sem_page = get_copy.urlencode()
+
+    has_column_filters = any(
+        [
+            filter_cd_maquina,
+            filter_descr_maquina,
+            filter_posicao,
+            filter_fabricante,
+            filter_cod_fabricante,
+            filter_desc_fabricante,
+            filter_parte_maquina,
+        ]
+    )
+    filters_open = bool(search_query or has_column_filters)
+
+    context = {
+        'page_title': 'Consultar peças no manual (LISTA COMPLETA)',
+        'active_page': 'consultar_pecas_maquinas_manual',
+        'pecas': pecas,
+        'total': total,
+        'total_count': total,
+        'maquinas_distintas': maquinas_distintas,
+        'search_query': search_query,
+        'filter_cd_maquina': filter_cd_maquina,
+        'filter_descr_maquina': filter_descr_maquina,
+        'filter_posicao': filter_posicao,
+        'filter_fabricante': filter_fabricante,
+        'filter_cod_fabricante': filter_cod_fabricante,
+        'filter_desc_fabricante': filter_desc_fabricante,
+        'filter_parte_maquina': filter_parte_maquina,
+        'filters_open': filters_open,
+        'has_column_filters': has_column_filters,
+        'qs_sem_page': qs_sem_page,
+    }
+    return render(request, 'maquinas/consultar_pecas_maquinas_manual.html', context)
 
 
 def dados_producao_diaria(request):
@@ -20776,12 +20882,13 @@ def gerenciar_projeto(request):
     from app.models import (
         Maquina, MaquinaDocumento, OrdemServicoCorretiva, OrdemServicoCorretivaFicha,
         CentroAtividade, Semana52, Manutentor, ManutentorMaquina,
-        ItemEstoque, ManutencaoCsv, ManutencaoTerceiro, MaquinaPeca,
+        ItemEstoque, ItemAurora, EstoqueAlmoxarifado, PecaMaquinaCitadoManual, PecaManualCatalogo,
+        ManutencaoCsv, ManutencaoTerceiro, MaquinaPeca,
         MaquinaPrimariaSecundaria, PlanoPreventiva, PlanoPreventivaDocumento,
         MeuPlanoPreventiva, MeuPlanoPreventivaDocumento, AgendamentoCronograma,
         RoteiroPreventiva, RequisicaoAlmoxarifado, NotaFiscal, Visitas,
         ProjecaoGasto, RelacaoProjecaoNotaFiscal, DadosOrcamento, ControleRCeNF,
-        ParadaMaquina
+        ParadaMaquina,
     )
     from datetime import date
     
@@ -20842,6 +20949,38 @@ def gerenciar_projeto(request):
             'icone': 'fas fa-boxes',
             'cor': 'secondary',
             'descricao': 'Itens de estoque cadastrados'
+        },
+        {
+            'nome': 'Itens Aurora',
+            'modelo': ItemAurora,
+            'key': 'item_aurora',
+            'icone': 'fas fa-barcode',
+            'cor': 'info',
+            'descricao': 'Catálogo Aurora (código, descrição, valor unitário — ex.: planilha LISTA COMPLETA)',
+        },
+        {
+            'nome': 'Estoque Almoxarifado',
+            'modelo': EstoqueAlmoxarifado,
+            'key': 'estoque_almoxarifado',
+            'icone': 'fas fa-warehouse',
+            'cor': 'secondary',
+            'descricao': 'Posições de estoque importadas do ERP (export ESTOQUE *.csv)',
+        },
+        {
+            'nome': 'PecaMaquinaCitadoManual',
+            'modelo': PecaMaquinaCitadoManual,
+            'key': 'peca_maquina_citado_manual',
+            'icone': 'fas fa-book',
+            'cor': 'primary',
+            'descricao': 'Uso de peça do catálogo por máquina (LISTA COMPLETA). Limpar antes do catálogo se ambos forem apagados.',
+        },
+        {
+            'nome': 'PecaManualCatalogo',
+            'modelo': PecaManualCatalogo,
+            'key': 'peca_manual_catalogo',
+            'icone': 'fas fa-bookmark',
+            'cor': 'info',
+            'descricao': 'Catálogo único fabricante + cód. fabricante (várias máquinas podem citar a mesma peça).',
         },
         {
             'nome': 'Manutenções CSV',
@@ -21121,12 +21260,13 @@ def limpar_tabela(request):
     from app.models import (
         Maquina, MaquinaDocumento, OrdemServicoCorretiva, OrdemServicoCorretivaFicha,
         CentroAtividade, Semana52, Manutentor, ManutentorMaquina,
-        ItemEstoque, ManutencaoCsv, ManutencaoTerceiro, MaquinaPeca,
+        ItemEstoque, ItemAurora, EstoqueAlmoxarifado, PecaMaquinaCitadoManual, PecaManualCatalogo,
+        ManutencaoCsv, ManutencaoTerceiro, MaquinaPeca,
         MaquinaPrimariaSecundaria, PlanoPreventiva, PlanoPreventivaDocumento,
         MeuPlanoPreventiva, MeuPlanoPreventivaDocumento, AgendamentoCronograma,
         RoteiroPreventiva, RequisicaoAlmoxarifado, NotaFiscal, Visitas,
         ProjecaoGasto, RelacaoProjecaoNotaFiscal, DadosOrcamento, ControleRCeNF,
-        ParadaMaquina
+        ParadaMaquina,
     )
     from django.db.models import Q
     
@@ -21139,6 +21279,10 @@ def limpar_tabela(request):
         'manutentores': {'modelo': Manutentor, 'nome': 'Manutentores'},
         'manutentor_maquina': {'modelo': ManutentorMaquina, 'nome': 'Máquinas dos Manutentores'},
         'estoque': {'modelo': ItemEstoque, 'nome': 'Itens de Estoque'},
+        'item_aurora': {'modelo': ItemAurora, 'nome': 'Itens Aurora'},
+        'estoque_almoxarifado': {'modelo': EstoqueAlmoxarifado, 'nome': 'Estoque Almoxarifado'},
+        'peca_maquina_citado_manual': {'modelo': PecaMaquinaCitadoManual, 'nome': 'PecaMaquinaCitadoManual'},
+        'peca_manual_catalogo': {'modelo': PecaManualCatalogo, 'nome': 'PecaManualCatalogo'},
         'manutencao_csv': {'modelo': ManutencaoCsv, 'nome': 'Manutenções CSV'},
         'manutencao_terceiros': {'modelo': ManutencaoTerceiro, 'nome': 'Manutenções Terceiros'},
         'maquina_peca': {'modelo': MaquinaPeca, 'nome': 'Peças das Máquinas'},

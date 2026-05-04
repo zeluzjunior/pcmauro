@@ -705,43 +705,53 @@ class ItemAurora(models.Model):
         return f"{self.codigo_aurora} - {self.descricao_aurora or 'Sem descrição'}"
 
 
-class PecaFornecedor(models.Model):
-    """Referência de peça pelo fabricante (manual / catálogo do fornecedor)."""
+class PecaManualCatalogo(models.Model):
+    """
+    Definição única de peça no catálogo do fabricante (mesma peça pode ser citada em várias máquinas).
+    Chave natural: fabricante + código do fabricante.
+    """
 
-    fabricante = models.CharField('Fabricante', max_length=255, db_index=True)
-    codigo_item = models.CharField('Código do item', max_length=120, db_index=True)
-    posicao_no_manual = models.CharField(
-        'Posição no manual',
+    fabricante = models.CharField(
+        'Fabricante',
         max_length=255,
-        blank=True,
-        null=True,
-        help_text='Ex.: página, figura ou seção do manual do fabricante',
+        db_index=True,
+        help_text='Coluna «FABRICANTE» (C) na LISTA COMPLETA.',
     )
-    descricao_fabricante = models.CharField(
+    codigo_fabricante = models.CharField(
+        'Código do fabricante',
+        max_length=120,
+        db_index=True,
+        help_text='Coluna «Cód. do fabricante» (D) na LISTA COMPLETA.',
+    )
+    peca_fornecedor = models.CharField(
         'Descrição do fabricante',
         max_length=500,
         blank=True,
         null=True,
+        help_text='Coluna «DESCRIÇÃO DO FABRICANTE» (E) na LISTA COMPLETA.',
     )
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
     updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
 
     class Meta:
-        verbose_name = 'Peça Fornecedor'
-        verbose_name_plural = 'Peças Fornecedor'
-        ordering = ['fabricante', 'codigo_item']
-        indexes = [
-            models.Index(fields=['fabricante', 'codigo_item']),
+        verbose_name = 'Peça manual (catálogo)'
+        verbose_name_plural = 'Peças manuais (catálogo)'
+        ordering = ['fabricante', 'codigo_fabricante']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['fabricante', 'codigo_fabricante'],
+                name='uniq_pecamanualcatalogo_fabricante_codigo',
+            ),
         ]
 
     def __str__(self):
-        return f"{self.fabricante} — {self.codigo_item}"
+        return f"{self.fabricante} · {self.codigo_fabricante}"
 
 
 class PecaMaquinaCitadoManual(models.Model):
     """
-    Peça citada no manual de uma máquina específica, relacionada ao catálogo PecaFornecedor
-    (fabricante + código do item no catálogo).
+    Uso de uma peça do catálogo em uma máquina (contexto da LISTA COMPLETA: posição, qtde, parte).
+    Várias máquinas podem referenciar o mesmo PecaManualCatalogo.
     """
 
     maquina = models.ForeignKey(
@@ -752,26 +762,12 @@ class PecaMaquinaCitadoManual(models.Model):
         verbose_name='Máquina',
         db_index=True,
     )
-    peca_fornecedor = models.ForeignKey(
-        PecaFornecedor,
+    peca_catalogo = models.ForeignKey(
+        PecaManualCatalogo,
         on_delete=models.PROTECT,
-        related_name='pecas_maquina',
-        verbose_name='Peça fornecedor',
-        help_text='Nome ou Descrição em Peça Fornecedor (fabricante e código do item)',
-    )
-    codigo_fabricante = models.CharField(
-        'Código do fabricante',
-        max_length=120,
-        db_index=True,
-        help_text='Código como aparece no manual da máquina (geralmente igual ao código em Peça Fornecedor)',
-    )
-    fabricante = models.CharField(
-        'Fabricante',
-        max_length=255,
-        blank=True,
-        null=True,
-        db_index=True,
-        help_text='Fabricante conforme a lista/manual (cópia desnormalizada; pode coincidir com Peça Fornecedor)',
+        related_name='citacoes_em_maquinas',
+        verbose_name='Peça (catálogo)',
+        help_text='Definição da peça no fabricante; compartilhada entre máquinas quando for a mesma referência.',
     )
     posicao_no_manual = models.CharField(
         'Posição no manual',
@@ -801,13 +797,19 @@ class PecaMaquinaCitadoManual(models.Model):
     class Meta:
         verbose_name = 'Peça da máquina citada no manual'
         verbose_name_plural = 'Peças da máquina citadas no manual'
-        ordering = ['maquina__cd_maquina', 'codigo_fabricante']
+        ordering = ['maquina__cd_maquina', 'peca_catalogo__codigo_fabricante']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['maquina', 'peca_catalogo'],
+                name='uniq_pmcm_maquina_peca_catalogo',
+            ),
+        ]
         indexes = [
-            models.Index(fields=['maquina', 'peca_fornecedor']),
+            models.Index(fields=['maquina', 'peca_catalogo']),
         ]
 
     def __str__(self):
-        return f"{self.maquina.cd_maquina} · {self.codigo_fabricante}"
+        return f"{self.maquina.cd_maquina} · {self.peca_catalogo.codigo_fabricante}"
 
 
 class ManutencaoCsv(models.Model):

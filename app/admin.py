@@ -13,7 +13,7 @@ from .models import (
     ItemEstoque,
     EstoqueAlmoxarifado,
     ItemAurora,
-    PecaFornecedor,
+    PecaManualCatalogo,
     PecaMaquinaCitadoManual,
     ManutencaoCsv, 
     ManutencaoTerceiro,
@@ -222,11 +222,11 @@ class ItemAuroraAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at', 'updated_at')
 
 
-@admin.register(PecaFornecedor)
-class PecaFornecedorAdmin(admin.ModelAdmin):
-    list_display = ('fabricante', 'codigo_item', 'posicao_no_manual', 'descricao_fabricante', 'updated_at')
+@admin.register(PecaManualCatalogo)
+class PecaManualCatalogoAdmin(admin.ModelAdmin):
+    list_display = ('fabricante', 'codigo_fabricante', 'peca_fornecedor', 'updated_at')
     list_filter = ('fabricante', 'created_at')
-    search_fields = ('fabricante', 'codigo_item', 'posicao_no_manual', 'descricao_fabricante')
+    search_fields = ('fabricante', 'codigo_fabricante', 'peca_fornecedor')
     readonly_fields = ('created_at', 'updated_at')
     list_per_page = 50
 
@@ -235,27 +235,41 @@ class PecaFornecedorAdmin(admin.ModelAdmin):
 class PecaMaquinaCitadoManualAdmin(admin.ModelAdmin):
     list_display = (
         'maquina',
-        'fabricante',
-        'codigo_fabricante',
+        'peca_catalogo',
+        'fabricante_catalogo',
+        'codigo_fabricante_catalogo',
         'posicao_no_manual',
         'quantidade',
         'parte_maquina',
-        'peca_fornecedor',
+        'desc_fabricante_catalogo',
         'updated_at',
     )
     list_filter = ('maquina', 'created_at')
     search_fields = (
-        'fabricante',
-        'codigo_fabricante',
+        'peca_catalogo__fabricante',
+        'peca_catalogo__codigo_fabricante',
+        'peca_catalogo__peca_fornecedor',
         'posicao_no_manual',
         'parte_maquina',
         'maquina__cd_maquina',
         'maquina__descr_maquina',
     )
-    autocomplete_fields = ('maquina', 'peca_fornecedor')
+    autocomplete_fields = ('maquina', 'peca_catalogo')
     readonly_fields = ('created_at', 'updated_at')
     list_per_page = 50
-    list_select_related = ('maquina', 'peca_fornecedor')
+    list_select_related = ('maquina', 'peca_catalogo')
+
+    @admin.display(description='Fabricante')
+    def fabricante_catalogo(self, obj):
+        return obj.peca_catalogo.fabricante if obj.peca_catalogo_id else ''
+
+    @admin.display(description='Cód. fabricante')
+    def codigo_fabricante_catalogo(self, obj):
+        return obj.peca_catalogo.codigo_fabricante if obj.peca_catalogo_id else ''
+
+    @admin.display(description='Descr. fabricante')
+    def desc_fabricante_catalogo(self, obj):
+        return (obj.peca_catalogo.peca_fornecedor or '')[:80] if obj.peca_catalogo_id else ''
 
 
 @admin.register(ManutencaoCsv)

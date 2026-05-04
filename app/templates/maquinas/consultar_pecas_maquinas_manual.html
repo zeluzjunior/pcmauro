@@ -1,0 +1,359 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Consultar peças no manual (LISTA COMPLETA){% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card { transition: transform 0.2s; }
+    .stat-card:hover { transform: translateY(-5px); }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .table-container {
+        max-height: 70vh;
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+    .table {
+        width: 100%;
+        table-layout: auto;
+    }
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa !important;
+        z-index: 10;
+        white-space: nowrap;
+        vertical-align: middle;
+        text-align: center;
+        padding: 12px 8px;
+        box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);
+    }
+    .table thead tr:first-child th {
+        z-index: 11;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .table tbody td {
+        vertical-align: middle;
+        padding: 10px 8px;
+    }
+    .filter-input {
+        width: 100%;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        margin-top: 4px;
+    }
+    .filter-input:focus {
+        outline: none;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    .filter-row th {
+        background-color: #e9ecef !important;
+        padding: 4px 8px !important;
+        position: sticky;
+        top: 48px;
+        z-index: 10;
+        box-shadow: 0 2px 2px -1px rgba(0,0,0,0.08);
+    }
+    .col-cd-mq { min-width: 100px; text-align: center; }
+    .col-descr-mq { min-width: 160px; max-width: 280px; text-align: left; white-space: normal; word-break: break-word; }
+    .col-pos { min-width: 100px; text-align: left; }
+    .col-fab { min-width: 120px; text-align: left; }
+    .col-codfab { min-width: 110px; text-align: center; }
+    .col-descfab { min-width: 180px; max-width: 320px; text-align: left; white-space: normal; word-break: break-word; }
+    .col-qtde { min-width: 72px; text-align: right; }
+    .col-parte { min-width: 160px; max-width: 280px; text-align: left; white-space: normal; word-break: break-word; }
+    .col-atualizado { min-width: 120px; text-align: center; white-space: nowrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Peças e Máquinas</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar peças no manual</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Consultar peças no manual</h1>
+                <p class="lead mb-0">
+                    Citações por máquina (<strong>PecaMaquinaCitadoManual</strong>) com dados do catálogo
+                    (<strong>PecaManualCatalogo</strong>) — a mesma peça pode aparecer em várias máquinas.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container-fluid px-5">
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="row g-3">
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Total de registros</h6>
+                                        <h4 class="mb-0 fw-bold">{{ total_count }}</h4>
+                                    </div>
+                                    <i class="fas fa-list fa-2x text-primary opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Nesta página</h6>
+                                        <h4 class="mb-0 fw-bold">{{ pecas|length }}</h4>
+                                    </div>
+                                    <i class="fas fa-table fa-2x text-success opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Máquinas (filtro atual)</h6>
+                                        <h4 class="mb-0 fw-bold">{{ maquinas_distintas }}</h4>
+                                    </div>
+                                    <i class="fas fa-industry fa-2x text-info opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="accordion filter-accordion" id="filtersAccordionPecasManual">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtersHeadingPecasManual">
+                            <button class="accordion-button {% if not filters_open %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapsePecasManual" aria-expanded="{{ filters_open|yesno:'true,false' }}" aria-controls="filtersCollapsePecasManual">
+                                <i class="fas fa-filter me-2"></i>
+                                <strong>Filtros avançados</strong>
+                                {% if has_column_filters %}
+                                    <span class="badge bg-primary ms-2" id="activeFiltersBadgePecas">Filtros por coluna ativos</span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtersCollapsePecasManual" class="accordion-collapse collapse {% if filters_open %}show{% endif %}" aria-labelledby="filtersHeadingPecasManual" data-bs-parent="#filtersAccordionPecasManual">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'consultar_pecas_maquinas_manual' %}" id="filtersFormPecasManual">
+                                    <div class="row mb-4">
+                                        <div class="col-12">
+                                            <label for="master_search_pecas" class="form-label">
+                                                <i class="fas fa-search me-1"></i><strong>Busca geral</strong>
+                                            </label>
+                                            <div class="input-group">
+                                                <input type="text" name="search" id="master_search_pecas" class="form-control" placeholder="Código fabricante, fabricante, descrição, posição, parte, descrição da máquina ou código da máquina…" value="{{ search_query|default:'' }}">
+                                                <button type="submit" class="btn btn-outline-primary">
+                                                    <i class="fas fa-search"></i> Buscar
+                                                </button>
+                                            </div>
+                                            <small class="form-text text-muted">Mesma ideia da busca geral em <em>Consultar Máquinas</em>: cruza vários campos de uma vez.</small>
+                                        </div>
+                                    </div>
+                                    <hr class="my-4">
+                                    <h6 class="mb-3"><i class="fas fa-filter me-2"></i>Filtros por campo</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-5">
+                                            <label for="acc_filter_descr_maquina" class="form-label"><i class="fas fa-industry me-1"></i>Descrição da máquina</label>
+                                            <input type="text" class="form-control" id="acc_filter_descr_maquina" name="filter_descr_maquina" placeholder="Trecho da descrição…" value="{{ filter_descr_maquina|default:'' }}">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label for="acc_filter_cd_maquina" class="form-label"><i class="fas fa-hashtag me-1"></i>Código da máquina (cd_maquina)</label>
+                                            <input type="text" class="form-control" id="acc_filter_cd_maquina" name="filter_cd_maquina" placeholder="Ex.: 12345" value="{{ filter_cd_maquina|default:'' }}">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="acc_filter_posicao" class="form-label"><i class="fas fa-bookmark me-1"></i>Posição (manual)</label>
+                                            <input type="text" class="form-control" id="acc_filter_posicao" name="filter_posicao" value="{{ filter_posicao|default:'' }}">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="acc_filter_fabricante" class="form-label"><i class="fas fa-industry me-1"></i>Fabricante</label>
+                                            <input type="text" class="form-control" id="acc_filter_fabricante" name="filter_fabricante" value="{{ filter_fabricante|default:'' }}">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="acc_filter_cod_fab" class="form-label"><i class="fas fa-barcode me-1"></i>Cód. fabricante</label>
+                                            <input type="text" class="form-control" id="acc_filter_cod_fab" name="filter_cod_fabricante" value="{{ filter_cod_fabricante|default:'' }}">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="acc_filter_desc_fab" class="form-label"><i class="fas fa-align-left me-1"></i>Descrição fabricante</label>
+                                            <input type="text" class="form-control" id="acc_filter_desc_fab" name="filter_desc_fabricante" value="{{ filter_desc_fabricante|default:'' }}">
+                                        </div>
+                                        <div class="col-12">
+                                            <label for="acc_filter_parte" class="form-label"><i class="fas fa-puzzle-piece me-1"></i>Parte / sistema na máquina</label>
+                                            <input type="text" class="form-control" id="acc_filter_parte" name="filter_parte_maquina" value="{{ filter_parte_maquina|default:'' }}">
+                                        </div>
+                                        <div class="col-12">
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <button type="submit" class="btn btn-primary">
+                                                    <i class="fas fa-filter me-2"></i>Aplicar filtros
+                                                </button>
+                                                <a href="{% url 'consultar_pecas_maquinas_manual' %}" class="btn btn-secondary">
+                                                    <i class="fas fa-times me-2"></i>Limpar todos os filtros
+                                                </a>
+                                                <button type="button" class="btn btn-outline-secondary" onclick="clearAllFiltersPecasManual()">
+                                                    <i class="fas fa-eraser me-2"></i>Limpar campos
+                                                </button>
+                                                <a href="{% url 'importar_pecas_maquina' %}" class="btn btn-outline-primary ms-md-auto">
+                                                    <i class="fas fa-file-upload me-1"></i>Importar planilha
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list me-2"></i>Lista — peças citadas no manual
+                            <small class="ms-2">({{ total_count }} registro{{ total_count|pluralize }})</small>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        {% if total_count == 0 %}
+                            <div class="text-center py-5 px-3">
+                                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                <p class="text-muted mb-2">Nenhum registro encontrado com os filtros atuais.</p>
+                                <a href="{% url 'importar_pecas_maquina' %}" class="btn btn-primary"><i class="fas fa-file-upload me-2"></i>Importar LISTA COMPLETA</a>
+                            </div>
+                        {% else %}
+                        <form method="get" action="{% url 'consultar_pecas_maquinas_manual' %}" id="tableFilterFormPecasManual">
+                            <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                            <div class="table-container">
+                                <table class="table table-hover table-striped mb-0" id="pecasManualTable">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-descr-mq">Máquina</th>
+                                            <th class="col-cd-mq">Código da máquina</th>
+                                            <th class="col-pos">Pos. manual</th>
+                                            <th class="col-fab">Fabricante</th>
+                                            <th class="col-codfab">Cód. fabricante</th>
+                                            <th class="col-descfab">Descrição fabricante</th>
+                                            <th class="col-qtde">Qtde</th>
+                                            <th class="col-parte">Parte / sistema</th>
+                                            <th class="col-atualizado">Atualizado</th>
+                                        </tr>
+                                        <tr class="filter-row">
+                                            <th>
+                                                <input type="text" name="filter_descr_maquina" class="filter-input" value="{{ filter_descr_maquina|default:'' }}" placeholder="Filtrar" onchange="document.getElementById('tableFilterFormPecasManual').submit();">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filter_cd_maquina" class="filter-input" value="{{ filter_cd_maquina|default:'' }}" placeholder="Filtrar" title="Código numérico da máquina (cd_maquina)" onchange="document.getElementById('tableFilterFormPecasManual').submit();">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filter_posicao" class="filter-input" value="{{ filter_posicao|default:'' }}" placeholder="Filtrar" onchange="document.getElementById('tableFilterFormPecasManual').submit();">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filter_fabricante" class="filter-input" value="{{ filter_fabricante|default:'' }}" placeholder="Filtrar" onchange="document.getElementById('tableFilterFormPecasManual').submit();">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filter_cod_fabricante" class="filter-input" value="{{ filter_cod_fabricante|default:'' }}" placeholder="Filtrar" onchange="document.getElementById('tableFilterFormPecasManual').submit();">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filter_desc_fabricante" class="filter-input" value="{{ filter_desc_fabricante|default:'' }}" placeholder="Filtrar" onchange="document.getElementById('tableFilterFormPecasManual').submit();">
+                                            </th>
+                                            <th></th>
+                                            <th>
+                                                <input type="text" name="filter_parte_maquina" class="filter-input" value="{{ filter_parte_maquina|default:'' }}" placeholder="Filtrar" onchange="document.getElementById('tableFilterFormPecasManual').submit();">
+                                            </th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for p in pecas %}
+                                        <tr>
+                                            <td class="col-descr-mq">{{ p.maquina.descr_maquina|default:"—" }}</td>
+                                            <td class="col-cd-mq">
+                                                <a href="{% url 'visualizar_maquina' p.maquina.id %}" class="fw-bold text-primary text-decoration-none" title="Ver máquina (cd_maquina)">{{ p.maquina.cd_maquina }}</a>
+                                            </td>
+                                            <td class="col-pos">{{ p.posicao_no_manual|default:"—" }}</td>
+                                            <td class="col-fab">{{ p.peca_catalogo.fabricante|default:"—" }}</td>
+                                            <td class="col-codfab">{{ p.peca_catalogo.codigo_fabricante }}</td>
+                                            <td class="col-descfab">{{ p.peca_catalogo.peca_fornecedor|default:"—" }}</td>
+                                            <td class="col-qtde text-end">{% if p.quantidade is not None %}{{ p.quantidade }}{% else %}—{% endif %}</td>
+                                            <td class="col-parte">{{ p.parte_maquina|default:"—" }}</td>
+                                            <td class="col-atualizado small text-muted">{{ p.updated_at|date:"d/m/Y H:i" }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if pecas.has_other_pages %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <nav aria-label="Paginação">
+                    <ul class="pagination justify-content-center flex-wrap">
+                        {% if pecas.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if qs_sem_page %}{{ qs_sem_page }}&{% endif %}page=1">Primeira</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if qs_sem_page %}{{ qs_sem_page }}&{% endif %}page={{ pecas.previous_page_number }}">Anterior</a>
+                            </li>
+                        {% endif %}
+                        <li class="page-item active">
+                            <span class="page-link">Página {{ pecas.number }} de {{ pecas.paginator.num_pages }}</span>
+                        </li>
+                        {% if pecas.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if qs_sem_page %}{{ qs_sem_page }}&{% endif %}page={{ pecas.next_page_number }}">Próxima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if qs_sem_page %}{{ qs_sem_page }}&{% endif %}page={{ pecas.paginator.num_pages }}">Última</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function clearAllFiltersPecasManual() {
+    const master = document.getElementById('master_search_pecas');
+    if (master) master.value = '';
+    document.querySelectorAll('#filtersFormPecasManual input[name^="filter_"]').forEach(function (el) { el.value = ''; });
+    document.querySelectorAll('#tableFilterFormPecasManual input[name^="filter_"]').forEach(function (el) { el.value = ''; });
+}
+</script>
+{% endblock %}

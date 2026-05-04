@@ -48,7 +48,7 @@
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="updateExistingPecas" name="update_existing">
                                     <label class="form-check-label" for="updateExistingPecas">
-                                        Atualizar registros já existentes (mesma máquina + mesma peça fornecedor)
+                                        Atualizar registros já existentes (mesma máquina + mesmo cód. fabricante)
                                     </label>
                                 </div>
                             </div>
@@ -123,8 +123,9 @@
                     </div>
                     <div class="card-body">
                         <p class="mb-0 text-muted">
-                            A importação grava <strong>Peça máquina (citada no manual)</strong> e cria/vincula <strong>Peça Fornecedor</strong>
-                            quando necessário. É preciso que o código da máquina da coluna <strong>A</strong> já exista em <strong>Máquinas</strong>.
+                            A importação grava <strong>PecaManualCatalogo</strong> (fabricante + cód. fabricante + descrição, único por par)
+                            e <strong>PecaMaquinaCitadoManual</strong> (uma linha por máquina que usa essa peça: posição, qtde, parte).
+                            O código da máquina na coluna <strong>A</strong> deve existir em <strong>Máquinas</strong>.
                             Item Aurora e demais colunas podem ser tratados em etapas futuras.
                         </p>
                     </div>

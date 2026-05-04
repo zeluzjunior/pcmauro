@@ -75,10 +75,10 @@ def fold_lista_completa_header(value: Any) -> str:
 # Ordem = ordem típica das colunas no PCM (ajuste se o arquivo variar).
 LISTA_COMPLETA_IMPORT_SCHEMA: List[Tuple[str, str, str]] = [
     ('Máquina (código da principal)', 'MAQUINA (CODIGO DA PRINCIPAL)', 'peca_maquina.maquina_cd'),
-    ('Posição (manual)', 'POSICAO (MANUAL)', 'peca_fornecedor.posicao_no_manual'),
-    ('Fabricante', 'FABRICANTE', 'peca_fornecedor.fabricante'),
-    ('Cód. do fabricante', 'COD. DO FABRICANTE', 'peca_fornecedor.codigo_item'),
-    ('Descrição do fabricante', 'DESCRICAO DO FABRICANTE', 'peca_fornecedor.descricao_fabricante'),
+    ('Posição (manual)', 'POSICAO (MANUAL)', 'peca_maquina.posicao_no_manual'),
+    ('Fabricante', 'FABRICANTE', 'peca_catalogo.fabricante'),
+    ('Cód. do fabricante', 'COD. DO FABRICANTE', 'peca_catalogo.codigo_fabricante'),
+    ('Descrição do fabricante', 'DESCRICAO DO FABRICANTE', 'peca_catalogo.peca_fornecedor'),
     ('Quantidade', 'QTDE', 'peca_maquina.quantidade'),
     ('Cód. Aurora', 'COD. AURORA', 'item_aurora.codigo_aurora'),
     ('Descrição Aurora', 'DESCRICAO AURORA', 'item_aurora.descricao_aurora'),
@@ -109,23 +109,16 @@ LISTA_COMPLETA_COLUMN_TARGETS_BY_HEADER: Dict[str, str] = {
 }
 
 # Na importação, o mesmo valor da planilha pode preencher mais de um campo do modelo.
-LISTA_COMPLETA_IMPORT_COPY_SAME_VALUE: Dict[str, Tuple[str, ...]] = {
-    'peca_fornecedor.codigo_item': ('peca_maquina.codigo_fabricante',),
-    'peca_fornecedor.fabricante': ('peca_maquina.fabricante',),
-    'peca_fornecedor.posicao_no_manual': ('peca_maquina.posicao_no_manual',),
-}
+LISTA_COMPLETA_IMPORT_COPY_SAME_VALUE: Dict[str, Tuple[str, ...]] = {}
 
 LISTA_COMPLETA_IMPORT_TARGET_LABELS: Dict[str, str] = {
     'peca_maquina.maquina_cd': 'Máquina · cd_maquina (FK)',
-    'peca_maquina.codigo_fabricante': 'Peça máquina (manual) · codigo_fabricante',
+    'peca_catalogo.codigo_fabricante': 'Peça manual (catálogo) · codigo_fabricante',
     'peca_maquina.parte_maquina': 'Peça máquina (manual) · parte_maquina',
     'peca_maquina.quantidade': 'Peça máquina (manual) · quantidade',
-    'peca_maquina.fabricante': 'Peça máquina (manual) · fabricante',
+    'peca_catalogo.fabricante': 'Peça manual (catálogo) · fabricante',
     'peca_maquina.posicao_no_manual': 'Peça máquina (manual) · posicao_no_manual',
-    'peca_fornecedor.fabricante': 'Peça Fornecedor · fabricante',
-    'peca_fornecedor.codigo_item': 'Peça Fornecedor · codigo_item',
-    'peca_fornecedor.posicao_no_manual': 'Peça Fornecedor · posicao_no_manual',
-    'peca_fornecedor.descricao_fabricante': 'Peça Fornecedor · descricao_fabricante',
+    'peca_catalogo.peca_fornecedor': 'Peça manual (catálogo) · peca_fornecedor (descrição)',
     'item_aurora.codigo_aurora': 'Item Aurora · codigo_aurora (PK)',
     'item_aurora.descricao_aurora': 'Item Aurora · descricao_aurora',
     'item_aurora.valor_unitario': 'Item Aurora · valor_unitario',
@@ -154,6 +147,7 @@ def resolve_lista_completa_column_targets(header_cells: List[Any]) -> List[Tuple
 
 
 # Colunas fixas na planilha LISTA COMPLETA (índice 0-based = Excel coluna - 1).
+# «FABRICANTE» na coluna C; «DESCRIÇÃO DO FABRICANTE» na coluna E (índice 4).
 LISTA_COMPLETA_COL_A_MAQUINA_CD = 0
 LISTA_COMPLETA_COL_B_POS_MANUAL = 1
 LISTA_COMPLETA_COL_C_FABRICANTE = 2
@@ -225,16 +219,16 @@ def upload_lista_completa_pecas_maquina_citado(
     update_existing: bool = False,
 ) -> Tuple[int, int, int, List[str]]:
     """
-    Importa a aba LISTA COMPLETA para PecaMaquinaCitadoManual (+ PecaFornecedor).
+    Importa a aba LISTA COMPLETA para PecaManualCatalogo + PecaMaquinaCitadoManual.
 
-    Mapeamento por coluna Excel:
-      A → maquina (cd_maquina); B → posicao_no_manual; C → fabricante;
-      D → codigo_fabricante + codigo_item (Peça Fornecedor); E → descricao_fabricante (Peça Fornecedor);
-      F → quantidade; S → parte_maquina.
+    Mapeamento por coluna Excel (layout «LISTA COMPLETA» padrão):
+      A → maquina (cd_maquina); B → posicao_no_manual; C/D/E → PecaManualCatalogo
+      (fabricante, codigo_fabricante, peca_fornecedor); F → quantidade; S → parte_maquina.
+      A mesma peça (C+D) é uma linha de catálogo; cada máquina ganha uma citação (FK).
 
     Retorno: (criados_peça_máquina, atualizados_peça_máquina, ignorados_duplicados, erros).
     """
-    from app.models import Maquina, PecaFornecedor, PecaMaquinaCitadoManual
+    from app.models import Maquina, PecaManualCatalogo, PecaMaquinaCitadoManual
 
     created_pm = 0
     updated_pm = 0
@@ -299,20 +293,6 @@ def upload_lista_completa_pecas_maquina_citado(
                 _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_E_DESCR_FABRICANTE), 500
             )
 
-            try:
-                pf, pf_created = PecaFornecedor.objects.get_or_create(
-                    fabricante=fab,
-                    codigo_item=cod_item,
-                    defaults={'descricao_fabricante': descr_fab},
-                )
-                if not pf_created and update_existing and descr_fab is not None:
-                    if pf.descricao_fabricante != descr_fab:
-                        pf.descricao_fabricante = descr_fab
-                        pf.save(update_fields=['descricao_fabricante', 'updated_at'])
-            except Exception as exc:
-                errors.append(f'Linha {row_idx}: Peça Fornecedor — {exc}')
-                continue
-
             pos_manual = _lista_completa_optional_str(
                 _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_B_POS_MANUAL), 255
             )
@@ -321,35 +301,43 @@ def upload_lista_completa_pecas_maquina_citado(
             )
             qty = _lista_completa_quantidade_cell(_lista_completa_row_get(row_t, LISTA_COMPLETA_COL_F_QTDE))
 
-            pm_defaults = {
-                'codigo_fabricante': cod_item,
-                'fabricante': fab,
+            link_defaults = {
                 'posicao_no_manual': pos_manual,
                 'parte_maquina': parte_mq,
                 'quantidade': qty,
             }
 
             try:
-                if update_existing:
-                    _obj, created = PecaMaquinaCitadoManual.objects.update_or_create(
+                cat, cat_created = PecaManualCatalogo.objects.get_or_create(
+                    fabricante=fab,
+                    codigo_fabricante=cod_item,
+                    defaults={'peca_fornecedor': descr_fab},
+                )
+                if not cat_created and update_existing and descr_fab is not None:
+                    if cat.peca_fornecedor != descr_fab:
+                        cat.peca_fornecedor = descr_fab
+                        cat.save(update_fields=['peca_fornecedor', 'updated_at'])
+
+                qs = PecaMaquinaCitadoManual.objects.filter(
+                    maquina=maquina,
+                    peca_catalogo=cat,
+                )
+                n = qs.count()
+                if n == 0:
+                    PecaMaquinaCitadoManual.objects.create(
                         maquina=maquina,
-                        peca_fornecedor=pf,
-                        defaults=pm_defaults,
+                        peca_catalogo=cat,
+                        **link_defaults,
                     )
-                    if created:
-                        created_pm += 1
-                    else:
-                        updated_pm += 1
+                    created_pm += 1
+                elif update_existing:
+                    for obj in qs:
+                        for key, val in link_defaults.items():
+                            setattr(obj, key, val)
+                        obj.save(update_fields=[*link_defaults.keys(), 'updated_at'])
+                    updated_pm += 1
                 else:
-                    _obj, created = PecaMaquinaCitadoManual.objects.get_or_create(
-                        maquina=maquina,
-                        peca_fornecedor=pf,
-                        defaults=pm_defaults,
-                    )
-                    if created:
-                        created_pm += 1
-                    else:
-                        skipped_pm += 1
+                    skipped_pm += 1
             except Exception as exc:
                 errors.append(f'Linha {row_idx}: Peça máquina (manual) — {exc}')
                 continue

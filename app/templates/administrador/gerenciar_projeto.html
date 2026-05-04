@@ -144,7 +144,7 @@
                         </thead>
                         <tbody>
                             {% for tabela in tabelas_info %}
-                            <tr class="table-row" data-name="{{ tabela.nome|lower }}" data-desc="{{ tabela.descricao|lower|default:'' }}">
+                            <tr class="table-row" data-name="{{ tabela.nome|lower }}" data-desc="{{ tabela.descricao|lower|default:'' }}" data-key="{{ tabela.key|default:''|lower }}">
                                 <td>
                                     <strong>
                                         <i class="{{ tabela.icone }} me-2"></i>{{ tabela.nome }}
@@ -502,8 +502,9 @@
             tableRows.forEach(row => {
                 const name = row.getAttribute('data-name');
                 const desc = row.getAttribute('data-desc');
+                const key = row.getAttribute('data-key') || '';
                 
-                if (name.includes(searchTerm) || desc.includes(searchTerm)) {
+                if (name.includes(searchTerm) || desc.includes(searchTerm) || key.includes(searchTerm)) {
                     row.style.display = '';
                     visibleCount++;
                 } else {

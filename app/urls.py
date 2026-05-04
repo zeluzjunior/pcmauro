@@ -35,6 +35,7 @@ urlpatterns = [
     path('importar/estoque/', views.importar_estoque, name="importar_estoque"),
     path('importar/projecao-gastos/', views.importar_projecao_gastos, name="importar_projecao_gastos"),
     path('importar/pecas-maquina/', views.importar_pecas_maquina, name="importar_pecas_maquina"),
+    path('maquinas/consultar-pecas-manual/', views.consultar_pecas_maquinas_manual, name="consultar_pecas_maquinas_manual"),
 
     # Exportar Dados
     path('exportar/maquinas/', views.exportar_maquinas, name="exportar_maquinas"),
