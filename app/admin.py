@@ -224,9 +224,10 @@ class ItemAuroraAdmin(admin.ModelAdmin):
 
 @admin.register(PecaManualCatalogo)
 class PecaManualCatalogoAdmin(admin.ModelAdmin):
-    list_display = ('fabricante', 'codigo_fabricante', 'peca_fornecedor', 'updated_at')
+    list_display = ('fabricante', 'codigo_fabricante', 'peca_fornecedor', 'item_aurora', 'updated_at')
     list_filter = ('fabricante', 'created_at')
-    search_fields = ('fabricante', 'codigo_fabricante', 'peca_fornecedor')
+    search_fields = ('fabricante', 'codigo_fabricante', 'peca_fornecedor', 'item_aurora__codigo_aurora')
+    autocomplete_fields = ('item_aurora',)
     readonly_fields = ('created_at', 'updated_at')
     list_per_page = 50
 
@@ -249,6 +250,7 @@ class PecaMaquinaCitadoManualAdmin(admin.ModelAdmin):
         'peca_catalogo__fabricante',
         'peca_catalogo__codigo_fabricante',
         'peca_catalogo__peca_fornecedor',
+        'peca_catalogo__item_aurora__codigo_aurora',
         'posicao_no_manual',
         'parte_maquina',
         'maquina__cd_maquina',
@@ -257,7 +259,7 @@ class PecaMaquinaCitadoManualAdmin(admin.ModelAdmin):
     autocomplete_fields = ('maquina', 'peca_catalogo')
     readonly_fields = ('created_at', 'updated_at')
     list_per_page = 50
-    list_select_related = ('maquina', 'peca_catalogo')
+    list_select_related = ('maquina', 'peca_catalogo', 'peca_catalogo__item_aurora')
 
     @admin.display(description='Fabricante')
     def fabricante_catalogo(self, obj):

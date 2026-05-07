@@ -1,0 +1,393 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Consultar Itens Aurora{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card { transition: transform 0.2s; }
+    .stat-card:hover { transform: translateY(-5px); }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .table-container {
+        max-height: 70vh;
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+    .table {
+        width: 100%;
+        table-layout: auto;
+    }
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+        white-space: nowrap;
+        vertical-align: middle;
+        text-align: center;
+        padding: 12px 8px;
+    }
+    .table tbody td {
+        vertical-align: middle;
+        padding: 10px 8px;
+        font-size: 0.875rem;
+    }
+    .filter-input {
+        width: 100%;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        margin-top: 4px;
+    }
+    .filter-input:focus {
+        outline: none;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    .filter-row th {
+        background-color: #e9ecef;
+        padding: 4px 8px !important;
+        position: sticky;
+        top: 48px;
+        z-index: 8;
+    }
+    .col-codigo { min-width: 110px; text-align: left; }
+    .col-desc { min-width: 220px; max-width: 320px; text-align: left; white-space: normal; word-break: break-word; }
+    .col-valor { min-width: 110px; text-align: right; }
+    .col-status { min-width: 120px; text-align: center; }
+    .col-qtd { min-width: 90px; text-align: right; }
+    .col-texto { min-width: 140px; max-width: 200px; text-align: left; white-space: normal; word-break: break-word; font-size: 0.8rem; }
+    .col-ativo { min-width: 80px; text-align: center; }
+    .col-acoes { min-width: 90px; text-align: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Itens Aurora</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar Itens Aurora</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Consultar Itens Aurora</h1>
+                <p class="lead">Catálogo importado da LISTA COMPLETA e cadastro manual — todos os campos de Item Aurora</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion filter-accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button {% if not filtro_ativo and not ordenar_valor %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if filtro_ativo or ordenar_valor %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                                <i class="fas fa-filter me-2"></i>
+                                <strong>Filtros</strong>
+                                {% if filtro_ativo or ordenar_valor %}
+                                    <span class="badge bg-info ms-2">
+                                        {% if filtro_ativo == '1' %}Somente ativos{% elif filtro_ativo == '0' %}Somente inativos{% endif %}
+                                        {% if filtro_ativo and ordenar_valor %} · {% endif %}
+                                        {% if ordenar_valor == 'desc' %}Valor unitário (maior → menor){% elif ordenar_valor == 'asc' %}Valor unitário (menor → maior){% endif %}
+                                    </span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if filtro_ativo or ordenar_valor %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'consultar_itens_aurora' %}" class="row g-3">
+                                    <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                                    <input type="hidden" name="filtro_codigo" value="{{ filtro_codigo|default:'' }}">
+                                    <input type="hidden" name="filtro_descricao" value="{{ filtro_descricao|default:'' }}">
+                                    <input type="hidden" name="filtro_status" value="{{ filtro_status|default:'' }}">
+                                    <div class="col-md-4">
+                                        <label for="filtro_ativo" class="form-label">Situação «Ativo»</label>
+                                        <select class="form-select" id="filtro_ativo" name="filtro_ativo">
+                                            <option value="" {% if not filtro_ativo %}selected{% endif %}>Todos</option>
+                                            <option value="1" {% if filtro_ativo == '1' %}selected{% endif %}>Somente ativos</option>
+                                            <option value="0" {% if filtro_ativo == '0' %}selected{% endif %}>Somente inativos</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="ordenar_valor_acc" class="form-label">Ordenar por valor unitário</label>
+                                        <select class="form-select" id="ordenar_valor_acc" name="ordenar_valor">
+                                            <option value="" {% if not ordenar_valor %}selected{% endif %}>Não ordenar por valor (código Aurora)</option>
+                                            <option value="desc" {% if ordenar_valor == 'desc' %}selected{% endif %}>Maior → menor</option>
+                                            <option value="asc" {% if ordenar_valor == 'asc' %}selected{% endif %}>Menor → maior</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="fas fa-search me-2"></i>Aplicar filtros
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <form method="get" action="{% url 'consultar_itens_aurora' %}" class="d-flex flex-wrap gap-2">
+                    <input type="hidden" name="filtro_ativo" value="{{ filtro_ativo|default:'' }}">
+                    <input type="hidden" name="ordenar_valor" value="{{ ordenar_valor|default:'' }}">
+                    <input type="hidden" name="filtro_codigo" value="{{ filtro_codigo|default:'' }}">
+                    <input type="hidden" name="filtro_descricao" value="{{ filtro_descricao|default:'' }}">
+                    <input type="hidden" name="filtro_status" value="{{ filtro_status|default:'' }}">
+                    <input type="text" name="search" class="form-control flex-grow-1" placeholder="Buscar por código, descrição, status, troca conforme, classificação, observação..." value="{{ search_query|default:'' }}">
+                    <button type="submit" class="btn btn-outline-primary"><i class="fas fa-search"></i> Buscar</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="row g-3">
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Total (filtro atual)</h6>
+                                        <h4 class="mb-0 fw-bold format-number">{{ total_count }}</h4>
+                                    </div>
+                                    <i class="fas fa-list fa-2x text-primary opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Ativos</h6>
+                                        <h4 class="mb-0 fw-bold format-number">{{ ativos_count }}</h4>
+                                    </div>
+                                    <i class="fas fa-check-circle fa-2x text-success opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Inativos</h6>
+                                        <h4 class="mb-0 fw-bold format-number">{{ inativos_count }}</h4>
+                                    </div>
+                                    <i class="fas fa-ban fa-2x text-info opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Valor médio unitário</h6>
+                                        <h4 class="mb-0 fw-bold format-money" data-value="{{ valor_medio_unitario|default:0 }}">R$ {{ valor_medio_unitario|floatformat:2 }}</h4>
+                                    </div>
+                                    <i class="fas fa-coins fa-2x text-warning opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-barcode me-2"></i>Itens Aurora
+                            <small class="ms-2">(<span class="format-number">{{ itens.paginator.count }}</span> registro{{ itens.paginator.count|pluralize }})</small>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <form method="get" action="{% url 'consultar_itens_aurora' %}" id="filterForm">
+                            <input type="hidden" name="search" value="{{ search_query|default:'' }}">
+                            <input type="hidden" name="filtro_ativo" value="{{ filtro_ativo|default:'' }}">
+                            <div class="table-container">
+                                <table class="table table-hover table-striped mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-codigo">Código Aurora</th>
+                                            <th class="col-desc">Descrição</th>
+                                            <th class="col-valor">Valor unit.</th>
+                                            <th class="col-status">Status item</th>
+                                            <th class="col-qtd">Est. mín.</th>
+                                            <th class="col-qtd">Est. máx.</th>
+                                            <th class="col-valor">Vl. est. mín.</th>
+                                            <th class="col-valor">Vl. est. máx.</th>
+                                            <th class="col-texto">Troca conforme</th>
+                                            <th class="col-ativo">Ativo</th>
+                                            <th class="col-acoes">Ações</th>
+                                        </tr>
+                                        <tr class="filter-row">
+                                            <th>
+                                                <input type="text" name="filtro_codigo" class="filter-input" value="{{ filtro_codigo|default:'' }}" placeholder="Código">
+                                            </th>
+                                            <th>
+                                                <input type="text" name="filtro_descricao" class="filter-input" value="{{ filtro_descricao|default:'' }}" placeholder="Descrição">
+                                            </th>
+                                            <th>
+                                                <select name="ordenar_valor" class="filter-input">
+                                                    <option value="">Ordem valor</option>
+                                                    <option value="desc" {% if ordenar_valor == 'desc' %}selected{% endif %}>Maior → menor</option>
+                                                    <option value="asc" {% if ordenar_valor == 'asc' %}selected{% endif %}>Menor → maior</option>
+                                                </select>
+                                            </th>
+                                            <th>
+                                                <select name="filtro_status" class="filter-input">
+                                                    <option value="">Todos</option>
+                                                    {% for st in status_unicos_filtrados %}
+                                                        <option value="{{ st }}" {% if filtro_status == st %}selected{% endif %}>{{ st|truncatechars:40 }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </th>
+                                            <th colspan="7"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in itens %}
+                                        <tr>
+                                            <td class="col-codigo"><span class="badge bg-primary text-wrap text-start">{{ row.codigo_aurora }}</span></td>
+                                            <td class="col-desc"><small>{{ row.descricao_aurora|default:"—"|truncatechars:120 }}</small></td>
+                                            <td class="col-valor text-nowrap">{% if row.valor_unitario is not None %}{{ row.valor_unitario|currency_br }}{% else %}—{% endif %}</td>
+                                            <td class="col-status"><small>{{ row.status_item|default:"—"|truncatechars:35 }}</small></td>
+                                            <td class="col-qtd">{% if row.estoque_minimo is not None %}{{ row.estoque_minimo|number_br:2 }}{% else %}—{% endif %}</td>
+                                            <td class="col-qtd">{% if row.estoque_maximo is not None %}{{ row.estoque_maximo|number_br:2 }}{% else %}—{% endif %}</td>
+                                            <td class="col-valor text-nowrap">{% if row.valor_estoque_minimo is not None %}{{ row.valor_estoque_minimo|currency_br }}{% else %}—{% endif %}</td>
+                                            <td class="col-valor text-nowrap">{% if row.valor_estoque_maximo is not None %}{{ row.valor_estoque_maximo|currency_br }}{% else %}—{% endif %}</td>
+                                            <td class="col-texto"><small title="{{ row.troca_conforme|default:'' }}">{{ row.troca_conforme|default:"—"|truncatechars:50 }}</small></td>
+                                            <td class="col-ativo">
+                                                {% if row.ativo %}
+                                                    <span class="badge bg-success">Sim</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">Não</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="col-acoes">
+                                                <a href="{% url 'visualizar_item_aurora' row.codigo_aurora %}" class="btn btn-sm btn-outline-primary" title="Visualizar item" target="_blank" rel="noopener noreferrer">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="11" class="text-center text-muted py-5">
+                                                <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+                                                Nenhum item Aurora encontrado.
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if itens.has_other_pages %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <nav aria-label="Paginação">
+                    <ul class="pagination justify-content-center flex-wrap">
+                        {% if itens.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if query_no_page %}{{ query_no_page }}&{% endif %}page=1">Primeira</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if query_no_page %}{{ query_no_page }}&{% endif %}page={{ itens.previous_page_number }}">Anterior</a>
+                            </li>
+                        {% endif %}
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Página <span class="format-number">{{ itens.number }}</span> de <span class="format-number">{{ itens.paginator.num_pages }}</span>
+                            </span>
+                        </li>
+                        {% if itens.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if query_no_page %}{{ query_no_page }}&{% endif %}page={{ itens.next_page_number }}">Próxima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if query_no_page %}{{ query_no_page }}&{% endif %}page={{ itens.paginator.num_pages }}">Última</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function formatarNumeroBR(numero, decimais) {
+    decimais = decimais === undefined ? 2 : decimais;
+    if (numero === null || numero === undefined || isNaN(numero)) {
+        return decimais ? '0,' + '0'.repeat(decimais) : '0';
+    }
+    const num = typeof numero === 'string' ? parseFloat(numero) : numero;
+    return num.toLocaleString('pt-BR', {
+        minimumFractionDigits: decimais,
+        maximumFractionDigits: decimais
+    });
+}
+function formatarMoeda(valor) {
+    return 'R$ ' + formatarNumeroBR(valor, 2);
+}
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.format-money').forEach(function(el) {
+        const valor = parseFloat(el.getAttribute('data-value') || el.textContent.replace('R$', '').replace(/\./g, '').replace(',', '.').trim());
+        if (!isNaN(valor)) {
+            el.textContent = formatarMoeda(valor);
+        }
+    });
+    document.querySelectorAll('.format-number').forEach(function(el) {
+        const texto = el.textContent.trim();
+        const numero = parseFloat(texto.replace(/\./g, '').replace(',', '.'));
+        if (!isNaN(numero)) {
+            el.textContent = formatarNumeroBR(numero, 0);
+        }
+    });
+    const filterForm = document.getElementById('filterForm');
+    if (!filterForm) return;
+    document.querySelectorAll('#filterForm .filter-input').forEach(function(input) {
+        let timeout;
+        input.addEventListener('input', function() {
+            clearTimeout(timeout);
+            timeout = setTimeout(function() { filterForm.submit(); }, 500);
+        });
+    });
+    document.querySelectorAll('#filterForm select.filter-input').forEach(function(select) {
+        select.addEventListener('change', function() { filterForm.submit(); });
+    });
+});
+</script>
+{% endblock %}

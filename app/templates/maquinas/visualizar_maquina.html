@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load form_extras %}
 
-{% block title %}Visualizar Máquina {{ maquina.cd_maquina }}{% endblock %}
+{% block title %}Visualizar Máquina {{ maquina.cd_maquina|number_br:0 }}{% endblock %}
 
 {% block content %}
 <!-- Page Header -->
@@ -13,7 +14,7 @@
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'consultar_maquinas' %}" class="text-white">Máquinas</a></li>
-                        <li class="breadcrumb-item active text-white" aria-current="page">Visualizar Máquina {{ maquina.cd_maquina }}</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Visualizar Máquina {{ maquina.cd_maquina|number_br:0 }}</li>
                     </ol>
                 </nav>
                 <div class="mt-3">
@@ -21,16 +22,16 @@
                         {% if maquina.descr_maquina %}
                             {{ maquina.descr_maquina }}
                         {% else %}
-                            Máquina {{ maquina.cd_maquina }}
+                            Máquina {{ maquina.cd_maquina|number_br:0 }}
                         {% endif %}
                     </h1>
                     <p class="lead mb-1">
-                        <span class="badge bg-light text-dark fs-6 me-2">Código: {{ maquina.cd_maquina }}</span>
+                        <span class="badge bg-light text-dark fs-6 me-2">Código: {{ maquina.cd_maquina|number_br:0 }}</span>
                         {% if maquina.cs_tt_maquina %}
-                            <span class="badge bg-light text-dark fs-6 me-2">Total: {{ maquina.cs_tt_maquina }}</span>
+                            <span class="badge bg-light text-dark fs-6 me-2">Total: {{ maquina.cs_tt_maquina|number_br:0 }}</span>
                         {% endif %}
                         {% if maquina.cd_priomaqutv %}
-                            <span class="badge bg-warning text-dark fs-6">Prioridade: {{ maquina.cd_priomaqutv }}</span>
+                            <span class="badge bg-warning text-dark fs-6">Prioridade: {{ maquina.cd_priomaqutv|number_br:0 }}</span>
                         {% endif %}
                     </p>
                 </div>
@@ -67,17 +68,17 @@
                             <!-- Primeira linha: Códigos principais -->
                             <div class="col-md-3 col-lg-2">
                                 <label class="form-label fw-bold small">Código da Máquina</label>
-                                <p class="form-control-plaintext mb-0">{{ maquina.cd_maquina }}</p>
+                                <p class="form-control-plaintext mb-0">{{ maquina.cd_maquina|number_br:0 }}</p>
                             </div>
                             <div class="col-md-3 col-lg-2">
                                 <label class="form-label fw-bold small">Código Total</label>
-                                <p class="form-control-plaintext mb-0">{{ maquina.cs_tt_maquina|default:"Não informado" }}</p>
+                                <p class="form-control-plaintext mb-0">{% if maquina.cs_tt_maquina is not None %}{{ maquina.cs_tt_maquina|number_br:0 }}{% else %}Não informado{% endif %}</p>
                             </div>
                             <div class="col-md-3 col-lg-2">
                                 <label class="form-label fw-bold small">Prioridade</label>
                                 <p class="form-control-plaintext mb-0">
                                     {% if maquina.cd_priomaqutv %}
-                                        <span class="badge bg-warning text-dark">{{ maquina.cd_priomaqutv }}</span>
+                                        <span class="badge bg-warning text-dark">{{ maquina.cd_priomaqutv|number_br:0 }}</span>
                                     {% else %}
                                         Não informado
                                     {% endif %}
@@ -89,11 +90,11 @@
                             </div>
                             <div class="col-md-3 col-lg-2">
                                 <label class="form-label fw-bold small">Código Modelo</label>
-                                <p class="form-control-plaintext mb-0">{{ maquina.cd_modelo|default:"Não informado" }}</p>
+                                <p class="form-control-plaintext mb-0">{% if maquina.cd_modelo is not None %}{{ maquina.cd_modelo|number_br:0 }}{% else %}Não informado{% endif %}</p>
                             </div>
                             <div class="col-md-3 col-lg-2">
                                 <label class="form-label fw-bold small">Código Grupo</label>
-                                <p class="form-control-plaintext mb-0">{{ maquina.cd_grupo|default:"Não informado" }}</p>
+                                <p class="form-control-plaintext mb-0">{% if maquina.cd_grupo is not None %}{{ maquina.cd_grupo|number_br:0 }}{% else %}Não informado{% endif %}</p>
                             </div>
                             
                             <!-- Segunda linha: Descrição -->
@@ -105,7 +106,7 @@
                             <!-- Terceira linha: Outros campos -->
                             <div class="col-md-6 col-lg-4">
                                 <label class="form-label fw-bold small">Código Tipo Centro Atividade</label>
-                                <p class="form-control-plaintext mb-0">{{ maquina.cd_tpcentativ|default:"Não informado" }}</p>
+                                <p class="form-control-plaintext mb-0">{% if maquina.cd_tpcentativ is not None %}{{ maquina.cd_tpcentativ|number_br:0 }}{% else %}Não informado{% endif %}</p>
                             </div>
                             <div class="col-md-6 col-lg-8">
                                 <label class="form-label fw-bold small">Descrição Gerência</label>
@@ -119,7 +120,7 @@
                                 <div>
                                     <p class="mb-1">
                                         <strong class="small">Total de peças relacionadas:</strong> 
-                                        <span class="badge bg-success">{{ pecas_relacionadas.count }}</span>
+                                        <span class="badge bg-success">{{ pecas_relacionadas.count|number_br:0 }}</span>
                                     </p>
                                     {% if pecas_relacionadas %}
                                         <p class="text-muted small mb-0">Gerencie as peças de reposição desta máquina</p>
@@ -137,13 +138,142 @@
                     </div>
                 </div>
 
+                <!-- LISTA COMPLETA: manual + catálogo + Aurora -->
+                <div class="card shadow-sm visualizar-maquina-section">
+                    <div class="card-header bg-dark text-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <h5 class="mb-0">
+                            <i class="fas fa-book me-2"></i>Peças no manual (LISTA COMPLETA)
+                            {% if pecas_lista_completa %}
+                                <span class="badge bg-light text-dark ms-2">{{ pecas_lista_completa|length|number_br:0 }}</span>
+                            {% endif %}
+                        </h5>
+                        <a href="{% url 'consultar_pecas_maquinas_manual' %}?filter_cd_maquina={{ maquina.cd_maquina }}" class="btn btn-sm btn-outline-light">
+                            <i class="fas fa-external-link-alt me-1"></i>Ver na consulta geral
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">
+                            <strong>PecaMaquinaCitadoManual</strong>, <strong>PecaManualCatalogo</strong> e <strong>Item Aurora</strong> (quando houver código interno na importação).
+                        </p>
+                        {% if pecas_lista_completa %}
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Pos. manual</th>
+                                        <th>Fabricante</th>
+                                        <th>Cód. fab.</th>
+                                        <th>Descrição (catálogo)</th>
+                                        <th class="text-end">Qtde</th>
+                                        <th>Parte / sistema</th>
+                                        <th>Cód. Aurora</th>
+                                        <th>Descr. Aurora</th>
+                                        <th class="text-end">Vl. unit.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for pm in pecas_lista_completa %}
+                                    <tr>
+                                        <td>{{ pm.posicao_no_manual|default:"—" }}</td>
+                                        <td>{{ pm.peca_catalogo.fabricante|default:"—" }}</td>
+                                        <td class="text-nowrap">{{ pm.peca_catalogo.codigo_fabricante }}</td>
+                                        <td style="max-width:220px;"><small>{{ pm.peca_catalogo.peca_fornecedor|default:"—" }}</small></td>
+                                        <td class="text-end">{% if pm.quantidade is not None %}{{ pm.quantidade|number_br:2 }}{% else %}—{% endif %}</td>
+                                        <td style="max-width:180px;"><small>{{ pm.parte_maquina|default:"—" }}</small></td>
+                                        <td class="text-nowrap">
+                                            {% if pm.peca_catalogo.item_aurora %}
+                                                {{ pm.peca_catalogo.item_aurora.codigo_aurora }}
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </td>
+                                        <td style="max-width:200px;"><small>{{ pm.peca_catalogo.item_aurora.descricao_aurora|default:"—" }}</small></td>
+                                        <td class="text-end text-nowrap">
+                                            {% if pm.peca_catalogo.item_aurora and pm.peca_catalogo.item_aurora.valor_unitario is not None %}
+                                                {{ pm.peca_catalogo.item_aurora.valor_unitario|currency_br }}
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                            Nenhuma peça importada da LISTA COMPLETA para esta máquina.
+                            <div class="mt-2">
+                                <a href="{% url 'importar_pecas_maquina' %}" class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-file-upload me-1"></i>Importar planilha
+                                </a>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Estoque ERP (almoxarifado) relacionado -->
+                <div class="card shadow-sm visualizar-maquina-section">
+                    <div class="card-header bg-secondary text-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <h5 class="mb-0">
+                            <i class="fas fa-warehouse me-2"></i>Estoque ERP (Almoxarifado)
+                            <span class="badge bg-light text-dark ms-2">{{ estoque_erp_maquina_count|number_br:0 }}</span>
+                        </h5>
+                        <a href="{% url 'consultar_estoque' %}?search={{ maquina.cd_maquina }}" class="btn btn-sm btn-outline-light">
+                            <i class="fas fa-external-link-alt me-1"></i>Consultar estoque
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">
+                            Posições cujo <strong>código do item</strong> coincide com código Aurora numérico (LISTA COMPLETA) ou com <strong>ItemEstoque</strong> em «Peças das máquinas», ou cuja <strong>descrição destino de uso</strong> citam o código <strong>{{ maquina.cd_maquina|number_br:0 }}</strong>. Até 400 linhas.
+                        </p>
+                        {% if estoque_erp_maquina %}
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Cód. item</th>
+                                        <th>Descrição</th>
+                                        <th class="text-end">Qtd</th>
+                                        <th class="text-end">Valor</th>
+                                        <th>Destino uso</th>
+                                        <th>Local</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for es in estoque_erp_maquina %}
+                                    <tr>
+                                        <td>
+                                            <a href="{% url 'visualizar_estoque_almoxarifado' es.codigo_item %}" class="fw-semibold text-decoration-none">{{ es.codigo_item|number_br:0 }}</a>
+                                        </td>
+                                        <td style="max-width:260px;"><small>{{ es.descricao_item|default:"—" }}</small></td>
+                                        <td class="text-end">{% if es.quantidade is not None %}{{ es.quantidade|number_br:2 }}{% else %}—{% endif %}</td>
+                                        <td class="text-end">{% if es.valor is not None %}{{ es.valor|currency_br }}{% else %}—{% endif %}</td>
+                                        <td style="max-width:200px;"><small>{{ es.descricao_destino_uso|default:"—" }}</small></td>
+                                        <td style="max-width:160px;"><small>{{ es.descricao_local|default:"—" }}</small></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <i class="fas fa-warehouse fa-2x mb-2 d-block"></i>
+                            Nenhuma posição de estoque encontrada com os critérios acima.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
                 <!-- Planos Preventiva -->
                 <div class="card shadow-sm visualizar-maquina-section">
                     <div class="card-header bg-success text-white">
                         <h5 class="mb-0">
                             <i class="fas fa-calendar-check me-2"></i>Planos de Manutenção Preventiva
                             {% if planos_preventiva %}
-                                <span class="badge bg-light text-dark ms-2">{{ planos_preventiva|length }}</span>
+                                <span class="badge bg-light text-dark ms-2">{{ planos_preventiva|length|number_br:0 }}</span>
                             {% endif %}
                         </h5>
                     </div>
@@ -167,12 +297,12 @@
                                         {% for plano in planos_preventiva %}
                                         <tr>
                                             <td>
-                                                <strong>{{ plano.numero_plano|default:"-" }}</strong>
+                                                <strong>{% if plano.numero_plano is not None %}{{ plano.numero_plano|number_br:0 }}{% else %}-{% endif %}</strong>
                                                 {% if plano.descr_plano %}
                                                     <br><small class="text-muted">{{ plano.descr_plano }}</small>
                                                 {% endif %}
                                             </td>
-                                            <td>{{ plano.sequencia_manutencao|default:"-" }}</td>
+                                            <td>{% if plano.sequencia_manutencao is not None %}{{ plano.sequencia_manutencao|number_br:0 }}{% else %}-{% endif %}</td>
                                             <td>
                                                 {% if plano.dt_execucao %}
                                                     {{ plano.dt_execucao }}
@@ -182,12 +312,12 @@
                                             </td>
                                             <td>
                                                 {% if plano.quantidade_periodo %}
-                                                    <span class="badge bg-info">{{ plano.quantidade_periodo }}</span>
+                                                    <span class="badge bg-info">{{ plano.quantidade_periodo|number_br:0 }}</span>
                                                 {% else %}
                                                     -
                                                 {% endif %}
                                             </td>
-                                            <td>{{ plano.sequencia_tarefa|default:"-" }}</td>
+                                            <td>{% if plano.sequencia_tarefa is not None %}{{ plano.sequencia_tarefa|number_br:0 }}{% else %}-{% endif %}</td>
                                             <td style="word-wrap: break-word; white-space: normal; max-width: 300px;">
                                                 {% if plano.descr_tarefa %}
                                                     <small>{{ plano.descr_tarefa|truncatewords:15 }}</small>
@@ -225,7 +355,7 @@
                             <div class="mt-3">
                                 <small class="text-muted">
                                     <i class="fas fa-info-circle me-1"></i>
-                                    Total de planos preventiva: <strong>{{ planos_preventiva|length }}</strong>
+                                    Total de planos preventiva: <strong>{{ planos_preventiva|length|number_br:0 }}</strong>
                                 </small>
                             </div>
                         {% else %}
@@ -268,7 +398,7 @@
                     <div class="card-header bg-info text-white">
                         <h5 class="mb-0">
                             <i class="fas fa-calendar-alt me-2"></i>Calendário de Preventivas — Máquinas Secundárias
-                            <span class="badge bg-light text-dark ms-2">{{ relacionamentos_como_primaria.count }} máquinas</span>
+                            <span class="badge bg-light text-dark ms-2">{{ relacionamentos_como_primaria.count|number_br:0 }} máquinas</span>
                         </h5>
                         <small class="d-block mt-1 opacity-90">Mesmas legendas: OS (verde/laranja) + projeção Plano+Roteiro (roxo).</small>
                     </div>
@@ -282,7 +412,7 @@
                                 {% for rel in relacionamentos_como_primaria %}
                                 <span class="badge bg-secondary">
                                     <a href="{% url 'visualizar_maquina' rel.maquina_secundaria.id %}" class="text-white text-decoration-none">
-                                        {{ rel.maquina_secundaria.cd_maquina }}
+                                        {{ rel.maquina_secundaria.cd_maquina|number_br:0 }}
                                     </a>
                                 </span>
                                 {% endfor %}
@@ -316,7 +446,7 @@
                                     <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePrimaria" aria-expanded="true" aria-controls="collapsePrimaria">
                                         <i class="fas fa-star me-2 text-primary"></i>
                                         <strong>Máquinas Secundárias Relacionadas</strong>
-                                        <span class="badge bg-primary ms-2">{{ relacionamentos_como_primaria.count }}</span>
+                                        <span class="badge bg-primary ms-2">{{ relacionamentos_como_primaria.count|number_br:0 }}</span>
                                     </button>
                                 </h2>
                                 <div id="collapsePrimaria" class="accordion-collapse collapse show" aria-labelledby="headingPrimaria" data-bs-parent="#accordionRelacionamentos">
@@ -341,7 +471,7 @@
                                                         <td>
                                                             <strong>
                                                                 <a href="{% url 'visualizar_maquina' rel.maquina_secundaria.id %}" class="text-decoration-none">
-                                                                    {{ rel.maquina_secundaria.cd_maquina }}
+                                                                    {{ rel.maquina_secundaria.cd_maquina|number_br:0 }}
                                                                 </a>
                                                             </strong>
                                                         </td>
@@ -369,7 +499,7 @@
                                         <div class="mt-2">
                                             <small class="text-muted">
                                                 <i class="fas fa-info-circle me-1"></i>
-                                                Total de máquinas secundárias: <strong>{{ relacionamentos_como_primaria.count }}</strong>
+                                                Total de máquinas secundárias: <strong>{{ relacionamentos_como_primaria.count|number_br:0 }}</strong>
                                             </small>
                                         </div>
                                     </div>
@@ -384,7 +514,7 @@
                                     <button class="accordion-button {% if not relacionamentos_como_primaria %}show{% else %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSecundaria" aria-expanded="{% if not relacionamentos_como_primaria %}true{% else %}false{% endif %}" aria-controls="collapseSecundaria">
                                         <i class="fas fa-link me-2 text-warning"></i>
                                         <strong>Máquina Primária Relacionada</strong>
-                                        <span class="badge bg-warning text-dark ms-2">{{ relacionamentos_como_secundaria.count }}</span>
+                                        <span class="badge bg-warning text-dark ms-2">{{ relacionamentos_como_secundaria.count|number_br:0 }}</span>
                                     </button>
                                 </h2>
                                 <div id="collapseSecundaria" class="accordion-collapse collapse {% if not relacionamentos_como_primaria %}show{% endif %}" aria-labelledby="headingSecundaria" data-bs-parent="#accordionRelacionamentos">
@@ -409,7 +539,7 @@
                                                         <td>
                                                             <strong>
                                                                 <a href="{% url 'visualizar_maquina' rel.maquina_primaria.id %}" class="text-decoration-none">
-                                                                    {{ rel.maquina_primaria.cd_maquina }}
+                                                                    {{ rel.maquina_primaria.cd_maquina|number_br:0 }}
                                                                 </a>
                                                             </strong>
                                                         </td>
@@ -437,7 +567,7 @@
                                         <div class="mt-2">
                                             <small class="text-muted">
                                                 <i class="fas fa-info-circle me-1"></i>
-                                                Total de máquinas primárias: <strong>{{ relacionamentos_como_secundaria.count }}</strong>
+                                                Total de máquinas primárias: <strong>{{ relacionamentos_como_secundaria.count|number_br:0 }}</strong>
                                             </small>
                                         </div>
                                     </div>
@@ -470,7 +600,7 @@
                                 {% if maquina.foto %}
                                     <div class="text-center flex-grow-1 d-flex align-items-center justify-content-center">
                                         <a href="#" data-bs-toggle="modal" data-bs-target="#modalFoto" style="cursor: pointer;">
-                                            <img src="{{ maquina.foto.url }}" alt="Foto da máquina {{ maquina.cd_maquina }}" class="img-fluid rounded shadow" style="max-width: 100%; max-height: 300px; object-fit: contain;">
+                                            <img src="{{ maquina.foto.url }}" alt="Foto da máquina {{ maquina.cd_maquina|number_br:0 }}" class="img-fluid rounded shadow" style="max-width: 100%; max-height: 300px; object-fit: contain;">
                                         </a>
                                     </div>
                                 {% else %}
@@ -498,7 +628,7 @@
                                 {% if maquina.placa_identificacao %}
                                     <div class="text-center flex-grow-1 d-flex align-items-center justify-content-center">
                                         <a href="#" data-bs-toggle="modal" data-bs-target="#modalPlaca" style="cursor: pointer;">
-                                            <img src="{{ maquina.placa_identificacao.url }}" alt="Placa de identificação da máquina {{ maquina.cd_maquina }}" class="img-fluid rounded shadow" style="max-width: 100%; max-height: 300px; object-fit: contain;">
+                                            <img src="{{ maquina.placa_identificacao.url }}" alt="Placa de identificação da máquina {{ maquina.cd_maquina|number_br:0 }}" class="img-fluid rounded shadow" style="max-width: 100%; max-height: 300px; object-fit: contain;">
                                         </a>
                                     </div>
                                 {% else %}
@@ -616,12 +746,12 @@
                         <div class="modal-content">
                             <div class="modal-header bg-primary text-white">
                                 <h5 class="modal-title" id="modalFotoLabel">
-                                    <i class="fas fa-camera me-2"></i>Foto da Máquina - {{ maquina.cd_maquina }}
+                                    <i class="fas fa-camera me-2"></i>Foto da Máquina - {{ maquina.cd_maquina|number_br:0 }}
                                 </h5>
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body text-center p-0">
-                                <img src="{{ maquina.foto.url }}" alt="Foto da máquina {{ maquina.cd_maquina }}" class="img-fluid" style="max-width: 100%; max-height: 80vh; object-fit: contain;">
+                                <img src="{{ maquina.foto.url }}" alt="Foto da máquina {{ maquina.cd_maquina|number_br:0 }}" class="img-fluid" style="max-width: 100%; max-height: 80vh; object-fit: contain;">
                             </div>
                             <div class="modal-footer">
                                 <a href="{{ maquina.foto.url }}" target="_blank" class="btn btn-primary">
@@ -644,12 +774,12 @@
                         <div class="modal-content">
                             <div class="modal-header bg-info text-white">
                                 <h5 class="modal-title" id="modalPlacaLabel">
-                                    <i class="fas fa-id-card me-2"></i>Placa de Identificação - {{ maquina.cd_maquina }}
+                                    <i class="fas fa-id-card me-2"></i>Placa de Identificação - {{ maquina.cd_maquina|number_br:0 }}
                                 </h5>
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body text-center p-0">
-                                <img src="{{ maquina.placa_identificacao.url }}" alt="Placa de identificação da máquina {{ maquina.cd_maquina }}" class="img-fluid" style="max-width: 100%; max-height: 80vh; object-fit: contain;">
+                                <img src="{{ maquina.placa_identificacao.url }}" alt="Placa de identificação da máquina {{ maquina.cd_maquina|number_br:0 }}" class="img-fluid" style="max-width: 100%; max-height: 80vh; object-fit: contain;">
                             </div>
                             <div class="modal-footer">
                                 <a href="{{ maquina.placa_identificacao.url }}" target="_blank" class="btn btn-info">
@@ -672,7 +802,7 @@
                         <div class="modal-content">
                             <div class="modal-header bg-danger text-white">
                                 <h5 class="modal-title" id="modalPDFLabel">
-                                    <i class="fas fa-file-pdf me-2"></i>Arquivo PDF - {{ maquina.cd_maquina }}
+                                    <i class="fas fa-file-pdf me-2"></i>Arquivo PDF - {{ maquina.cd_maquina|number_br:0 }}
                                 </h5>
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
@@ -706,7 +836,7 @@
                         <div class="modal-content">
                             <div class="modal-header bg-warning text-white">
                                 <h5 class="modal-title" id="modalDiagramaLabel">
-                                    <i class="fas fa-bolt me-2"></i>Diagrama Elétrico - {{ maquina.cd_maquina }}
+                                    <i class="fas fa-bolt me-2"></i>Diagrama Elétrico - {{ maquina.cd_maquina|number_br:0 }}
                                 </h5>
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
@@ -740,7 +870,7 @@
                         <div class="modal-content">
                             <div class="modal-header bg-success text-white">
                                 <h5 class="modal-title" id="modalPecasLabel">
-                                    <i class="fas fa-cog me-2"></i>Peças de Reposição - {{ maquina.cd_maquina }}
+                                    <i class="fas fa-cog me-2"></i>Peças de Reposição - {{ maquina.cd_maquina|number_br:0 }}
                                 </h5>
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
@@ -805,7 +935,7 @@
                         <h5 class="mb-0">
                             <i class="fas fa-file-upload me-2"></i>Documentos da Máquina
                             {% if documentos_maquina %}
-                                <span class="badge bg-light text-dark ms-2">{{ documentos_maquina|length }}</span>
+                                <span class="badge bg-light text-dark ms-2">{{ documentos_maquina|length|number_br:0 }}</span>
                             {% endif %}
                         </h5>
                     </div>
@@ -889,7 +1019,7 @@
                                 <div class="row">
                                     <div class="col-md-4 mb-3">
                                         <label class="form-label fw-bold">ID do Registro</label>
-                                        <p class="form-control-plaintext">{{ maquina.id }}</p>
+                                        <p class="form-control-plaintext">{{ maquina.id|number_br:0 }}</p>
                                     </div>
                                     <div class="col-md-4 mb-3">
                                         <label class="form-label fw-bold">Data de Criação</label>

@@ -621,7 +621,6 @@ class ItemEstoque(models.Model):
         from decimal import Decimal
         return Decimal(str(self.quantidade)) * Decimal(str(self.valor))
 
-
 class EstoqueAlmoxarifado(models.Model):
     """Posição de estoque importada do ERP (export tipo ESTOQUE *.csv)."""
 
@@ -669,9 +668,8 @@ class EstoqueAlmoxarifado(models.Model):
     def __str__(self):
         return f"{self.codigo_item} - {self.descricao_item or 'Sem descrição'}"
 
-
 class ItemAurora(models.Model):
-    """Catálogo de itens Aurora (código, descrição e valor unitário importados ou digitados)."""
+    """Catálogo de itens Aurora (import LISTA COMPLETA + edição manual)."""
     codigo_aurora = models.CharField('Código Aurora', max_length=100, primary_key=True)
     descricao_aurora = models.CharField('Descrição Aurora', max_length=500, blank=True, null=True)
     valor_unitario = models.DecimalField(
@@ -680,6 +678,7 @@ class ItemAurora(models.Model):
         decimal_places=2,
         blank=True,
         null=True,
+        help_text='Coluna «Valor unitário» (I) na LISTA COMPLETA.',
     )
     status_item = models.CharField(
         'Status do Item',
@@ -688,6 +687,65 @@ class ItemAurora(models.Model):
         null=True,
         db_index=True,
         help_text='Situação do item no catálogo (ex.: ativo, obsoleto, bloqueado — texto livre ou código interno)',
+    )
+    estoque_minimo = models.DecimalField(
+        'Estoque mínimo',
+        max_digits=15,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text='Coluna «Estoque mínimo» (J) na LISTA COMPLETA.',
+    )
+    estoque_maximo = models.DecimalField(
+        'Estoque máximo',
+        max_digits=15,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text='Coluna «Estoque máximo» (K) na LISTA COMPLETA.',
+    )
+    valor_estoque_minimo = models.DecimalField(
+        'Valor est. mínimo',
+        max_digits=15,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text='Coluna «Valor est. mínimo» (L) na LISTA COMPLETA.',
+    )
+    valor_estoque_maximo = models.DecimalField(
+        'Valor est. máximo',
+        max_digits=15,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text='Coluna «Valor est. máximo» (M) na LISTA COMPLETA.',
+    )
+    vida_util_horas = models.DecimalField(
+        'Vida útil (horas)',
+        max_digits=12,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text='Coluna «Vida útil (horas)» (O) na LISTA COMPLETA.',
+    )
+    troca_conforme = models.TextField(
+        'Troca conforme',
+        blank=True,
+        null=True,
+        help_text='Coluna «Troca conforme» (Q) na LISTA COMPLETA.',
+    )
+    classificacao_inclusao_almox = models.CharField(
+        'Classificação inclusão almox.',
+        max_length=500,
+        blank=True,
+        null=True,
+        help_text='Coluna «Classificação de inclusão no almox.» (R) na LISTA COMPLETA.',
+    )
+    observacao = models.TextField(
+        'Observação',
+        blank=True,
+        null=True,
+        help_text='Coluna «Observação» (T) na LISTA COMPLETA.',
     )
     ativo = models.BooleanField('Ativo', default=True, db_index=True, help_text='Excluir da lista sem apagar o registro')
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
@@ -709,6 +767,9 @@ class PecaManualCatalogo(models.Model):
     """
     Definição única de peça no catálogo do fabricante (mesma peça pode ser citada em várias máquinas).
     Chave natural: fabricante + código do fabricante.
+
+    O código interno «Aurora» (col. G da LISTA COMPLETA) liga esta peça de fabricante ao item
+    interno de compra/estoque (ItemAurora), evitando ambiguidade com códigos iguais de outros fornecedores.
     """
 
     fabricante = models.CharField(
@@ -729,6 +790,18 @@ class PecaManualCatalogo(models.Model):
         blank=True,
         null=True,
         help_text='Coluna «DESCRIÇÃO DO FABRICANTE» (E) na LISTA COMPLETA.',
+    )
+    item_aurora = models.ForeignKey(
+        'ItemAurora',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pecas_catalogo_manual',
+        verbose_name='Item Aurora (código interno)',
+        help_text=(
+            'Referência ao código interno Aurora na mesma linha da LISTA COMPLETA (col. G); '
+            'associa fabricante + cód. fabricante ao item único usado pela empresa.'
+        ),
     )
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
     updated_at = models.DateTimeField('Data de Atualização', auto_now=True)

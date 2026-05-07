@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Visualizar Item Aurora {{ item.codigo_aurora }}{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_itens_aurora' %}" class="text-white">Consultar Itens Aurora</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Item {{ item.codigo_aurora }}</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Item Aurora {{ item.codigo_aurora }}</h1>
+                <p class="lead mb-0">{{ item.descricao_aurora|default:"Sem descrição" }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0"><i class="fas fa-barcode me-2"></i>Dados completos do Item Aurora</h5>
+                <span class="badge {% if item.ativo %}bg-success{% else %}bg-secondary{% endif %}">
+                    {% if item.ativo %}Ativo{% else %}Inativo{% endif %}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold small">Código Aurora</label>
+                        <p class="form-control-plaintext mb-0">{{ item.codigo_aurora }}</p>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label fw-bold small">Descrição Aurora</label>
+                        <p class="form-control-plaintext mb-0">{{ item.descricao_aurora|default:"Não informado" }}</p>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold small">Valor unitário</label>
+                        <p class="form-control-plaintext mb-0">{% if item.valor_unitario is not None %}{{ item.valor_unitario|currency_br }}{% else %}Não informado{% endif %}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold small">Estoque mínimo</label>
+                        <p class="form-control-plaintext mb-0">{% if item.estoque_minimo is not None %}{{ item.estoque_minimo|number_br:2 }}{% else %}Não informado{% endif %}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold small">Estoque máximo</label>
+                        <p class="form-control-plaintext mb-0">{% if item.estoque_maximo is not None %}{{ item.estoque_maximo|number_br:2 }}{% else %}Não informado{% endif %}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold small">Vida útil (horas)</label>
+                        <p class="form-control-plaintext mb-0">{% if item.vida_util_horas is not None %}{{ item.vida_util_horas|number_br:2 }}{% else %}Não informado{% endif %}</p>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold small">Valor est. mínimo</label>
+                        <p class="form-control-plaintext mb-0">{% if item.valor_estoque_minimo is not None %}{{ item.valor_estoque_minimo|currency_br }}{% else %}Não informado{% endif %}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold small">Valor est. máximo</label>
+                        <p class="form-control-plaintext mb-0">{% if item.valor_estoque_maximo is not None %}{{ item.valor_estoque_maximo|currency_br }}{% else %}Não informado{% endif %}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold small">Status do item</label>
+                        <p class="form-control-plaintext mb-0">{{ item.status_item|default:"Não informado" }}</p>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold small">Troca conforme</label>
+                        <p class="form-control-plaintext mb-0">{{ item.troca_conforme|default:"Não informado"|linebreaksbr }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold small">Classificação inclusão almox.</label>
+                        <p class="form-control-plaintext mb-0">{{ item.classificacao_inclusao_almox|default:"Não informado"|linebreaksbr }}</p>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-bold small">Observação</label>
+                        <p class="form-control-plaintext mb-0">{{ item.observacao|default:"Não informado"|linebreaksbr }}</p>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold small">Criado em</label>
+                        <p class="form-control-plaintext mb-0">{{ item.created_at|date:"d/m/Y H:i:s" }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold small">Atualizado em</label>
+                        <p class="form-control-plaintext mb-0">{{ item.updated_at|date:"d/m/Y H:i:s" }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-light d-flex justify-content-between flex-wrap gap-2">
+                <a href="{% url 'consultar_itens_aurora' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Voltar para consulta
+                </a>
+                <a href="{% url 'consultar_itens_aurora' %}?search={{ item.codigo_aurora|urlencode }}" class="btn btn-outline-primary">
+                    <i class="fas fa-search me-2"></i>Buscar este código na listagem
+                </a>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mt-4">
+            <div class="card-header bg-dark text-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h5 class="mb-0">
+                    <i class="fas fa-cogs me-2"></i>Máquinas que usam este Item Aurora
+                </h5>
+                <span class="badge bg-light text-dark">{{ maquinas_item_count|number_br:0 }} máquina{{ maquinas_item_count|pluralize }}</span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Ligação via LISTA COMPLETA: <strong>PecaMaquinaCitadoManual</strong> → <strong>PecaManualCatalogo</strong> com este código Aurora.
+                    {% if citacoes_manual_count != maquinas_item_count %}
+                        <span class="d-block mt-1">{{ citacoes_manual_count|number_br:0 }} linha{{ citacoes_manual_count|pluralize }} no manual (uma máquina pode ter mais de uma referência de catálogo apontando para o mesmo item).</span>
+                    {% endif %}
+                </p>
+                {% if citacoes_manual %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Cód. máquina</th>
+                                <th>Descrição da máquina</th>
+                                <th>Fabricante</th>
+                                <th>Cód. fab.</th>
+                                <th class="text-end">Qtde</th>
+                                <th>Pos. manual</th>
+                                <th>Parte / sistema</th>
+                                <th class="text-center">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pm in citacoes_manual %}
+                            <tr>
+                                <td class="text-nowrap">
+                                    <span class="badge bg-secondary">{{ pm.maquina.cd_maquina|number_br:0 }}</span>
+                                </td>
+                                <td style="max-width:260px;"><small>{{ pm.maquina.descr_maquina|default:"—" }}</small></td>
+                                <td><small>{{ pm.peca_catalogo.fabricante|default:"—" }}</small></td>
+                                <td class="text-nowrap"><small>{{ pm.peca_catalogo.codigo_fabricante }}</small></td>
+                                <td class="text-end">{% if pm.quantidade is not None %}{{ pm.quantidade|number_br:2 }}{% else %}—{% endif %}</td>
+                                <td><small>{{ pm.posicao_no_manual|default:"—" }}</small></td>
+                                <td style="max-width:200px;"><small>{{ pm.parte_maquina|default:"—" }}</small></td>
+                                <td class="text-center">
+                                    <a href="{% url 'visualizar_maquina' pm.maquina.id %}" class="btn btn-sm btn-outline-primary" title="Visualizar máquina" target="_blank" rel="noopener noreferrer">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-industry fa-2x mb-2 d-block opacity-50"></i>
+                    Nenhuma máquina encontrada com esta peça na LISTA COMPLETA (catálogo manual vinculado a este código Aurora).
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -36,6 +36,9 @@ urlpatterns = [
     path('importar/projecao-gastos/', views.importar_projecao_gastos, name="importar_projecao_gastos"),
     path('importar/pecas-maquina/', views.importar_pecas_maquina, name="importar_pecas_maquina"),
     path('maquinas/consultar-pecas-manual/', views.consultar_pecas_maquinas_manual, name="consultar_pecas_maquinas_manual"),
+    path('consultar/itens-aurora/', views.consultar_itens_aurora, name="consultar_itens_aurora"),
+    path('itens-aurora/analise/', views.analise_itens_aurora, name="analise_itens_aurora"),
+    path('itens-aurora/visualizar/<str:codigo_aurora>/', views.visualizar_item_aurora, name="visualizar_item_aurora"),
 
     # Exportar Dados
     path('exportar/maquinas/', views.exportar_maquinas, name="exportar_maquinas"),

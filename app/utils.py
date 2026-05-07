@@ -83,25 +83,25 @@ LISTA_COMPLETA_IMPORT_SCHEMA: List[Tuple[str, str, str]] = [
     ('Cód. Aurora', 'COD. AURORA', 'item_aurora.codigo_aurora'),
     ('Descrição Aurora', 'DESCRICAO AURORA', 'item_aurora.descricao_aurora'),
     ('Valor unitário', 'VALOR UNITARIO', 'item_aurora.valor_unitario'),
-    ('Estoque mínimo', 'ESTOQUE MINIMO', 'import.skip'),
-    ('Estoque máximo', 'ESTOQUE MAXIMO', 'import.skip'),
-    ('Valor est. mínimo', 'VALOR EST. MINIMO', 'import.skip'),
-    ('Valor est. máximo', 'VALOR EST. MAXIMO', 'import.skip'),
+    ('Estoque mínimo', 'ESTOQUE MINIMO', 'item_aurora.estoque_minimo'),
+    ('Estoque máximo', 'ESTOQUE MAXIMO', 'item_aurora.estoque_maximo'),
+    ('Valor est. mínimo', 'VALOR EST. MINIMO', 'item_aurora.valor_estoque_minimo'),
+    ('Valor est. máximo', 'VALOR EST. MAXIMO', 'item_aurora.valor_estoque_maximo'),
     ('Status do item', 'STATUS DO ITEM', 'item_aurora.status_item'),
-    ('Vida útil (horas)', 'VIDA UTIL (HORAS)', 'import.skip'),
+    ('Vida útil (horas)', 'VIDA UTIL (HORAS)', 'item_aurora.vida_util_horas'),
     ('Qtde atual em estoque', 'QTDE ATUAL EM ESTOQUE', 'import.skip'),
-    ('Troca conforme', 'TROCA CONFORME:', 'import.skip'),
+    ('Troca conforme', 'TROCA CONFORME:', 'item_aurora.troca_conforme'),
     (
         'Classificação de inclusão no almox.',
         'CLASSIFICACAO DE INLCUSAO NO ALMOXARIFADO',
-        'import.skip',
+        'item_aurora.classificacao_inclusao_almox',
     ),
     (
         'Componente / parte na máquina',
         'COMPONENTE, PARTE OU SISTEMA DA MAQUINA ONDE E USADO',
         'peca_maquina.parte_maquina',
     ),
-    ('Observação', 'OBSERVACAO', 'import.skip'),
+    ('Observação', 'OBSERVACAO', 'item_aurora.observacao'),
 ]
 
 LISTA_COMPLETA_COLUMN_TARGETS_BY_HEADER: Dict[str, str] = {
@@ -119,11 +119,20 @@ LISTA_COMPLETA_IMPORT_TARGET_LABELS: Dict[str, str] = {
     'peca_catalogo.fabricante': 'Peça manual (catálogo) · fabricante',
     'peca_maquina.posicao_no_manual': 'Peça máquina (manual) · posicao_no_manual',
     'peca_catalogo.peca_fornecedor': 'Peça manual (catálogo) · peca_fornecedor (descrição)',
+    'peca_catalogo.item_aurora': 'Peça manual (catálogo) · item_aurora (FK; col. G na mesma linha)',
     'item_aurora.codigo_aurora': 'Item Aurora · codigo_aurora (PK)',
     'item_aurora.descricao_aurora': 'Item Aurora · descricao_aurora',
     'item_aurora.valor_unitario': 'Item Aurora · valor_unitario',
     'item_aurora.status_item': 'Item Aurora · status_item',
-    'import.skip': 'Ignorado nesta importação',
+    'item_aurora.estoque_minimo': 'Item Aurora · estoque_minimo',
+    'item_aurora.estoque_maximo': 'Item Aurora · estoque_maximo',
+    'item_aurora.valor_estoque_minimo': 'Item Aurora · valor_estoque_minimo',
+    'item_aurora.valor_estoque_maximo': 'Item Aurora · valor_estoque_maximo',
+    'item_aurora.vida_util_horas': 'Item Aurora · vida_util_horas',
+    'item_aurora.troca_conforme': 'Item Aurora · troca_conforme',
+    'item_aurora.classificacao_inclusao_almox': 'Item Aurora · classificacao_inclusao_almox',
+    'item_aurora.observacao': 'Item Aurora · observacao',
+    'import.skip': 'Ignorado nesta importação (col. P — qtde atual em estoque)',
     'import.unmapped': 'Sem mapeamento (revisar utils ou planilha)',
 }
 
@@ -154,7 +163,19 @@ LISTA_COMPLETA_COL_C_FABRICANTE = 2
 LISTA_COMPLETA_COL_D_COD_FABRICANTE = 3
 LISTA_COMPLETA_COL_E_DESCR_FABRICANTE = 4
 LISTA_COMPLETA_COL_F_QTDE = 5
+LISTA_COMPLETA_COL_G_COD_AURORA = 6
+LISTA_COMPLETA_COL_H_DESCR_AURORA = 7
+LISTA_COMPLETA_COL_I_VALOR_UNITARIO = 8
+LISTA_COMPLETA_COL_J_ESTOQUE_MIN = 9
+LISTA_COMPLETA_COL_K_ESTOQUE_MAX = 10
+LISTA_COMPLETA_COL_L_VALOR_EST_MIN = 11
+LISTA_COMPLETA_COL_M_VALOR_EST_MAX = 12
+LISTA_COMPLETA_COL_N_STATUS_ITEM = 13
+LISTA_COMPLETA_COL_O_VIDA_UTIL_HORAS = 14
+LISTA_COMPLETA_COL_Q_TROCA_CONFORME = 16
+LISTA_COMPLETA_COL_R_CLASSIFICACAO_ALMOX = 17
 LISTA_COMPLETA_COL_S_PARTE_MAQUINA = 18  # coluna S
+LISTA_COMPLETA_COL_T_OBSERVACAO = 19
 
 
 def _lista_completa_row_get(row: Tuple[Any, ...], idx: int) -> Any:
@@ -214,25 +235,52 @@ def _lista_completa_quantidade_cell(val: Any):
     return _safe_decimal(val, default=None)
 
 
+def _lista_completa_codigo_aurora_cell(val: Any) -> str | None:
+    """Coluna G (Cód. Aurora): texto ou número Excel → string PK em ItemAurora (máx. 100)."""
+    if val is None or val == '':
+        return None
+    if isinstance(val, bool):
+        return None
+    if isinstance(val, float):
+        s = str(int(val)) if val == int(val) else ' '.join(str(val).strip().split())
+    elif isinstance(val, int):
+        s = str(val)
+    else:
+        s = ' '.join(str(val).strip().split())
+    if not s:
+        return None
+    if s.upper() in ('-', '#VALUE!', '#REF!', '#N/A', '#NUM!'):
+        return None
+    if len(s) > 100:
+        s = s[:100]
+    return s
+
+
 def upload_lista_completa_pecas_maquina_citado(
     file,
     update_existing: bool = False,
-) -> Tuple[int, int, int, List[str]]:
+) -> Tuple[int, int, int, int, int, List[str]]:
     """
-    Importa a aba LISTA COMPLETA para PecaManualCatalogo + PecaMaquinaCitadoManual.
+    Importa a aba LISTA COMPLETA para PecaManualCatalogo + PecaMaquinaCitadoManual + ItemAurora.
 
     Mapeamento por coluna Excel (layout «LISTA COMPLETA» padrão):
       A → maquina (cd_maquina); B → posicao_no_manual; C/D/E → PecaManualCatalogo
       (fabricante, codigo_fabricante, peca_fornecedor); F → quantidade; S → parte_maquina.
+      G–T (exc. P) → ItemAurora quando col. G preenchida; col. P (qtde em estoque) não é importada.
+      Com G preenchido, associa PecaManualCatalogo.item_aurora ao ItemAurora da col. G (código interno).
       A mesma peça (C+D) é uma linha de catálogo; cada máquina ganha uma citação (FK).
 
-    Retorno: (criados_peça_máquina, atualizados_peça_máquina, ignorados_duplicados, erros).
+    Retorno:
+      (criados_peça_máquina, atualizados_peça_máquina, ignorados_duplicados,
+       criados_item_aurora, atualizados_item_aurora, erros).
     """
-    from app.models import Maquina, PecaManualCatalogo, PecaMaquinaCitadoManual
+    from app.models import ItemAurora, Maquina, PecaManualCatalogo, PecaMaquinaCitadoManual
 
     created_pm = 0
     updated_pm = 0
     skipped_pm = 0
+    created_ia = 0
+    updated_ia = 0
     errors: List[str] = []
     max_errors = 120
 
@@ -245,11 +293,13 @@ def upload_lista_completa_pecas_maquina_citado(
     try:
         wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
     except Exception as exc:
-        return 0, 0, 0, [f'Erro ao abrir o arquivo Excel: {exc}']
+        return 0, 0, 0, 0, 0, [f'Erro ao abrir o arquivo Excel: {exc}']
 
     try:
         if LISTA_PECAS_MAQUINA_WORKBOOK_SHEET not in wb.sheetnames:
             return (
+                0,
+                0,
                 0,
                 0,
                 0,
@@ -307,16 +357,90 @@ def upload_lista_completa_pecas_maquina_citado(
                 'quantidade': qty,
             }
 
+            cod_aurora = _lista_completa_codigo_aurora_cell(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_G_COD_AURORA)
+            )
+            descr_aurora = _lista_completa_optional_str(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_H_DESCR_AURORA), 500
+            )
+            valor_aurora = _safe_decimal(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_I_VALOR_UNITARIO), default=None
+            )
+            status_aurora = _lista_completa_optional_str(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_N_STATUS_ITEM), 120
+            )
+            estoque_min = _lista_completa_quantidade_cell(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_J_ESTOQUE_MIN)
+            )
+            estoque_max = _lista_completa_quantidade_cell(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_K_ESTOQUE_MAX)
+            )
+            valor_est_min = _safe_decimal(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_L_VALOR_EST_MIN), default=None
+            )
+            valor_est_max = _safe_decimal(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_M_VALOR_EST_MAX), default=None
+            )
+            vida_util_horas = _lista_completa_quantidade_cell(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_O_VIDA_UTIL_HORAS)
+            )
+            troca_conforme = _lista_completa_optional_str(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_Q_TROCA_CONFORME), 8000
+            )
+            classificacao_almox = _lista_completa_optional_str(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_R_CLASSIFICACAO_ALMOX), 500
+            )
+            observacao_ia = _lista_completa_optional_str(
+                _lista_completa_row_get(row_t, LISTA_COMPLETA_COL_T_OBSERVACAO), 8000
+            )
+
             try:
+                ia = None
+                if cod_aurora:
+                    aurora_defaults = {
+                        'descricao_aurora': descr_aurora,
+                        'valor_unitario': valor_aurora,
+                        'status_item': status_aurora,
+                        'estoque_minimo': estoque_min,
+                        'estoque_maximo': estoque_max,
+                        'valor_estoque_minimo': valor_est_min,
+                        'valor_estoque_maximo': valor_est_max,
+                        'vida_util_horas': vida_util_horas,
+                        'troca_conforme': troca_conforme,
+                        'classificacao_inclusao_almox': classificacao_almox,
+                        'observacao': observacao_ia,
+                    }
+                    ia, ia_created = ItemAurora.objects.get_or_create(
+                        codigo_aurora=cod_aurora,
+                        defaults=aurora_defaults,
+                    )
+                    if ia_created:
+                        created_ia += 1
+                    elif update_existing:
+                        upd_fields: List[str] = []
+                        for fname, fval in aurora_defaults.items():
+                            if getattr(ia, fname) != fval:
+                                setattr(ia, fname, fval)
+                                upd_fields.append(fname)
+                        if upd_fields:
+                            ia.save(update_fields=[*upd_fields, 'updated_at'])
+                            updated_ia += 1
+
                 cat, cat_created = PecaManualCatalogo.objects.get_or_create(
                     fabricante=fab,
                     codigo_fabricante=cod_item,
-                    defaults={'peca_fornecedor': descr_fab},
+                    defaults={'peca_fornecedor': descr_fab, 'item_aurora': ia},
                 )
+                cat_upd: List[str] = []
                 if not cat_created and update_existing and descr_fab is not None:
                     if cat.peca_fornecedor != descr_fab:
                         cat.peca_fornecedor = descr_fab
-                        cat.save(update_fields=['peca_fornecedor', 'updated_at'])
+                        cat_upd.append('peca_fornecedor')
+                if cod_aurora and ia is not None and cat.item_aurora_id != ia.pk:
+                    cat.item_aurora = ia
+                    cat_upd.append('item_aurora')
+                if cat_upd:
+                    cat.save(update_fields=[*cat_upd, 'updated_at'])
 
                 qs = PecaMaquinaCitadoManual.objects.filter(
                     maquina=maquina,
@@ -339,10 +463,10 @@ def upload_lista_completa_pecas_maquina_citado(
                 else:
                     skipped_pm += 1
             except Exception as exc:
-                errors.append(f'Linha {row_idx}: Peça máquina (manual) — {exc}')
+                errors.append(f'Linha {row_idx}: LISTA COMPLETA (catálogo / Item Aurora / peça máquina) — {exc}')
                 continue
 
-        return created_pm, updated_pm, skipped_pm, errors
+        return created_pm, updated_pm, skipped_pm, created_ia, updated_ia, errors
     finally:
         if wb is not None:
             wb.close()

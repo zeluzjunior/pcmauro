@@ -87,7 +87,7 @@
                 <h1 class="display-4 fw-bold mt-3">Consultar peças no manual</h1>
                 <p class="lead mb-0">
                     Citações por máquina (<strong>PecaMaquinaCitadoManual</strong>) com dados do catálogo
-                    (<strong>PecaManualCatalogo</strong>) — a mesma peça pode aparecer em várias máquinas.
+                    (<strong>PecaManualCatalogo</strong>), ligados ao código interno <strong>Item Aurora</strong> quando importado na LISTA COMPLETA — a mesma peça de fabricante pode aparecer em várias máquinas.
                 </p>
             </div>
         </div>
@@ -165,7 +165,7 @@
                                                 <i class="fas fa-search me-1"></i><strong>Busca geral</strong>
                                             </label>
                                             <div class="input-group">
-                                                <input type="text" name="search" id="master_search_pecas" class="form-control" placeholder="Código fabricante, fabricante, descrição, posição, parte, descrição da máquina ou código da máquina…" value="{{ search_query|default:'' }}">
+                                                <input type="text" name="search" id="master_search_pecas" class="form-control" placeholder="Código fabricante, fabricante, descrição, código Aurora, posição, parte, máquina…" value="{{ search_query|default:'' }}">
                                                 <button type="submit" class="btn btn-outline-primary">
                                                     <i class="fas fa-search"></i> Buscar
                                                 </button>
@@ -199,6 +199,10 @@
                                         <div class="col-md-4">
                                             <label for="acc_filter_desc_fab" class="form-label"><i class="fas fa-align-left me-1"></i>Descrição fabricante</label>
                                             <input type="text" class="form-control" id="acc_filter_desc_fab" name="filter_desc_fabricante" value="{{ filter_desc_fabricante|default:'' }}">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="acc_filter_cod_aurora" class="form-label"><i class="fas fa-tag me-1"></i>Cód. Aurora (interno)</label>
+                                            <input type="text" class="form-control" id="acc_filter_cod_aurora" name="filter_cod_aurora" value="{{ filter_cod_aurora|default:'' }}">
                                         </div>
                                         <div class="col-12">
                                             <label for="acc_filter_parte" class="form-label"><i class="fas fa-puzzle-piece me-1"></i>Parte / sistema na máquina</label>
@@ -258,6 +262,7 @@
                                             <th class="col-fab">Fabricante</th>
                                             <th class="col-codfab">Cód. fabricante</th>
                                             <th class="col-descfab">Descrição fabricante</th>
+                                            <th class="col-aurora">Cód. Aurora</th>
                                             <th class="col-qtde">Qtde</th>
                                             <th class="col-parte">Parte / sistema</th>
                                             <th class="col-atualizado">Atualizado</th>
@@ -281,6 +286,9 @@
                                             <th>
                                                 <input type="text" name="filter_desc_fabricante" class="filter-input" value="{{ filter_desc_fabricante|default:'' }}" placeholder="Filtrar" onchange="document.getElementById('tableFilterFormPecasManual').submit();">
                                             </th>
+                                            <th>
+                                                <input type="text" name="filter_cod_aurora" class="filter-input" value="{{ filter_cod_aurora|default:'' }}" placeholder="Filtrar" onchange="document.getElementById('tableFilterFormPecasManual').submit();">
+                                            </th>
                                             <th></th>
                                             <th>
                                                 <input type="text" name="filter_parte_maquina" class="filter-input" value="{{ filter_parte_maquina|default:'' }}" placeholder="Filtrar" onchange="document.getElementById('tableFilterFormPecasManual').submit();">
@@ -299,6 +307,13 @@
                                             <td class="col-fab">{{ p.peca_catalogo.fabricante|default:"—" }}</td>
                                             <td class="col-codfab">{{ p.peca_catalogo.codigo_fabricante }}</td>
                                             <td class="col-descfab">{{ p.peca_catalogo.peca_fornecedor|default:"—" }}</td>
+                                            <td class="col-aurora text-nowrap">
+                                                {% if p.peca_catalogo.item_aurora %}
+                                                    <span title="{{ p.peca_catalogo.item_aurora.descricao_aurora|default:'Item Aurora' }}">{{ p.peca_catalogo.item_aurora.codigo_aurora }}</span>
+                                                {% else %}
+                                                    —
+                                                {% endif %}
+                                            </td>
                                             <td class="col-qtde text-end">{% if p.quantidade is not None %}{{ p.quantidade }}{% else %}—{% endif %}</td>
                                             <td class="col-parte">{{ p.parte_maquina|default:"—" }}</td>
                                             <td class="col-atualizado small text-muted">{{ p.updated_at|date:"d/m/Y H:i" }}</td>

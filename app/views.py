@@ -380,7 +380,7 @@ def em_desenvolvimento(request):
 
 
 def importar_pecas_maquina(request):
-    """Upload e importação da planilha «LISTA COMPLETA» para catálogo + PecaMaquinaCitadoManual."""
+    """Upload «LISTA COMPLETA»: PecaManualCatalogo, PecaMaquinaCitadoManual e ItemAurora (G–T exceto P)."""
     from app.utils import (
         LISTA_COMPLETA_IMPORT_COPY_SAME_VALUE,
         LISTA_COMPLETA_IMPORT_SCHEMA,
@@ -438,17 +438,25 @@ def importar_pecas_maquina(request):
 
         from app.utils import upload_lista_completa_pecas_maquina_citado
 
-        criados, atualizados, ignorados, errs = upload_lista_completa_pecas_maquina_citado(
-            file,
-            update_existing=update_existing,
+        criados, atualizados, ignorados, criados_ia, atualizados_ia, errs = (
+            upload_lista_completa_pecas_maquina_citado(
+                file,
+                update_existing=update_existing,
+            )
         )
 
-        if criados or atualizados or ignorados:
-            messages.success(
-                request,
-                f'Importação concluída: {criados} novo(s), {atualizados} atualizado(s)'
-                f'{f", {ignorados} ignorado(s) (já existiam)" if ignorados else ""}.',
-            )
+        if criados or atualizados or ignorados or criados_ia or atualizados_ia:
+            partes = []
+            if criados or atualizados or ignorados:
+                partes.append(
+                    f'Peças na máquina: {criados} novo(s), {atualizados} atualizado(s)'
+                    f'{f", {ignorados} ignorado(s) (já existiam)" if ignorados else ""}'
+                )
+            if criados_ia or atualizados_ia:
+                partes.append(
+                    f'Itens Aurora: {criados_ia} novo(s), {atualizados_ia} atualizado(s)'
+                )
+            messages.success(request, 'Importação concluída — ' + ' · '.join(partes) + '.')
         elif not errs:
             messages.warning(request, 'Nenhuma linha de dados foi importada (planilha vazia ou só linhas em branco).')
 
@@ -466,7 +474,9 @@ def consultar_pecas_maquinas_manual(request):
     """Lista dados importados da planilha LISTA COMPLETA (modelo PecaMaquinaCitadoManual)."""
     from app.models import PecaMaquinaCitadoManual
 
-    qs = PecaMaquinaCitadoManual.objects.select_related('maquina', 'peca_catalogo').order_by(
+    qs = PecaMaquinaCitadoManual.objects.select_related(
+        'maquina', 'peca_catalogo', 'peca_catalogo__item_aurora'
+    ).order_by(
         'maquina__cd_maquina', 'peca_catalogo__codigo_fabricante'
     )
 
@@ -480,6 +490,8 @@ def consultar_pecas_maquinas_manual(request):
             Q(peca_catalogo__codigo_fabricante__icontains=search_query)
             | Q(peca_catalogo__fabricante__icontains=search_query)
             | Q(peca_catalogo__peca_fornecedor__icontains=search_query)
+            | Q(peca_catalogo__item_aurora__codigo_aurora__icontains=search_query)
+            | Q(peca_catalogo__item_aurora__descricao_aurora__icontains=search_query)
             | Q(posicao_no_manual__icontains=search_query)
             | Q(parte_maquina__icontains=search_query)
             | Q(maquina__descr_maquina__icontains=search_query)
@@ -516,6 +528,10 @@ def consultar_pecas_maquinas_manual(request):
     if filter_desc_fabricante:
         qs = qs.filter(peca_catalogo__peca_fornecedor__icontains=filter_desc_fabricante)
 
+    filter_cod_aurora = request.GET.get('filter_cod_aurora', '').strip()
+    if filter_cod_aurora:
+        qs = qs.filter(peca_catalogo__item_aurora__codigo_aurora__icontains=filter_cod_aurora)
+
     filter_parte_maquina = request.GET.get('filter_parte_maquina', '').strip()
     if filter_parte_maquina:
         qs = qs.filter(parte_maquina__icontains=filter_parte_maquina)
@@ -541,6 +557,7 @@ def consultar_pecas_maquinas_manual(request):
             filter_fabricante,
             filter_cod_fabricante,
             filter_desc_fabricante,
+            filter_cod_aurora,
             filter_parte_maquina,
         ]
     )
@@ -560,6 +577,7 @@ def consultar_pecas_maquinas_manual(request):
         'filter_fabricante': filter_fabricante,
         'filter_cod_fabricante': filter_cod_fabricante,
         'filter_desc_fabricante': filter_desc_fabricante,
+        'filter_cod_aurora': filter_cod_aurora,
         'filter_parte_maquina': filter_parte_maquina,
         'filters_open': filters_open,
         'has_column_filters': has_column_filters,
@@ -10677,6 +10695,493 @@ def consultar_notas_fiscais(request):
     return render(request, 'consultar/consultar_notas_fiscais.html', context)
 
 
+def consultar_itens_aurora(request):
+    """Lista ItemAurora com busca, filtros e paginação (layout alinhado à consulta de notas fiscais)."""
+    from app.models import ItemAurora
+    from django.db.models import Avg
+    from decimal import Decimal
+
+    qs = ItemAurora.objects.all()
+
+    filtro_ativo = request.GET.get('filtro_ativo', '').strip()
+    if filtro_ativo == '1':
+        qs = qs.filter(ativo=True)
+    elif filtro_ativo == '0':
+        qs = qs.filter(ativo=False)
+
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        qs = qs.filter(
+            Q(codigo_aurora__icontains=search_query)
+            | Q(descricao_aurora__icontains=search_query)
+            | Q(status_item__icontains=search_query)
+            | Q(troca_conforme__icontains=search_query)
+            | Q(classificacao_inclusao_almox__icontains=search_query)
+            | Q(observacao__icontains=search_query),
+        )
+
+    filtro_codigo = request.GET.get('filtro_codigo', '').strip()
+    if filtro_codigo:
+        qs = qs.filter(codigo_aurora__icontains=filtro_codigo)
+
+    filtro_descricao = request.GET.get('filtro_descricao', '').strip()
+    if filtro_descricao:
+        qs = qs.filter(descricao_aurora__icontains=filtro_descricao)
+
+    filtro_status = request.GET.get('filtro_status', '').strip()
+    if filtro_status:
+        qs = qs.filter(status_item__icontains=filtro_status)
+
+    ordenar_valor = request.GET.get('ordenar_valor', '').strip()
+    if ordenar_valor == 'desc':
+        qs = qs.order_by('-valor_unitario', 'codigo_aurora')
+    elif ordenar_valor == 'asc':
+        qs = qs.order_by('valor_unitario', 'codigo_aurora')
+    else:
+        qs = qs.order_by('codigo_aurora')
+
+    total_count = qs.count()
+    ativos_count = qs.filter(ativo=True).count()
+    inativos_count = qs.filter(ativo=False).count()
+    _avg = qs.aggregate(a=Avg('valor_unitario'))['a']
+    valor_medio_unitario = Decimal(str(_avg)) if _avg is not None else Decimal('0')
+
+    status_unicos_filtrados = (
+        qs.exclude(status_item__isnull=True)
+        .exclude(status_item='')
+        .values_list('status_item', flat=True)
+        .distinct()
+        .order_by('status_item')
+    )
+
+    status_unicos = (
+        ItemAurora.objects.exclude(status_item__isnull=True)
+        .exclude(status_item='')
+        .values_list('status_item', flat=True)
+        .distinct()
+        .order_by('status_item')
+    )
+
+    paginator = Paginator(qs, 100)
+    page_number = request.GET.get('page', 1)
+    itens = paginator.get_page(page_number)
+
+    qdict = request.GET.copy()
+    qdict.pop('page', None)
+    query_no_page = qdict.urlencode()
+
+    context = {
+        'page_title': 'Consultar Itens Aurora',
+        'active_page': 'consultar_itens_aurora',
+        'itens': itens,
+        'total_count': total_count,
+        'ativos_count': ativos_count,
+        'inativos_count': inativos_count,
+        'valor_medio_unitario': valor_medio_unitario,
+        'search_query': search_query,
+        'filtro_ativo': filtro_ativo,
+        'filtro_codigo': filtro_codigo,
+        'filtro_descricao': filtro_descricao,
+        'filtro_status': filtro_status,
+        'ordenar_valor': ordenar_valor,
+        'status_unicos': status_unicos,
+        'status_unicos_filtrados': status_unicos_filtrados,
+        'query_no_page': query_no_page,
+    }
+    return render(request, 'itens_aurora/consultar_itens_aurora.html', context)
+
+
+def visualizar_item_aurora(request, codigo_aurora):
+    """Visualiza todos os dados de um ItemAurora."""
+    from app.models import ItemAurora, PecaMaquinaCitadoManual, Maquina
+
+    item = get_object_or_404(ItemAurora, codigo_aurora=codigo_aurora)
+
+    maquinas_item = (
+        Maquina.objects.filter(pecas_maquina_manual__peca_catalogo__item_aurora=item)
+        .distinct()
+        .order_by('cd_maquina')
+    )
+    citacoes_manual = (
+        PecaMaquinaCitadoManual.objects.filter(peca_catalogo__item_aurora=item)
+        .select_related('maquina', 'peca_catalogo')
+        .order_by(
+            'maquina__cd_maquina',
+            'peca_catalogo__fabricante',
+            'peca_catalogo__codigo_fabricante',
+        )
+    )
+
+    context = {
+        'page_title': f'Visualizar Item Aurora {item.codigo_aurora}',
+        'active_page': 'consultar_itens_aurora',
+        'item': item,
+        'maquinas_item': maquinas_item,
+        'maquinas_item_count': maquinas_item.count(),
+        'citacoes_manual': citacoes_manual,
+        'citacoes_manual_count': citacoes_manual.count(),
+    }
+    return render(request, 'itens_aurora/visualizar_item_aurora.html', context)
+
+
+def analise_itens_aurora(request):
+    """Dashboard ItemAurora + vínculos (LISTA COMPLETA, ERP, estoque), layout alinhado à análise de OS."""
+    from app.models import (
+        ItemAurora,
+        PecaManualCatalogo,
+        PecaMaquinaCitadoManual,
+        Maquina,
+        EstoqueAlmoxarifado,
+        ItemEstoque,
+        MaquinaPeca,
+        CentroAtividade,
+    )
+    from django.db.models import Count, Q
+    from django.utils import timezone
+    from collections import defaultdict
+    import json
+
+    hoje = timezone.now()
+
+    ano_raw = request.GET.get('ano')
+    meses_filtro = request.GET.getlist('mes')
+    if not ano_raw:
+        ano_filtro = hoje.year
+    else:
+        try:
+            ano_filtro = int(ano_raw)
+        except (ValueError, TypeError):
+            ano_filtro = hoje.year
+
+    meses_filtro_int = []
+    for mes in meses_filtro:
+        try:
+            m = int(mes)
+            if 1 <= m <= 12:
+                meses_filtro_int.append(m)
+        except (ValueError, TypeError):
+            continue
+    meses_filtro_int = sorted(set(meses_filtro_int))
+    if not meses_filtro_int:
+        meses_filtro_int = list(range(1, 13))
+
+    dates_qs = ItemAurora.objects.dates('created_at', 'year')
+    anos_disponiveis = sorted({d.year for d in dates_qs}, reverse=True)
+    if not anos_disponiveis:
+        anos_disponiveis = [hoje.year]
+    if ano_filtro not in anos_disponiveis:
+        anos_disponiveis.insert(0, ano_filtro)
+        anos_disponiveis = sorted(set(anos_disponiveis), reverse=True)
+
+    items_qs = ItemAurora.objects.filter(
+        created_at__year=ano_filtro,
+        created_at__month__in=meses_filtro_int,
+    )
+
+    total_itens = items_qs.count()
+    ativos = items_qs.filter(ativo=True).count()
+    inativos = items_qs.filter(ativo=False).count()
+    com_valor_unitario = items_qs.exclude(valor_unitario__isnull=True).count()
+    sem_valor_unitario = total_itens - com_valor_unitario
+
+    itens_com_catalogo = (
+        items_qs.filter(pecas_catalogo_manual__isnull=False).distinct().count()
+        if total_itens
+        else 0
+    )
+    linhas_catalogo = (
+        PecaManualCatalogo.objects.filter(item_aurora__in=items_qs).count() if total_itens else 0
+    )
+    citacoes_pmcm = (
+        PecaMaquinaCitadoManual.objects.filter(peca_catalogo__item_aurora__in=items_qs).count()
+        if total_itens
+        else 0
+    )
+    maquinas_no_manual = (
+        Maquina.objects.filter(pecas_maquina_manual__peca_catalogo__item_aurora__in=items_qs)
+        .distinct()
+        .count()
+        if total_itens
+        else 0
+    )
+
+    def parse_codigo_item(pk_str):
+        try:
+            return int(str(pk_str).strip())
+        except (ValueError, TypeError):
+            return None
+
+    codigos_numericos = set()
+    for pk in items_qs.values_list('codigo_aurora', flat=True):
+        v = parse_codigo_item(pk)
+        if v is not None:
+            codigos_numericos.add(v)
+
+    almox_codigos = set(EstoqueAlmoxarifado.objects.values_list('codigo_item', flat=True))
+    estoque_codigos = set(ItemEstoque.objects.values_list('codigo_item', flat=True))
+
+    itens_match_almox = 0
+    itens_match_item_estoque = 0
+    if codigos_numericos:
+        hit_almox = codigos_numericos & almox_codigos
+        hit_estoque = codigos_numericos & estoque_codigos
+        for pk in items_qs.values_list('codigo_aurora', flat=True):
+            v = parse_codigo_item(pk)
+            if v is None:
+                continue
+            if v in hit_almox:
+                itens_match_almox += 1
+            if v in hit_estoque:
+                itens_match_item_estoque += 1
+
+    maquina_peca_vinculos = (
+        MaquinaPeca.objects.filter(item_estoque__codigo_item__in=codigos_numericos).count()
+        if codigos_numericos
+        else 0
+    )
+    maquinas_com_peca_estoque = (
+        Maquina.objects.filter(pecas__item_estoque__codigo_item__in=codigos_numericos)
+        .distinct()
+        .count()
+        if codigos_numericos
+        else 0
+    )
+
+    status_rows = list(
+        items_qs.exclude(status_item__isnull=True)
+        .exclude(status_item='')
+        .values('status_item')
+        .annotate(c=Count('codigo_aurora'))
+        .order_by('-c')[:10]
+    )
+    chart_status_labels = json.dumps([row['status_item'][:45] for row in status_rows])
+    chart_status_data = json.dumps([row['c'] for row in status_rows])
+
+    meses_abrev = {
+        1: 'Jan',
+        2: 'Fev',
+        3: 'Mar',
+        4: 'Abr',
+        5: 'Mai',
+        6: 'Jun',
+        7: 'Jul',
+        8: 'Ago',
+        9: 'Set',
+        10: 'Out',
+        11: 'Nov',
+        12: 'Dez',
+    }
+    meses_ordenados = sorted(meses_filtro_int)
+    por_mes = defaultdict(int)
+    for row in items_qs.only('created_at'):
+        por_mes[row.created_at.month] += 1
+    chart_meses_labels = json.dumps(
+        [f"{meses_abrev[m]}/{str(ano_filtro)[-2:]}" for m in meses_ordenados]
+    )
+    chart_meses_data = json.dumps([por_mes.get(m, 0) for m in meses_ordenados])
+
+    chart_ativo_labels = json.dumps(['Ativos', 'Inativos'])
+    chart_ativo_data = json.dumps([ativos, inativos])
+
+    chart_integracao_labels = json.dumps(
+        [
+            'Linhas catálogo manual',
+            'Citações LISTA COMPLETA',
+            'Máquinas (manual)',
+            'Itens × ERP almox.',
+            'Itens × ItemEstoque',
+            'Vínculos máquina–peça',
+        ]
+    )
+    chart_integracao_data = json.dumps(
+        [
+            linhas_catalogo,
+            citacoes_pmcm,
+            maquinas_no_manual,
+            itens_match_almox,
+            itens_match_item_estoque,
+            maquina_peca_vinculos,
+        ]
+    )
+
+    meses_nomes = {
+        1: 'Janeiro',
+        2: 'Fevereiro',
+        3: 'Março',
+        4: 'Abril',
+        5: 'Maio',
+        6: 'Junho',
+        7: 'Julho',
+        8: 'Agosto',
+        9: 'Setembro',
+        10: 'Outubro',
+        11: 'Novembro',
+        12: 'Dezembro',
+    }
+
+    taxa_ativos = (ativos / total_itens * 100) if total_itens else 0
+    taxa_catalogo = (itens_com_catalogo / total_itens * 100) if total_itens else 0
+
+    # Cobertura LISTA COMPLETA por setor (Frigorífico vs Indústria): mesmo critério de outras análises —
+    # cd_setormanut = sigla em CentroAtividade; local contém FRIGOR → Frigorífico; INDÚSTRIA/INDUSTRIA → Indústria.
+    maquinas_cd_com_pmcm = frozenset(
+        PecaMaquinaCitadoManual.objects.values_list('maquina_id', flat=True).distinct()
+    )
+
+    siglas_frigorifico_u = set()
+    for sigla in CentroAtividade.objects.filter(Q(local__icontains='FRIGOR')).values_list('sigla', flat=True):
+        s = (sigla or '').strip()
+        if s:
+            siglas_frigorifico_u.add(s.upper())
+
+    siglas_industria_u = set()
+    for sigla in CentroAtividade.objects.filter(
+        Q(local__icontains='INDÚSTRIA') | Q(local__icontains='INDUSTRIA')
+    ).values_list('sigla', flat=True):
+        s = (sigla or '').strip()
+        if s:
+            siglas_industria_u.add(s.upper())
+
+    def _bucket_pmcm_centro(cd_setormanut):
+        if cd_setormanut is None:
+            return None
+        key = str(cd_setormanut).strip().upper()
+        if not key:
+            return None
+        in_frig = key in siglas_frigorifico_u
+        in_ind = key in siglas_industria_u
+        if in_frig:
+            return 'frigorifico'
+        if in_ind:
+            return 'industria'
+        return None
+
+    pmcm_agg_frigorifico = defaultdict(lambda: {'total': 0, 'com_pmcm': 0, 'descr_setormanut': ''})
+    pmcm_agg_industria = defaultdict(lambda: {'total': 0, 'com_pmcm': 0, 'descr_setormanut': ''})
+    maquinas_pmcm_sem_classificacao_count = 0
+
+    for cd_maquina, cd_set, descr in Maquina.objects.filter(ativo=True).values_list(
+        'cd_maquina', 'cd_setormanut', 'descr_setormanut'
+    ):
+        bucket = _bucket_pmcm_centro(cd_set)
+        if bucket == 'frigorifico':
+            pmcm_agg = pmcm_agg_frigorifico
+        elif bucket == 'industria':
+            pmcm_agg = pmcm_agg_industria
+        else:
+            maquinas_pmcm_sem_classificacao_count += 1
+            continue
+
+        key = str(cd_set).strip() if cd_set is not None else ''
+        slot = pmcm_agg[key]
+        desc_clean = (descr or '').strip()
+        if not slot['descr_setormanut'] and desc_clean:
+            slot['descr_setormanut'] = desc_clean
+        slot['total'] += 1
+        if cd_maquina in maquinas_cd_com_pmcm:
+            slot['com_pmcm'] += 1
+
+    def _montar_pmcm_por_setor(pmcm_por_setor_agg):
+        rows_out = []
+        chart_lab = []
+        chart_co = []
+        chart_se = []
+        for cd_set in sorted(pmcm_por_setor_agg.keys(), key=lambda s: (s == '', s)):
+            v = pmcm_por_setor_agg[cd_set]
+            total_m = v['total']
+            com_m = v['com_pmcm']
+            sem_m = total_m - com_m
+            pct_com_m = round((com_m / total_m * 100), 1) if total_m else 0.0
+            pct_sem_m = round((sem_m / total_m * 100), 1) if total_m else 0.0
+            label_setor = cd_set if cd_set else '(sem cd_setormanut)'
+            descr_m = v['descr_setormanut']
+            rows_out.append(
+                {
+                    'cd_setormanut': label_setor,
+                    'descr_setormanut': descr_m,
+                    'total': total_m,
+                    'com_pmcm': com_m,
+                    'sem_pmcm': sem_m,
+                    'pct_com': pct_com_m,
+                    'pct_sem': pct_sem_m,
+                }
+            )
+            chart_lab.append(label_setor)
+            chart_co.append(com_m)
+            chart_se.append(sem_m)
+        altura = min(720, max(220, 100 + len(rows_out) * 44))
+        return rows_out, json.dumps(chart_lab), json.dumps(chart_co), json.dumps(chart_se), altura
+
+    (
+        maquinas_pmcm_por_setor_frigorifico,
+        chart_maquinas_pmcm_labels_frigorifico,
+        chart_maquinas_pmcm_com_frigorifico,
+        chart_maquinas_pmcm_sem_frigorifico,
+        maquinas_pmcm_chart_min_height_px_frigorifico,
+    ) = _montar_pmcm_por_setor(pmcm_agg_frigorifico)
+
+    (
+        maquinas_pmcm_por_setor_industria,
+        chart_maquinas_pmcm_labels_industria,
+        chart_maquinas_pmcm_com_industria,
+        chart_maquinas_pmcm_sem_industria,
+        maquinas_pmcm_chart_min_height_px_industria,
+    ) = _montar_pmcm_por_setor(pmcm_agg_industria)
+
+    maquinas_pmcm_total_ativas = Maquina.objects.filter(ativo=True).count()
+
+    # Accordion de filtros: fechado na entrada; abre após enviar o formulário (GET com ano ou mes).
+    filtros_analise_abertos = ('ano' in request.GET) or ('mes' in request.GET)
+
+    context = {
+        'page_title': 'Análise Itens Aurora',
+        'active_page': 'analise_itens_aurora',
+        'ano_filtro': ano_filtro,
+        'meses_filtro': meses_filtro_int,
+        'filtros_analise_abertos': filtros_analise_abertos,
+        'meses_nomes': meses_nomes,
+        'anos_disponiveis': anos_disponiveis,
+        'total_itens': total_itens,
+        'ativos': ativos,
+        'inativos': inativos,
+        'taxa_ativos': taxa_ativos,
+        'com_valor_unitario': com_valor_unitario,
+        'sem_valor_unitario': sem_valor_unitario,
+        'itens_com_catalogo': itens_com_catalogo,
+        'itens_sem_catalogo': max(total_itens - itens_com_catalogo, 0),
+        'taxa_catalogo': taxa_catalogo,
+        'linhas_catalogo': linhas_catalogo,
+        'citacoes_pmcm': citacoes_pmcm,
+        'maquinas_no_manual': maquinas_no_manual,
+        'itens_match_almox': itens_match_almox,
+        'itens_match_item_estoque': itens_match_item_estoque,
+        'maquina_peca_vinculos': maquina_peca_vinculos,
+        'maquinas_com_peca_estoque': maquinas_com_peca_estoque,
+        'chart_ativo_labels': chart_ativo_labels,
+        'chart_ativo_data': chart_ativo_data,
+        'chart_status_labels': chart_status_labels,
+        'chart_status_data': chart_status_data,
+        'chart_meses_labels': chart_meses_labels,
+        'chart_meses_data': chart_meses_data,
+        'chart_integracao_labels': chart_integracao_labels,
+        'chart_integracao_data': chart_integracao_data,
+        'codigos_numericos_count': len(codigos_numericos),
+        'maquinas_pmcm_por_setor_frigorifico': maquinas_pmcm_por_setor_frigorifico,
+        'maquinas_pmcm_por_setor_industria': maquinas_pmcm_por_setor_industria,
+        'chart_maquinas_pmcm_labels_frigorifico': chart_maquinas_pmcm_labels_frigorifico,
+        'chart_maquinas_pmcm_com_frigorifico': chart_maquinas_pmcm_com_frigorifico,
+        'chart_maquinas_pmcm_sem_frigorifico': chart_maquinas_pmcm_sem_frigorifico,
+        'chart_maquinas_pmcm_labels_industria': chart_maquinas_pmcm_labels_industria,
+        'chart_maquinas_pmcm_com_industria': chart_maquinas_pmcm_com_industria,
+        'chart_maquinas_pmcm_sem_industria': chart_maquinas_pmcm_sem_industria,
+        'maquinas_pmcm_chart_min_height_px_frigorifico': maquinas_pmcm_chart_min_height_px_frigorifico,
+        'maquinas_pmcm_chart_min_height_px_industria': maquinas_pmcm_chart_min_height_px_industria,
+        'maquinas_pmcm_sem_classificacao_count': maquinas_pmcm_sem_classificacao_count,
+        'maquinas_pmcm_total_ativas': maquinas_pmcm_total_ativas,
+    }
+    return render(request, 'itens_aurora/analise_itens_aurora.html', context)
+
+
 def visualizar_nota_fiscal(request, nota_id):
     """Visualizar detalhes de uma nota fiscal específica"""
     from app.models import NotaFiscal
@@ -14195,8 +14700,31 @@ def remover_documento_maquina(request, maquina_id, documento_id):
 
 def visualizar_maquina(request, maquina_id):
     """Visualizar detalhes de uma máquina específica"""
-    from app.models import Maquina, ItemEstoque, MaquinaPeca, MaquinaPrimariaSecundaria, PlanoPreventiva, MaquinaDocumento, MeuPlanoPreventiva
-    
+    from decimal import Decimal, InvalidOperation
+
+    from app.models import (
+        EstoqueAlmoxarifado,
+        Maquina,
+        ItemEstoque,
+        MaquinaDocumento,
+        MaquinaPeca,
+        MaquinaPrimariaSecundaria,
+        MeuPlanoPreventiva,
+        PecaMaquinaCitadoManual,
+        PlanoPreventiva,
+    )
+
+    def _codigo_aurora_para_item_erp(val) -> int | None:
+        if val is None:
+            return None
+        s = str(val).strip()
+        if not s:
+            return None
+        try:
+            return int(Decimal(s.replace(',', '.')))
+        except (InvalidOperation, ValueError, TypeError):
+            return None
+
     try:
         maquina = Maquina.objects.get(id=maquina_id)
     except Maquina.DoesNotExist:
@@ -14233,6 +14761,30 @@ def visualizar_maquina(request, maquina_id):
     
     # Buscar documentos relacionados a esta máquina
     documentos_maquina = MaquinaDocumento.objects.filter(maquina=maquina).order_by('-created_at')
+
+    # LISTA COMPLETA: peças citadas no manual + catálogo + Item Aurora
+    pecas_lista_completa = PecaMaquinaCitadoManual.objects.filter(maquina=maquina).select_related(
+        'peca_catalogo', 'peca_catalogo__item_aurora'
+    ).order_by('peca_catalogo__fabricante', 'peca_catalogo__codigo_fabricante', 'posicao_no_manual')
+
+    # Estoque ERP (almox.): itens cujo código bate com Aurora numérico ou ItemEstoque da máquina,
+    # ou linhas em que «destino de uso» cita o cd_maquina.
+    codigos_item_erp = set()
+    for p in pecas_lista_completa:
+        cat = p.peca_catalogo
+        if cat and cat.item_aurora_id:
+            n = _codigo_aurora_para_item_erp(cat.item_aurora.codigo_aurora)
+            if n is not None:
+                codigos_item_erp.add(n)
+    for mp in pecas_relacionadas:
+        codigos_item_erp.add(mp.item_estoque.codigo_item)
+
+    q_estoque = Q(descricao_destino_uso__icontains=str(maquina.cd_maquina))
+    if codigos_item_erp:
+        q_estoque |= Q(codigo_item__in=codigos_item_erp)
+    estoque_erp_maquina = list(
+        EstoqueAlmoxarifado.objects.filter(q_estoque).distinct().order_by('codigo_item')[:400]
+    )
     
     # Verificar se é máquina principal
     is_maquina_principal = maquina.descr_gerenc and 'MÁQUINAS PRINCIPAL' in maquina.descr_gerenc.upper()
@@ -14255,6 +14807,9 @@ def visualizar_maquina(request, maquina_id):
         'documentos_maquina': documentos_maquina,
         'is_maquina_principal': is_maquina_principal,
         'maquinas_secundarias_ids': list(maquinas_secundarias_ids),
+        'pecas_lista_completa': pecas_lista_completa,
+        'estoque_erp_maquina': estoque_erp_maquina,
+        'estoque_erp_maquina_count': len(estoque_erp_maquina),
     }
     return render(request, 'maquinas/visualizar_maquina.html', context)
 
@@ -19899,6 +20454,128 @@ def export_calendario_preventivas_pdf(request):
     return response
 
 
+def montar_analise_item_aurora_estoque_maquina(maquina):
+    """
+    ItemAurora ligados à máquina via LISTA COMPLETA (PecaMaquinaCitadoManual → PecaManualCatalogo.item_aurora),
+    com quantidade manual somada por código e confronto com EstoqueAlmoxarifado (codigo_item numérico).
+    Retorna (lista de dicts `rows`, dict `resumo`).
+    """
+    from decimal import Decimal
+    from app.models import PecaMaquinaCitadoManual, EstoqueAlmoxarifado
+
+    def _parse_codigo_item(pk_str):
+        try:
+            return int(str(pk_str).strip())
+        except (ValueError, TypeError):
+            return None
+
+    pmcms = (
+        PecaMaquinaCitadoManual.objects.filter(maquina=maquina)
+        .select_related('peca_catalogo__item_aurora')
+        .order_by(
+            'peca_catalogo__item_aurora__codigo_aurora',
+            'peca_catalogo__fabricante',
+            'peca_catalogo__codigo_fabricante',
+        )
+    )
+
+    agg = {}
+    for pm in pmcms:
+        cat = pm.peca_catalogo
+        if not cat or not cat.item_aurora_id:
+            continue
+        ia = cat.item_aurora
+        key = ia.codigo_aurora
+        if key not in agg:
+            agg[key] = {
+                'item': ia,
+                'qty_manual': Decimal('0'),
+                'pmcm_count': 0,
+                'catalog_refs': [],
+            }
+        block = agg[key]
+        block['pmcm_count'] += 1
+        if pm.quantidade is not None:
+            block['qty_manual'] += Decimal(str(pm.quantidade))
+        block['catalog_refs'].append(
+            {
+                'fabricante': cat.fabricante or '',
+                'codigo_fabricante': cat.codigo_fabricante or '',
+            }
+        )
+
+    numeric_codes = []
+    for key in agg:
+        v = _parse_codigo_item(key)
+        if v is not None:
+            numeric_codes.append(v)
+
+    erp_by_codigo = {}
+    if numeric_codes:
+        for row in EstoqueAlmoxarifado.objects.filter(codigo_item__in=numeric_codes).only(
+            'codigo_item', 'quantidade'
+        ):
+            erp_by_codigo[row.codigo_item] = row.quantidade
+
+    resumo = {
+        'total_itens_distintos': len(agg),
+        'com_codigo_numerico': 0,
+        'com_linha_erp': 0,
+        'sem_linha_erp': 0,
+        'disponivel_ok': 0,
+        'insuficiente': 0,
+        'sem_qtd_manual': 0,
+        'codigo_alfanumerico': 0,
+    }
+
+    rows = []
+    for key in sorted(agg.keys()):
+        data = agg[key]
+        ia = data['item']
+        qty_m = data['qty_manual']
+        cod_int = _parse_codigo_item(key)
+        erp_qty = erp_by_codigo.get(cod_int) if cod_int is not None else None
+
+        if cod_int is not None:
+            resumo['com_codigo_numerico'] += 1
+            if cod_int in erp_by_codigo:
+                resumo['com_linha_erp'] += 1
+            else:
+                resumo['sem_linha_erp'] += 1
+        else:
+            resumo['codigo_alfanumerico'] += 1
+
+        if cod_int is None:
+            situacao = 'Código alfanumérico'
+        elif qty_m <= 0:
+            situacao = 'Sem qt. manual'
+            resumo['sem_qtd_manual'] += 1
+        elif erp_qty is None:
+            situacao = 'Sem estoque ERP'
+        elif erp_qty >= qty_m:
+            situacao = 'Disponível'
+            resumo['disponivel_ok'] += 1
+        else:
+            situacao = 'Insuficiente'
+            resumo['insuficiente'] += 1
+
+        rows.append(
+            {
+                'codigo_aurora': ia.codigo_aurora,
+                'descricao': ia.descricao_aurora or '',
+                'qty_manual': qty_m,
+                'pmcm_count': data['pmcm_count'],
+                'valor_unitario': ia.valor_unitario,
+                'erp_qty': erp_qty,
+                'codigo_int': cod_int,
+                'situacao': situacao,
+                'catalog_refs': data['catalog_refs'][:4],
+            }
+        )
+
+    return rows, resumo
+
+
 def gerar_arquivo_para_preventiva(request):
     """Filtros por setor (cd_setormanut), gerência e máquina — base em Maquina ativa."""
     from datetime import datetime, date, timedelta
@@ -20136,6 +20813,13 @@ def gerar_arquivo_para_preventiva(request):
                     'maquina_descricao': getattr(doc.maquina, 'descr_maquina', ''),
                 })
 
+    analise_item_aurora_estoque_rows = []
+    analise_item_aurora_estoque_resumo = None
+    if maquina_selecionada:
+        analise_item_aurora_estoque_rows, analise_item_aurora_estoque_resumo = (
+            montar_analise_item_aurora_estoque_maquina(maquina_selecionada)
+        )
+
     context = {
         'page_title': 'Gerar Arquivo de Documento para Preventivas',
         'active_page': 'gerar_arquivo_para_preventiva',
@@ -20154,6 +20838,8 @@ def gerar_arquivo_para_preventiva(request):
         'documentos_por_maquina': documentos_por_maquina,
         'documentos_maquina_selecionada_total': documentos_maquina_selecionada_total,
         'documentos_para_pdf': documentos_para_pdf,
+        'analise_item_aurora_estoque_rows': analise_item_aurora_estoque_rows,
+        'analise_item_aurora_estoque_resumo': analise_item_aurora_estoque_resumo,
     }
     return render(request, 'planejamento/gerar_arquivo_para_preventiva.html', context)
 
@@ -20168,8 +20854,14 @@ def baixar_documentos_maquina_preventiva(request):
     from PIL import Image, ImageOps
     from reportlab.pdfgen import canvas
     from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib.utils import ImageReader
+    from reportlab.lib.utils import ImageReader, simpleSplit
+    from reportlab.pdfbase.pdfmetrics import stringWidth
     from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.enums import TA_LEFT
+    from xml.sax.saxutils import escape
+    from decimal import Decimal as DecimalBr
 
     redirect_url = reverse('gerar_arquivo_para_preventiva')
     if request.GET:
@@ -20204,13 +20896,15 @@ def baixar_documentos_maquina_preventiva(request):
     )
     maquinas_documentos_ids.update(mid for mid in rels_sec if mid)
 
-    docs_qs = (
+    docs_qs_base = (
         MaquinaDocumento.objects.filter(maquina_id__in=maquinas_documentos_ids)
         .exclude(arquivo__isnull=True)
         .exclude(arquivo='')
         .select_related('maquina')
         .order_by('maquina__cd_maquina', 'created_at', 'id')
     )
+    # Somente entradas explícitas em documento_id viram anexos. Sem parâmetro = PDF só com capa +
+    # relatório Item Aurora × ERP (útil quando não há arquivos ou o usuário desmarcou todos).
     if documento_ids_raw:
         documento_ids = []
         for raw in documento_ids_raw:
@@ -20219,29 +20913,67 @@ def baixar_documentos_maquina_preventiva(request):
             except (TypeError, ValueError):
                 continue
         documento_ids = list(set(documento_ids))
-        if documento_ids:
-            docs_qs = docs_qs.filter(id__in=documento_ids)
-        else:
-            messages.error(request, 'Selecione pelo menos um documento válido para gerar o PDF.')
+        if not documento_ids:
+            messages.error(request, 'Nenhum documento válido foi informado. Desmarque a seleção ou envie IDs válidos.')
             return redirect(redirect_url)
-    if not docs_qs.exists():
-        messages.warning(request, 'Não há documentos selecionados/associados à máquina para gerar o PDF.')
-        return redirect(redirect_url)
+        docs_qs = docs_qs_base.filter(id__in=documento_ids)
+    else:
+        docs_qs = docs_qs_base.none()
 
     def _build_info_page(doc_nome, observacao):
         page_buffer = io.BytesIO()
         c = canvas.Canvas(page_buffer, pagesize=A4)
-        width, height = A4
-        y = height - 80
-        c.setFont('Helvetica-Bold', 14)
-        c.drawString(50, y, 'Documento não incorporado diretamente')
-        y -= 30
-        c.setFont('Helvetica', 11)
-        c.drawString(50, y, f'Arquivo: {doc_nome}')
-        y -= 20
-        c.drawString(50, y, observacao)
-        y -= 20
-        c.drawString(50, y, 'Esse arquivo foi listado para manter rastreabilidade na geração do PDF final.')
+        page_w, page_h = A4
+        margin = 34
+        col_banner = colors.HexColor('#0b5ed7')
+        col_accent = colors.HexColor('#f97316')
+
+        c.setFillColor(col_banner)
+        c.rect(0, page_h - 52, page_w, 52, stroke=0, fill=1)
+        c.setFillColor(col_accent)
+        c.rect(0, page_h - 55, page_w, 3, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.setFont('Helvetica-Bold', 12)
+        c.drawString(margin, page_h - 28, 'Anexo — arquivo nao incorporado ao PDF')
+        c.setFont('Helvetica', 8)
+        c.drawRightString(page_w - margin, page_h - 30, f'Gerado em {date.today().strftime("%d/%m/%Y")}')
+
+        box_top = page_h - 74
+        box_h = min(210, page_h - margin - 92)
+        c.setStrokeColor(colors.HexColor('#cbd5e1'))
+        c.setFillColor(colors.white)
+        c.roundRect(margin, box_top - box_h, page_w - 2 * margin, box_h, 8, stroke=1, fill=1)
+
+        y = box_top - 26
+        c.setFillColor(colors.HexColor('#1e293b'))
+        c.setFont('Helvetica-Bold', 10)
+        c.drawString(margin + 16, y, 'Arquivo')
+        y -= 14
+        c.setFont('Helvetica', 9)
+        c.setFillColor(colors.HexColor('#0f172a'))
+        nome_curto = (doc_nome or '-')[:96]
+        c.drawString(margin + 16, y, nome_curto)
+        y -= 22
+        c.setFillColor(colors.HexColor('#1e293b'))
+        c.setFont('Helvetica-Bold', 10)
+        c.drawString(margin + 16, y, 'Detalhe')
+        y -= 14
+        c.setFont('Helvetica', 9)
+        c.setFillColor(colors.HexColor('#475569'))
+        obs = (observacao or '-')[:320]
+        line_y = y
+        chunk = 92
+        for i in range(0, len(obs), chunk):
+            c.drawString(margin + 16, line_y, obs[i : i + chunk])
+            line_y -= 12
+
+        foot_y = margin + 36
+        c.setStrokeColor(colors.HexColor('#e2e8f0'))
+        c.line(margin, foot_y, page_w - margin, foot_y)
+        c.setFillColor(colors.HexColor('#94a3b8'))
+        c.setFont('Helvetica', 8)
+        c.drawString(margin, foot_y - 18, 'Registro para rastreabilidade na montagem deste documento.')
+
         c.showPage()
         c.save()
         page_buffer.seek(0)
@@ -20265,126 +20997,188 @@ def baixar_documentos_maquina_preventiva(request):
         page_buffer = io.BytesIO()
         c = canvas.Canvas(page_buffer, pagesize=A4)
         page_w, page_h = A4
-        margin = 34
+        margin = 38
 
         def _safe(value):
             return str(value).strip() if value is not None and str(value).strip() else '-'
 
-        def _draw_label_value(x, y, label, value, label_w=66, max_len=52):
-            c.setFont('Helvetica-Bold', 8)
-            c.setFillColor(colors.HexColor('#334155'))
-            c.drawString(x, y, f"{label}:")
-            c.setFont('Helvetica', 8)
-            c.setFillColor(colors.HexColor('#0f172a'))
-            c.drawString(x + label_w, y, str(value)[:max_len])
+        fs_body = 9
+        fs_card_title = 12
+        pad_x_body = 18
+        pad_bottom_card = 18
+        title_band = 26
+        line_leading = 11
+        field_gap = 7
 
-        docs_total = docs_qs.count()
-        docs_pdf = docs_qs.filter(arquivo__iendswith='.pdf').count()
-        docs_img = 0
-        for ext in ('.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.tif', '.tiff'):
-            docs_img += docs_qs.filter(arquivo__iendswith=ext).count()
-        docs_outros = max(docs_total - docs_pdf - docs_img, 0)
-        docs_com_comentario = docs_qs.exclude(comentario__isnull=True).exclude(comentario='').count()
+        def _consume_field_inline(y_start, value_str, value_wrap_w):
+            vs = str(value_str).strip() if value_str is not None else ''
+            if not vs:
+                vs = '-'
+            val_lines = simpleSplit(vs, 'Helvetica', fs_body, value_wrap_w) or ['-']
+            nl = max(1, min(len(val_lines), 20))
+            return y_start - nl * line_leading - field_gap
 
-        # Top header
-        c.setFillColor(colors.HexColor('#0b5ed7'))
-        c.roundRect(margin, page_h - 70, page_w - (2 * margin), 26, 6, stroke=0, fill=1)
+        def _draw_machine_field_inline(x0, y0, label, value_str, label_col_w, value_wrap_w):
+            lab = f"{label}:"
+            c.setFillColor(colors.HexColor('#374151'))
+            c.setFont('Helvetica-Bold', fs_body)
+            c.drawString(x0, y0, lab)
+            vs = str(value_str).strip() if value_str is not None else ''
+            if not vs:
+                vs = '-'
+            vx = x0 + label_col_w
+            c.setFont('Helvetica', fs_body)
+            c.setFillColor(colors.HexColor('#111827'))
+            lines = simpleSplit(vs, 'Helvetica', fs_body, value_wrap_w) or ['-']
+            lines = lines[:20]
+            c.drawString(vx, y0, lines[0])
+            y_cur = y0 - line_leading
+            for line in lines[1:]:
+                c.drawString(vx, y_cur, line)
+                y_cur -= line_leading
+            return y_cur - field_gap
+
+        centro_txt = _safe(
+            getattr(maquina.centro_atividade, 'descr_centativ', None)
+            or getattr(maquina.centro_atividade, 'nome_centativ', None)
+        )
+
+        machine_fields = [
+            ('Codigo da maquina', _safe(maquina.cd_maquina)),
+            ('Descricao', _safe(maquina.descr_maquina)),
+            ('Setor de manutencao', f"{_safe(maquina.cd_setormanut)} - {_safe(maquina.descr_setormanut)}"),
+            ('Gerencia', _safe(maquina.descr_gerenc)),
+            ('Tipo de centro de atividade', _safe(maquina.cd_tpcentativ)),
+            ('Centro de atividade', centro_txt),
+            ('Maquina ativa', 'Sim' if maquina.ativo else 'Nao'),
+        ]
+
+        x_body = margin + pad_x_body
+        content_right = page_w - margin - pad_x_body
+        label_col_w = 0
+        for lab, _ in machine_fields:
+            tw = stringWidth(f"{lab}:", 'Helvetica-Bold', fs_body)
+            if tw > label_col_w:
+                label_col_w = tw
+        label_col_w += 10
+        value_wrap_w = max(100.0, content_right - x_body - label_col_w)
+
+        # Page banner — stacked lines so title, codigo and descricao do not overlap
+        banner_h = 76
+        banner_ll_y = page_h - margin - banner_h
+        inner_top = banner_ll_y + banner_h
+        bx = margin + 14
+        usable_banner_w = page_w - 2 * margin - 28
+
+        c.setFillColor(colors.HexColor('#1d4ed8'))
+        c.rect(margin, banner_ll_y, page_w - 2 * margin, banner_h, stroke=0, fill=1)
         c.setFillColor(colors.white)
-        c.setFont('Helvetica-Bold', 11)
-        c.drawString(margin + 10, page_h - 54, 'DOCUMENTACAO DA MAQUINA - PREVENTIVAS')
+
+        y_title = inner_top - 15
+        c.setFont('Helvetica-Bold', 12)
+        c.drawString(bx, y_title, 'Documentacao preventivas')
         c.setFont('Helvetica', 8)
-        c.drawRightString(page_w - margin - 10, page_h - 54, f"Gerado em: {date.today().strftime('%d/%m/%Y')}")
+        c.drawRightString(page_w - margin - 14, y_title, f"Gerado em {date.today().strftime('%d/%m/%Y')}")
 
-        # Section 1 title
-        c.setFillColor(colors.HexColor('#1e3a8a'))
-        c.setFont('Helvetica-Bold', 10)
-        c.drawString(margin, page_h - 94, '1. Informacoes gerais da Maquina:')
-
-        # Machine block (left)
-        box_top = page_h - 82
-        left_x = margin
-        left_w = 315
-        right_gap = 10
-        right_x = left_x + left_w + right_gap
-        right_w = page_w - margin - right_x
-        box_h = 176
-        c.setStrokeColor(colors.HexColor('#cbd5e1'))
-        c.setFillColor(colors.HexColor('#f8fafc'))
-        c.roundRect(left_x, box_top - box_h, left_w, box_h, 6, stroke=1, fill=1)
+        y_cod = inner_top - 36
         c.setFont('Helvetica-Bold', 9)
-        c.setFillColor(colors.HexColor('#1e293b'))
-        c.drawString(left_x + 10, box_top - 15, '1.1 Dados da Maquina')
+        c.drawString(bx, y_cod, 'Codigo da maquina:')
+        lw_cod = stringWidth('Codigo da maquina:', 'Helvetica-Bold', 9) + 8
+        c.setFont('Helvetica', 9)
+        c.drawString(bx + lw_cod, y_cod, _safe(maquina.cd_maquina))
 
-        y = box_top - 32
-        step = 13
-        _draw_label_value(left_x + 10, y, 'Codigo', _safe(maquina.cd_maquina), max_len=28); y -= step
-        _draw_label_value(left_x + 10, y, 'Descricao', _safe(maquina.descr_maquina), max_len=58); y -= step
-        _draw_label_value(left_x + 10, y, 'Setor', f"{_safe(maquina.cd_setormanut)} - {_safe(maquina.descr_setormanut)}", max_len=58); y -= step
-        _draw_label_value(left_x + 10, y, 'Gerencia', _safe(maquina.descr_gerenc), max_len=58); y -= step
-        _draw_label_value(left_x + 10, y, 'Unidade', f"{_safe(maquina.cd_unid)} - {_safe(maquina.nome_unid)}", max_len=58); y -= step
-        _draw_label_value(left_x + 10, y, 'Patrimonio', _safe(maquina.nro_patrimonio), max_len=58); y -= step
-        _draw_label_value(left_x + 10, y, 'Modelo/Grupo', f"{_safe(maquina.cd_modelo)} / {_safe(maquina.cd_grupo)}", max_len=58); y -= step
-        _draw_label_value(left_x + 10, y, 'Prioridade', _safe(maquina.cd_priomaqutv), max_len=58); y -= step
-        _draw_label_value(left_x + 10, y, 'Tipo C. Ativ.', _safe(maquina.cd_tpcentativ), max_len=58); y -= step
-        _draw_label_value(left_x + 10, y, 'Centro Ativ.', _safe(getattr(maquina.centro_atividade, 'descr_centativ', None) or getattr(maquina.centro_atividade, 'nome_centativ', None)), max_len=58); y -= step
-        _draw_label_value(left_x + 10, y, 'Cadastro', _safe(maquina.created_at.strftime('%d/%m/%Y') if maquina.created_at else None), max_len=30); y -= step
-        _draw_label_value(left_x + 10, y, 'Atualizacao', _safe(maquina.updated_at.strftime('%d/%m/%Y') if maquina.updated_at else None), max_len=30)
-
-        # Documents block (right)
-        c.setStrokeColor(colors.HexColor('#cbd5e1'))
-        c.setFillColor(colors.HexColor('#f8fafc'))
-        c.roundRect(right_x, box_top - box_h, right_w, box_h, 6, stroke=1, fill=1)
-        c.setFillColor(colors.HexColor('#1e293b'))
+        y_desc = inner_top - 54
         c.setFont('Helvetica-Bold', 9)
-        c.drawString(right_x + 10, box_top - 15, '1.2 Resumo dos Documentos')
+        c.drawString(bx, y_desc, 'Descricao:')
+        lw_desc = stringWidth('Descricao:', 'Helvetica-Bold', 9) + 8
+        c.setFont('Helvetica', 9)
+        desc_wrapped = simpleSplit(_safe(maquina.descr_maquina) or '-', 'Helvetica', 9, usable_banner_w - lw_desc)[:3]
+        line_step = 11
+        for i, line in enumerate(desc_wrapped):
+            y_ln = y_desc - i * line_step
+            if y_ln >= banner_ll_y + 8:
+                c.drawString(bx + lw_desc, y_ln, line)
 
-        y_docs = box_top - 32
-        docs_step = 13
-        _draw_label_value(right_x + 10, y_docs, 'Total', docs_total, label_w=48, max_len=20); y_docs -= docs_step
-        _draw_label_value(right_x + 10, y_docs, 'PDF', docs_pdf, label_w=48, max_len=20); y_docs -= docs_step
-        _draw_label_value(right_x + 10, y_docs, 'Imagens', docs_img, label_w=48, max_len=20); y_docs -= docs_step
-        _draw_label_value(right_x + 10, y_docs, 'Outros', docs_outros, label_w=48, max_len=20); y_docs -= docs_step
-        _draw_label_value(right_x + 10, y_docs, 'C/ comentario', docs_com_comentario, label_w=48, max_len=20); y_docs -= docs_step
-        _draw_label_value(right_x + 10, y_docs, 'Ativa', 'Sim' if maquina.ativo else 'Nao', label_w=48, max_len=20); y_docs -= docs_step
+        # Single card: machine information only
+        card_top_y = banner_ll_y - 16
+        y_cursor = card_top_y - title_band - 12
+        y_sim = y_cursor
+        for lab, val in machine_fields:
+            y_sim = _consume_field_inline(y_sim, val, value_wrap_w)
+        card_ll_y = y_sim - pad_bottom_card
+        card_h = card_top_y - card_ll_y
 
-        c.setFont('Helvetica-Bold', 8)
-        c.setFillColor(colors.HexColor('#334155'))
-        c.drawString(right_x + 10, y_docs - 3, 'Ultimos arquivos selecionados:')
-        y_docs -= 15
-        c.setFont('Helvetica', 7)
+        c.setFillColor(colors.HexColor('#ffffff'))
+        c.setStrokeColor(colors.HexColor('#cbd5e1'))
+        c.setLineWidth(1.1)
+        c.roundRect(margin, card_ll_y, page_w - 2 * margin, card_h, 8, stroke=1, fill=1)
+
         c.setFillColor(colors.HexColor('#0f172a'))
-        for idx, nome in enumerate(list(docs_qs.values_list('arquivo', flat=True)[:7])):
-            nome_curto = os.path.basename(nome or '-')[:35]
-            c.drawString(right_x + 12, y_docs, f"- {nome_curto}")
-            y_docs -= 10
-            if y_docs < (box_top - box_h + 8):
-                break
+        c.setFont('Helvetica-Bold', fs_card_title)
+        c.drawString(x_body, card_top_y - 17, 'Informacoes da maquina')
+
+        y_draw = y_cursor
+        for lab, val in machine_fields:
+            y_draw = _draw_machine_field_inline(x_body, y_draw, lab, val, label_col_w, value_wrap_w)
 
         # Preventive schedule block
-        sched_top = box_top - box_h - 10
+        sched_top = card_ll_y - 14
         sched_h = 282
         c.setStrokeColor(colors.HexColor('#cbd5e1'))
         c.setFillColor(colors.white)
         c.roundRect(margin, sched_top - sched_h, page_w - (2 * margin), sched_h, 6, stroke=1, fill=1)
-        c.setFillColor(colors.HexColor('#0f5132'))
-        c.rect(margin, sched_top - 20, page_w - (2 * margin), 20, stroke=0, fill=1)
+        col_green = colors.HexColor('#0f5132')
+        c.setFillColor(col_green)
+        c.rect(margin, sched_top - 22, page_w - (2 * margin), 22, stroke=0, fill=1)
+        c.setFillColor(colors.HexColor('#34d399'))
+        c.rect(margin, sched_top - 25, page_w - (2 * margin), 3, stroke=0, fill=1)
         c.setFillColor(colors.white)
         c.setFont('Helvetica-Bold', 9)
-        c.drawString(margin + 10, sched_top - 14, 'Proximas Ordens de Servico Preventivas')
+        c.drawString(margin + 12, sched_top - 14, 'Proximas ordens de servico preventivas')
 
-        y = sched_top - 33
-        c.setFillColor(colors.HexColor('#1e293b'))
-        c.setFont('Helvetica-Bold', 8)
-        c.drawString(margin + 10, y, 'OS')
-        c.drawString(margin + 58, y, 'Data prevista')
-        c.drawString(margin + 128, y, 'Dias')
-        c.drawString(margin + 166, y, 'Periodo')
-        c.drawString(margin + 214, y, 'Plano/Tarefa')
-        c.drawString(margin + 505, y, 'Resp.')
-        y -= 8
-        c.setStrokeColor(colors.HexColor('#dbe4ef'))
-        c.line(margin + 8, y, page_w - margin - 8, y)
-        y -= 9
+        hdr_lo = sched_top - 52
+        hdr_hi = sched_top - 23
+        c.setFillColor(colors.HexColor('#ecfdf5'))
+        c.rect(margin + 8, hdr_lo, page_w - 2 * margin - 16, hdr_hi - hdr_lo, stroke=0, fill=1)
+
+        sched_inner_left = margin + 10
+        sched_inner_right = page_w - margin - 10
+        gap_c = 5
+        x_os = sched_inner_left
+        w_os = 38
+        x_dt = x_os + w_os + gap_c
+        w_dt = 54
+        x_dias = x_dt + w_dt + gap_c
+        w_dias = 26
+        x_per = x_dias + w_dias + gap_c
+        w_per = 30
+        x_task = x_per + w_per + gap_c
+        w_resp = 92
+        w_task = max(80.0, sched_inner_right - x_task - gap_c - w_resp)
+        x_resp = x_task + w_task + gap_c
+        fs_sched = 8
+        sched_line = 10
+        def _draw_center_text(x_start, col_w, y_pos, text, font_name='Helvetica', font_size=8):
+            raw = str(text) if text is not None else ''
+            c.setFont(font_name, font_size)
+            tw = stringWidth(raw, font_name, font_size)
+            tx = x_start + max(0, (col_w - tw) / 2.0)
+            c.drawString(tx, y_pos, raw)
+
+        y = sched_top - 38
+        c.setFillColor(colors.HexColor('#14532d'))
+        _draw_center_text(x_os, w_os, y, 'OS', font_name='Helvetica-Bold', font_size=fs_sched)
+        _draw_center_text(x_dt, w_dt, y, 'Data prev.', font_name='Helvetica-Bold', font_size=fs_sched)
+        _draw_center_text(x_dias, w_dias, y, 'Dias', font_name='Helvetica-Bold', font_size=fs_sched)
+        _draw_center_text(x_per, w_per, y, 'Periodo', font_name='Helvetica-Bold', font_size=fs_sched)
+        c.setFont('Helvetica-Bold', fs_sched)
+        c.drawString(x_task, y, 'Plano / tarefa')
+        _draw_center_text(x_resp, w_resp, y, 'Resp.', font_name='Helvetica-Bold', font_size=fs_sched)
+        y -= 10
+        c.setStrokeColor(colors.HexColor('#bbf7d0'))
+        c.setLineWidth(0.8)
+        c.line(sched_inner_left - 2, y, sched_inner_right + 2, y)
+        y -= 12
 
         plano_intervalo_por_chave = {}
         for plano in PlanoPreventiva.objects.filter(cd_maquina=maquina.cd_maquina).only(
@@ -20421,28 +21215,65 @@ def baixar_documentos_maquina_preventiva(request):
                 'dt_prev': dt_prev,
                 'dias': (dt_prev - hoje).days,
                 'intervalo': intervalo,
-                'tarefa': roteiro.descr_tarefamanu or roteiro.descr_seqplamanu or roteiro.descr_planmanut or '-',
+                'tarefa': roteiro.descr_seqplamanu or roteiro.descr_planmanut or roteiro.descr_tarefamanu or '-',
                 'resp': roteiro.nome_funciomanu or '-',
             })
 
         proximas.sort(key=lambda x: (x['dt_prev'], x['os']))
+        row_floor = margin + 52
+        sched_body_floor = sched_top - sched_h + 14
         if not proximas:
             c.setFont('Helvetica', 9)
             c.setFillColor(colors.HexColor('#475569'))
-            c.drawString(margin + 10, y, 'Nenhuma proxima OS preventiva encontrada.')
+            c.drawString(sched_inner_left, y, 'Nenhuma proxima OS preventiva encontrada.')
         else:
-            c.setFont('Helvetica', 8)
-            for item in proximas[:16]:
-                if y < (margin + 8):
+            for row_idx, item in enumerate(proximas):
+                tarefa_txt = str(item['tarefa'] or '-')[:800]
+                resp_txt = str(item['resp'] or '-')[:400]
+                lines_task = simpleSplit(tarefa_txt, 'Helvetica', fs_sched, w_task)[:4]
+                lines_resp = simpleSplit(resp_txt, 'Helvetica', fs_sched, w_resp)[:3]
+                nl = max(len(lines_task), len(lines_resp), 1)
+                row_h = nl * sched_line + 6
+                if y - row_h < max(row_floor, sched_body_floor):
                     break
-                c.setFillColor(colors.HexColor('#0f172a'))
-                c.drawString(margin + 10, y, str(item['os'])[:9])
-                c.drawString(margin + 58, y, item['dt_prev'].strftime('%d/%m/%Y'))
-                c.drawString(margin + 128, y, str(item['dias'])[:4])
-                c.drawString(margin + 166, y, str(item['intervalo'])[:4])
-                c.drawString(margin + 214, y, str(item['tarefa'])[:52])
-                c.drawString(margin + 505, y, str(item['resp'])[:13])
-                y -= 11
+                band_bottom = y - row_h + 4
+                band_top = y + 3
+                if row_idx % 2 == 0:
+                    c.setFillColor(colors.HexColor('#f8fafc'))
+                    c.rect(sched_inner_left - 2, band_bottom, sched_inner_right - sched_inner_left + 4, band_top - band_bottom, stroke=0, fill=1)
+                dias_val = item['dias']
+                if dias_val <= 0:
+                    dias_col = colors.HexColor('#b45309')
+                elif dias_val <= 7:
+                    dias_col = colors.HexColor('#a16207')
+                elif dias_val <= 30:
+                    dias_col = colors.HexColor('#1e40af')
+                else:
+                    dias_col = colors.HexColor('#0f172a')
+                txt_col = colors.HexColor('#0f172a')
+                c.setFillColor(txt_col)
+                _draw_center_text(x_os, w_os, y, str(item['os'])[:11], font_name='Helvetica', font_size=fs_sched)
+                _draw_center_text(x_dt, w_dt, y, item['dt_prev'].strftime('%d/%m/%Y'), font_name='Helvetica', font_size=fs_sched)
+                c.setFillColor(dias_col)
+                _draw_center_text(x_dias, w_dias, y, str(dias_val)[:5], font_name='Helvetica-Bold', font_size=fs_sched)
+                c.setFont('Helvetica', fs_sched)
+                c.setFillColor(txt_col)
+                _draw_center_text(x_per, w_per, y, str(item['intervalo'])[:6], font_name='Helvetica', font_size=fs_sched)
+                for li, seg in enumerate(lines_task):
+                    c.drawString(x_task, y - li * sched_line, seg)
+                for li, seg in enumerate(lines_resp):
+                    _draw_center_text(x_resp, w_resp, y - li * sched_line, seg, font_name='Helvetica', font_size=fs_sched)
+                y -= row_h
+
+        c.setStrokeColor(colors.HexColor('#e2e8f0'))
+        c.setLineWidth(0.6)
+        fy = margin + 28
+        c.line(margin, fy + 10, page_w - margin, fy + 10)
+        c.setFillColor(colors.HexColor('#64748b'))
+        c.setFont('Helvetica', 7)
+        mq = _safe(maquina.cd_maquina)
+        c.drawString(margin + 8, fy, f'Maquina {mq} | Documentacao preventivas')
+        c.drawRightString(page_w - margin - 8, fy, 'Sistema interno')
 
         c.save()
         page_buffer.seek(0)
@@ -20635,8 +21466,220 @@ def baixar_documentos_maquina_preventiva(request):
             pages_added += 1
         return pages_added
 
+    def _build_pdf_item_aurora_estoque_maquina():
+        rows_ia, resumo_ia = montar_analise_item_aurora_estoque_maquina(maquina)
+
+        def _fmt_dec(val):
+            if val is None:
+                return '-'
+            try:
+                if isinstance(val, DecimalBr):
+                    s = format(val.normalize(), 'f').rstrip('0').rstrip('.')
+                else:
+                    s = str(val).strip()
+                if '.' in s:
+                    ent, frac = s.split('.', 1)
+                    return f'{ent},{frac}' if frac else ent
+                return s or '-'
+            except Exception:
+                return '-'
+
+        def _situacao_html(situacao):
+            s_raw = str(situacao)
+            situacao_esc = escape(s_raw)
+            sl = s_raw.lower()
+            if 'dispon' in sl:
+                hex_color = '#15803d'
+            elif 'insuficiente' in sl:
+                hex_color = '#b91c1c'
+            elif 'sem estoque erp' in sl:
+                hex_color = '#b45309'
+            elif 'alfanum' in sl:
+                hex_color = '#475569'
+            elif 'sem qt' in sl:
+                hex_color = '#6d28d9'
+            else:
+                hex_color = '#334155'
+            return f'<font color="{hex_color}"><b>{situacao_esc}</b></font>'
+
+        buf = io.BytesIO()
+        doc_pdf = SimpleDocTemplate(
+            buf,
+            pagesize=A4,
+            leftMargin=26,
+            rightMargin=26,
+            topMargin=52,
+            bottomMargin=44,
+        )
+        styles = getSampleStyleSheet()
+        cell_style = ParagraphStyle(
+            name='CellIA',
+            parent=styles['Normal'],
+            fontSize=7,
+            leading=9,
+            alignment=TA_LEFT,
+        )
+        intro_style = ParagraphStyle(
+            name='IAIntro',
+            parent=styles['Normal'],
+            fontSize=9,
+            textColor=colors.HexColor('#475569'),
+            leading=12,
+            spaceAfter=4,
+        )
+
+        def _ia_page(canv, doc):
+            canv.saveState()
+            w, h = A4
+            canv.setFillColor(colors.HexColor('#0b5ed7'))
+            canv.rect(0, h - 40, w, 40, stroke=0, fill=1)
+            canv.setFillColor(colors.HexColor('#f97316'))
+            canv.rect(0, h - 43, w, 3, stroke=0, fill=1)
+            canv.setFillColor(colors.white)
+            canv.setFont('Helvetica-Bold', 11)
+            canv.drawString(26, h - 26, 'Item Aurora e Estoque Almoxarifado')
+            canv.setFont('Helvetica', 8)
+            canv.drawRightString(w - 26, h - 26, str(maquina.cd_maquina or '').strip()[:38])
+            canv.setStrokeColor(colors.HexColor('#e2e8f0'))
+            canv.line(26, 34, w - 26, 34)
+            canv.setFillColor(colors.HexColor('#64748b'))
+            canv.setFont('Helvetica', 7)
+            canv.drawString(26, 20, 'LISTA COMPLETA vs ERP')
+            canv.drawRightString(w - 26, 20, f'Pagina {doc.page}')
+            canv.restoreState()
+
+        story = []
+        story.append(
+            Paragraph(
+                '<font color="#1e3a8a"><b>Relatorio de pecas (LISTA COMPLETA)</b></font>',
+                styles['Normal'],
+            )
+        )
+        story.append(Spacer(1, 6))
+        story.append(
+            Paragraph(
+                escape(
+                    f"Maquina {maquina.cd_maquina} — {maquina.descr_maquina or 'Sem descricao'}. "
+                    'Fluxo: PMCM → catalogo → Item Aurora. '
+                    'ERP: EstoqueAlmoxarifado quando o codigo Aurora e numerico e coincide com codigo_item.'
+                ),
+                intro_style,
+            )
+        )
+        story.append(Spacer(1, 10))
+        if resumo_ia:
+            ktw = doc_pdf.width
+            kh = ktw / 7.0
+            kpi_headers = ['Total', 'Com ERP', 'Disponivel', 'Insufic.', 'Sem ERP', 'Alfanum.', 'Sem qt.']
+            kpi_vals = [
+                str(resumo_ia['total_itens_distintos']),
+                str(resumo_ia['com_linha_erp']),
+                str(resumo_ia['disponivel_ok']),
+                str(resumo_ia['insuficiente']),
+                str(resumo_ia['sem_linha_erp']),
+                str(resumo_ia['codigo_alfanumerico']),
+                str(resumo_ia['sem_qtd_manual']),
+            ]
+            kt = Table([kpi_headers, kpi_vals], colWidths=[kh] * 7)
+            kt.setStyle(
+                TableStyle(
+                    [
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e8eef9')),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#1e3a8a')),
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, 0), 7),
+                        ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#f8fafc')),
+                        ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 1), (-1, 1), 9),
+                        ('TEXTCOLOR', (2, 1), (2, 1), colors.HexColor('#15803d')),
+                        ('TEXTCOLOR', (3, 1), (3, 1), colors.HexColor('#b91c1c')),
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#cbd5e1')),
+                        ('TOPPADDING', (0, 0), (-1, -1), 7),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+                    ]
+                )
+            )
+            story.append(kt)
+            story.append(Spacer(1, 14))
+
+        if not rows_ia:
+            story.append(
+                Paragraph(
+                    escape(
+                        'Nenhum Item Aurora vinculado a esta maquina na LISTA COMPLETA '
+                        '(importe a planilha ou associe coluna G ao catalogo).'
+                    ),
+                    styles['Italic'],
+                )
+            )
+            doc_pdf.build(story, onFirstPage=_ia_page, onLaterPages=_ia_page)
+            buf.seek(0)
+            return buf
+
+        thead = ['Cod. Aurora', 'Descricao', 'Qt.manual', 'Qtd ERP', 'Situacao']
+        data = [thead]
+
+        for rw in rows_ia:
+            raw_desc = (rw.get('descricao') or '')[:240]
+            desc_esc = escape(raw_desc)
+            refs = rw.get('catalog_refs') or []
+            if refs:
+                bits = []
+                for r in refs[:2]:
+                    bits.append(
+                        escape(
+                            f"{(r.get('fabricante') or '')[:22]} {(r.get('codigo_fabricante') or '')[:18]}".strip()
+                        )
+                    )
+                ref_line = ' · '.join(bits)
+                desc_html = f'{desc_esc}<br/><font size="6" color="#475569">{ref_line}</font>'
+            else:
+                desc_html = desc_esc
+
+            data.append(
+                [
+                    Paragraph(escape(str(rw['codigo_aurora']))[:26], cell_style),
+                    Paragraph(desc_html, cell_style),
+                    Paragraph(escape(_fmt_dec(rw['qty_manual'])), cell_style),
+                    Paragraph(escape(_fmt_dec(rw['erp_qty'])), cell_style),
+                    Paragraph(_situacao_html(rw['situacao']), cell_style),
+                ]
+            )
+
+        tw = doc_pdf.width
+        col_ws = [tw * 0.13, tw * 0.41, tw * 0.12, tw * 0.12, tw * 0.22]
+        tbl = Table(data, colWidths=col_ws, repeatRows=1)
+        tbl.setStyle(
+            TableStyle(
+                [
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 8),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f1f5f9')]),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('LINEABOVE', (0, 0), (-1, 0), 1.2, colors.HexColor('#f97316')),
+                    ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#cbd5e1')),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 5),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+                    ('TOPPADDING', (0, 0), (-1, -1), 5),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+                ]
+            )
+        )
+        story.append(tbl)
+        doc_pdf.build(story, onFirstPage=_ia_page, onLaterPages=_ia_page)
+        buf.seek(0)
+        return buf
+
     header_reader = PdfReader(_build_header_page())
     for page in header_reader.pages:
+        pdf_writer.add_page(page)
+
+    ia_reader = PdfReader(_build_pdf_item_aurora_estoque_maquina())
+    for page in ia_reader.pages:
         pdf_writer.add_page(page)
 
     for doc in docs_qs:
@@ -20700,7 +21743,7 @@ def baixar_documentos_maquina_preventiva(request):
     if imagens_para_grade:
         _append_grade_imagens(imagens_para_grade)
 
-    if arquivos_processados == 0 or not pdf_writer.pages:
+    if not pdf_writer.pages:
         messages.error(request, 'Não foi possível gerar o PDF da máquina selecionada.')
         return redirect(redirect_url)
 
@@ -21247,6 +22290,18 @@ def gerenciar_projeto(request):
         'dias_mes': dias_mes,
         'ano_atual': ano_atual,
         'setores_projecao_gasto': setores_projecao_gasto,
+        'limpar_contagens_aux': {
+            'item_aurora': next((t['count'] for t in tabelas_info if t['key'] == 'item_aurora'), 0),
+            'estoque_almoxarifado': next(
+                (t['count'] for t in tabelas_info if t['key'] == 'estoque_almoxarifado'), 0
+            ),
+            'peca_maquina_citado_manual': next(
+                (t['count'] for t in tabelas_info if t['key'] == 'peca_maquina_citado_manual'), 0
+            ),
+            'peca_manual_catalogo': next(
+                (t['count'] for t in tabelas_info if t['key'] == 'peca_manual_catalogo'), 0
+            ),
+        },
     }
     return render(request, 'administrador/gerenciar_projeto.html', context)
 
@@ -21455,6 +22510,27 @@ def limpar_tabela(request):
                     messages.info(request, 'Não há registros para os meses selecionados em Notas Fiscais.')
             except (ValueError, TypeError) as e:
                 messages.error(request, f'Ano ou mês(es) inválidos: {str(e)}')
+        return redirect('gerenciar_projeto')
+    
+    # PecaManualCatalogo: filhas PecaMaquinaCitadoManual bloqueiam delete (PROTECT). Remove citações primeiro.
+    if tabela == 'peca_manual_catalogo':
+        from django.db import transaction
+        try:
+            with transaction.atomic():
+                n_pmcm = PecaMaquinaCitadoManual.objects.count()
+                PecaMaquinaCitadoManual.objects.all().delete()
+                n_cat = PecaManualCatalogo.objects.count()
+                PecaManualCatalogo.objects.all().delete()
+            if n_pmcm or n_cat:
+                messages.success(
+                    request,
+                    f'Lista manual no catálogo: removidos {n_pmcm} registro(s) em PecaMaquinaCitadoManual '
+                    f'e {n_cat} em PecaManualCatalogo.',
+                )
+            else:
+                messages.info(request, 'Não há registros em PecaManualCatalogo nem em PecaMaquinaCitadoManual.')
+        except Exception as e:
+            messages.error(request, f'Erro ao limpar catálogo manual / peças citadas: {str(e)}')
         return redirect('gerenciar_projeto')
     
     try:

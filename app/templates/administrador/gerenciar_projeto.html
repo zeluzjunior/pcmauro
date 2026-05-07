@@ -1,10 +1,29 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load form_extras %}
 
 {% block title %}Gerenciar Projeto - Administração{% endblock %}
 
 {% block extra_css %}
 <style>
+    /* Mesmo padrão visual de ordens-de-servico/analise (analise_geral_ordens_servico.html) */
+    .stat-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .kpi-secondary { border-left-color: #6c757d; }
+    .kpi-dark { border-left-color: #212529; }
+
     .danger-zone {
         border: 2px solid #dc3545;
         border-radius: 8px;
@@ -14,18 +33,12 @@
     .table-stats {
         font-size: 0.9rem;
     }
-    .action-card {
-        transition: transform 0.2s;
-    }
-    .action-card:hover {
-        transform: translateY(-5px);
-    }
 </style>
 {% endblock %}
 
 {% block content %}
 <!-- Page Header -->
-<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 153, 0, 0.171)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
     <div class="container">
         <div class="row">
             <div class="col-12">
@@ -48,71 +61,138 @@
 <!-- Main Content -->
 <section class="py-5">
     <div class="container">
-        <!-- Statistics Cards -->
-        <div class="row mb-4">
-            <div class="col-md-2">
-                <div class="card bg-dark text-white action-card">
+        <!-- KPI Cards (padrão analise_ordens_de_servico) -->
+        <div class="row mb-2">
+            <div class="col-xl-2 col-lg-4 col-md-6 mb-3">
+                <div class="card stat-card kpi-card kpi-dark shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">
-                            <i class="fas fa-database me-2"></i>Total de Tabelas
-                        </h5>
-                        <p class="card-text display-6">{{ tabelas_info|length }}</p>
-                        <small>Tabelas gerenciadas</small>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total de Tabelas</h6>
+                                <h2 class="mb-0 fw-bold">{{ tabelas_info|length|number_br:0 }}</h2>
+                                <small class="text-muted">Tabelas gerenciadas</small>
+                            </div>
+                            <i class="fas fa-database fa-3x text-dark opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-2">
-                <div class="card bg-secondary text-white action-card">
+            <div class="col-xl-2 col-lg-4 col-md-6 mb-3">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">
-                            <i class="fas fa-list me-2"></i>Total de Registros
-                        </h5>
-                        <p class="card-text display-6">{{ total_geral }}</p>
-                        <small>Registros no sistema</small>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total de Registros</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_geral|number_br:0 }}</h2>
+                                <small class="text-muted">No sistema (todas as tabelas)</small>
+                            </div>
+                            <i class="fas fa-list fa-3x text-primary opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-2">
-                <div class="card bg-primary text-white action-card">
+            <div class="col-xl-2 col-lg-4 col-md-6 mb-3">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">
-                            <i class="fas fa-industry me-2"></i>Máquinas
-                        </h5>
-                        <p class="card-text display-6">{{ maquinas_count }}</p>
-                        <small>Registros cadastrados</small>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Máquinas</h6>
+                                <h2 class="mb-0 fw-bold">{{ maquinas_count|number_br:0 }}</h2>
+                                <small class="text-muted">Cadastradas</small>
+                            </div>
+                            <i class="fas fa-industry fa-3x text-success opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-2">
-                <div class="card bg-info text-white action-card">
+            <div class="col-xl-2 col-lg-4 col-md-6 mb-3">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">
-                            <i class="fas fa-wrench me-2"></i>Ordens Corretivas
-                        </h5>
-                        <p class="card-text display-6">{{ ordens_count }}</p>
-                        <small>Registros cadastrados</small>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Ordens Corretivas</h6>
+                                <h2 class="mb-0 fw-bold">{{ ordens_count|number_br:0 }}</h2>
+                                <small class="text-muted">Registros</small>
+                            </div>
+                            <i class="fas fa-wrench fa-3x text-info opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-2">
-                <div class="card bg-success text-white action-card">
+            <div class="col-xl-2 col-lg-4 col-md-6 mb-3">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">
-                            <i class="fas fa-building me-2"></i>Centros de Atividade
-                        </h5>
-                        <p class="card-text display-6">{{ centros_count }}</p>
-                        <small>Registros cadastrados</small>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Centros de Atividade</h6>
+                                <h2 class="mb-0 fw-bold">{{ centros_count|number_br:0 }}</h2>
+                                <small class="text-muted">Registros</small>
+                            </div>
+                            <i class="fas fa-building fa-3x text-warning opacity-25"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-2">
-                <div class="card bg-warning text-white action-card">
+            <div class="col-xl-2 col-lg-4 col-md-6 mb-3">
+                <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <h5 class="card-title">
-                            <i class="fas fa-user-tie me-2"></i>Manutentores
-                        </h5>
-                        <p class="card-text display-6">{{ manutentores_count }}</p>
-                        <small>Registros cadastrados</small>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Manutentores</h6>
+                                <h2 class="mb-0 fw-bold">{{ manutentores_count|number_br:0 }}</h2>
+                                <small class="text-muted">Registros</small>
+                            </div>
+                            <i class="fas fa-user-tie fa-3x text-danger opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Atalhos: LISTA COMPLETA / estoque ERP -->
+        <div class="card shadow-sm border-secondary mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-layer-group me-2"></i>Limpar dados — Item Aurora, Estoque ERP e manual de peças
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    Mesmas ações da tabela abaixo. Ao limpar <strong>PecaManualCatalogo</strong>, o sistema remove antes todas as
+                    <strong>PecaMaquinaCitadoManual</strong> (citações por máquina). Para só apagar vínculos máquina–peça, use o primeiro botão.
+                </p>
+                <div class="row g-2">
+                    <div class="col-md-6 col-xl-3">
+                        <button type="button" class="btn btn-outline-danger w-100"
+                                onclick="confirmarLimpeza('peca_maquina_citado_manual', '{{ limpar_contagens_aux.peca_maquina_citado_manual|number_br:0 }}', 'PecaMaquinaCitadoManual')"
+                                {% if limpar_contagens_aux.peca_maquina_citado_manual == 0 %}disabled title="Tabela vazia"{% endif %}>
+                            <i class="fas fa-book me-1"></i>PecaMaquinaCitadoManual<br>
+                            <small>({{ limpar_contagens_aux.peca_maquina_citado_manual|number_br:0 }} reg.)</small>
+                        </button>
+                    </div>
+                    <div class="col-md-6 col-xl-3">
+                        <button type="button" class="btn btn-outline-danger w-100"
+                                onclick="confirmarLimpeza('peca_manual_catalogo', '{{ limpar_contagens_aux.peca_manual_catalogo|number_br:0 }}', 'PecaManualCatalogo')"
+                                {% if limpar_contagens_aux.peca_manual_catalogo == 0 and limpar_contagens_aux.peca_maquina_citado_manual == 0 %}disabled title="Catálogo e citações vazios"{% endif %}>
+                            <i class="fas fa-bookmark me-1"></i>PecaManualCatalogo<br>
+                            <small>({{ limpar_contagens_aux.peca_manual_catalogo|number_br:0 }} cat. + remove citações)</small>
+                        </button>
+                    </div>
+                    <div class="col-md-6 col-xl-3">
+                        <button type="button" class="btn btn-outline-danger w-100"
+                                onclick="confirmarLimpeza('item_aurora', '{{ limpar_contagens_aux.item_aurora|number_br:0 }}', 'Itens Aurora')"
+                                {% if limpar_contagens_aux.item_aurora == 0 %}disabled title="Tabela vazia"{% endif %}>
+                            <i class="fas fa-barcode me-1"></i>ItemAurora<br>
+                            <small>({{ limpar_contagens_aux.item_aurora|number_br:0 }} reg.)</small>
+                        </button>
+                    </div>
+                    <div class="col-md-6 col-xl-3">
+                        <button type="button" class="btn btn-outline-danger w-100"
+                                onclick="confirmarLimpeza('estoque_almoxarifado', '{{ limpar_contagens_aux.estoque_almoxarifado|number_br:0 }}', 'Estoque Almoxarifado')"
+                                {% if limpar_contagens_aux.estoque_almoxarifado == 0 %}disabled title="Tabela vazia"{% endif %}>
+                            <i class="fas fa-warehouse me-1"></i>EstoqueAlmoxarifado<br>
+                            <small>({{ limpar_contagens_aux.estoque_almoxarifado|number_br:0 }} reg.)</small>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -122,7 +202,7 @@
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
-                    <i class="fas fa-database me-2"></i>Visão Geral das Tabelas ({{ tabelas_info|length }} tabelas)
+                    <i class="fas fa-database me-2"></i>Visão Geral das Tabelas ({{ tabelas_info|length|number_br:0 }} tabelas)
                 </h5>
                 <div class="input-group" style="max-width: 300px;">
                     <span class="input-group-text bg-white">
@@ -153,7 +233,7 @@
                                 <td>{{ tabela.descricao|default:"Tabela do sistema" }}</td>
                                 <td class="text-center">
                                     <span class="badge bg-{{ tabela.cor }} {% if tabela.cor == 'warning' %}text-dark{% endif %} fs-6">
-                                        {{ tabela.count|floatformat:0 }}
+                                        {{ tabela.count|number_br:0 }}
                                     </span>
                                 </td>
                                 <td class="text-center">
@@ -162,7 +242,7 @@
                                         <button type="button" class="btn btn-sm btn-outline-danger" onclick="abrirModalExcluirProjecaoPorSetor()" {% if tabela.count == 0 %}disabled title="Tabela vazia"{% endif %}>
                                             <i class="fas fa-filter me-1"></i>Excluir por setor
                                         </button>
-                                        <button type="button" class="btn btn-sm btn-danger" onclick="confirmarLimpeza('{{ tabela.key }}', '{{ tabela.count }}', '{{ tabela.nome }}')" {% if tabela.count == 0 %}disabled title="Tabela vazia"{% endif %}>
+                                        <button type="button" class="btn btn-sm btn-danger" onclick="confirmarLimpeza('{{ tabela.key }}', '{{ tabela.count|number_br:0 }}', '{{ tabela.nome }}')" {% if tabela.count == 0 %}disabled title="Tabela vazia"{% endif %}>
                                             <i class="fas fa-trash me-1"></i>Limpar tudo
                                         </button>
                                     </div>
@@ -171,7 +251,7 @@
                                         <i class="fas fa-calendar-alt me-1"></i>Limpar por mês
                                     </button>
                                     {% else %}
-                                    <button type="button" class="btn btn-sm btn-danger" onclick="confirmarLimpeza('{{ tabela.key }}', '{{ tabela.count }}', '{{ tabela.nome }}')" {% if tabela.count == 0 %}disabled title="Tabela vazia"{% endif %}>
+                                    <button type="button" class="btn btn-sm btn-danger" onclick="confirmarLimpeza('{{ tabela.key }}', '{{ tabela.count|number_br:0 }}', '{{ tabela.nome }}')" {% if tabela.count == 0 %}disabled title="Tabela vazia"{% endif %}>
                                         <i class="fas fa-trash me-1"></i>Limpar
                                     </button>
                                     {% endif %}
@@ -436,7 +516,7 @@
                                 <input type="checkbox" name="setores" value="{% if not item.setor_value %}__EMPTY__{% else %}{{ item.setor_value|escape }}{% endif %}" class="form-check-input me-2">
                                 {{ item.setor_display }}
                             </span>
-                            <span class="badge bg-secondary rounded-pill">{{ item.count }}</span>
+                            <span class="badge bg-secondary rounded-pill">{{ item.count|number_br:0 }}</span>
                         </label>
                         {% endfor %}
                     </div>
@@ -607,7 +687,11 @@
         const modalMessage = document.getElementById('modalMessage');
         const confirmButton = document.getElementById('confirmButton');
         
-        modalMessage.innerHTML = `Você está prestes a limpar a tabela <strong>${tabelaNome}</strong>.<br><br>Total de registros que serão removidos: <strong>${count}</strong>`;
+        let extra = '';
+        if (tabela === 'peca_manual_catalogo') {
+            extra = '<br><br><strong>Inclui:</strong> serão removidos primeiro <em>todos</em> os registros de <strong>PecaMaquinaCitadoManual</strong> (citações por máquina), depois o catálogo fabricante + cód. fabricante.';
+        }
+        modalMessage.innerHTML = `Você está prestes a limpar a tabela <strong>${tabelaNome}</strong>.<br><br>Total de registros listados nesta linha (referência): <strong>${count}</strong>${extra}`;
         
         confirmButton.onclick = function() {
             document.getElementById('tabelaInput').value = tabela;
@@ -622,10 +706,10 @@
         const modalMessage = document.getElementById('modalMessage');
         const confirmButton = document.getElementById('confirmButton');
         
-        const total = {{ total_geral }};
+        const total = "{{ total_geral|number_br:0 }}";
         const tabelasList = [
             {% for tabela in tabelas_info %}
-            '{{ tabela.nome }} ({{ tabela.count }})'{% if not forloop.last %},{% endif %}
+            '{{ tabela.nome }} ({{ tabela.count|number_br:0 }})'{% if not forloop.last %},{% endif %}
             {% endfor %}
         ];
         const tabelasHtml = tabelasList.map(t => `- ${t}`).join('<br>');

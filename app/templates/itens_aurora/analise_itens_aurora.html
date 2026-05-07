@@ -1,0 +1,746 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+{% load l10n %}
+
+{% block title %}Análise Itens Aurora{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 30px;
+    }
+    .chart-container-large {
+        position: relative;
+        height: 400px;
+        margin-bottom: 30px;
+    }
+    .stat-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .section-header {
+        border-bottom: 3px solid;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .pmcm-intro-list {
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 0.75rem 1rem 0.75rem 1.75rem;
+        margin-bottom: 0;
+    }
+    .chart-wrap-pmcm-setor {
+        position: relative;
+        width: 100%;
+        min-height: 280px;
+    }
+    .pmcm-setor-strip {
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 0.875rem;
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    }
+    .pmcm-setor-strip:last-child {
+        margin-bottom: 0;
+    }
+    .pmcm-bar-track {
+        height: 30px;
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        background: #f1f5f9;
+    }
+    .pmcm-bar-seg-success {
+        background: linear-gradient(180deg, #20c997 0%, #198754 100%);
+        min-width: 0;
+        transition: width 0.2s ease;
+    }
+    .pmcm-bar-seg-muted {
+        background: linear-gradient(180deg, #dee2e6 0%, #adb5bd 100%);
+        min-width: 0;
+        transition: width 0.2s ease;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Itens Aurora</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise Itens Aurora</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-chart-bar me-2"></i>Análise Itens Aurora
+                </h1>
+                <p class="lead mb-0">Indicadores do cadastro Item Aurora e vínculos com LISTA COMPLETA, estoque ERP e peças de máquinas</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion filter-accordion" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button {% if not filtros_analise_abertos %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="{% if filtros_analise_abertos %}true{% else %}false{% endif %}" aria-controls="filtrosCollapse">
+                                <i class="fas fa-filter me-2"></i>
+                                <strong>Filtros</strong>
+                                <span class="badge bg-info ms-2">
+                                    {% if meses_filtro|length == 12 %}
+                                        Todo o ano {{ ano_filtro }}
+                                    {% elif meses_filtro|length == 1 %}
+                                        {{ meses_nomes|get_item:meses_filtro.0 }} de {{ ano_filtro }}
+                                    {% else %}
+                                        {{ meses_filtro|length }} meses de {{ ano_filtro }}
+                                    {% endif %}
+                                </span>
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse {% if filtros_analise_abertos %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
+                            <div class="accordion-body">
+                                <form method="get" action="{% url 'analise_itens_aurora' %}" class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="ano" class="form-label">Ano (data de criação do item)</label>
+                                        <select class="form-select" id="ano" name="ano" required>
+                                            {% for ano in anos_disponiveis %}
+                                                <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Meses (criação em <code>created_at</code>)</label>
+                                        <div class="row g-2">
+                                            {% for i in "123456789012" %}
+                                                {% with mes_num=forloop.counter %}
+                                                    <div class="col-md-3 col-sm-4 col-6">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="mes" value="{{ mes_num }}" id="mes{{ mes_num }}" {% if mes_num in meses_filtro %}checked{% endif %}>
+                                                            <label class="form-check-label" for="mes{{ mes_num }}">{{ meses_nomes|get_item:mes_num }}</label>
+                                                        </div>
+                                                    </div>
+                                                {% endwith %}
+                                            {% endfor %}
+                                        </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selecionarTodosMeses()">Selecionar Todos</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodosMeses()">Desmarcar Todos</button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="fas fa-search me-2"></i>Filtrar
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-light border shadow-sm mb-4" role="alert">
+            <small class="text-muted">
+                <i class="fas fa-info-circle me-1"></i>
+                Os números principais consideram apenas <strong>ItemAurora</strong> criados no período acima.
+                Integrações com <strong>PecaManualCatalogo</strong>, <strong>PecaMaquinaCitadoManual</strong>, <strong>EstoqueAlmoxarifado</strong>, <strong>ItemEstoque</strong> e <strong>MaquinaPeca</strong> são calculadas em cima desse conjunto de itens.
+                Match de estoque: código Aurora <strong>numérico</strong> igual a <code>codigo_item</code> (BigInteger).
+            </small>
+        </div>
+
+        <div class="row mb-2">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Itens no período</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_itens|number_br:0 }}</h2>
+                                <small class="text-muted">Registros ItemAurora criados</small>
+                            </div>
+                            <i class="fas fa-barcode fa-3x text-primary opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Ativos / Inativos</h6>
+                                <h2 class="mb-0 fw-bold">{{ taxa_ativos|floatformat:1 }}%</h2>
+                                <small class="text-muted">{{ ativos|number_br:0 }} ativos · {{ inativos|number_br:0 }} inativos</small>
+                            </div>
+                            <i class="fas fa-toggle-on fa-3x text-success opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Com valor unitário</h6>
+                                <h2 class="mb-0 fw-bold">{{ com_valor_unitario|number_br:0 }}</h2>
+                                <small class="text-muted">{{ sem_valor_unitario|number_br:0 }} sem valor</small>
+                            </div>
+                            <i class="fas fa-dollar-sign fa-3x text-info opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Com LISTA COMPLETA</h6>
+                                <h2 class="mb-0 fw-bold">{{ taxa_catalogo|floatformat:1 }}%</h2>
+                                <small class="text-muted">{{ itens_com_catalogo|number_br:0 }} com catálogo · {{ itens_sem_catalogo|number_br:0 }} sem</small>
+                            </div>
+                            <i class="fas fa-book fa-3x text-warning opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-5">
+            <div class="col-md-4 mb-3">
+                <div class="card stat-card shadow-sm border-0 h-100 border-start border-primary border-4">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Linhas em PecaManualCatalogo</h6>
+                        <h3 class="mb-0 fw-bold text-primary">{{ linhas_catalogo|number_br:0 }}</h3>
+                        <small class="text-muted">Peças de fabricante ligadas a estes itens</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card stat-card shadow-sm border-0 h-100 border-start border-secondary border-4">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Citações PMCM (manual × máquina)</h6>
+                        <h3 class="mb-0 fw-bold">{{ citacoes_pmcm|number_br:0 }}</h3>
+                        <small class="text-muted">{{ maquinas_no_manual|number_br:0 }} máquinas distintas na LISTA COMPLETA</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card stat-card shadow-sm border-0 h-100 border-start border-success border-4">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Códigos numéricos no período</h6>
+                        <h3 class="mb-0 fw-bold text-success">{{ codigos_numericos_count|number_br:0 }}</h3>
+                        <small class="text-muted">Elegíveis a cruzar com ERP / ItemEstoque</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card stat-card shadow-sm border-0 h-100 border-start border-info border-4">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Match EstoqueAlmoxarifado</h6>
+                        <h3 class="mb-0 fw-bold text-info">{{ itens_match_almox|number_br:0 }}</h3>
+                        <small class="text-muted">Itens com código em posição ERP</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card stat-card shadow-sm border-0 h-100 border-start border-warning border-4">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Match ItemEstoque</h6>
+                        <h3 class="mb-0 fw-bold text-warning">{{ itens_match_item_estoque|number_br:0 }}</h3>
+                        <small class="text-muted">{{ maquina_peca_vinculos|number_br:0 }} vínculos MaquinaPeca · {{ maquinas_com_peca_estoque|number_br:0 }} máquinas</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card stat-card shadow-sm border-0 h-100 border-start border-danger border-4">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Ações</h6>
+                        <a href="{% url 'consultar_itens_aurora' %}" class="btn btn-outline-primary btn-sm w-100 mb-2"><i class="fas fa-table me-1"></i>Consultar tabela</a>
+                        <a href="{% url 'importar_pecas_maquina' %}" class="btn btn-outline-secondary btn-sm w-100"><i class="fas fa-upload me-1"></i>Importar LISTA COMPLETA</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-5">
+            <div class="col-12">
+                <h4 class="section-header border-secondary">
+                    <i class="fas fa-industry me-2"></i>Cobertura da LISTA COMPLETA — Frigorífico e Indústria
+                </h4>
+                <ul class="pmcm-intro-list small text-muted mb-4">
+                    <li class="mb-1"><strong>Frigorífico</strong> e <strong>Indústria</strong> seguem <strong>CentroAtividade</strong>: <code>Maquina.cd_setormanut</code> = sigla do centro; <code>local</code> contém “FRIGOR” ou “INDÚSTRIA” / “INDUSTRIA”.</li>
+                    <li class="mb-1"><strong>Máquinas ativas</strong> agrupadas por setor <em>só dentro de cada painel</em> (menos barras por gráfico).</li>
+                    <li class="mb-1"><span class="badge bg-success">Verde</span> — ao menos uma linha em <strong>PecaMaquinaCitadoManual</strong> (LISTA COMPLETA).</li>
+                    <li class="mb-0"><span class="badge bg-secondary">Cinza</span> — sem LISTA COMPLETA para aquela máquina.</li>
+                </ul>
+                <p class="text-muted small mb-4">
+                    Indicador independente do filtro de ano/mês dos itens Aurora no topo da página.
+                </p>
+                {% if maquinas_pmcm_total_ativas %}
+                {% if maquinas_pmcm_sem_classificacao_count %}
+                <div class="alert alert-warning border-0 shadow-sm mb-4" role="alert">
+                    <strong>{{ maquinas_pmcm_sem_classificacao_count|number_br:0 }}</strong> máquina{{ maquinas_pmcm_sem_classificacao_count|pluralize }}
+                    ativa{{ maquinas_pmcm_sem_classificacao_count|pluralize }} não entram nestes gráficos (setor sem centro em Frigorífico/Indústria em <strong>CentroAtividade</strong> ou sem <code>cd_setormanut</code>).
+                </div>
+                {% endif %}
+
+                {% if maquinas_pmcm_por_setor_frigorifico %}
+                <div class="card shadow-sm border-0 mb-2 border-start border-primary border-4">
+                    <div class="card-header bg-primary text-white py-3">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                            <div>
+                                <h5 class="mb-1"><i class="fas fa-snowflake me-2"></i>Frigorífico — máquinas por setor</h5>
+                                <span class="small opacity-90">Barras empilhadas = quantidade de máquinas ativas (não é percentual).</span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                                <span class="badge bg-light text-dark px-3 py-2">Com LISTA COMPLETA</span>
+                                <span class="badge bg-secondary px-3 py-2">Sem LISTA COMPLETA</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body pt-3 pb-2">
+                        <p class="small text-muted mb-2">Somente setores cujo <code>cd_setormanut</code> está ligado a centro classificado como Frigorífico.</p>
+                        <div class="chart-wrap-pmcm-setor" style="height: {{ maquinas_pmcm_chart_min_height_px_frigorifico }}px;">
+                            <canvas id="chartMaquinasPmcmSetorFrig"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <h5 class="fw-semibold mt-4 mb-3"><i class="fas fa-list-ul me-2 text-primary"></i>Detalhe por setor — Frigorífico</h5>
+                {% localize off %}
+                {% for row in maquinas_pmcm_por_setor_frigorifico %}
+                <div class="pmcm-setor-strip">
+                    <div class="row align-items-start g-2 mb-2">
+                        <div class="col-md-8">
+                            <div class="fw-semibold text-dark">{{ row.cd_setormanut }}</div>
+                            {% if row.descr_setormanut %}
+                            <div class="text-muted small">{{ row.descr_setormanut }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <span class="small text-muted d-block">Máquinas ativas no setor</span>
+                            <span class="fs-5 fw-bold text-dark">{{ row.total|number_br:0 }}</span>
+                        </div>
+                    </div>
+                    <div class="pmcm-bar-track mb-2" role="img" aria-label="Proporção com e sem LISTA COMPLETA">
+                        <div class="pmcm-bar-seg-success d-flex align-items-center justify-content-center text-white small fw-semibold" style="width: {{ row.pct_com }}%;">
+                            {% if row.pct_com >= 14 %}{{ row.pct_com|floatformat:1 }}%{% endif %}
+                        </div>
+                        <div class="pmcm-bar-seg-muted d-flex align-items-center justify-content-center text-dark small fw-semibold" style="width: {{ row.pct_sem }}%;">
+                            {% if row.pct_sem >= 14 %}{{ row.pct_sem|floatformat:1 }}%{% endif %}
+                        </div>
+                    </div>
+                    <div class="row small g-2">
+                        <div class="col-sm-6">
+                            <span class="text-success fw-semibold">{{ row.com_pmcm|number_br:0 }}</span>
+                            com LISTA COMPLETA
+                            <span class="text-muted">({{ row.pct_com|floatformat:1 }}%)</span>
+                        </div>
+                        <div class="col-sm-6">
+                            <span class="text-secondary fw-semibold">{{ row.sem_pmcm|number_br:0 }}</span>
+                            sem LISTA COMPLETA
+                            <span class="text-muted">({{ row.pct_sem|floatformat:1 }}%)</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endlocalize %}
+                {% else %}
+                <div class="alert alert-light border mb-5 shadow-sm">
+                    <strong>Frigorífico:</strong> nenhuma máquina ativa com <code>cd_setormanut</code> associado a centro cuja coluna <code>local</code> indique Frigorífico em <strong>CentroAtividade</strong>.
+                </div>
+                {% endif %}
+
+                {% if maquinas_pmcm_por_setor_industria %}
+                <div class="card shadow-sm border-0 mb-2 mt-5 border-start border-success border-4">
+                    <div class="card-header bg-success text-white py-3">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                            <div>
+                                <h5 class="mb-1"><i class="fas fa-cogs me-2"></i>Indústria — máquinas por setor</h5>
+                                <span class="small opacity-90">Barras empilhadas = quantidade de máquinas ativas (não é percentual).</span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                                <span class="badge bg-light text-dark px-3 py-2">Com LISTA COMPLETA</span>
+                                <span class="badge bg-dark px-3 py-2">Sem LISTA COMPLETA</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body pt-3 pb-2">
+                        <p class="small text-muted mb-2">Somente setores cujo <code>cd_setormanut</code> está ligado a centro classificado como Indústria.</p>
+                        <div class="chart-wrap-pmcm-setor" style="height: {{ maquinas_pmcm_chart_min_height_px_industria }}px;">
+                            <canvas id="chartMaquinasPmcmSetorInd"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <h5 class="fw-semibold mt-4 mb-3"><i class="fas fa-list-ul me-2 text-success"></i>Detalhe por setor — Indústria</h5>
+                {% localize off %}
+                {% for row in maquinas_pmcm_por_setor_industria %}
+                <div class="pmcm-setor-strip">
+                    <div class="row align-items-start g-2 mb-2">
+                        <div class="col-md-8">
+                            <div class="fw-semibold text-dark">{{ row.cd_setormanut }}</div>
+                            {% if row.descr_setormanut %}
+                            <div class="text-muted small">{{ row.descr_setormanut }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <span class="small text-muted d-block">Máquinas ativas no setor</span>
+                            <span class="fs-5 fw-bold text-dark">{{ row.total|number_br:0 }}</span>
+                        </div>
+                    </div>
+                    <div class="pmcm-bar-track mb-2" role="img" aria-label="Proporção com e sem LISTA COMPLETA">
+                        <div class="pmcm-bar-seg-success d-flex align-items-center justify-content-center text-white small fw-semibold" style="width: {{ row.pct_com }}%;">
+                            {% if row.pct_com >= 14 %}{{ row.pct_com|floatformat:1 }}%{% endif %}
+                        </div>
+                        <div class="pmcm-bar-seg-muted d-flex align-items-center justify-content-center text-dark small fw-semibold" style="width: {{ row.pct_sem }}%;">
+                            {% if row.pct_sem >= 14 %}{{ row.pct_sem|floatformat:1 }}%{% endif %}
+                        </div>
+                    </div>
+                    <div class="row small g-2">
+                        <div class="col-sm-6">
+                            <span class="text-success fw-semibold">{{ row.com_pmcm|number_br:0 }}</span>
+                            com LISTA COMPLETA
+                            <span class="text-muted">({{ row.pct_com|floatformat:1 }}%)</span>
+                        </div>
+                        <div class="col-sm-6">
+                            <span class="text-secondary fw-semibold">{{ row.sem_pmcm|number_br:0 }}</span>
+                            sem LISTA COMPLETA
+                            <span class="text-muted">({{ row.pct_sem|floatformat:1 }}%)</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endlocalize %}
+                {% else %}
+                <div class="alert alert-light border mb-0 shadow-sm">
+                    <strong>Indústria:</strong> nenhuma máquina ativa com <code>cd_setormanut</code> associado a centro cuja coluna <code>local</code> indique Indústria em <strong>CentroAtividade</strong>.
+                </div>
+                {% endif %}
+
+                {% else %}
+                <div class="alert alert-secondary mb-0">
+                    Nenhuma máquina ativa cadastrada para montar este indicador.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row mb-5">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Ativo × Inativo</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="chartAtivo"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Criações por mês (período)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="chartMeses"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-5">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-tags me-2"></i>Status do item (top 10)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="chartStatus"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-link me-2"></i>Volume de integrações</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-large">
+                            <canvas id="chartIntegracao"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+function formatarNumeroBR(numero, decimais) {
+    decimais = decimais === undefined ? 0 : decimais;
+    if (numero === null || numero === undefined || isNaN(numero)) {
+        return '0';
+    }
+    const num = typeof numero === 'string' ? parseFloat(numero) : numero;
+    return num.toLocaleString('pt-BR', {
+        minimumFractionDigits: decimais,
+        maximumFractionDigits: decimais
+    });
+}
+
+function selecionarTodosMeses() {
+    document.querySelectorAll('input[name="mes"]').forEach(function(cb) { cb.checked = true; });
+}
+function desmarcarTodosMeses() {
+    document.querySelectorAll('input[name="mes"]').forEach(function(cb) { cb.checked = false; });
+}
+
+const chartAtivoEl = document.getElementById('chartAtivo');
+if (chartAtivoEl) {
+    new Chart(chartAtivoEl.getContext('2d'), {
+        type: 'pie',
+        data: {
+            labels: {{ chart_ativo_labels|safe }},
+            datasets: [{
+                data: {{ chart_ativo_data|safe }},
+                backgroundColor: ['#198754', '#6c757d']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return (ctx.label || '') + ': ' + formatarNumeroBR(ctx.parsed);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+const chartMesesEl = document.getElementById('chartMeses');
+if (chartMesesEl) {
+    new Chart(chartMesesEl.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: {{ chart_meses_labels|safe }},
+            datasets: [{
+                label: 'Itens criados',
+                data: {{ chart_meses_data|safe }},
+                borderColor: '#198754',
+                backgroundColor: 'rgba(25, 135, 84, 0.15)',
+                fill: true,
+                tension: 0.25
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return 'Itens: ' + formatarNumeroBR(ctx.parsed.y);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { callback: function(v) { return formatarNumeroBR(v); } }
+                }
+            }
+        }
+    });
+}
+
+const chartStatusEl = document.getElementById('chartStatus');
+if (chartStatusEl) {
+    const statusLabels = {{ chart_status_labels|safe }};
+    const statusData = {{ chart_status_data|safe }};
+    new Chart(chartStatusEl.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: statusLabels.length ? statusLabels : ['Sem dados'],
+            datasets: [{
+                label: 'Itens',
+                data: statusData.length ? statusData : [0],
+                backgroundColor: '#0d6efd'
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return 'Itens: ' + formatarNumeroBR(ctx.parsed.x);
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: { callback: function(v) { return formatarNumeroBR(v); } }
+                }
+            }
+        }
+    });
+}
+
+function criarGraficoPmcmPorSetor(canvasId, pmcmLabels, pmcmCom, pmcmSem) {
+    const chartPmcmSetorEl = document.getElementById(canvasId);
+    if (!chartPmcmSetorEl) {
+        return;
+    }
+    new Chart(chartPmcmSetorEl.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: pmcmLabels.length ? pmcmLabels : ['Sem dados'],
+            datasets: [
+                {
+                    label: 'Com LISTA COMPLETA',
+                    data: pmcmCom.length ? pmcmCom : [0],
+                    stack: 'setor',
+                    backgroundColor: '#198754'
+                },
+                {
+                    label: 'Sem LISTA COMPLETA',
+                    data: pmcmSem.length ? pmcmSem : [0],
+                    stack: 'setor',
+                    backgroundColor: '#6c757d'
+                }
+            ]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            const dsLabel = ctx.dataset.label || '';
+                            const tot = (pmcmCom[ctx.dataIndex] || 0) + (pmcmSem[ctx.dataIndex] || 0);
+                            const pct = tot ? ((ctx.parsed.x / tot) * 100).toFixed(1) : '0';
+                            return dsLabel + ': ' + formatarNumeroBR(ctx.parsed.x) + ' (' + pct + '% do setor)';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Quantidade de máquinas ativas',
+                        font: { size: 11 }
+                    },
+                    ticks: { callback: function(v) { return formatarNumeroBR(v); } }
+                },
+                y: {
+                    stacked: true,
+                    ticks: {
+                        autoSkip: false,
+                        font: { size: 11 }
+                    }
+                }
+            }
+        }
+    });
+}
+
+criarGraficoPmcmPorSetor(
+    'chartMaquinasPmcmSetorFrig',
+    {{ chart_maquinas_pmcm_labels_frigorifico|safe }},
+    {{ chart_maquinas_pmcm_com_frigorifico|safe }},
+    {{ chart_maquinas_pmcm_sem_frigorifico|safe }}
+);
+criarGraficoPmcmPorSetor(
+    'chartMaquinasPmcmSetorInd',
+    {{ chart_maquinas_pmcm_labels_industria|safe }},
+    {{ chart_maquinas_pmcm_com_industria|safe }},
+    {{ chart_maquinas_pmcm_sem_industria|safe }}
+);
+
+const chartIntEl = document.getElementById('chartIntegracao');
+if (chartIntEl) {
+    new Chart(chartIntEl.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: {{ chart_integracao_labels|safe }},
+            datasets: [{
+                label: 'Quantidade',
+                data: {{ chart_integracao_data|safe }},
+                backgroundColor: ['#0d6efd', '#6f42c1', '#fd7e14', '#0dcaf0', '#ffc107', '#dc3545']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return formatarNumeroBR(ctx.parsed.y);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { callback: function(v) { return formatarNumeroBR(v); } }
+                }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

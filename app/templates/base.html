@@ -737,6 +737,20 @@
                             </div>
                         </li>
 
+                        <!-- Itens Aurora -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#itens-aurora-collapse" aria-expanded="false">
+                                <i class="fas fa-barcode me-2"></i>
+                                <span class="btn-toggle-text">Itens Aurora</span>
+                            </button>
+                            <div class="collapse" id="itens-aurora-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'analise_itens_aurora' %}" class="link-dark rounded"><i class="bi bi-bar-chart me-2"></i>Análise Itens Aurora</a></li>
+                                    <li><a href="{% url 'consultar_itens_aurora' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Itens Aurora</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
                         <!-- Máquinas -->
                         <li class="mb-1">
                             <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#maquinas-collapse" aria-expanded="false">

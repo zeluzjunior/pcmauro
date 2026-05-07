@@ -41,14 +41,16 @@
                                     Somente a aba <strong>«LISTA COMPLETA»</strong> é lida. Colunas usadas:
                                     <strong>A</strong> máquina, <strong>B</strong> posição (manual), <strong>C</strong> fabricante,
                                     <strong>D</strong> cód. fabricante, <strong>E</strong> descrição (Peça Fornecedor),
-                                    <strong>F</strong> quantidade, <strong>S</strong> parte/componente na máquina.
+                                    <strong>F</strong> quantidade,
+                                    <strong>G–T</strong> item Aurora exceto <strong>P</strong> (qtde atual em estoque),
+                                    <strong>S</strong> parte/componente na máquina.
                                 </div>
                             </div>
                             <div class="mb-3">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="updateExistingPecas" name="update_existing">
                                     <label class="form-check-label" for="updateExistingPecas">
-                                        Atualizar registros já existentes (mesma máquina + mesmo cód. fabricante)
+                                        Atualizar registros já existentes (mesma máquina + mesmo cód. fabricante; mesmo cód. Aurora em G)
                                     </label>
                                 </div>
                             </div>
@@ -123,10 +125,10 @@
                     </div>
                     <div class="card-body">
                         <p class="mb-0 text-muted">
-                            A importação grava <strong>PecaManualCatalogo</strong> (fabricante + cód. fabricante + descrição, único por par)
-                            e <strong>PecaMaquinaCitadoManual</strong> (uma linha por máquina que usa essa peça: posição, qtde, parte).
+                            A importação grava <strong>PecaManualCatalogo</strong> (fabricante + cód. fabricante + descrição do manual; único por par),
+                            associando à linha o <strong>Item Aurora</strong> da coluna <strong>G</strong> (código interno único da empresa).
+                            Grava também <strong>PecaMaquinaCitadoManual</strong> (uma linha por máquina + essa peça: posição, qtde, parte).
                             O código da máquina na coluna <strong>A</strong> deve existir em <strong>Máquinas</strong>.
-                            Item Aurora e demais colunas podem ser tratados em etapas futuras.
                         </p>
                     </div>
                 </div>
