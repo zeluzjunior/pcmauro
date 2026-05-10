@@ -8367,6 +8367,7 @@ def _analise_paradas_maquina_impl(request, template_name):
     perda_max_media_restante_ind_dia = None
     perda_restante_permitida_frig = None
     perda_restante_permitida_ind = None
+    perda_max_total_permitida_frig = None
 
     def _dias_produtivos_passados_restantes(cfg, dia_ref, ultimo_dia_mes):
         """
@@ -9152,6 +9153,7 @@ def _analise_paradas_maquina_impl(request, template_name):
         'soma_capacidade_frig': soma_capacidade_frig,
         'soma_suinos_abatidos_frig': soma_suinos_abatidos_frig,
         'perda_maxima_calculada_frig': perda_maxima_calculada_frig,
+        'perda_maxima_planejada_frig_exibicao': float(perda_max_total_permitida_frig) if perda_max_total_permitida_frig is not None else perda_maxima_calculada_frig,
         'perda_restante_frig': perda_restante_frig,
         'perda_maximo_frig': perda_maximo_frig,
         'perda_maximo_industria': perda_maximo_industria,
@@ -10448,6 +10450,21 @@ def analise_estoque_almoxarifado(request):
 def consultar_notas_fiscais(request):
     """Consultar/listar notas fiscais com filtros avançados"""
     from app.models import NotaFiscal
+    is_status_manual_page = bool(getattr(request, '_status_manual_page', False))
+    base_manager = NotaFiscal.all_objects if is_status_manual_page else NotaFiscal.objects
+
+    if is_status_manual_page and request.method == 'POST':
+        nota_id = request.POST.get('nota_id')
+        status_manual_raw = request.POST.get('status_manual')
+        try:
+            nota_obj = NotaFiscal.all_objects.get(id=nota_id)
+            novo_status = str(status_manual_raw).lower() in ('1', 'true', 'on', 'yes')
+            nota_obj.status_manual = novo_status
+            nota_obj.save(update_fields=['status_manual', 'updated_at'])
+        except NotaFiscal.DoesNotExist:
+            messages.error(request, 'Nota fiscal não encontrada para atualizar status manual.')
+        return redirect(request.get_full_path())
+
     from decimal import Decimal
     from django.db.models import Sum
     from datetime import datetime
@@ -10501,7 +10518,7 @@ def consultar_notas_fiscais(request):
     
     # Obter anos disponíveis (baseado em data_emissao)
     anos_disponiveis = []
-    todas_notas_anos = NotaFiscal.objects.exclude(data_emissao__isnull=True).exclude(data_emissao='')
+    todas_notas_anos = base_manager.exclude(data_emissao__isnull=True).exclude(data_emissao='')
     for nota in todas_notas_anos:
         data_emissao = parse_date(nota.data_emissao)
         if data_emissao:
@@ -10514,7 +10531,7 @@ def consultar_notas_fiscais(request):
     
     # Busca geral
     search_query = request.GET.get('search', '').strip()
-    notas_list = NotaFiscal.objects.all()
+    notas_list = base_manager.all()
     
     # Filtrar por ano e mês usando somente data_emissao da NotaFiscal
     # Incluir também notas com situacao PENDENTE sem data_emissao (não apareciam antes)
@@ -10531,7 +10548,7 @@ def consultar_notas_fiscais(request):
         notas_list = notas_list.filter(id__in=notas_filtradas_por_data)
     else:
         # Se não há notas no ano/mês, retornar queryset vazio
-        notas_list = NotaFiscal.objects.none()
+        notas_list = base_manager.none()
     
     # Aplicar busca geral
     if search_query:
@@ -10643,27 +10660,44 @@ def consultar_notas_fiscais(request):
     notas = paginator.get_page(page_number)
     
     # Manter valores únicos gerais para dropdowns de filtros (todos os dados)
-    situacoes_unicas = NotaFiscal.objects.exclude(
+    situacoes_unicas = base_manager.exclude(
         situacao__isnull=True
     ).exclude(
         situacao=''
     ).values_list('situacao', flat=True).distinct().order_by('situacao')
     
-    uso_contabil_unicos = NotaFiscal.objects.exclude(
+    uso_contabil_unicos = base_manager.exclude(
         uso_contabil__isnull=True
     ).exclude(
         uso_contabil=''
     ).values_list('uso_contabil', flat=True).distinct().order_by('uso_contabil')
     
-    unidades_unicas = NotaFiscal.objects.exclude(
+    unidades_unicas = base_manager.exclude(
         nome_unidade__isnull=True
     ).exclude(
         nome_unidade=''
     ).values_list('nome_unidade', flat=True).distinct().order_by('nome_unidade')
+
+    notas_status_manual_zero = []
+    if is_status_manual_page:
+        notas_status_manual_zero = list(
+            NotaFiscal.all_objects.filter(status_manual=False)
+            .order_by('-updated_at', '-id')
+            .values(
+                'id',
+                'nota',
+                'nome_fantasia_emitente',
+                'emitente',
+                'data_emissao',
+                'data_autorizacao',
+                'total_nota',
+                'situacao',
+            )
+        )
     
     context = {
-        'page_title': 'Consultar Notas Fiscais',
-        'active_page': 'consultar_notas_fiscais',
+        'page_title': 'Status Manual de Notas Fiscais' if is_status_manual_page else 'Consultar Notas Fiscais',
+        'active_page': 'status_manual_nota_fiscal' if is_status_manual_page else 'consultar_notas_fiscais',
         'notas': notas,
         'total_count': total_count,
         'emitentes_count': emitentes_count,
@@ -10691,8 +10725,17 @@ def consultar_notas_fiscais(request):
         'filtro_data_autorizacao': filtro_data_autorizacao,
         'filtro_observacoes': filtro_observacoes,
         'ordenar_total': ordenar_total,
+        'is_status_manual_page': is_status_manual_page,
+        'notas_status_manual_zero': notas_status_manual_zero,
     }
-    return render(request, 'consultar/consultar_notas_fiscais.html', context)
+    template_name = 'orcamento/status_manual_nota_fiscal.html' if is_status_manual_page else 'consultar/consultar_notas_fiscais.html'
+    return render(request, template_name, context)
+
+
+def status_manual_nota_fiscal(request):
+    """Página para controlar se a nota fiscal entra nos cálculos do sistema."""
+    request._status_manual_page = True
+    return consultar_notas_fiscais(request)
 
 
 def consultar_itens_aurora(request):
@@ -19656,10 +19699,23 @@ def visualizar_assunto_reuniao(request, pk):
     from app.models import AssuntoReuniaoPCM
 
     assunto = get_object_or_404(AssuntoReuniaoPCM, pk=pk)
+    arquivos_assunto = []
+    if assunto.arquivo:
+        arquivos_assunto.append({
+            'url': assunto.arquivo.url,
+            'nome': assunto.nome_arquivo_curto,
+        })
+    for anexo in assunto.anexos:
+        if anexo.arquivo:
+            arquivos_assunto.append({
+                'url': anexo.arquivo.url,
+                'nome': anexo.nome_arquivo_curto,
+            })
     context = {
         'page_title': assunto.titulo,
         'active_page': 'reuniao_pcm',
         'assunto': assunto,
+        'arquivos_assunto': arquivos_assunto,
     }
     return render(request, 'reuniao/visualizar_assunto_reuniao.html', context)
 
@@ -19676,6 +19732,9 @@ def excluir_assunto_reuniao(request, pk):
     titulo = obj.titulo
     if obj.arquivo:
         obj.arquivo.delete(save=False)
+    for anexo in obj.arquivos.all():
+        if anexo.arquivo:
+            anexo.arquivo.delete(save=False)
     obj.delete()
     messages.success(request, f'Assunto removido: {titulo}')
     return redirect('reuniao_pcm')
@@ -19684,7 +19743,7 @@ def excluir_assunto_reuniao(request, pk):
 def configuracao_reuniao_pcm(request):
     from django.shortcuts import get_object_or_404, redirect
     from django.contrib import messages
-    from app.models import AssuntoReuniaoPCM
+    from app.models import AssuntoReuniaoPCM, AssuntoReuniaoPCMArquivo
     from app.forms import AssuntoReuniaoPCMForm
 
     edit_obj = None
@@ -19700,6 +19759,9 @@ def configuracao_reuniao_pcm(request):
                 obj = get_object_or_404(AssuntoReuniaoPCM, pk=pk)
                 if obj.arquivo:
                     obj.arquivo.delete(save=False)
+                for anexo in obj.arquivos.all():
+                    if anexo.arquivo:
+                        anexo.arquivo.delete(save=False)
                 obj.delete()
                 messages.success(request, 'Assunto removido.')
             return redirect('configuracao_reuniao_pcm')
@@ -19712,9 +19774,13 @@ def configuracao_reuniao_pcm(request):
             else:
                 form = AssuntoReuniaoPCMForm(request.POST, request.FILES)
             if form.is_valid():
-                form.save()
+                assunto = form.save()
+                arquivos_extras = request.FILES.getlist('arquivos')
+                for arquivo in arquivos_extras:
+                    AssuntoReuniaoPCMArquivo.objects.create(assunto=assunto, arquivo=arquivo)
                 messages.success(request, 'Assunto salvo.')
                 return redirect('configuracao_reuniao_pcm')
+            messages.error(request, 'Não foi possível salvar o assunto. Verifique os campos obrigatórios.')
             context = {
                 'page_title': 'Configuração Reunião PCM',
                 'active_page': 'configuracao_reuniao_pcm',
@@ -26144,6 +26210,92 @@ def analise_notas_fiscais(request):
     )
     percentual_pendentes = (notas_pendentes / total_notas * 100) if total_notas > 0 else 0
 
+    # --- Ocorrências por mês de análise (emissão mês anterior x inclusão/autorização no mês selecionado) ---
+    mes_referencia = max(meses_filtro_int) if meses_filtro_int else hoje.month
+    ano_referencia = ano_filtro
+    if mes_referencia == 1:
+        mes_anterior = 12
+        ano_mes_anterior = ano_referencia - 1
+    else:
+        mes_anterior = mes_referencia - 1
+        ano_mes_anterior = ano_referencia
+
+    mes_nome_map = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro',
+    }
+    mes_referencia_nome = mes_nome_map.get(mes_referencia, str(mes_referencia))
+    mes_anterior_nome = mes_nome_map.get(mes_anterior, str(mes_anterior))
+
+    notas_base_atraso = []
+    for nota in todas_notas_list:
+        if _uso_norm and _norm(nota.uso_contabil) != _uso_norm:
+            continue
+        if _situ_norm and _norm(nota.situacao) != _situ_norm:
+            continue
+        if emitente_filtro:
+            ef = emitente_filtro.lower()
+            emit_ok = (nota.emitente and ef in nota.emitente.lower()) or (nota.nome_fantasia_emitente and ef in nota.nome_fantasia_emitente.lower())
+            if not emit_ok:
+                continue
+        if centro_filtro:
+            cf = centro_filtro.lower()
+            centro_ok = (nota.centro_atividade and cf in nota.centro_atividade.lower()) or (nota.nome_centro_atividade and cf in nota.nome_centro_atividade.lower())
+            if not centro_ok:
+                continue
+        notas_base_atraso.append(nota)
+
+    notas_pendencia_pos_emissao = []
+    notas_com_lag_pos_emissao = []
+
+    for nota in notas_base_atraso:
+        data_emissao = parse_date(nota.data_emissao)
+        if not data_emissao:
+            continue
+        if not (data_emissao.year == ano_mes_anterior and data_emissao.month == mes_anterior):
+            continue
+
+        data_inclusao = parse_date(nota.data_inclusao)
+        data_autorizacao = parse_date(nota.data_autorizacao)
+
+        # 1) Emissão no mês anterior e sem inclusão/autorização
+        if not data_inclusao and not data_autorizacao:
+            notas_pendencia_pos_emissao.append(nota)
+            continue
+
+        # 2) Emissão no mês anterior e inclusão + autorização no mês de referência
+        inclusao_no_mes = bool(data_inclusao and data_inclusao.year == ano_referencia and data_inclusao.month == mes_referencia)
+        autorizacao_no_mes = bool(data_autorizacao and data_autorizacao.year == ano_referencia and data_autorizacao.month == mes_referencia)
+        if inclusao_no_mes and autorizacao_no_mes:
+            notas_com_lag_pos_emissao.append({
+                'nota': nota,
+                'meses_diferenca': 1,
+            })
+
+    ocorrencias_atraso_total = len(notas_pendencia_pos_emissao) + len(notas_com_lag_pos_emissao)
+    percentual_atraso_total = (ocorrencias_atraso_total / total_notas * 100) if total_notas > 0 else 0
+    notas_pendencia_sem_datas = len(notas_pendencia_pos_emissao)
+    notas_lag_meses = len(notas_com_lag_pos_emissao)
+    valor_pendencia_sem_datas = sum((nota.total_nota or Decimal(0)) for nota in notas_pendencia_pos_emissao)
+    valor_lag_meses = sum((item['nota'].total_nota or Decimal(0)) for item in notas_com_lag_pos_emissao)
+    valor_total_ocorrencias_atraso = valor_pendencia_sem_datas + valor_lag_meses
+    valor_total_mes_com_ocorrencias = valor_total_notas + valor_total_ocorrencias_atraso
+
+    ocorrencias_atraso_detalhes = []
+    for nota in notas_pendencia_pos_emissao:
+        ocorrencias_atraso_detalhes.append({
+            'nota': nota,
+            'tipo': 'Sem inclusão/autorização',
+            'meses_diferenca': None,
+        })
+    for item in notas_com_lag_pos_emissao[:30]:
+        ocorrencias_atraso_detalhes.append({
+            'nota': item['nota'],
+            'tipo': 'Inclusão/Autorização em mês posterior',
+            'meses_diferenca': item['meses_diferenca'],
+        })
+
     # --- Dados para Gráficos ---
     # Gráfico 1: Distribuição por Emitente (Top 10)
     emitentes_data_dict = defaultdict(Decimal)
@@ -26319,6 +26471,7 @@ def analise_notas_fiscais(request):
         # KPIs
         'total_notas': total_notas,
         'valor_total_notas': valor_total_notas,
+        'valor_total_mes_com_ocorrencias': valor_total_mes_com_ocorrencias,
         'valor_medio': valor_medio,
         'notas_com_projecao': notas_com_projecao,
         'percentual_com_projecao': percentual_com_projecao,
@@ -26345,6 +26498,20 @@ def analise_notas_fiscais(request):
         'notas_pendentes': notas_pendentes,
         'valor_pendentes': valor_pendentes,
         'percentual_pendentes': percentual_pendentes,
+        
+        # Ocorrências de atraso emissão x inclusão/autorização
+        'ocorrencias_atraso_total': ocorrencias_atraso_total,
+        'percentual_atraso_total': percentual_atraso_total,
+        'notas_pendencia_sem_datas': notas_pendencia_sem_datas,
+        'notas_lag_meses': notas_lag_meses,
+        'valor_pendencia_sem_datas': valor_pendencia_sem_datas,
+        'valor_lag_meses': valor_lag_meses,
+        'valor_total_ocorrencias_atraso': valor_total_ocorrencias_atraso,
+        'ocorrencias_atraso_detalhes': ocorrencias_atraso_detalhes,
+        'mes_referencia_nome': mes_referencia_nome,
+        'ano_referencia': ano_referencia,
+        'mes_anterior_nome': mes_anterior_nome,
+        'ano_mes_anterior': ano_mes_anterior,
 
         # Gráficos
         'emitentes_labels': json.dumps(emitentes_labels, ensure_ascii=False),

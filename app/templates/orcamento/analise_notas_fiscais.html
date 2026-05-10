@@ -186,8 +186,8 @@
                     <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
                         <div class="card-body">
                             <h6 class="text-muted mb-1 small">Valor Total</h6>
-                            <h3 class="mb-1 fw-bold">{{ valor_total_notas|currency_br }}</h3>
-                            <small class="text-muted">Soma de todas as notas</small>
+                            <h3 class="mb-1 fw-bold">{{ valor_total_mes_com_ocorrencias|currency_br }}</h3>
+                            <small class="text-muted">Notas filtradas + ocorrências de atraso</small>
                         </div>
                     </div>
                 </div>
@@ -226,6 +226,128 @@
                     </div>
                 </div>
                 {% endfor %}
+            </div>
+        </div>
+
+        <!-- Ocorrências de atraso (emissão x inclusão/autorização) -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-hourglass-half me-2"></i>Ocorrências de Atraso entre Emissão e Inclusão/Autorização</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">
+                            Mês em análise: <strong>{{ mes_referencia_nome }}/{{ ano_referencia }}</strong>.
+                            A seção considera notas com <strong>emissão em {{ mes_anterior_nome }}/{{ ano_mes_anterior }}</strong>.
+                        </p>
+                        <div class="row mb-3">
+                            <div class="col-md-4 mb-3">
+                                <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
+                                    <div class="card-body">
+                                        <h6 class="text-muted mb-1 small">Total de Ocorrências</h6>
+                                        <h3 class="mb-1 fw-bold format-number">{{ ocorrencias_atraso_total }}</h3>
+                                        <small class="text-muted">{{ percentual_atraso_total|floatformat:1 }}% das notas filtradas</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                                    <div class="card-body">
+                                        <h6 class="text-muted mb-1 small">Sem Inclusão/Autorização</h6>
+                                        <h3 class="mb-1 fw-bold format-number">{{ notas_pendencia_sem_datas }}</h3>
+                                        <small class="text-muted">Emissão em {{ mes_anterior_nome }}/{{ ano_mes_anterior }} e sem data de inclusão/autorização</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                                    <div class="card-body">
+                                        <h6 class="text-muted mb-1 small">Inclusão e Autorização no Mês em Análise</h6>
+                                        <h3 class="mb-1 fw-bold format-number">{{ notas_lag_meses }}</h3>
+                                        <small class="text-muted">Emissão em {{ mes_anterior_nome }}/{{ ano_mes_anterior }} com inclusão e autorização em {{ mes_referencia_nome }}/{{ ano_referencia }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4 mb-3">
+                                <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
+                                    <div class="card-body">
+                                        <h6 class="text-muted mb-1 small">Valor Total das Ocorrências</h6>
+                                        <h3 class="mb-1 fw-bold">{{ valor_total_ocorrencias_atraso|currency_br }}</h3>
+                                        <small class="text-muted">Soma dos valores exibidos nesta seção</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                                    <div class="card-body">
+                                        <h6 class="text-muted mb-1 small">Valor sem Inclusão/Autorização</h6>
+                                        <h3 class="mb-1 fw-bold">{{ valor_pendencia_sem_datas|currency_br }}</h3>
+                                        <small class="text-muted">{{ notas_pendencia_sem_datas }} ocorrência(s)</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                                    <div class="card-body">
+                                        <h6 class="text-muted mb-1 small">Valor com Inclusão/Autorização no Mês</h6>
+                                        <h3 class="mb-1 fw-bold">{{ valor_lag_meses|currency_br }}</h3>
+                                        <small class="text-muted">{{ notas_lag_meses }} ocorrência(s)</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Nota</th>
+                                        <th>Emitente</th>
+                                        <th class="text-end">Valor NF</th>
+                                        <th>Data Emissão</th>
+                                        <th>Data Inclusão</th>
+                                        <th>Data Autorização</th>
+                                        <th>Tipo de Ocorrência</th>
+                                        <th class="text-end">Defasagem (meses)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in ocorrencias_atraso_detalhes %}
+                                    <tr>
+                                        <td><strong>{{ item.nota.nota|default:"-" }}</strong></td>
+                                        <td>{{ item.nota.nome_fantasia_emitente|default:item.nota.emitente|default:"Não informado"|truncatewords:6 }}</td>
+                                        <td class="text-end format-money" data-value="{{ item.nota.total_nota|default:0 }}">R$ {{ item.nota.total_nota|default:0|floatformat:2 }}</td>
+                                        <td>{{ item.nota.data_emissao|default:"-" }}</td>
+                                        <td>{{ item.nota.data_inclusao|default:"-" }}</td>
+                                        <td>{{ item.nota.data_autorizacao|default:"-" }}</td>
+                                        <td>
+                                            {% if item.tipo == 'Sem inclusão/autorização' %}
+                                                <span class="badge bg-warning text-dark">{{ item.tipo }}</span>
+                                            {% else %}
+                                                <span class="badge bg-info text-dark">{{ item.tipo }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">
+                                            {% if item.meses_diferenca %}
+                                                {{ item.meses_diferenca }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="8" class="text-center text-muted">Nenhuma ocorrência encontrada com os filtros atuais.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 

@@ -78,6 +78,18 @@
                             <div class="form-text">Opcional. PDF, imagens ou planilhas para este item da pauta. Ao editar, deixe em branco para manter o arquivo atual ou marque “Limpar” para remover.</div>
                             {% if form.arquivo.errors %}<div class="invalid-feedback d-block">{{ form.arquivo.errors.0 }}</div>{% endif %}
                         </div>
+                        <div class="col-12">
+                            <label for="id_arquivos" class="form-label">Arquivos adicionais (múltiplos)</label>
+                            <input
+                                type="file"
+                                name="arquivos"
+                                id="id_arquivos"
+                                class="form-control"
+                                multiple
+                                accept=".pdf,.doc,.docx,.xls,.xlsx,.xlsm,.csv,.png,.jpg,.jpeg,.gif,.txt"
+                            >
+                            <div class="form-text">Você pode selecionar vários arquivos de uma vez. Em edição, novos arquivos serão adicionados aos já existentes.</div>
+                        </div>
                     </div>
 
                     <div class="mt-4 d-flex flex-wrap gap-2">
@@ -116,8 +128,13 @@
                                         <td class="fw-medium">{{ a.titulo }}</td>
                                         <td>{{ a.duracao_minutos }} min</td>
                                         <td>
-                                            {% if a.arquivo %}
-                                                <a href="{{ a.arquivo.url }}" target="_blank" rel="noopener" class="text-decoration-none"><i class="bi bi-paperclip me-1"></i>{{ a.nome_arquivo_curto|truncatechars:32 }}</a>
+                                            {% if a.total_anexos %}
+                                                {% if a.arquivo %}
+                                                    <a href="{{ a.arquivo.url }}" target="_blank" rel="noopener" class="text-decoration-none"><i class="bi bi-paperclip me-1"></i>{{ a.nome_arquivo_curto|truncatechars:24 }}</a>
+                                                {% endif %}
+                                                {% if a.anexos %}
+                                                    <div class="small text-muted mt-1">+ {{ a.anexos|length }} arquivo(s) adicional(is)</div>
+                                                {% endif %}
                                             {% else %}
                                                 <span class="text-muted small">—</span>
                                             {% endif %}

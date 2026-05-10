@@ -59,10 +59,29 @@
                                 {% endif %}
                             </dd>
 
-                            <dt class="col-sm-4 text-muted">Arquivo anexo</dt>
+                            <dt class="col-sm-4 text-muted">Arquivos anexados</dt>
                             <dd class="col-sm-8">
-                                {% if assunto.arquivo %}
-                                    <a href="{{ assunto.arquivo.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary"><i class="bi bi-download me-1"></i>{{ assunto.nome_arquivo_curto }}</a>
+                                {% if arquivos_assunto %}
+                                    {% for arquivo in arquivos_assunto %}
+                                        <div class="border rounded p-2 mb-3">
+                                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                                <span class="small fw-semibold">{{ arquivo.nome }}</span>
+                                                <a href="{{ arquivo.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-box-arrow-up-right me-1"></i>Abrir arquivo
+                                                </a>
+                                            </div>
+
+                                            {% if '.png' in arquivo.url|lower or '.jpg' in arquivo.url|lower or '.jpeg' in arquivo.url|lower or '.gif' in arquivo.url|lower or '.webp' in arquivo.url|lower %}
+                                                <img src="{{ arquivo.url }}" alt="{{ arquivo.nome }}" class="img-fluid rounded border" style="max-height: 420px;">
+                                            {% elif '.pdf' in arquivo.url|lower %}
+                                                <iframe src="{{ arquivo.url }}" class="w-100 rounded border" style="height: 460px;" title="{{ arquivo.nome }}"></iframe>
+                                            {% else %}
+                                                <div class="small text-muted">
+                                                    Pré-visualização indisponível para este tipo de arquivo. Clique em "Abrir arquivo".
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    {% endfor %}
                                 {% else %}
                                     <span class="text-muted">Nenhum arquivo anexado</span>
                                 {% endif %}

@@ -79,6 +79,7 @@ urlpatterns = [
     path('almoxarifado/analise-requisicoes-data-importada/', views.analise_requisicoes_data_importada, name="analise_requisicoes_data_importada"),
     path('almoxarifado/analise-estoque/', views.analise_estoque_almoxarifado, name="analise_estoque_almoxarifado"),
     path('consultar/notas-fiscais/', views.consultar_notas_fiscais, name="consultar_notas_fiscais"),
+    path('orcamento/status-manual-nota-fiscal/', views.status_manual_nota_fiscal, name="status_manual_nota_fiscal"),
     path('notas-fiscais/visualizar/<int:nota_id>/', views.visualizar_nota_fiscal, name="visualizar_nota_fiscal"),
     path('orcamento/dados-orcamento/', views.dados_orcamento, name="dados_orcamento"),
     path('orcamento/dados-orcamento/editar/<int:registro_id>/', views.editar_dados_orcamento, name="editar_dados_orcamento"),

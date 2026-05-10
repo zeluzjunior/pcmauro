@@ -81,11 +81,11 @@
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
                         <li class="breadcrumb-item active text-white" aria-current="page">Orçamento</li>
-                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar Notas Fiscais</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">{% if is_status_manual_page %}Status Manual de Notas Fiscais{% else %}Consultar Notas Fiscais{% endif %}</li>
                     </ol>
                 </nav>
-                <h1 class="display-4 fw-bold mt-3">Consultar Notas Fiscais</h1>
-                <p class="lead">Visualize e consulte todas as notas fiscais cadastradas</p>
+                <h1 class="display-4 fw-bold mt-3">{% if is_status_manual_page %}Status Manual de Notas Fiscais{% else %}Consultar Notas Fiscais{% endif %}</h1>
+                <p class="lead">{% if is_status_manual_page %}Marque quais notas devem entrar nos cálculos do sistema{% else %}Visualize e consulte todas as notas fiscais cadastradas{% endif %}</p>
             </div>
         </div>
     </div>
@@ -142,7 +142,7 @@
                         </h2>
                         <div id="filtrosCollapse" class="accordion-collapse collapse {% if meses_filtro or filtro_situacao or filtro_uso_contabil %}show{% endif %}" aria-labelledby="filtrosHeading" data-bs-parent="#filtrosAccordion">
                             <div class="accordion-body">
-                                <form method="get" action="{% url 'consultar_notas_fiscais' %}" class="row g-3">
+                                <form method="get" action="{% if is_status_manual_page %}{% url 'status_manual_nota_fiscal' %}{% else %}{% url 'consultar_notas_fiscais' %}{% endif %}" class="row g-3">
                                     <!-- Preservar busca geral e ordenação -->
                                     <input type="hidden" name="search" value="{{ search_query|default:'' }}">
                                     <input type="hidden" name="ordenar_total" value="{{ ordenar_total|default:'' }}">
@@ -274,7 +274,7 @@
         <!-- Search Bar -->
         <div class="row mb-4">
             <div class="col-12">
-                <form method="get" action="{% url 'consultar_notas_fiscais' %}" class="d-flex">
+                <form method="get" action="{% if is_status_manual_page %}{% url 'status_manual_nota_fiscal' %}{% else %}{% url 'consultar_notas_fiscais' %}{% endif %}" class="d-flex">
                     <input type="hidden" name="ano" value="{{ ano_filtro }}">
                     {% for mes in meses_filtro %}
                         <input type="hidden" name="mes" value="{{ mes }}">
@@ -351,6 +351,56 @@
             </div>
         </div>
 
+        {% if is_status_manual_page %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-warning-subtle">
+                        <h5 class="mb-0">
+                            <i class="fas fa-triangle-exclamation me-2 text-warning"></i>
+                            Notas Desmarcadas (status_manual = 0)
+                            <small class="ms-2 text-muted">(<span class="format-number">{{ notas_status_manual_zero|length }}</span> registro{{ notas_status_manual_zero|length|pluralize }})</small>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Nota</th>
+                                        <th>Emitente</th>
+                                        <th>Data Emissão</th>
+                                        <th>Data Autorização</th>
+                                        <th class="text-end">Total</th>
+                                        <th>Situação</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for n in notas_status_manual_zero %}
+                                    <tr>
+                                        <td>{{ n.nota|default:"-" }}</td>
+                                        <td>{{ n.nome_fantasia_emitente|default:n.emitente|default:"-"|truncatechars:45 }}</td>
+                                        <td>{{ n.data_emissao|default:"-" }}</td>
+                                        <td>{{ n.data_autorizacao|default:"-" }}</td>
+                                        <td class="text-end format-money" data-value="{{ n.total_nota|default:0 }}">R$ {{ n.total_nota|default:0|floatformat:2 }}</td>
+                                        <td>{{ n.situacao|default:"-"|truncatechars:40 }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted py-3">
+                                            Nenhuma nota está desmarcada no momento.
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Table -->
         <div class="row">
             <div class="col-12">
@@ -362,7 +412,7 @@
                         </h5>
                     </div>
                     <div class="card-body p-0">
-                        <form method="get" action="{% url 'consultar_notas_fiscais' %}" id="filterForm">
+                        <form method="get" action="{% if is_status_manual_page %}{% url 'status_manual_nota_fiscal' %}{% else %}{% url 'consultar_notas_fiscais' %}{% endif %}" id="filterForm">
                             <!-- Preservar busca geral e filtros -->
                             <input type="hidden" name="search" value="{{ search_query|default:'' }}">
                             <input type="hidden" name="ano" value="{{ ano_filtro }}">
@@ -375,6 +425,9 @@
                                 <table class="table table-hover table-striped mb-0">
                                     <thead>
                                         <tr>
+                                            {% if is_status_manual_page %}
+                                            <th class="text-center" style="min-width: 90px;">NF Válide</th>
+                                            {% endif %}
                                             <th class="col-nota">Nota</th>
                                             <th class="col-emitente">Emitente</th>
                                             <th class="col-data">Data Emissão</th>
@@ -386,6 +439,9 @@
                                             <th class="col-acoes">Ações</th>
                                         </tr>
                                         <tr class="filter-row">
+                                            {% if is_status_manual_page %}
+                                            <th></th>
+                                            {% endif %}
                                             <th>
                                                 <input type="text" name="filtro_nota" class="filter-input" value="{{ filtro_nota|default:'' }}" placeholder="Filtrar Nota" onchange="document.getElementById('filterForm').submit();">
                                             </th>
@@ -440,6 +496,17 @@
                                     <tbody>
                                         {% for nota in notas %}
                                         <tr>
+                                            {% if is_status_manual_page %}
+                                            <td class="text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    class="form-check-input js-status-manual-toggle"
+                                                    data-nota-id="{{ nota.id }}"
+                                                    {% if nota.status_manual %}checked{% endif %}
+                                                    title="Marcado = entra nos cálculos"
+                                                >
+                                            </td>
+                                            {% endif %}
                                             <td class="col-nota"><span class="badge bg-primary format-number">{{ nota.nota|default:"-" }}</span></td>
                                             <td class="col-emitente">{{ nota.nome_fantasia_emitente|default:nota.emitente|default:"-"|truncatechars:40 }}</td>
                                             <td class="col-data">{{ nota.data_emissao|default:"-" }}</td>
@@ -476,7 +543,7 @@
                                         </tr>
                                         {% empty %}
                                         <tr>
-                                            <td colspan="9" class="text-center text-muted py-5">
+                                            <td colspan="{% if is_status_manual_page %}10{% else %}9{% endif %}" class="text-center text-muted py-5">
                                                 <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
                                                 Nenhuma nota fiscal encontrada.
                                             </td>
@@ -527,6 +594,13 @@
         {% endif %}
     </div>
 </section>
+{% if is_status_manual_page %}
+<form method="post" action="{% url 'status_manual_nota_fiscal' %}?{{ request.GET.urlencode }}" id="statusManualForm" class="d-none">
+    {% csrf_token %}
+    <input type="hidden" name="nota_id" id="statusManualNotaId">
+    <input type="hidden" name="status_manual" id="statusManualValue">
+</form>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
@@ -590,6 +664,20 @@ document.addEventListener('DOMContentLoaded', function() {
             filterForm.submit();
         });
     });
+
+    // Atualização de status manual (NF válida para cálculos)
+    const statusManualForm = document.getElementById('statusManualForm');
+    if (statusManualForm) {
+        const notaIdInput = document.getElementById('statusManualNotaId');
+        const valueInput = document.getElementById('statusManualValue');
+        document.querySelectorAll('.js-status-manual-toggle').forEach(toggle => {
+            toggle.addEventListener('change', function() {
+                notaIdInput.value = this.dataset.notaId || '';
+                valueInput.value = this.checked ? '1' : '0';
+                statusManualForm.submit();
+            });
+        });
+    }
 });
 
 // Funções para selecionar/desmarcar todos os meses

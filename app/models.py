@@ -3,6 +3,13 @@ from decimal import Decimal
 from django.db import models
 
 
+class NotaFiscalAtivaManager(models.Manager):
+    """Retorna apenas notas marcadas para uso nos cálculos."""
+
+    def get_queryset(self):
+        return super().get_queryset().filter(status_manual=True)
+
+
 # Choices para o modelo Manutentor
 TURNO = (
     ('Turno A', 'Turno A'),
@@ -762,7 +769,6 @@ class ItemAurora(models.Model):
     def __str__(self):
         return f"{self.codigo_aurora} - {self.descricao_aurora or 'Sem descrição'}"
 
-
 class PecaManualCatalogo(models.Model):
     """
     Definição única de peça no catálogo do fabricante (mesma peça pode ser citada em várias máquinas).
@@ -819,7 +825,6 @@ class PecaManualCatalogo(models.Model):
 
     def __str__(self):
         return f"{self.fabricante} · {self.codigo_fabricante}"
-
 
 class PecaMaquinaCitadoManual(models.Model):
     """
@@ -883,7 +888,6 @@ class PecaMaquinaCitadoManual(models.Model):
 
     def __str__(self):
         return f"{self.maquina.cd_maquina} · {self.peca_catalogo.codigo_fabricante}"
-
 
 class ManutencaoCsv(models.Model):
     """Modelo temporário para referência de OS importada - ajustar conforme necessário"""
@@ -1559,6 +1563,12 @@ class NotaFiscal(models.Model):
     # Situação
     situacao = models.CharField('Situação', max_length=100, blank=True, null=True, db_index=True)
     situacao_detalhada = models.TextField('Situação Detalhada', blank=True, null=True)
+    status_manual = models.BooleanField(
+        'Considerar nos cálculos',
+        default=True,
+        db_index=True,
+        help_text='Define se este registro deve ser considerado nos cálculos do sistema.',
+    )
     
     # Usuário e Autorização
     nome_usuario = models.CharField('Nome Usuário', max_length=255, blank=True, null=True)
@@ -1575,6 +1585,10 @@ class NotaFiscal(models.Model):
     # Timestamps
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
     updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    # Managers
+    objects = NotaFiscalAtivaManager()
+    all_objects = models.Manager()
     
     class Meta:
         verbose_name = 'Nota Fiscal'
@@ -2307,4 +2321,47 @@ class AssuntoReuniaoPCM(models.Model):
         if not self.arquivo:
             return ''
         from pathlib import Path
+        return Path(self.arquivo.name).name
+
+    @property
+    def anexos(self):
+        """Retorna anexos extras cadastrados para o assunto."""
+        return self.arquivos.all()
+
+    @property
+    def total_anexos(self):
+        """Total de anexos (legado + extras)."""
+        return (1 if self.arquivo else 0) + self.arquivos.count()
+
+
+class AssuntoReuniaoPCMArquivo(models.Model):
+    """Arquivos extras vinculados a um assunto da reunião PCM."""
+
+    assunto = models.ForeignKey(
+        AssuntoReuniaoPCM,
+        on_delete=models.CASCADE,
+        related_name='arquivos',
+        verbose_name='Assunto Reunião PCM',
+    )
+    arquivo = models.FileField(
+        'Arquivo anexo',
+        upload_to='reuniao_pcm/assuntos/',
+        help_text='Arquivo adicional vinculado ao assunto.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Arquivo do Assunto Reunião PCM'
+        verbose_name_plural = 'Arquivos dos Assuntos Reunião PCM'
+        ordering = ['id']
+
+    def __str__(self):
+        from pathlib import Path
+        return Path(self.arquivo.name).name if self.arquivo else f'Arquivo #{self.pk}'
+
+    @property
+    def nome_arquivo_curto(self):
+        from pathlib import Path
+        if not self.arquivo:
+            return ''
         return Path(self.arquivo.name).name
