@@ -32,6 +32,11 @@
     .kpi-info { border-left-color: #0dcaf0; }
     .kpi-danger { border-left-color: #dc3545; }
     .kpi-purple { border-left-color: #6f42c1; }
+    .saldo-parcial-termo-card { transition: opacity 0.2s, filter 0.2s; }
+    .saldo-parcial-termo-card.saldo-termo-excluido {
+        opacity: 0.48;
+        filter: grayscale(0.25);
+    }
 </style>
 {% endblock %}
 
@@ -66,30 +71,28 @@
                             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="false" aria-controls="filtrosCollapse">
                                 <i class="fas fa-filter me-2"></i>
                                 <strong>Filtros</strong>
-                                {% if meses_filtro or ano_filtro %}
+                                {% if meses_explicitos_na_url and meses_filtro_url %}
                                     <span class="badge bg-info ms-2">
-                                        {% if meses_filtro %}
-                                            {% if meses_filtro|length == 1 %}
-                                                {% if meses_filtro.0 == 1 %}Janeiro
-                                                {% elif meses_filtro.0 == 2 %}Fevereiro
-                                                {% elif meses_filtro.0 == 3 %}Março
-                                                {% elif meses_filtro.0 == 4 %}Abril
-                                                {% elif meses_filtro.0 == 5 %}Maio
-                                                {% elif meses_filtro.0 == 6 %}Junho
-                                                {% elif meses_filtro.0 == 7 %}Julho
-                                                {% elif meses_filtro.0 == 8 %}Agosto
-                                                {% elif meses_filtro.0 == 9 %}Setembro
-                                                {% elif meses_filtro.0 == 10 %}Outubro
-                                                {% elif meses_filtro.0 == 11 %}Novembro
-                                                {% elif meses_filtro.0 == 12 %}Dezembro
+                                        {% if meses_filtro_url|length == 1 %}
+                                                {% if meses_filtro_url.0 == 1 %}Janeiro
+                                                {% elif meses_filtro_url.0 == 2 %}Fevereiro
+                                                {% elif meses_filtro_url.0 == 3 %}Março
+                                                {% elif meses_filtro_url.0 == 4 %}Abril
+                                                {% elif meses_filtro_url.0 == 5 %}Maio
+                                                {% elif meses_filtro_url.0 == 6 %}Junho
+                                                {% elif meses_filtro_url.0 == 7 %}Julho
+                                                {% elif meses_filtro_url.0 == 8 %}Agosto
+                                                {% elif meses_filtro_url.0 == 9 %}Setembro
+                                                {% elif meses_filtro_url.0 == 10 %}Outubro
+                                                {% elif meses_filtro_url.0 == 11 %}Novembro
+                                                {% elif meses_filtro_url.0 == 12 %}Dezembro
                                                 {% endif %} de {{ ano_filtro }}
-                                            {% else %}
-                                                {{ meses_filtro|length }} meses de {{ ano_filtro }}
-                                            {% endif %}
                                         {% else %}
-                                            Todos os meses de {{ ano_filtro }}
+                                            {{ meses_filtro_url|length }} meses de {{ ano_filtro }}
                                         {% endif %}
                                     </span>
+                                {% elif ano_filtro %}
+                                    <span class="badge bg-info ms-2">Todos os meses de {{ ano_filtro }}</span>
                                 {% endif %}
                             </button>
                         </h2>
@@ -109,73 +112,73 @@
                                         <div class="row g-2">
                                             <div class="col-md-3 col-sm-4 col-6">
                                                 <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" name="mes" value="1" id="mes1" {% if 1 in meses_filtro %}checked{% endif %}>
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="1" id="mes1" {% if meses_explicitos_na_url and 1 in meses_filtro_url %}checked{% endif %}>
                                                     <label class="form-check-label" for="mes1">Janeiro</label>
                                                 </div>
                                             </div>
                                             <div class="col-md-3 col-sm-4 col-6">
                                                 <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" name="mes" value="2" id="mes2" {% if 2 in meses_filtro %}checked{% endif %}>
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="2" id="mes2" {% if meses_explicitos_na_url and 2 in meses_filtro_url %}checked{% endif %}>
                                                     <label class="form-check-label" for="mes2">Fevereiro</label>
                                                 </div>
                                             </div>
                                             <div class="col-md-3 col-sm-4 col-6">
                                                 <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" name="mes" value="3" id="mes3" {% if 3 in meses_filtro %}checked{% endif %}>
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="3" id="mes3" {% if meses_explicitos_na_url and 3 in meses_filtro_url %}checked{% endif %}>
                                                     <label class="form-check-label" for="mes3">Março</label>
                                                 </div>
                                             </div>
                                             <div class="col-md-3 col-sm-4 col-6">
                                                 <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" name="mes" value="4" id="mes4" {% if 4 in meses_filtro %}checked{% endif %}>
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="4" id="mes4" {% if meses_explicitos_na_url and 4 in meses_filtro_url %}checked{% endif %}>
                                                     <label class="form-check-label" for="mes4">Abril</label>
                                                 </div>
                                             </div>
                                             <div class="col-md-3 col-sm-4 col-6">
                                                 <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" name="mes" value="5" id="mes5" {% if 5 in meses_filtro %}checked{% endif %}>
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="5" id="mes5" {% if meses_explicitos_na_url and 5 in meses_filtro_url %}checked{% endif %}>
                                                     <label class="form-check-label" for="mes5">Maio</label>
                                                 </div>
                                             </div>
                                             <div class="col-md-3 col-sm-4 col-6">
                                                 <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" name="mes" value="6" id="mes6" {% if 6 in meses_filtro %}checked{% endif %}>
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="6" id="mes6" {% if meses_explicitos_na_url and 6 in meses_filtro_url %}checked{% endif %}>
                                                     <label class="form-check-label" for="mes6">Junho</label>
                                                 </div>
                                             </div>
                                             <div class="col-md-3 col-sm-4 col-6">
                                                 <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" name="mes" value="7" id="mes7" {% if 7 in meses_filtro %}checked{% endif %}>
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="7" id="mes7" {% if meses_explicitos_na_url and 7 in meses_filtro_url %}checked{% endif %}>
                                                     <label class="form-check-label" for="mes7">Julho</label>
                                                 </div>
                                             </div>
                                             <div class="col-md-3 col-sm-4 col-6">
                                                 <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" name="mes" value="8" id="mes8" {% if 8 in meses_filtro %}checked{% endif %}>
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="8" id="mes8" {% if meses_explicitos_na_url and 8 in meses_filtro_url %}checked{% endif %}>
                                                     <label class="form-check-label" for="mes8">Agosto</label>
                                                 </div>
                                             </div>
                                             <div class="col-md-3 col-sm-4 col-6">
                                                 <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" name="mes" value="9" id="mes9" {% if 9 in meses_filtro %}checked{% endif %}>
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="9" id="mes9" {% if meses_explicitos_na_url and 9 in meses_filtro_url %}checked{% endif %}>
                                                     <label class="form-check-label" for="mes9">Setembro</label>
                                                 </div>
                                             </div>
                                             <div class="col-md-3 col-sm-4 col-6">
                                                 <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" name="mes" value="10" id="mes10" {% if 10 in meses_filtro %}checked{% endif %}>
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="10" id="mes10" {% if meses_explicitos_na_url and 10 in meses_filtro_url %}checked{% endif %}>
                                                     <label class="form-check-label" for="mes10">Outubro</label>
                                                 </div>
                                             </div>
                                             <div class="col-md-3 col-sm-4 col-6">
                                                 <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" name="mes" value="11" id="mes11" {% if 11 in meses_filtro %}checked{% endif %}>
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="11" id="mes11" {% if meses_explicitos_na_url and 11 in meses_filtro_url %}checked{% endif %}>
                                                     <label class="form-check-label" for="mes11">Novembro</label>
                                                 </div>
                                             </div>
                                             <div class="col-md-3 col-sm-4 col-6">
                                                 <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" name="mes" value="12" id="mes12" {% if 12 in meses_filtro %}checked{% endif %}>
+                                                    <input class="form-check-input" type="checkbox" name="mes" value="12" id="mes12" {% if meses_explicitos_na_url and 12 in meses_filtro_url %}checked{% endif %}>
                                                     <label class="form-check-label" for="mes12">Dezembro</label>
                                                 </div>
                                             </div>
@@ -198,18 +201,28 @@
             </div>
         </div>
         
-        <!-- Linha 1: Orçamento – fluxo do saldo em uma linha: Orçamento − Requisições sem NF − Valor NF Lançadas = Saldo Parcial -->
+        <!-- Linha 1: Orçamento – fluxo do saldo; termos podem ser incluídos/excluídos do cálculo do Saldo Parcial -->
         <div class="row mt-4 mb-4">
             <div class="col-12">
-                <h5 class="mb-3 text-primary">
+                <h5 class="mb-2 text-primary">
                     <i class="fas fa-wallet me-2"></i>Orçamento:
                 </h5>
+                <p class="text-muted small mb-3">
+                    Em cada cartão, use <strong>Incluir no Saldo Parcial</strong> para definir o que entra no cálculo (por padrão, todos marcados = mesmo resultado do servidor).
+                    Fórmula: Orçamento disponível − Requisições sem NF − Gastos previstos (serviço concluído = NÃO) − Total em NF (igual «Valor Total» em Análise de Notas Fiscais).
+                </p>
             </div>
+            <script type="application/json" id="saldo-parcial-terms-json">{{ saldo_parcial_termos_json|safe }}</script>
+            <input type="hidden" id="saldo-parcial-filtro-key" value="{{ saldo_parcial_filtro_key }}">
             <div class="col-12">
                 <div class="row g-1 align-items-stretch flex-nowrap overflow-auto">
-                    <div class="col flex-grow-1" style="min-width: 0;">
+                    <div class="col flex-grow-1 saldo-parcial-termo-card" style="min-width: 0;" data-termo-card="disponivel">
                         <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
                             <div class="card-body py-2 px-2 d-flex flex-column justify-content-center">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input saldo-parcial-termo-check" type="checkbox" id="saldoIncDisponivel" data-termo="disponivel" checked>
+                                    <label class="form-check-label small" for="saldoIncDisponivel">Incluir no Saldo Parcial</label>
+                                </div>
                                 <h6 class="text-muted mb-2">Orçamento Disponível</h6>
                                 <h4 class="mb-0 fw-bold format-currency">{{ total_orcamento_disponivel|floatformat:2 }}</h4>
                             </div>
@@ -220,9 +233,13 @@
                             <span class="fs-4 fw-bold text-secondary">−</span>
                         </div>
                     </div>
-                    <div class="col flex-grow-1" style="min-width: 0;">
+                    <div class="col flex-grow-1 saldo-parcial-termo-card" style="min-width: 0;" data-termo-card="req_sem_nf">
                         <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4" style="border-left-color: #6f42c1 !important;">
                             <div class="card-body py-2 px-2 d-flex flex-column justify-content-center">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input saldo-parcial-termo-check" type="checkbox" id="saldoIncReqSemNf" data-termo="req_sem_nf" checked>
+                                    <label class="form-check-label small" for="saldoIncReqSemNf">Incluir no Saldo Parcial</label>
+                                </div>
                                 <h6 class="text-muted mb-2">Requisições sem NF</h6>
                                 <h4 class="mb-0 fw-bold format-currency">{{ valor_total_requisicoes_sem_nf|floatformat:2 }}</h4>
                             </div>
@@ -233,9 +250,13 @@
                             <span class="fs-4 fw-bold text-secondary">−</span>
                         </div>
                     </div>
-                    <div class="col flex-grow-1" style="min-width: 0;">
+                    <div class="col flex-grow-1 saldo-parcial-termo-card" style="min-width: 0;" data-termo-card="gastos_prev_nao">
                         <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-warning">
                             <div class="card-body py-2 px-2 d-flex flex-column justify-content-center">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input saldo-parcial-termo-check" type="checkbox" id="saldoIncGastosPrev" data-termo="gastos_prev_nao" checked>
+                                    <label class="form-check-label small" for="saldoIncGastosPrev">Incluir no Saldo Parcial</label>
+                                </div>
                                 <h6 class="text-muted mb-2">Gastos Previstos (Serviço Concluído = NÃO)</h6>
                                 <h4 class="mb-0 fw-bold format-currency">{{ valor_servico_concluido_nao|floatformat:2 }}</h4>
                             </div>
@@ -246,10 +267,14 @@
                             <span class="fs-4 fw-bold text-secondary">−</span>
                         </div>
                     </div>
-                    <div class="col flex-grow-1" style="min-width: 0;">
+                    <div class="col flex-grow-1 saldo-parcial-termo-card" style="min-width: 0;" data-termo-card="nf_lancadas">
                         <div class="card stat-card kpi-card shadow-sm border-0 h-100 border-start border-4 border-success">
                             <div class="card-body py-2 px-2 d-flex flex-column justify-content-center">
-                                <h6 class="text-muted mb-2">Valor NF Lançadas</h6>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input saldo-parcial-termo-check" type="checkbox" id="saldoIncNfLancadas" data-termo="nf_lancadas" checked>
+                                    <label class="form-check-label small" for="saldoIncNfLancadas">Incluir no Saldo Parcial</label>
+                                </div>
+                                <h6 class="text-muted mb-2">Total em NF</h6>
                                 <h4 class="mb-0 fw-bold format-currency">{{ valor_total_notas_lancadas|floatformat:2 }}</h4>
                             </div>
                         </div>
@@ -263,7 +288,9 @@
                         <div class="card stat-card kpi-card h-100 border border-2 shadow" style="border-color: #0d6efd !important; background: linear-gradient(135deg, #e7f1ff 0%, #cfe2ff 100%);">
                             <div class="card-body py-2 px-2 d-flex flex-column justify-content-center">
                                 <h6 class="text-muted mb-2">Saldo Parcial</h6>
-                                <h4 class="mb-0 fw-bold text-primary format-currency">{{ saldo_parcial|floatformat:2 }}</h4>
+                                <h4 id="saldoParcialValor" class="mb-1 fw-bold text-primary" title="Recalculado conforme os itens incluídos abaixo">{{ saldo_parcial|floatformat:2 }}</h4>
+                                <p id="saldoParcialFormula" class="mb-0 small text-muted" style="line-height: 1.25;"></p>
+                                <button type="button" class="btn btn-sm btn-outline-primary mt-2 align-self-start" id="saldoParcialResetFormula">Marcar todos</button>
                             </div>
                         </div>
                     </div>
@@ -471,9 +498,9 @@
                                     <div class="card-body">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <div>
-                                                <h6 class="text-muted mb-2">Valor NF Lançadas</h6>
+                                                <h6 class="text-muted mb-2">Total em NF</h6>
                                                 <h4 class="mb-0 fw-bold format-currency">{{ valor_total_notas_lancadas|floatformat:2 }}</h4>
-                                                <small class="text-muted">Situação: LANÇADA | Uso: 242</small>
+                                                <small class="text-muted">Mesmo «Valor Total» de <a href="{% url 'analise_notas_fiscais' %}?ano={{ ano_filtro }}{% if meses_explicitos_na_url %}{% for m in meses_filtro_url %}&mes={{ m }}{% endfor %}{% endif %}" target="_blank" rel="noopener noreferrer">Análise de Notas Fiscais</a> (data de emissão + ocorrências de atraso).</small>
                                             </div>
                                             <i class="fas fa-file-invoice-dollar fa-2x text-success opacity-25"></i>
                                         </div>
@@ -501,7 +528,7 @@
                                     <div class="card-body">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <div>
-                                                <h6 class="text-muted mb-2">Valor NF Lançadas: impacto no orçamento</h6>
+                                                <h6 class="text-muted mb-2">Total em NF: impacto no orçamento</h6>
                                                 <h4 class="mb-0 fw-bold">{{ percentual_notas_lancadas_sobre_orcamento|floatformat:1 }}%</h4>
                                                 <small class="text-muted">do orçamento total</small>
                                             </div>
@@ -628,7 +655,105 @@ document.addEventListener('DOMContentLoaded', function() {
             el.textContent = formatarNumeroBR(num, 1) + '%';
         }
     });
+
+    initSaldoParcialToggle();
 });
+
+/** Incluir/excluir termos do cálculo do Saldo Parcial (persistência por ano+mês no localStorage). */
+function initSaldoParcialToggle() {
+    const jsonEl = document.getElementById('saldo-parcial-terms-json');
+    const keyEl = document.getElementById('saldo-parcial-filtro-key');
+    if (!jsonEl || !keyEl) return;
+    let terms;
+    try {
+        terms = JSON.parse(jsonEl.textContent.trim());
+    } catch (e) {
+        return;
+    }
+    const filterKey = keyEl.value || 'default';
+    const storageKey = 'orc_analise_saldo_inc_' + filterKey;
+    const labels = {
+        disponivel: 'Orç. disponível',
+        req_sem_nf: 'Req. sem NF',
+        gastos_prev_nao: 'Gastos prev. (serv. concl. = NÃO)',
+        nf_lancadas: 'Total em NF'
+    };
+    const order = ['disponivel', 'req_sem_nf', 'gastos_prev_nao', 'nf_lancadas'];
+    const checks = {};
+    order.forEach(function (t) {
+        checks[t] = document.querySelector('.saldo-parcial-termo-check[data-termo="' + t + '"]');
+    });
+
+    function loadState() {
+        try {
+            var raw = localStorage.getItem(storageKey);
+            if (raw) {
+                var o = JSON.parse(raw);
+                order.forEach(function (t) {
+                    if (checks[t] && typeof o[t] === 'boolean') checks[t].checked = o[t];
+                });
+            }
+        } catch (e) { /* ignore */ }
+    }
+
+    function saveState() {
+        var o = {};
+        order.forEach(function (t) {
+            if (checks[t]) o[t] = checks[t].checked;
+        });
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(o));
+        } catch (e) { /* ignore */ }
+    }
+
+    function updateCardVisual() {
+        order.forEach(function (t) {
+            var card = document.querySelector('[data-termo-card="' + t + '"]');
+            var ch = checks[t];
+            if (card && ch) card.classList.toggle('saldo-termo-excluido', !ch.checked);
+        });
+    }
+
+    function recalc() {
+        function inc(t) { return checks[t] && checks[t].checked; }
+        function v(t) { return typeof terms[t] === 'number' ? terms[t] : parseFloat(terms[t]) || 0; }
+        var saldo = 0;
+        if (inc('disponivel')) saldo += v('disponivel');
+        if (inc('req_sem_nf')) saldo -= v('req_sem_nf');
+        if (inc('gastos_prev_nao')) saldo -= v('gastos_prev_nao');
+        if (inc('nf_lancadas')) saldo -= v('nf_lancadas');
+        var el = document.getElementById('saldoParcialValor');
+        if (el) el.textContent = formatarMoeda(saldo);
+        var parts = [];
+        if (inc('disponivel')) parts.push(labels.disponivel + ' (' + formatarMoeda(v('disponivel')) + ')');
+        else parts.push('0 (orç. disponível excluído)');
+        var subs = [];
+        if (inc('req_sem_nf')) subs.push('− ' + labels.req_sem_nf + ' (' + formatarMoeda(v('req_sem_nf')) + ')');
+        if (inc('gastos_prev_nao')) subs.push('− ' + labels.gastos_prev_nao + ' (' + formatarMoeda(v('gastos_prev_nao')) + ')');
+        if (inc('nf_lancadas')) subs.push('− ' + labels.nf_lancadas + ' (' + formatarMoeda(v('nf_lancadas')) + ')');
+        var formulaEl = document.getElementById('saldoParcialFormula');
+        if (formulaEl) {
+            formulaEl.textContent = parts[0] + (subs.length ? ' ' + subs.join(' ') : '') + ' = ' + formatarMoeda(saldo);
+        }
+        updateCardVisual();
+        saveState();
+    }
+
+    loadState();
+    order.forEach(function (t) {
+        if (checks[t]) checks[t].addEventListener('change', recalc);
+    });
+    var resetBtn = document.getElementById('saldoParcialResetFormula');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function () {
+            order.forEach(function (t) {
+                if (checks[t]) checks[t].checked = true;
+            });
+            recalc();
+        });
+    }
+    recalc();
+}
 
 // Gráfico de Evolução Temporal
 const evolucaoEl = document.getElementById('evolucaoChart');

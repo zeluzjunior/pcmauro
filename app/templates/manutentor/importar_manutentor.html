@@ -12,7 +12,7 @@
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
-                        <li class="breadcrumb-item active text-white" aria-current="page">Importar Dados</li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_manutentores' %}" class="text-white">Manutentores</a></li>
                         <li class="breadcrumb-item active text-white" aria-current="page">Importar Manutentor</li>
                     </ol>
                 </nav>
@@ -73,7 +73,20 @@
                     </div>
                     <div class="card-body">
                         <h6 class="fw-bold">Formato do Arquivo</h6>
-                        <p>O arquivo Excel ou CSV deve conter as seguintes colunas (primeira linha como cabeçalho):</p>
+                        <p class="mb-3">O sistema aceita dois modos. Demais colunas além das descritas abaixo são <strong>ignoradas</strong>.</p>
+                        <div class="alert alert-secondary small mb-4">
+                            <strong><i class="fas fa-file-excel me-1"></i>Planilha RH (ex.: HRCL102)</strong> — colunas:
+                            <code>MATRICULA</code> → matrícula (chave),
+                            <code>NOME</code>,
+                            <code>CARGO</code>,
+                            <code>LOCAL</code> → local de trabalho
+                            (equivalente a <code>LOCAL_TRAB</code>). O Excel pode ter título na primeira linha;
+                            o cabeçalho com <strong>MATRICULA</strong> é localizado automaticamente.
+                            Novos registros recebem turno padrão <strong>COMERCIAL</strong> e tempo de trabalho <strong>—</strong> até você editar no cadastro.
+                            Com <strong>Atualizar registros existentes</strong>, matrículas já cadastradas têm apenas
+                            <strong>Nome</strong>, <strong>Cargo</strong> e <strong>Local de trabalho</strong> atualizados (turno e tempo não são alterados).
+                        </div>
+                        <p>O arquivo Excel ou CSV no formato completo pode conter as colunas abaixo (primeira linha como cabeçalho, ou linha detectada no Excel):</p>
                         <div class="table-responsive">
                             <table class="table table-bordered table-sm">
                                 <thead class="table-light">
@@ -118,20 +131,20 @@
                                     <tr>
                                         <td><strong>TEMPO_TRABALHO</strong></td>
                                         <td>Tempo de trabalho</td>
-                                        <td><span class="badge bg-danger">Sim</span></td>
-                                        <td>Texto</td>
+                                        <td><span class="badge bg-warning text-dark">Modo completo</span></td>
+                                        <td>Obrigatório se <strong>TURNO</strong> vier preenchido; no modo RH (só 4 colunas) use padrão automático em novos cadastros</td>
                                     </tr>
                                     <tr>
                                         <td><strong>TURNO</strong></td>
                                         <td>Turno de trabalho</td>
-                                        <td><span class="badge bg-danger">Sim</span></td>
-                                        <td>Turno A, Turno B, Turno C</td>
+                                        <td><span class="badge bg-warning text-dark">Modo completo</span></td>
+                                        <td>Turno A, B, C, COMERCIAL — obrigatório junto com TEMPO_TRABALHO nesse modo</td>
                                     </tr>
                                     <tr>
-                                        <td><strong>LOCAL_TRAB</strong></td>
+                                        <td><strong>LOCAL</strong> ou <strong>LOCAL_TRAB</strong></td>
                                         <td>Local de trabalho</td>
-                                        <td><span class="badge bg-danger">Sim</span></td>
-                                        <td>Industria, Frigorífico, Civil, Indefinido, ETE/ETA, Utilidades, Manutenção</td>
+                                        <td><span class="badge bg-warning text-dark">Condicional</span></td>
+                                        <td>Texto livre (até 255 caracteres), gravado como veio na planilha; vazio permitido.</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -141,9 +154,9 @@
                         <ul>
                             <li>O sistema aceita variações nos nomes das colunas (maiúsculas/minúsculas, com ou sem acentos)</li>
                             <li>Para arquivos CSV, use ponto e vírgula (;) como delimitador</li>
-                            <li>A primeira linha deve conter os cabeçalhos das colunas</li>
-                            <li>Campos obrigatórios: <strong>MATRICULA</strong> (ou CADASTRO), <strong>TEMPO_TRABALHO</strong>, <strong>TURNO</strong>, <strong>LOCAL_TRAB</strong></li>
-                            <li>Se a matrícula já existir e a opção "Atualizar registros existentes" estiver marcada, o registro será atualizado</li>
+                            <li>No CSV, a primeira linha costuma ser o cabeçalho (linha 1). No Excel RH, o cabeçalho pode estar na linha 2.</li>
+                            <li>Chave única: <strong>MATRICULA</strong> (ou CADASTRO). Com &quot;Atualizar registros existentes&quot;, usada para atualizar o mesmo registro.</li>
+                            <li>Modo RH: sem <strong>TEMPO_TRABALHO</strong> e <strong>TURNO</strong> na linha — apenas Nome, Cargo e Local são aplicados em atualizações.</li>
                         </ul>
                         <hr>
                         <h6 class="fw-bold">Exemplo de Estrutura</h6>
@@ -235,4 +248,3 @@ window.addEventListener('load', function() {
 });
 </script>
 {% endblock %}
-

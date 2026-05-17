@@ -85,6 +85,10 @@
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Setor de Trabalho</label>
+                                <p class="form-control-plaintext">
+                                    <span class="badge bg-primary">{{ manutentor.get_setor_trabalho_display }}</span>
+                                </p>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">Turno</label>
@@ -100,7 +104,7 @@
                                 <label class="form-label fw-bold">Local de Trabalho</label>
                                 <p class="form-control-plaintext">
                                     {% if manutentor.local_trab %}
-                                        <span class="badge bg-success">{{ manutentor.get_local_trab_display }}</span>
+                                        <span class="badge bg-success">{{ manutentor.local_trab|default:"—" }}</span>
                                     {% else %}
                                         Não informado
                                     {% endif %}

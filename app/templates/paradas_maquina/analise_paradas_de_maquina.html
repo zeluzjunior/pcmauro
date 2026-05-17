@@ -279,7 +279,7 @@
                     <div class="section-panel section-panel-frigorifico band-inner mb-0">
                         <div class="section-header d-flex align-items-center justify-content-between">
                             <span><i class="fas fa-industry me-2"></i>Frigorífico</span>
-                            <a href="{% url 'analise_parada_frigorifico' %}?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}" class="btn btn-sm btn-light">Ver completa <i class="fas fa-external-link-alt ms-1"></i></a>
+                            <a href="{% url 'analise_parada_frigorifico' %}?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}" class="btn btn-sm btn-light" target="_blank" rel="noopener noreferrer">Ver completa <i class="fas fa-external-link-alt ms-1"></i></a>
                         </div>
                     </div>
                 </div>
@@ -287,7 +287,7 @@
                     <div class="section-panel section-panel-industria band-inner mb-0">
                         <div class="section-header d-flex align-items-center justify-content-between">
                             <span><i class="fas fa-cogs me-2"></i>Indústria</span>
-                            <a href="{% url 'analise_parada_industria' %}?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}" class="btn btn-sm btn-light">Ver completa <i class="fas fa-external-link-alt ms-1"></i></a>
+                            <a href="{% url 'analise_parada_industria' %}?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}" class="btn btn-sm btn-light" target="_blank" rel="noopener noreferrer">Ver completa <i class="fas fa-external-link-alt ms-1"></i></a>
                         </div>
                     </div>
                 </div>
@@ -389,7 +389,7 @@
             <!-- Faixa 5: Projeção do indicador (fim do mês) -->
             <div class="row g-4 band-row band-row--projecao-indicador">
                 <div class="col-lg-6">
-                    {% if projecao_dias_passados_frig and projecao_dias_restantes_frig is not None %}
+                    {% if projecao_dias_passados_frig is not None and projecao_dias_restantes_frig is not None and projecao_dias_passados_frig > 0 %}
                     <div class="section-panel section-panel-frigorifico band-inner border-0 shadow-none bg-transparent">
                         <div class="card shadow-sm border-0 border-start border-4 border-info h-100">
                             <div class="card-header bg-info text-white py-2"><h6 class="mb-0"><i class="fas fa-project-diagram me-1"></i>Projeção do Indicador Atual (restante do mês)</h6></div>
@@ -403,25 +403,44 @@
                                     <div class="col-6 col-md-6"><div class="card border-0 bg-light"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Suínos projetados (fim do mês)</h6><h5 class="mb-0 fw-bold">{% if projecao_suinos_frig_total is not None %}{{ projecao_suinos_frig_total|number_br:0 }}{% else %}-{% endif %}</h5></div></div></div>
                                     <div class="col-12"><div class="card border-0 {% if projecao_indicador_frig is not None and perda_maximo_frig is not None and projecao_indicador_frig > perda_maximo_frig %}border-danger{% else %}border-success{% endif %} border-start border-4"><div class="card-body py-2"><h6 class="text-muted mb-0 small">Indicador projetado (fim do mês)</h6><h5 class="mb-0 fw-bold {% if projecao_indicador_frig is not None and perda_maximo_frig is not None and projecao_indicador_frig > perda_maximo_frig %}text-danger{% else %}text-success{% endif %}">{% if projecao_indicador_frig is not None %}{{ projecao_indicador_frig|number_br:2 }}%{% else %}-{% endif %}</h5></div></div></div>
                                 </div>
-                                <div class="card mt-3 border-0 border-start border-4 {% if perda_max_media_restante_frig_dia is not None and perda_max_media_restante_frig_dia < 0 %}border-danger{% else %}border-primary{% endif %}">
+                                <div class="card mt-3 border-0 border-start border-4 {% if perda_max_media_restante_planej_frig_dia is not None and perda_max_media_restante_planej_frig_dia < 0 or perda_max_media_restante_frig_dia is not None and perda_max_media_restante_frig_dia < 0 %}border-danger{% else %}border-primary{% endif %}">
                                     <div class="card-body py-2">
-                                        <h6 class="text-muted mb-1 small">Necessário para manter indicador abaixo do limite</h6>
-                                        {% if perda_max_media_restante_frig_dia is not None %}
-                                            <div class="row g-2">
-                                                <div class="col-12 col-md-6">
-                                                    <small class="text-muted d-block">Média máxima de perda por dia restante</small>
-                                                    <h5 class="mb-0 fw-bold {% if perda_max_media_restante_frig_dia < 0 %}text-danger{% else %}text-primary{% endif %}">
-                                                        {{ perda_max_media_restante_frig_dia|number_br:2 }} carcaças/dia
-                                                    </h5>
-                                                </div>
-                                                <div class="col-12 col-md-6">
-                                                    <small class="text-muted d-block">Perda restante permitida no mês</small>
-                                                    <h6 class="mb-0 {% if perda_restante_permitida_frig is not None and perda_restante_permitida_frig < 0 %}text-danger{% else %}text-secondary{% endif %}">
-                                                        {% if perda_restante_permitida_frig is not None %}{{ perda_restante_permitida_frig|number_br:2 }} carcaças{% else %}-{% endif %}
-                                                    </h6>
-                                                </div>
+                                        <h6 class="text-muted mb-2 small">Margem até ao fim do mês (duas referências)</h6>
+                                        {% if perda_max_media_restante_planej_frig_dia is not None or perda_restante_meta_planejada_frig is not None %}
+                                        <p class="small text-muted mb-1"><strong>1) Meta planejada</strong> — mesmo critério do KPI «Perda Máxima planejada» (abate planejado × % máx. no mês).</p>
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-12 col-md-6">
+                                                <small class="text-muted d-block">Média máx. perda / dia restante</small>
+                                                <h5 class="mb-0 fw-bold {% if perda_max_media_restante_planej_frig_dia is not None and perda_max_media_restante_planej_frig_dia < 0 %}text-danger{% else %}text-primary{% endif %}">
+                                                    {% if perda_max_media_restante_planej_frig_dia is not None %}{{ perda_max_media_restante_planej_frig_dia|number_br:2 }} carcaças/dia{% else %}-{% endif %}
+                                                </h5>
                                             </div>
-                                        {% else %}
+                                            <div class="col-12 col-md-6">
+                                                <small class="text-muted d-block">Perda restante vs. meta planejada</small>
+                                                <h6 class="mb-0 {% if perda_restante_meta_planejada_frig is not None and perda_restante_meta_planejada_frig < 0 %}text-danger{% else %}text-secondary{% endif %}">
+                                                    {% if perda_restante_meta_planejada_frig is not None %}{{ perda_restante_meta_planejada_frig|number_br:2 }} carcaças{% else %}-{% endif %}
+                                                </h6>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        {% if perda_max_media_restante_frig_dia is not None or perda_restante_permitida_frig is not None %}
+                                        <p class="small text-muted mb-1"><strong>2) Teto do indicador</strong> — com base em suínos projetados e no mesmo critério do «Indicador Atual» (% máx. ÷ fator × suínos).</p>
+                                        <div class="row g-2">
+                                            <div class="col-12 col-md-6">
+                                                <small class="text-muted d-block">Média máx. perda / dia restante</small>
+                                                <h5 class="mb-0 fw-bold {% if perda_max_media_restante_frig_dia is not None and perda_max_media_restante_frig_dia < 0 %}text-danger{% else %}text-primary{% endif %}">
+                                                    {% if perda_max_media_restante_frig_dia is not None %}{{ perda_max_media_restante_frig_dia|number_br:2 }} carcaças/dia{% else %}-{% endif %}
+                                                </h5>
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <small class="text-muted d-block">Perda restante vs. teto do indicador</small>
+                                                <h6 class="mb-0 {% if perda_restante_permitida_frig is not None and perda_restante_permitida_frig < 0 %}text-danger{% else %}text-secondary{% endif %}">
+                                                    {% if perda_restante_permitida_frig is not None %}{{ perda_restante_permitida_frig|number_br:2 }} carcaças{% else %}-{% endif %}
+                                                </h6>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        {% if perda_max_media_restante_planej_frig_dia is None and perda_restante_meta_planejada_frig is None and perda_max_media_restante_frig_dia is None and perda_restante_permitida_frig is None %}
                                             <span class="text-muted small">Dados insuficientes para calcular a meta diária máxima.</span>
                                         {% endif %}
                                     </div>
@@ -434,7 +453,7 @@
                     {% endif %}
                 </div>
                 <div class="col-lg-6">
-                    {% if projecao_dias_passados_ind and projecao_dias_restantes_ind is not None %}
+                    {% if projecao_dias_passados_ind is not None and projecao_dias_restantes_ind is not None and projecao_dias_passados_ind > 0 %}
                     <div class="section-panel section-panel-industria band-inner border-0 shadow-none bg-transparent">
                         <div class="card shadow-sm border-0 border-start border-4 border-info h-100">
                             <div class="card-header bg-info text-white py-2"><h6 class="mb-0"><i class="fas fa-project-diagram me-1"></i>Projeção do Indicador Atual (restante do mês)</h6></div>

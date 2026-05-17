@@ -1,0 +1,626 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Análise Máquina e Manutentor{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(13, 110, 253, 0.5), rgba(13, 110, 253, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise de Mão de Obra</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise Máquina e Manutentor</li>
+                    </ol>
+                </nav>
+                <h1 class="display-5 fw-bold mt-3">
+                    <i class="bi bi-diagram-3 me-2"></i>Análise Máquina e Manutentor
+                </h1>
+                <p class="lead mb-0">Selecione o setor (<strong>descr_setormanut</strong>). Opcionalmente restrinja por <strong>turno</strong> do manutentor e por <strong>descrição gerência</strong> (<code>descr_gerenc</code>) das máquinas. O <strong>Centro de Atividade</strong> segue o vínculo na máquina ou <code>cd_tpcentativ</code>, <code>cd_setormanut</code> ou descrição do CA. O <strong>local</strong> do CA é confrontado com <strong>local de trabalho</strong> dos manutentores; vínculos em <strong>Máquina do Manutentor</strong> aparecem como coerentes ou divergentes.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-funnel me-2"></i>Setor de manutenção</h5>
+            </div>
+            <div class="card-body">
+                <form method="get" action="{% url 'analise_maquina_manutentor' %}">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-8">
+                            <label for="descr_setormanut" class="form-label">Descrição do setor (<code>descr_setormanut</code>)</label>
+                            <select name="descr_setormanut" id="descr_setormanut" class="form-select" required>
+                                <option value="">— Selecione —</option>
+                                {% for s in setores_opcoes %}
+                                <option value="{{ s }}" {% if descr_setormanut_selecionado == s %}selected{% endif %}>{{ s }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-12">
+                            <label class="form-label d-block">Turno do manutentor</label>
+                            <p class="small text-muted mb-2">Opcional. Marque uma ou mais opções para restringir manutentores e vínculos antes de <strong>Avaliar</strong>. Sem marcação = todos os turnos.</p>
+                            <div class="d-flex flex-wrap gap-3 border rounded px-3 py-2 bg-light">
+                                {% for val, label in turno_opcoes %}
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" name="turno" value="{{ val }}" id="filtro_turno_{{ forloop.counter }}" {% if val in turnos_selecionados %}checked{% endif %}>
+                                    <label class="form-check-label" for="filtro_turno_{{ forloop.counter }}">{{ label }}</label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-12">
+                            <label class="form-label d-block">Descrição gerência (<code>descr_gerenc</code>)</label>
+                            <p class="small text-muted mb-2">Opcional. Restringe a <strong>lista de máquinas</strong> do setor às descrições marcadas. Valores são os que existem nas máquinas do setor selecionado. Sem marcação = todas as máquinas do setor.</p>
+                            {% if descr_gerenc_opcoes or descr_gerenc_tem_vazio %}
+                            <div class="border rounded px-3 py-2 bg-light" style="max-height: 240px; overflow-y: auto;">
+                                <div class="row row-cols-1 row-cols-lg-2 g-2">
+                                    {% for g in descr_gerenc_opcoes %}
+                                    <div class="col">
+                                        <div class="form-check mb-0">
+                                            <input class="form-check-input" type="checkbox" name="descr_gerenc" value="{{ g }}" id="filtro_gerenc_{{ forloop.counter }}" {% if g in descr_gerenc_selecionados %}checked{% endif %}>
+                                            <label class="form-check-label small" for="filtro_gerenc_{{ forloop.counter }}" title="{{ g }}">{{ g|truncatechars:72 }}</label>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                    {% if descr_gerenc_tem_vazio %}
+                                    <div class="col">
+                                        <div class="form-check mb-0">
+                                            <input class="form-check-input" type="checkbox" name="descr_gerenc" value="{{ descr_gerenc_vazio_valor }}" id="filtro_gerenc_vazio" {% if descr_gerenc_vazio_valor in descr_gerenc_selecionados %}checked{% endif %}>
+                                            <label class="form-check-label small text-muted" for="filtro_gerenc_vazio"><em>(Sem descrição gerência — campo vazio)</em></label>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% else %}
+                            <p class="small text-muted fst-italic mb-0">Escolha um setor e clique em <strong>Avaliar</strong> para carregar as descrições de gerência disponíveis neste setor.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-4 col-lg-3">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-check2-circle me-1"></i>Avaliar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                {% if not setores_opcoes %}
+                <p class="text-muted mb-0 mt-3">Nenhuma descrição de setor cadastrada nas máquinas.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if analise %}
+            {% if analise.erro %}
+            <div class="alert alert-warning">{{ analise.erro }}</div>
+            {% else %}
+
+            {% if analise.filtro_turnos or analise.filtro_descr_gerenc %}
+            <div class="alert alert-info py-2">
+                {% if analise.filtro_turnos %}
+                <div class="mb-1">
+                    <strong>Filtro de turno:</strong>
+                    {% for t in analise.filtro_turnos %}<span class="badge bg-primary me-1">{{ t }}</span>{% endfor %}
+                    <span class="small ms-1">— manutentores e vínculos só nesses turnos.</span>
+                </div>
+                {% endif %}
+                {% if analise.filtro_descr_gerenc %}
+                <div>
+                    <strong>Filtro descrição gerência:</strong>
+                    {% for x in analise.filtro_descr_gerenc %}
+                        {% if x == descr_gerenc_vazio_valor %}
+                        <span class="badge bg-secondary me-1">(campo vazio)</span>
+                        {% else %}
+                        <span class="badge bg-dark me-1">{{ x|truncatechars:48 }}</span>
+                        {% endif %}
+                    {% endfor %}
+                    <span class="small ms-1">— apenas máquinas com essas <code>descr_gerenc</code> entram na lista e nos totais.</span>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <div class="card border-primary h-100 shadow-sm">
+                        <div class="card-body">
+                            <div class="text-muted small">{% if analise.filtro_descr_gerenc %}Máquinas (após filtro gerência){% else %}Máquinas no setor{% endif %}</div>
+                            <div class="fs-3 fw-bold text-primary">{{ analise.total_maquinas }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-secondary h-100 shadow-sm">
+                        <div class="card-body">
+                            <div class="text-muted small">Centros de atividade (distintos)</div>
+                            <div class="fs-3 fw-bold">{{ analise.centros|length }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-success h-100 shadow-sm">
+                        <div class="card-body">
+                            <div class="text-muted small">Manutentores ativos (local compatível com CA)</div>
+                            <div class="fs-3 fw-bold text-success">{{ analise.manutentores_local_compativel|length }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-info h-100 shadow-sm">
+                        <div class="card-body">
+                            <div class="text-muted small">Compatíveis sem vínculo a máquina do setor</div>
+                            <div class="fs-3 fw-bold text-info">{{ analise.elegiveis_sem_vinculo|length }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if analise.sem_centro_atividade %}
+            <div class="alert alert-warning">
+                <strong><i class="bi bi-exclamation-triangle me-1"></i>{{ analise.sem_centro_atividade|length }} máquina(s)</strong> sem Centro de Atividade vinculado — não entram no cruzamento por <code>local</code>.
+            </div>
+            {% endif %}
+
+            {% if analise.sem_local_no_centro %}
+            <div class="alert alert-secondary">
+                <strong><i class="bi bi-info-circle me-1"></i>{{ analise.sem_local_no_centro|length }} máquina(s)</strong> com CA cadastrado mas <strong>local</strong> do CA vazio — não é possível casar com <code>local_trab</code>.
+            </div>
+            {% endif %}
+
+            {% if analise.locais_ca_sem_manutentor %}
+            <div class="alert alert-danger">
+                <strong>Locais do CA sem manutentor ativo com o mesmo local de trabalho:</strong>
+                <ul class="mb-0 mt-2">
+                    {% for loc in analise.locais_ca_sem_manutentor %}
+                    <li>{{ loc }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if analise.locais_ca_distintos %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Locais nos Centros de Atividade (deste setor)</h6>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-2">Valores do campo <code>CentroAtividade.local</code> encontrados nas máquinas do setor selecionado (comparação com manutentores ignorando maiúsculas/minúsculas).</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for loc in analise.locais_ca_distintos %}
+                        <span class="badge bg-primary rounded-pill">{{ loc }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0"><i class="bi bi-building me-2"></i>Centros de atividade</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>CA</th>
+                                <th>Sigla</th>
+                                <th>Descrição</th>
+                                <th>Local</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ca in analise.centros %}
+                            <tr>
+                                <td>{{ ca.ca }}</td>
+                                <td>{{ ca.sigla|default:"—" }}</td>
+                                <td>{{ ca.descricao|default:"—" }}</td>
+                                <td>{{ ca.local|default:"—" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-muted">Nenhum centro vinculado às máquinas deste setor.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <form method="get" action="{% url 'analise_maquina_manutentor' %}" id="form-sugestao-divisao" class="mb-4" autocomplete="off" novalidate>
+                <input type="hidden" name="descr_setormanut" value="{{ descr_setormanut_selecionado|default_if_none:'' }}">
+                {% for t in turnos_selecionados %}<input type="hidden" name="turno" value="{{ t }}">{% endfor %}
+                {% for g in descr_gerenc_selecionados %}<input type="hidden" name="descr_gerenc" value="{{ g }}">{% endfor %}
+
+            <div class="card shadow-sm mb-4 border-success border-opacity-50">
+                <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <h6 class="mb-0"><i class="bi bi-people me-2"></i>Manutentores ativos — local compatível com o CA do setor</h6>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-secondary" id="btn-sel-todos-manut" title="Marcar todos">Todos</button>
+                        <button type="button" class="btn btn-outline-secondary" id="btn-sel-nenhum-manut" title="Desmarcar todos">Nenhum</button>
+                    </div>
+                </div>
+                <div class="card-body py-2 border-bottom bg-success bg-opacity-10">
+                    <p class="small mb-0 text-muted"><i class="bi bi-hand-index-thumb me-1"></i>Marque os manutentores que entram na <strong>sugestão de divisão</strong>. Depois marque as máquinas na tabela seguinte e use <strong>Gerar sugestão de divisão</strong>.</p>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 2.5rem;" class="text-center">
+                                    <span class="visually-hidden">Selecionar</span>
+                                    <i class="bi bi-check2-square text-muted" title="Seleção para sugestão"></i>
+                                </th>
+                                <th>Matrícula</th>
+                                <th>Nome</th>
+                                <th>Turno</th>
+                                <th>Local de trabalho</th>
+                                <th>Vínculo com máquina do setor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for man in analise.manutentores_local_compativel %}
+                            <tr class="{% if man in analise.elegiveis_sem_vinculo %}table-warning{% endif %}">
+                                <td class="text-center align-middle">
+                                    <input class="form-check-input sel-manut" type="checkbox" name="sel_manut" value="{{ man.Matricula }}" id="sel_manut_{{ forloop.counter }}" {% if man.Matricula in analise.sel_manut_checked_values %}checked{% endif %}>
+                                </td>
+                                <td><label class="mb-0 fw-normal" for="sel_manut_{{ forloop.counter }}"><a href="{% url 'visualizar_manutentor' man.Matricula %}" class="text-decoration-none" onclick="event.stopPropagation();">{{ man.Matricula }}</a></label></td>
+                                <td>{{ man.Nome|default:"—" }}</td>
+                                <td><span class="badge text-dark border">{{ man.get_turno_display }}</span></td>
+                                <td>{{ man.local_trab|default:"—" }}</td>
+                                <td>
+                                    {% if man in analise.elegiveis_sem_vinculo %}
+                                    <span class="badge bg-warning text-dark">Sem vínculo com máquina deste setor</span>
+                                    {% else %}
+                                    <span class="badge bg-success">Possui vínculo</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="6" class="text-muted">Nenhum manutentor ativo com <code>local_trab</code> igual ao <code>local</code> de algum CA das máquinas deste setor.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4 border-primary border-opacity-25">
+                <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <h6 class="mb-0"><i class="bi bi-grid-3x3-gap me-2"></i>Máquinas do setor e vínculos (coerência com local do CA)</h6>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <div class="form-check mb-0">
+                            <input type="checkbox" class="form-check-input" id="chk-sel-todas-maquinas" title="Selecionar todas as máquinas desta tabela" aria-label="Selecionar todas as máquinas desta tabela">
+                            <label class="form-check-label small" for="chk-sel-todas-maquinas">Sel. todas</label>
+                        </div>
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Seleção em massa das máquinas">
+                            <button type="button" class="btn btn-outline-primary" id="btn-sel-todos-maq" title="Marca todas as linhas desta tabela">
+                                <i class="bi bi-ui-checks me-1"></i>Todas as máquinas
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="btn-sel-nenhum-maq" title="Desmarca todas">
+                                Limpar seleção
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body py-2 border-bottom bg-primary bg-opacity-10">
+                    <p class="small mb-0 text-muted"><i class="bi bi-hdd-network me-1"></i>Marque as máquinas que deseja distribuir entre os manutentores selecionados — ou use <strong>Todas as máquinas</strong> / o checkbox no cabeçalho da tabela para selecionar <strong>todas as máquinas listadas</strong> no setor (resultado atual dos filtros).</p>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 2.5rem;" class="text-center align-middle"><span class="visually-hidden">Sel.</span></th>
+                                <th>Cód.</th>
+                                <th>Máquina</th>
+                                <th>Descr. gerência</th>
+                                <th>Centro de atividade</th>
+                                <th>Local CA</th>
+                                <th>Vínculos</th>
+                                <th>Coerentes</th>
+                                <th>Divergentes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in analise.linhas_maquinas %}
+                            <tr>
+                                <td class="text-center align-middle">
+                                    <input class="form-check-input sel-maq" type="checkbox" name="sel_maquina" value="{{ row.maquina.id }}" id="sel_maq_{{ row.maquina.id }}" {% if row.maquina.id in analise.sel_maquina_selecionados %}checked{% endif %}>
+                                </td>
+                                <td><label class="mb-0 fw-normal" for="sel_maq_{{ row.maquina.id }}"><a href="{% url 'visualizar_maquina' row.maquina.id }}" onclick="event.stopPropagation();">{{ row.maquina.cd_maquina }}</a></label></td>
+                                <td>{{ row.maquina.descr_maquina|default:"—"|truncatechars:48 }}</td>
+                                <td class="small">{{ row.maquina.descr_gerenc|default:"—"|truncatechars:56 }}</td>
+                                <td>
+                                    {% if row.centro %}
+                                    <div class="fw-semibold">{{ row.centro.ca }} — {{ row.centro.sigla|default:row.centro.descricao|truncatechars:32 }}</div>
+                                    {% if row.centro_origem == 'fk' %}
+                                    <span class="badge bg-secondary mt-1">CA pelo cadastro da máquina</span>
+                                    {% elif row.centro_origem == 'cd_tpcentativ' %}
+                                    <span class="badge bg-info text-dark mt-1">CA por cód. tipo centro (<code>cd_tpcentativ</code>)</span>
+                                    {% elif row.centro_origem == 'cd_setormanut_sigla' %}
+                                    <span class="badge bg-primary mt-1">CA pela sigla em <code>cd_setormanut</code></span>
+                                    {% elif row.centro_origem == 'cd_setormanut_ca' %}
+                                    <span class="badge bg-primary mt-1">CA pelo número em <code>cd_setormanut</code></span>
+                                    {% elif row.centro_origem == 'descr_setormanut' %}
+                                    <span class="badge bg-primary mt-1">CA pela descrição (= descr. do cadastro)</span>
+                                    {% endif %}
+                                    {% else %}
+                                    <span class="badge bg-warning text-dark">Sem CA</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ row.local_ca|default:"—" }}</td>
+                                <td>{{ row.assoc_total }}</td>
+                                <td>
+                                    {% if row.assoc_coerentes %}
+                                    <ul class="small mb-0 ps-3">
+                                        {% for rel in row.assoc_coerentes %}
+                                        <li><a href="{% url 'visualizar_manutentor' rel.manutentor.Matricula %}">{{ rel.manutentor.Nome|default:rel.manutentor.Matricula }}</a> ({{ rel.manutentor.local_trab|default:"—" }})</li>
+                                        {% endfor %}
+                                    </ul>
+                                    {% else %}—{% endif %}
+                                </td>
+                                <td>
+                                    {% if row.assoc_divergentes %}
+                                    <ul class="small mb-0 ps-3 text-danger">
+                                        {% for rel in row.assoc_divergentes %}
+                                        <li><a href="{% url 'visualizar_manutentor' rel.manutentor.Matricula %}" class="link-danger">{{ rel.manutentor.Nome|default:rel.manutentor.Matricula }}</a> ({{ rel.manutentor.local_trab|default:"—" }})</li>
+                                        {% endfor %}
+                                    </ul>
+                                    {% else %}—{% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer small text-muted">
+                    <strong>Coerente:</strong> o manutentor vinculado tem <code>local_trab</code> igual ao <code>local</code> do CA da máquina (ignorando maiúsculas/minúsculas).
+                    <strong>Divergente:</strong> há vínculo, mas o local não coincide ou o CA/local está vazio.
+                    <span class="d-block mt-1"><strong>Resolução do CA:</strong> prioridade — FK na máquina; depois <code>cd_tpcentativ</code> = número do CA; depois <code>cd_setormanut</code> (sigla ou dígitos, ex. «ABT 2488» ou «2.488»); por último <code>descr_setormanut</code> igual à descrição do CA.</span>
+                </div>
+            </div>
+
+                <div class="card shadow-sm mb-4 border-0 bg-gradient" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+                    <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+                        <div>
+                            <h6 class="mb-1"><i class="bi bi-stars text-warning me-2"></i>Sugestão de divisão de carteiras</h6>
+                            <p class="small text-muted mb-0">Simulação automática: cada máquina marcada é atribuída ao manutentor compatível com o <strong>local do CA</strong> que tiver <strong>menos vínculos</strong> no setor (entre os marcados), para equilibrar carga.</p>
+                        </div>
+                        <button type="submit" name="acao_sugestao" value="1" class="btn btn-success btn-lg px-4 shadow-sm">
+                            <i class="bi bi-diagram-3 me-2"></i>Gerar sugestão de divisão
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            {% if analise.sugestao_divisao.ativa %}
+            <section class="mb-5" aria-label="Resultado da sugestão">
+                <div class="card shadow border-0 overflow-hidden mb-4">
+                    <div class="card-header text-white py-3" style="background: linear-gradient(90deg, #198754 0%, #0d6efd 100%);">
+                        <h5 class="mb-0"><i class="bi bi-patch-check-fill me-2"></i>Painel sugerido — quem poderia cuidar de quê</h5>
+                        <p class="mb-0 mt-1 small opacity-90">Isto não altera cadastros; é um raciocínio auxiliar para alinhamento de equipe e PCM.</p>
+                    </div>
+                    <div class="card-body">
+                        {% with met=analise.sugestao_divisao.metricas %}
+                        <div class="row g-3 mb-4">
+                            <div class="col-6 col-md-3">
+                                <div class="rounded-3 border p-3 text-center h-100 bg-white">
+                                    <div class="text-muted small">Máquinas marcadas</div>
+                                    <div class="fs-4 fw-bold text-primary">{{ met.n_maq_marcadas }}</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="rounded-3 border p-3 text-center h-100 bg-white">
+                                    <div class="text-muted small">Atribuídas na simulação</div>
+                                    <div class="fs-4 fw-bold text-success">{{ met.n_atribuidas }}</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="rounded-3 border p-3 text-center h-100 bg-white">
+                                    <div class="text-muted small">Média / manutentor</div>
+                                    <div class="fs-4 fw-bold">{{ met.media }}</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="rounded-3 border p-3 text-center h-100 bg-white">
+                                    <div class="text-muted small">Dispersão (desvio)</div>
+                                    <div class="fs-4 fw-bold text-secondary">{{ met.dp }}</div>
+                                    <div class="small text-muted">min {{ met.min }} — max {{ met.max }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endwith %}
+
+                        {% if analise.sugestao_divisao.insights %}
+                        <div class="alert alert-light border mb-4">
+                            <strong><i class="bi bi-lightbulb me-1"></i>Leitura rápida</strong>
+                            <ul class="mb-0 mt-2 small">
+                                {% for tip in analise.sugestao_divisao.insights %}
+                                <li>{{ tip }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        <div class="row g-4">
+                            {% for bloco in analise.sugestao_divisao.por_manut %}
+                            <div class="col-lg-6">
+                                <div class="card h-100 shadow-sm border-start border-success border-4">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <div>
+                                                <h6 class="mb-0">{{ bloco.manutentor.Nome|default:bloco.manutentor.Matricula }}</h6>
+                                                <small class="text-muted">{{ bloco.manutentor.Matricula }} · {{ bloco.manutentor.get_turno_display }} · {{ bloco.manutentor.local_trab|default:"—" }}</small>
+                                            </div>
+                                            <span class="badge bg-success rounded-pill fs-6">{{ bloco.total }} máq.</span>
+                                        </div>
+                                        <div class="mb-2 small text-muted">Vínculos atuais neste setor (entre os selecionados): <strong>{{ bloco.carga_previa_setor }}</strong></div>
+                                        {% if analise.sugestao_divisao.metricas.max %}
+                                        <div class="progress mb-3" style="height: 8px;" title="Carga sugerida relativa ao máximo do grupo">
+                                            {% widthratio bloco.total analise.sugestao_divisao.metricas.max 100 as pct %}
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ pct }}%; min-width: 8%;"></div>
+                                        </div>
+                                        {% endif %}
+                                        {% if bloco.itens %}
+                                        <ul class="list-group list-group-flush small mb-2">
+                                            {% for it in bloco.itens %}
+                                            <li class="list-group-item px-0 py-1 border-0 border-bottom">
+                                                <strong>{{ it.maquina.cd_maquina }}</strong>
+                                                — {{ it.maquina.descr_maquina|default:"—"|truncatechars:40 }}
+                                                <span class="text-muted"> · CA local: {{ it.loc_ca }}</span>
+                                                {% if it.ja_vinculado %}<span class="badge bg-secondary ms-1">já vinculado</span>{% endif %}
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% else %}
+                                        <p class="small text-muted fst-italic mb-2">Nenhuma máquina sugerida para este perfil na seleção atual.</p>
+                                        {% endif %}
+                                        {% for d in bloco.dicas %}
+                                        <p class="small mb-1"><i class="bi bi-chat-quote text-primary me-1"></i>{{ d }}</p>
+                                        {% endfor %}
+                                        <a href="{% url 'visualizar_manutentor' bloco.manutentor.Matricula %}" class="small">Abrir ficha do manutentor →</a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        {% if analise.sugestao_divisao.nao_atribuidas %}
+                        <div class="alert alert-warning mt-4 mb-0">
+                            <strong><i class="bi bi-exclamation-triangle me-1"></i>Máquinas marcadas sem sugestão automática</strong>
+                            <ul class="small mb-0 mt-2">
+                                {% for na in analise.sugestao_divisao.nao_atribuidas %}
+                                <li>
+                                    <strong>{{ na.maquina.cd_maquina }}</strong> — {{ na.detalhe }}
+                                    {% if na.local_ca %}<span class="text-muted">(local CA: {{ na.local_ca }})</span>{% endif %}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if analise.sugestao_divisao.carga_preventiva %}
+                {% with cp=analise.sugestao_divisao.carga_preventiva %}
+                <div class="card shadow-sm border-0 mt-4 overflow-hidden">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h6 class="mb-1"><i class="bi bi-clipboard-data me-2 text-primary"></i>Carga histórica — OS preventivas nas máquinas da simulação</h6>
+                        <p class="mb-0 small text-muted">
+                            {{ cp.n_maquinas_atribuidas }} máquina(s) com atribuição na simulação ·
+                            <strong>{{ cp.total_ordens }}</strong> OS preventivas somadas ·
+                            <strong>{{ cp.total_horas_apontadas }}</strong> h apontadas (fechadas, fichas)
+                        </p>
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted border-start border-3 border-secondary ps-3 mb-4">{{ cp.metodologia }}</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Manutentor</th>
+                                        <th class="text-end">OS total</th>
+                                        <th class="text-end">Fechadas</th>
+                                        <th class="text-end">Abertas</th>
+                                        <th class="text-end">Horas (fichas)</th>
+                                        <th class="text-end">h / OS fechada</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for linha in cp.por_manutentor %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ linha.manutentor.Nome|default:linha.manutentor.Matricula }}</strong>
+                                            <br><span class="text-muted small">{{ linha.manutentor.Matricula }}</span>
+                                        </td>
+                                        <td class="text-end">{{ linha.total_ordens }}</td>
+                                        <td class="text-end text-success">{{ linha.fechadas }}</td>
+                                        <td class="text-end text-warning">{{ linha.abertas }}</td>
+                                        <td class="text-end">{{ linha.horas_apontadas }}</td>
+                                        <td class="text-end">{% if linha.fechadas %}{{ linha.media_horas_os_fechada }}{% else %}—{% endif %}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                {% endwith %}
+                {% endif %}
+            </section>
+            {% elif analise.sugestao_divisao.mensagem %}
+            <div class="alert alert-secondary mb-4">{{ analise.sugestao_divisao.mensagem }}</div>
+            {% endif %}
+
+            {% endif %}
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var form = document.getElementById('form-sugestao-divisao');
+    if (!form) return;
+
+    var syncingMaster = false;
+
+    function toggleAll(selector, checked) {
+        form.querySelectorAll(selector).forEach(function (cb) { cb.checked = checked; });
+    }
+
+    function maquinasBoxes() {
+        return form.querySelectorAll('input.sel-maq');
+    }
+
+    function syncMasterMaquinas() {
+        var master = document.getElementById('chk-sel-todas-maquinas');
+        if (!master) return;
+        syncingMaster = true;
+        try {
+            var boxes = maquinasBoxes();
+            var n = boxes.length;
+            var c = 0;
+            boxes.forEach(function (b) { if (b.checked) c++; });
+            master.checked = n > 0 && c === n;
+            master.indeterminate = c > 0 && c < n;
+        } finally {
+            syncingMaster = false;
+        }
+    }
+
+    var bm = document.getElementById('btn-sel-todos-manut');
+    var bn = document.getElementById('btn-sel-nenhum-manut');
+    var bmt = document.getElementById('btn-sel-todos-maq');
+    var bnm = document.getElementById('btn-sel-nenhum-maq');
+    var masterMaq = document.getElementById('chk-sel-todas-maquinas');
+
+    if (bm) bm.addEventListener('click', function () { toggleAll('input.sel-manut', true); });
+    if (bn) bn.addEventListener('click', function () { toggleAll('input.sel-manut', false); });
+    if (bmt) bmt.addEventListener('click', function () { toggleAll('input.sel-maq', true); syncMasterMaquinas(); });
+    if (bnm) bnm.addEventListener('click', function () { toggleAll('input.sel-maq', false); syncMasterMaquinas(); });
+
+    if (masterMaq) {
+        masterMaq.addEventListener('change', function () {
+            if (syncingMaster) return;
+            toggleAll('input.sel-maq', masterMaq.checked);
+            masterMaq.indeterminate = false;
+        });
+    }
+
+    form.addEventListener('change', function (e) {
+        if (e.target && e.target.classList.contains('sel-maq')) syncMasterMaquinas();
+    });
+
+    syncMasterMaquinas();
+})();
+</script>
+{% endblock %}

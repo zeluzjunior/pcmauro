@@ -15,6 +15,7 @@ TURNO = (
     ('Turno A', 'Turno A'),
     ('Turno B', 'Turno B'),
     ('Turno C', 'Turno C'),
+    ('COMERCIAL', 'COMERCIAL'),
 )
 
 TIPO_MANUTENTOR = (
@@ -34,7 +35,7 @@ TIPO_MANUTENCAO = (
     ('Preventiva', 'Preventiva'),
 )
 
-LOCAL_TRABALHO = (
+SETOR_TRABALHO = (
     ('Industria', 'Industria'),
     ('Frigorífico', 'Frigorífico'),
     ('Civil', 'Civil'),
@@ -529,7 +530,19 @@ class Manutentor(models.Model):
     horario_fim = models.TimeField('Horário Fim', blank=True, null=True)
     tempo_trabalho = models.CharField('Tempo de Trabalho', max_length=250)
     turno = models.CharField('Turno', max_length=25, choices=TURNO)
-    local_trab = models.CharField('Local de Trabalho', max_length=40, choices=LOCAL_TRABALHO)
+    local_trab = models.CharField(
+        'Local de Trabalho',
+        max_length=255,
+        blank=True,
+        default='',
+        help_text='Texto livre (ex.: coluna LOCAL na importação HR).',
+    )
+    setor_trabalho = models.CharField(
+        'Setor de Trabalho',
+        max_length=50,
+        choices=SETOR_TRABALHO,
+        default='Indefinido',
+    )
     horas_semanais = models.DecimalField('Horas Semanais', max_digits=5, decimal_places=2, null=True, blank=True, help_text='Quantidade de horas trabalhadas por semana')
     ativo = models.BooleanField('Ativo', default=True, db_index=True, help_text='Indica se o manutentor faz parte da equipe')
     created_at = models.DateTimeField('Data de Criação', auto_now_add=True)

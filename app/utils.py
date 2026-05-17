@@ -2862,7 +2862,7 @@ def upload_requisicoes_almoxarifado_from_file(file, data_requisicao, update_exis
 def _find_column_by_partial_match(row_data, keywords):
     """
     Tenta encontrar uma coluna em row_data que contenha qualquer uma das palavras-chave.
-    Ãštil para lidar com problemas de encoding ou pequenas variaÃ§Ãµes.
+    Ãtil para lidar com problemas de encoding ou pequenas variaÃ§Ãµes.
     """
     for key, value in row_data.items():
         normalized_key = str(key).strip().lower().replace(' ', '_')
@@ -2870,6 +2870,106 @@ def _find_column_by_partial_match(row_data, keywords):
             if keyword in normalized_key:
                 return value
     return None
+
+
+def _coerce_manutentor_matricula(value) -> str:
+    """Normaliza matrícula vinda de Excel (número, float 12345.0, texto)."""
+    import re
+    if value is None:
+        return ''
+    if isinstance(value, float):
+        if value != value:  # NaN
+            return ''
+        if value == int(value):
+            value = int(value)
+    if isinstance(value, int):
+        return str(value)
+    s = str(value).strip()
+    if re.fullmatch(r'\d+\.0', s):
+        s = s[:-2]
+    return s
+
+
+def _detect_manutentor_excel_header_row(file) -> int:
+    """Localiza a linha do cabeçalho (ex.: planilha com título na linha 1 e colunas na 2)."""
+    import unicodedata
+    import openpyxl
+    file.seek(0)
+    wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
+    try:
+        ws = wb.active
+        max_scan = min(25, ws.max_row or 25)
+        for r in range(1, max_scan + 1):
+            row_tuple = None
+            for row in ws.iter_rows(min_row=r, max_row=r, values_only=True):
+                row_tuple = row
+                break
+            if not row_tuple:
+                continue
+            for cell in row_tuple:
+                if cell is None:
+                    continue
+                t = str(cell).strip()
+                if not t:
+                    continue
+                t = unicodedata.normalize('NFKD', t)
+                t = ''.join(c for c in t if not unicodedata.combining(c)).upper().replace(' ', '')
+                if not t:
+                    continue
+                if t == 'MATRICULA' or 'MATRICULA' in t:
+                    return r
+        return 1
+    finally:
+        wb.close()
+        file.seek(0)
+
+
+def _normalize_local_trab_import(raw_val, row_num: int, errors: list) -> str:
+    """Normaliza texto da coluna LOCAL / LOCAL_TRAB para gravar em Manutentor.local_trab (texto livre)."""
+    import re
+    if raw_val is None:
+        return ''
+    if isinstance(raw_val, float):
+        if raw_val == int(raw_val):
+            raw_val = int(raw_val)
+    s = str(raw_val).strip()
+    s = re.sub(r'\s+', ' ', s)
+    max_len = 255
+    if len(s) > max_len:
+        s = s[:max_len]
+        errors.append(f"Linha {row_num}: LOCAL truncado para {max_len} caracteres.")
+    return s
+
+
+def _parse_setor_trabalho_import(row_data: dict, row_num: int, errors: list):
+    """
+    Opcional: coluna SETOR / SETOR_TRABALHO. Retorna valor canônico de SETOR_TRABALHO,
+    None se ausente/vazio, ou False se inválido (erro já adicionado em errors).
+    """
+    from app.models import SETOR_TRABALHO
+
+    raw = (
+        row_data.get('SETOR_TRABALHO')
+        or row_data.get('setor_trabalho')
+        or row_data.get('Setor_Trabalho')
+        or row_data.get('SETOR')
+        or row_data.get('setor')
+        or row_data.get('Setor')
+        or _get_row_value_by_normalized_key(row_data, 'setor_trabalho', 'setor')
+        or _find_column_by_partial_match(row_data, ('setor_trab', 'setor'))
+    )
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    for val, _ in SETOR_TRABALHO:
+        if val.lower() == s.lower():
+            return val
+    errors.append(
+        f"Linha {row_num}: SETOR / SETOR_TRABALHO '{s}' não corresponde a uma opção válida."
+    )
+    return False
 
 
 def upload_manutentores_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:
@@ -2883,7 +2983,7 @@ def upload_manutentores_from_file(file, update_existing=False) -> Tuple[int, int
     Returns:
         Tupla (created_count, updated_count, errors)
     """
-    from app.models import Manutentor
+    from app.models import Manutentor, TURNO
     from datetime import datetime
     
     errors = []
@@ -2894,16 +2994,16 @@ def upload_manutentores_from_file(file, update_existing=False) -> Tuple[int, int
     file_name = file.name.lower()
     
     try:
-        # Ler arquivo baseado na extensÃ£o
+        header_row = 1
         if file_name.endswith(('.xlsx', '.xls', '.xlsm')):
-            data = read_excel_file(file)
+            header_row = _detect_manutentor_excel_header_row(file)
+            data = read_excel_file(file, header_row=header_row)
         elif file_name.endswith('.csv'):
-            # Tentar diferentes encodings
             try:
                 data = read_csv_file(file, encoding='utf-8')
             except UnicodeDecodeError:
                 try:
-                    file.seek(0)  # Resetar arquivo
+                    file.seek(0)
                     data = read_csv_file(file, encoding='latin-1')
                 except Exception as e:
                     raise ValidationError(f"Erro ao ler arquivo CSV: {str(e)}")
@@ -2913,78 +3013,177 @@ def upload_manutentores_from_file(file, update_existing=False) -> Tuple[int, int
         if not data:
             raise ValidationError("Arquivo vazio ou sem dados vÃ¡lidos")
         
-        # Processar dados em transaÃ§Ã£o
+        valid_turnos = {c for c, _ in TURNO}
+        DEFAULT_TEMPO_IMPORT = '—'
+        DEFAULT_TURNO_IMPORT = 'COMERCIAL'
+        
+        data_start_row = header_row + 1
+        
         with transaction.atomic():
-            for row_num, row_data in enumerate(data, start=2):  # ComeÃ§ar em 2 (linha 1 Ã© cabeÃ§alho)
+            for row_idx, row_data in enumerate(data):
+                row_num = data_start_row + row_idx
                 try:
-                    # Verificar se a linha estÃ¡ vazia ou tem apenas valores vazios
-                    if not any(str(v).strip() if v else '' for v in row_data.values()):
+                    if not any(str(v).strip() if v is not None and v != '' else '' for v in row_data.values()):
                         continue
                     
-                    # Mapear colunas do CSV para campos do modelo
-                    matricula = _safe_str(row_data.get('MATRICULA') or row_data.get('matricula') or row_data.get('Matricula') or row_data.get('CADASTRO') or row_data.get('cadastro') or row_data.get('Cadastro'), max_length=1000)
-                    nome = _safe_str(row_data.get('NOME') or row_data.get('nome') or row_data.get('Nome'), max_length=1000)
-                    cargo = _safe_str(row_data.get('CARGO') or row_data.get('cargo') or row_data.get('Cargo'), max_length=1000)
-                    horario_inicio_str = row_data.get('HORARIO_INICIO') or row_data.get('horario_inicio') or row_data.get('Horario_Inicio')
-                    horario_fim_str = row_data.get('HORARIO_FIM') or row_data.get('horario_fim') or row_data.get('Horario_Fim')
-                    tempo_trabalho = _safe_str(row_data.get('TEMPO_TRABALHO') or row_data.get('tempo_trabalho') or row_data.get('Tempo_Trabalho'), max_length=250)
-                    turno = _safe_str(row_data.get('TURNO') or row_data.get('turno') or row_data.get('Turno'), max_length=25)
-                    local_trab = _safe_str(row_data.get('LOCAL_TRAB') or row_data.get('local_trab') or row_data.get('Local_Trab') or row_data.get('LOCAL_TRABALHO') or row_data.get('local_trabalho') or row_data.get('Local_Trabalho'), max_length=40)
-                    
-                    # Validar que temos pelo menos a matrÃ­cula
+                    matricula_raw = (
+                        row_data.get('MATRICULA')
+                        or row_data.get('matricula')
+                        or row_data.get('Matricula')
+                        or row_data.get('CADASTRO')
+                        or row_data.get('cadastro')
+                        or row_data.get('Cadastro')
+                        or _get_row_value_by_normalized_key(row_data, 'matricula', 'cadastro')
+                    )
+                    matricula = _coerce_manutentor_matricula(matricula_raw)
                     if not matricula:
-                        errors.append(f"Linha {row_num}: Campo 'MATRICULA' Ã© obrigatÃ³rio")
+                        errors.append(f"Linha {row_num}: campo MATRICULA Ã© obrigatÃ³rio")
                         continue
                     
-                    # Converter horÃ¡rios
+                    nome = _safe_str(
+                        row_data.get('NOME')
+                        or row_data.get('nome')
+                        or row_data.get('Nome')
+                        or _get_row_value_by_normalized_key(row_data, 'nome'),
+                        max_length=1000,
+                    )
+                    cargo = _safe_str(
+                        row_data.get('CARGO')
+                        or row_data.get('cargo')
+                        or row_data.get('Cargo')
+                        or _get_row_value_by_normalized_key(row_data, 'cargo'),
+                        max_length=1000,
+                    )
+                    
+                    local_raw = (
+                        row_data.get('LOCAL')
+                        or row_data.get('local')
+                        or row_data.get('Local')
+                        or row_data.get('LOCAL_TRAB')
+                        or row_data.get('local_trab')
+                        or row_data.get('Local_Trab')
+                        or row_data.get('LOCAL_TRABALHO')
+                        or row_data.get('local_trabalho')
+                        or _get_row_value_by_normalized_key(row_data, 'local', 'local_trab', 'local_trabalho')
+                        or _find_column_by_partial_match(row_data, ('local_trab', 'local'))
+                    )
+                    
+                    horario_inicio_str = (
+                        row_data.get('HORARIO_INICIO')
+                        or row_data.get('horario_inicio')
+                        or row_data.get('Horario_Inicio')
+                    )
+                    horario_fim_str = (
+                        row_data.get('HORARIO_FIM')
+                        or row_data.get('horario_fim')
+                        or row_data.get('Horario_Fim')
+                    )
+                    tempo_trabalho = _safe_str(
+                        row_data.get('TEMPO_TRABALHO')
+                        or row_data.get('tempo_trabalho')
+                        or row_data.get('Tempo_Trabalho')
+                        or _get_row_value_by_normalized_key(row_data, 'tempo_trabalho'),
+                        max_length=250,
+                    )
+                    turno = _safe_str(
+                        row_data.get('TURNO')
+                        or row_data.get('turno')
+                        or row_data.get('Turno')
+                        or _get_row_value_by_normalized_key(row_data, 'turno'),
+                        max_length=25,
+                    )
+                    
+                    has_tempo = bool(tempo_trabalho)
+                    has_turno = bool(turno)
+                    if has_tempo != has_turno:
+                        errors.append(
+                            f"Linha {row_num}: informe TEMPO_TRABALHO e TURNO juntos ou omita ambos (modo planilha RH: sÃ³ MATRICULA, NOME, CARGO, LOCAL)."
+                        )
+                        continue
+                    extended = has_tempo and has_turno
+                    
+                    local_code = _normalize_local_trab_import(local_raw, row_num, errors)
+
+                    setor_parsed = _parse_setor_trabalho_import(row_data, row_num, errors)
+                    if setor_parsed is False:
+                        continue
+                    
                     horario_inicio_time = None
                     horario_fim_time = None
-                    if horario_inicio_str:
-                        try:
-                            horario_inicio_time = datetime.strptime(str(horario_inicio_str).strip(), '%H:%M:%S').time()
-                        except ValueError:
+                    if extended:
+                        if turno not in valid_turnos:
+                            errors.append(f"Linha {row_num}: TURNO '{turno}' invÃ¡lido. Use: {', '.join(sorted(valid_turnos))}")
+                            continue
+                        if horario_inicio_str:
                             try:
-                                horario_inicio_time = datetime.strptime(str(horario_inicio_str).strip(), '%H:%M').time()
+                                horario_inicio_time = datetime.strptime(str(horario_inicio_str).strip(), '%H:%M:%S').time()
                             except ValueError:
-                                pass  # HorÃ¡rio Ã© opcional
-                    
-                    if horario_fim_str:
-                        try:
-                            horario_fim_time = datetime.strptime(str(horario_fim_str).strip(), '%H:%M:%S').time()
-                        except ValueError:
+                                try:
+                                    horario_inicio_time = datetime.strptime(str(horario_inicio_str).strip(), '%H:%M').time()
+                                except ValueError:
+                                    pass
+                        if horario_fim_str:
                             try:
-                                horario_fim_time = datetime.strptime(str(horario_fim_str).strip(), '%H:%M').time()
+                                horario_fim_time = datetime.strptime(str(horario_fim_str).strip(), '%H:%M:%S').time()
                             except ValueError:
-                                pass  # HorÃ¡rio Ã© opcional
-                    
-                    # Preparar dados para criaÃ§Ã£o/atualizaÃ§Ã£o
-                    manutentor_data = {
-                        'Nome': nome,
-                        'Cargo': cargo,
-                        'horario_inicio': horario_inicio_time,
-                        'horario_fim': horario_fim_time,
-                        'tempo_trabalho': tempo_trabalho,
-                        'turno': turno,
-                        'local_trab': local_trab,
-                    }
-                    
-                    # Criar ou atualizar registro
-                    if update_existing:
-                        manutentor_obj, created = Manutentor.objects.update_or_create(
-                            Matricula=matricula,
-                            defaults=manutentor_data
-                        )
-                        if created:
-                            created_count += 1
-                        else:
-                            updated_count += 1
+                                try:
+                                    horario_fim_time = datetime.strptime(str(horario_fim_str).strip(), '%H:%M').time()
+                                except ValueError:
+                                    pass
+                        
+                        manutentor_data = {
+                            'Nome': nome,
+                            'Cargo': cargo,
+                            'horario_inicio': horario_inicio_time,
+                            'horario_fim': horario_fim_time,
+                            'tempo_trabalho': tempo_trabalho,
+                            'turno': turno,
+                            'local_trab': local_code,
+                        }
                     else:
-                        manutentor_obj, created = Manutentor.objects.get_or_create(
-                            Matricula=matricula,
-                            defaults=manutentor_data
-                        )
-                        if created:
-                            created_count += 1
+                        manutentor_data = {
+                            'Nome': nome,
+                            'Cargo': cargo,
+                            'local_trab': local_code,
+                            'tempo_trabalho': DEFAULT_TEMPO_IMPORT,
+                            'turno': DEFAULT_TURNO_IMPORT,
+                            'horario_inicio': None,
+                            'horario_fim': None,
+                        }
+                    if setor_parsed:
+                        manutentor_data['setor_trabalho'] = setor_parsed
+                    
+                    if update_existing:
+                        if extended:
+                            obj, created = Manutentor.objects.update_or_create(
+                                Matricula=matricula,
+                                defaults=manutentor_data,
+                            )
+                            if created:
+                                created_count += 1
+                            else:
+                                updated_count += 1
+                        else:
+                            try:
+                                m = Manutentor.objects.get(Matricula=matricula)
+                            except Manutentor.DoesNotExist:
+                                Manutentor.objects.create(Matricula=matricula, **manutentor_data)
+                                created_count += 1
+                            else:
+                                m.Nome = nome
+                                m.Cargo = cargo
+                                m.local_trab = local_code
+                                _upd = ['Nome', 'Cargo', 'local_trab']
+                                if setor_parsed is not None:
+                                    m.setor_trabalho = setor_parsed
+                                    _upd.append('setor_trabalho')
+                                m.save(update_fields=_upd)
+                                updated_count += 1
+                    else:
+                        if Manutentor.objects.filter(Matricula=matricula).exists():
+                            continue
+                        Manutentor.objects.create(Matricula=matricula, **manutentor_data)
+                        created_count += 1
                     
                 except Exception as e:
                     error_msg = f"Linha {row_num}: Erro ao processar registro - {str(e)}"
@@ -6229,3 +6428,85 @@ def find_matching_notas_fiscais(projecao):
     matches.sort(key=lambda x: x[1]['score'], reverse=True)
     
     return matches
+
+
+def build_centro_atividade_lookups():
+    """
+    Índices para localizar CentroAtividade por código numérico (ca), sigla ou descrição.
+    Usado quando Maquina.centro_atividade (FK) está vazio mas há cd_tpcentativ / cd_setormanut / descr.
+    """
+    from app.models import CentroAtividade
+
+    centros = list(CentroAtividade.objects.all())
+    by_ca = {}
+    by_sigla_cf = {}
+    by_desc_cf = {}
+    for c in centros:
+        by_ca[c.ca] = c
+        if c.sigla:
+            s = c.sigla.strip()
+            if s:
+                by_sigla_cf[s.casefold()] = c
+        if c.descricao:
+            d = c.descricao.strip()
+            if d:
+                by_desc_cf[d.casefold()] = c
+    return by_ca, by_sigla_cf, by_desc_cf
+
+
+def resolve_centro_atividade_maquina(maquina, by_ca, by_sigla_cf, by_desc_cf):
+    """
+    Determina o Centro de Atividade de uma máquina:
+    1) FK centro_atividade (quando preenchido no cadastro)
+    2) cd_tpcentativ == CentroAtividade.ca (ex.: 2488 — na tela pode aparecer como 2.488)
+    3) cd_setormanut: sigla (ex.: ABT), só dígitos, «ABT 2488», «2.488» etc.
+    4) descr_setormanut igual à CentroAtividade.descricao (ignorando maiúsculas)
+
+    Retorna (centro ou None, origem ou None) onde origem indica qual regra encontrou o CA.
+    """
+    import re
+
+    if getattr(maquina, 'centro_atividade_id', None):
+        return maquina.centro_atividade, 'fk'
+
+    cd_tp = maquina.cd_tpcentativ
+    if cd_tp is not None:
+        try:
+            ca_key = int(cd_tp)
+        except (TypeError, ValueError):
+            ca_key = None
+        if ca_key is not None and ca_key in by_ca:
+            return by_ca[ca_key], 'cd_tpcentativ'
+
+    cd_set = (maquina.cd_setormanut or '').strip()
+    if cd_set:
+        hit = by_sigla_cf.get(cd_set.casefold())
+        if hit:
+            return hit, 'cd_setormanut_sigla'
+
+        compact_digits = re.sub(r'\D', '', cd_set)
+        if compact_digits:
+            candidates = []
+            if len(compact_digits) <= 6:
+                candidates.append(compact_digits)
+            if len(compact_digits) >= 4:
+                candidates.append(compact_digits[-4:])
+            seen = set()
+            for cand in candidates:
+                if not cand or cand in seen:
+                    continue
+                seen.add(cand)
+                try:
+                    ca_val = int(cand)
+                    if ca_val in by_ca:
+                        return by_ca[ca_val], 'cd_setormanut_ca'
+                except ValueError:
+                    pass
+
+    descr_set = (maquina.descr_setormanut or '').strip()
+    if descr_set:
+        hit = by_desc_cf.get(descr_set.casefold())
+        if hit:
+            return hit, 'descr_setormanut'
+
+    return None, None

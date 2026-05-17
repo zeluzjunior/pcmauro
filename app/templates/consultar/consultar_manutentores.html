@@ -64,14 +64,12 @@
     #manutentoresTable thead th:nth-child(5),
     #manutentoresTable thead th:nth-child(6),
     #manutentoresTable thead th:nth-child(7),
-    #manutentoresTable thead th:nth-child(8),
     #manutentoresTable tbody td:nth-child(1),
     #manutentoresTable tbody td:nth-child(3),
     #manutentoresTable tbody td:nth-child(4),
     #manutentoresTable tbody td:nth-child(5),
     #manutentoresTable tbody td:nth-child(6),
-    #manutentoresTable tbody td:nth-child(7),
-    #manutentoresTable tbody td:nth-child(8) {
+    #manutentoresTable tbody td:nth-child(7) {
         text-align: center;
         vertical-align: middle;
     }
@@ -140,7 +138,7 @@
             <div class="col-md-12">
                 <form method="get" action="{% url 'consultar_manutentores' %}" class="d-flex">
                     <input type="hidden" name="filtro_ativo" value="{{ filtro_ativo }}">
-                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por cadastro, nome, cargo, tipo, turno ou local..." value="{{ request.GET.search }}">
+                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por cadastro, nome, cargo, turno, setor ou local..." value="{{ request.GET.search }}">
                     <button type="submit" class="btn btn-outline-primary">
                         <i class="fas fa-search"></i> Buscar
                     </button>
@@ -207,6 +205,17 @@
                                             <option value="">Todos os cargos</option>
                                             {% for cargo in cargos_unicos %}
                                                 <option value="{{ cargo }}" {% if filtro_cargo == cargo %}selected{% endif %}>{{ cargo|truncatewords:5 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+
+                                    <!-- Filtro por Setor de Trabalho -->
+                                    <div class="col-md-3">
+                                        <label for="filtro_setor_trabalho" class="form-label">Setor de Trabalho</label>
+                                        <select class="form-select" id="filtro_setor_trabalho" name="filtro_setor_trabalho">
+                                            <option value="">Todos os setores</option>
+                                            {% for setor_value, setor_label in setores_trabalho_db %}
+                                                <option value="{{ setor_value }}" {% if filtro_setor_trabalho == setor_value %}selected{% endif %}>{{ setor_label }}</option>
                                             {% endfor %}
                                         </select>
                                     </div>
@@ -327,10 +336,9 @@
                                 <th>Cadastro</th>
                                 <th>Nome</th>
                                 <th>Cargo</th>
-                                <th>Tipo</th>
                                 <th>Turno</th>
+                                <th>Setor</th>
                                 <th>Local de Trabalho</th>
-                                <th>Horário</th>
                                 <th>Ações</th>
                             </tr>
                             <tr class="filter-row">
@@ -341,19 +349,31 @@
                                     <input type="text" class="filter-input" placeholder="Filtrar Nome..." data-column="1">
                                 </th>
                                 <th class="filter-header">
-                                    <input type="text" class="filter-input" placeholder="Filtrar Cargo..." data-column="2">
+                                    <select class="form-select form-select-sm filter-input" data-column="2" aria-label="Filtrar por cargo">
+                                        <option value="">Todos os cargos</option>
+                                        {% for cargo in cargos_unicos %}
+                                        <option value="{{ cargo }}">{{ cargo|truncatechars:80 }}</option>
+                                        {% endfor %}
+                                    </select>
                                 </th>
                                 <th class="filter-header">
-                                    <input type="text" class="filter-input" placeholder="Filtrar Tipo..." data-column="3">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Turno..." data-column="3">
                                 </th>
                                 <th class="filter-header">
-                                    <input type="text" class="filter-input" placeholder="Filtrar Turno..." data-column="4">
+                                    <select class="form-select form-select-sm filter-input" data-column="4" aria-label="Filtrar por setor">
+                                        <option value="">Todos os setores</option>
+                                        {% for setor_value, setor_label in setores_trabalho_db %}
+                                        <option value="{{ setor_value }}">{{ setor_label|truncatechars:80 }}</option>
+                                        {% endfor %}
+                                    </select>
                                 </th>
                                 <th class="filter-header">
-                                    <input type="text" class="filter-input" placeholder="Filtrar Local..." data-column="5">
-                                </th>
-                                <th class="filter-header">
-                                    <input type="text" class="filter-input" placeholder="Filtrar Horário..." data-column="6">
+                                    <select class="form-select form-select-sm filter-input" data-column="5" aria-label="Filtrar por local de trabalho">
+                                        <option value="">Todos os locais</option>
+                                        {% for local_value, local_label in locais_trabalho %}
+                                        <option value="{{ local_value }}">{{ local_label|truncatechars:80 }}</option>
+                                        {% endfor %}
+                                    </select>
                                 </th>
                                 <th class="filter-header">
                                     <!-- Sem filtro na coluna de ações -->
@@ -376,22 +396,15 @@
                                             {{ manutentor.Nome|default:"-" }}
                                         </a>
                                     </td>
-                                    <td>{{ manutentor.Cargo|default:"-"|truncatewords:5 }}</td>
-                                    <td>
-                                        <span class="badge bg-info">{{ manutentor.get_tipo_display|default:"-" }}</span>
-                                    </td>
+                                    <td data-filter-text="{{ manutentor.Cargo|default:''|escape }}">{{ manutentor.Cargo|default:"-"|truncatewords:5 }}</td>
                                     <td>
                                         <span class="badge bg-secondary">{{ manutentor.get_turno_display|default:"-" }}</span>
                                     </td>
-                                    <td>
-                                        <span class="badge bg-success">{{ manutentor.get_local_trab_display|default:"-" }}</span>
+                                    <td data-filter-text="{{ manutentor.setor_trabalho|default:''|escape }}">
+                                        <span class="badge bg-info text-dark">{{ manutentor.get_setor_trabalho_display }}</span>
                                     </td>
-                                    <td>
-                                        {% if manutentor.horario_inicio and manutentor.horario_fim %}
-                                            {{ manutentor.horario_inicio|time:"H:i" }} - {{ manutentor.horario_fim|time:"H:i" }}
-                                        {% else %}
-                                            -
-                                        {% endif %}
+                                    <td data-filter-text="{{ manutentor.local_trab|default:''|escape }}">
+                                        <span class="badge bg-success">{{ manutentor.local_trab|default:"-" }}</span>
                                     </td>
                                     <td>
                                         <div class="d-flex gap-1 justify-content-center">
@@ -407,7 +420,7 @@
                                 {% endfor %}
                             {% else %}
                                 <tr>
-                                    <td colspan="8" class="text-center py-5">
+                                    <td colspan="7" class="text-center py-5">
                                         <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
                                         <p class="text-muted">Nenhum manutentor encontrado.</p>
                                         <a href="{% url 'cadastrar_manutentor' %}" class="btn btn-primary">
@@ -430,16 +443,16 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const table = document.getElementById('manutentoresTable');
-    const filterInputs = document.querySelectorAll('.filter-input');
+    const filterControls = document.querySelectorAll('.filter-input');
     
-    if (!table || !filterInputs.length) return;
+    if (!table || !filterControls.length) return;
     
     // Função para filtrar a tabela
     function filterTable() {
         const filters = [];
-        filterInputs.forEach(input => {
-            const columnIndex = parseInt(input.getAttribute('data-column'));
-            const filterValue = input.value.toLowerCase().trim();
+        filterControls.forEach(control => {
+            const columnIndex = parseInt(control.getAttribute('data-column'));
+            const filterValue = control.value.toLowerCase().trim();
             filters[columnIndex] = filterValue;
         });
         
@@ -454,7 +467,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (filters[i]) {
                     const cell = row.cells[i];
                     if (cell) {
-                        const cellText = cell.textContent.toLowerCase().trim();
+                        const dataRaw = cell.getAttribute('data-filter-text');
+                        const cellText = (dataRaw !== null && dataRaw !== '')
+                            ? dataRaw.toLowerCase().trim()
+                            : cell.textContent.toLowerCase().trim();
                         if (!cellText.includes(filters[i])) {
                             showRow = false;
                             break;
@@ -473,9 +489,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Adicionar event listeners aos campos de filtro
-    filterInputs.forEach(input => {
-        input.addEventListener('input', filterTable);
-        input.addEventListener('keyup', filterTable);
+    filterControls.forEach(control => {
+        control.addEventListener('input', filterTable);
+        control.addEventListener('keyup', filterTable);
+        control.addEventListener('change', filterTable);
     });
     
     // Botão para limpar todos os filtros
@@ -484,8 +501,8 @@ document.addEventListener('DOMContentLoaded', function() {
     clearFiltersBtn.className = 'btn btn-sm btn-outline-secondary mt-2';
     clearFiltersBtn.innerHTML = '<i class="fas fa-times me-1"></i>Limpar Filtros';
     clearFiltersBtn.addEventListener('click', function() {
-        filterInputs.forEach(input => {
-            input.value = '';
+        filterControls.forEach(control => {
+            control.value = '';
         });
         filterTable();
     });

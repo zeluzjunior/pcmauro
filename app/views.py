@@ -4,7 +4,7 @@ from django.http import JsonResponse, HttpResponse
 from django.core.mail import send_mail
 from django.conf import settings
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, Count
 from functools import lru_cache
 import os
 import re
@@ -3288,7 +3288,7 @@ def importar_manutentores(request):
                 'page_title': 'Importar Manutentores',
                 'active_page': 'importar_manutentores'
             }
-            return render(request, 'importar/importar_manutentor.html', context)
+            return render(request, 'manutentor/importar_manutentor.html', context)
         
         file = request.FILES['file']
         print(f"DEBUG - Arquivo recebido: {file.name}, Tamanho: {file.size}")
@@ -3306,7 +3306,7 @@ def importar_manutentores(request):
                 'page_title': 'Importar Manutentores',
                 'active_page': 'importar_manutentores'
             }
-            return render(request, 'importar/importar_manutentor.html', context)
+            return render(request, 'manutentor/importar_manutentor.html', context)
         
         # Verificar se deve atualizar registros existentes
         update_existing = request.POST.get('update_existing', 'off') == 'on'
@@ -3343,14 +3343,17 @@ def importar_manutentores(request):
             print(f"DEBUG - Erro durante upload: {error_detail}")
             messages.error(request, f'Erro ao importar arquivo: {str(e)}')
         
-        # Sempre redirecionar para consultar_manutentores após importação
-        return redirect('consultar_manutentores')
+        context = {
+            'page_title': 'Importar Manutentores',
+            'active_page': 'importar_manutentores',
+        }
+        return render(request, 'manutentor/importar_manutentor.html', context)
     
     context = {
         'page_title': 'Importar Manutentores',
         'active_page': 'importar_manutentores'
     }
-    return render(request, 'importar/importar_manutentor.html', context)
+    return render(request, 'manutentor/importar_manutentor.html', context)
 
 
 def importar_ordens_corretivas_e_outros(request):
@@ -8364,8 +8367,10 @@ def _analise_paradas_maquina_impl(request, template_name):
     projecao_dias_passados_ind = None
     projecao_dias_restantes_ind = None
     perda_max_media_restante_frig_dia = None
+    perda_max_media_restante_planej_frig_dia = None
     perda_max_media_restante_ind_dia = None
     perda_restante_permitida_frig = None
+    perda_restante_meta_planejada_frig = None
     perda_restante_permitida_ind = None
     perda_max_total_permitida_frig = None
 
@@ -8394,14 +8399,17 @@ def _analise_paradas_maquina_impl(request, template_name):
         ).first()
         n_pass_f, n_rest_f = _dias_produtivos_passados_restantes(cfg_proj_frig, dia_ref, ultimo_dia_ref)
         n_pass_i, n_rest_i = _dias_produtivos_passados_restantes(cfg_proj_ind, dia_ref, ultimo_dia_ref)
-        # Indústria: média de perda/produção usa só dias em que houve produção informada (ProducaoDiaria)
-        n_dias_com_producao_ind = ProducaoDiaria.objects.filter(
-            ano=ref_ano,
-            mes=ref_mes_num,
-            dia__lte=dia_ref,
-            producao_industria__isnull=False,
-            producao_industria__gt=0,
-        ).count()
+        # Indústria: dias com produção informada (ProducaoDiaria) — lista usada para média de perda alinhada a esses dias
+        dias_com_producao_ind_list = list(
+            ProducaoDiaria.objects.filter(
+                ano=ref_ano,
+                mes=ref_mes_num,
+                dia__lte=dia_ref,
+                producao_industria__isnull=False,
+                producao_industria__gt=0,
+            ).values_list('dia', flat=True)
+        )
+        n_dias_com_producao_ind = len(dias_com_producao_ind_list)
         projecao_dias_passados_frig = n_pass_f
         projecao_dias_restantes_frig = n_rest_f
         projecao_dias_passados_ind = n_dias_com_producao_ind
@@ -8409,47 +8417,94 @@ def _analise_paradas_maquina_impl(request, template_name):
         projecao_dias_corridos = n_pass_f
         projecao_dias_restantes = n_rest_f
         if n_pass_f > 0 and n_rest_f >= 0:
-            # Frigorífico: dados do mês de referência
-            qs_frig_ref = qs_frigorifico.filter(data__year=ref_ano, data__month=ref_mes_num, data__lte=periodo_fim)
-            soma_cap_frig_ref = qs_frig_ref.aggregate(c=Sum('capacidade'))['c']
-            soma_cap_frig_ref = Decimal(str(soma_cap_frig_ref)) if soma_cap_frig_ref is not None else Decimal('0')
-            soma_suinos_ref = ProducaoDiaria.objects.filter(ano=ref_ano, mes=ref_mes_num, dia__lte=periodo_fim.day).aggregate(s=Sum('suinos_abatidos'))['s']
-            soma_suinos_ref = int(soma_suinos_ref or 0)
-            if soma_suinos_ref > 0 and fator_eficiencia_frig is not None:
-                avg_perda_frig_dia = soma_cap_frig_ref / Decimal(str(n_pass_f))
-                avg_suinos_dia = Decimal(str(soma_suinos_ref)) / Decimal(str(n_pass_f))
+            # Frigorífico: MTD no mês (todas as datas) vs média só nos dias produtivos decorridos (config), quando houver lista
+            qs_frig_mes_mtd = qs_frigorifico.filter(
+                data__year=ref_ano, data__month=ref_mes_num, data__lte=periodo_fim
+            )
+            soma_cap_frig_mtd = qs_frig_mes_mtd.aggregate(c=Sum('capacidade'))['c']
+            soma_cap_frig_mtd = Decimal(str(soma_cap_frig_mtd)) if soma_cap_frig_mtd is not None else Decimal('0')
+            if (
+                cfg_proj_frig
+                and cfg_proj_frig.perda_maximo is not None
+                and cfg_proj_frig.total_abate_planejado is not None
+            ):
+                cap_planej_mes_frig = (Decimal(str(cfg_proj_frig.perda_maximo)) / Decimal('100')) * Decimal(
+                    str(cfg_proj_frig.total_abate_planejado)
+                )
+                perda_restante_meta_planejada_frig = float(cap_planej_mes_frig - soma_cap_frig_mtd)
+                if n_rest_f > 0:
+                    perda_max_media_restante_planej_frig_dia = float(
+                        (cap_planej_mes_frig - soma_cap_frig_mtd) / Decimal(str(n_rest_f))
+                    )
+            soma_suinos_mtd = ProducaoDiaria.objects.filter(
+                ano=ref_ano, mes=ref_mes_num, dia__lte=periodo_fim.day
+            ).aggregate(s=Sum('suinos_abatidos'))['s']
+            soma_suinos_mtd = int(soma_suinos_mtd or 0)
+            if cfg_proj_frig and cfg_proj_frig.dias_produtivos:
+                dias_prod_elapsed = sorted(
+                    {int(x) for x in cfg_proj_frig.dias_produtivos if 1 <= int(x) <= dia_ref}
+                )
+            else:
+                dias_prod_elapsed = None
+            if dias_prod_elapsed:
+                soma_cap_rate = (
+                    qs_frigorifico.filter(
+                        data__year=ref_ano,
+                        data__month=ref_mes_num,
+                        data__day__in=dias_prod_elapsed,
+                    ).aggregate(c=Sum('capacidade'))['c']
+                )
+                soma_cap_rate = Decimal(str(soma_cap_rate)) if soma_cap_rate is not None else Decimal('0')
+                soma_suinos_rate = ProducaoDiaria.objects.filter(
+                    ano=ref_ano, mes=ref_mes_num, dia__in=dias_prod_elapsed
+                ).aggregate(s=Sum('suinos_abatidos'))['s']
+                soma_suinos_rate = int(soma_suinos_rate or 0)
+                n_div_frig = len(dias_prod_elapsed)
+            else:
+                soma_cap_rate = soma_cap_frig_mtd
+                soma_suinos_rate = soma_suinos_mtd
+                n_div_frig = n_pass_f
+            if soma_suinos_mtd > 0 and fator_eficiencia_frig is not None and n_div_frig > 0:
+                avg_perda_frig_dia = soma_cap_rate / Decimal(str(n_div_frig))
+                avg_suinos_dia = Decimal(str(soma_suinos_rate)) / Decimal(str(n_div_frig))
                 projecao_avg_perda_frig_dia = float(avg_perda_frig_dia)
-                perda_projetada_frig = soma_cap_frig_ref + (avg_perda_frig_dia * Decimal(str(n_rest_f)))
-                suinos_projetado_frig = Decimal(str(soma_suinos_ref)) + (avg_suinos_dia * Decimal(str(n_rest_f)))
+                perda_projetada_frig = soma_cap_frig_mtd + (avg_perda_frig_dia * Decimal(str(n_rest_f)))
+                suinos_projetado_frig = Decimal(str(soma_suinos_mtd)) + (avg_suinos_dia * Decimal(str(n_rest_f)))
                 if suinos_projetado_frig and suinos_projetado_frig > 0:
                     projecao_indicador_frig_val = float((perda_projetada_frig / suinos_projetado_frig) * Decimal(str(fator_eficiencia_frig)))
                     projecao_indicador_frig = projecao_indicador_frig_val
                     if perda_maximo_frig is not None and fator_eficiencia_frig is not None and Decimal(str(fator_eficiencia_frig)) > 0:
                         perda_max_total_permitida_frig = (Decimal(str(perda_maximo_frig)) / Decimal(str(fator_eficiencia_frig))) * suinos_projetado_frig
-                        perda_restante_permitida_frig = perda_max_total_permitida_frig - soma_cap_frig_ref
+                        perda_restante_permitida_frig = perda_max_total_permitida_frig - soma_cap_frig_mtd
                         if n_rest_f > 0:
                             perda_max_media_restante_frig_dia = float(perda_restante_permitida_frig / Decimal(str(n_rest_f)))
                 projecao_perda_frig_total = float(perda_projetada_frig)
                 projecao_suinos_frig_total = float(suinos_projetado_frig)
         if n_dias_com_producao_ind > 0 and n_rest_i >= 0:
-            # Indústria: média kg perda/dia e média produção/dia pelo nº de dias com produção informada (não pelo calendário produtivo)
-            qs_ind_ref = qs_industria.filter(data__year=ref_ano, data__month=ref_mes_num, data__lte=periodo_fim)
-            soma_cap_ind_ref = qs_ind_ref.aggregate(c=Sum('capacidade'))['c']
-            soma_cap_ind_ref = Decimal(str(soma_cap_ind_ref)) if soma_cap_ind_ref is not None else Decimal('0')
+            # Indústria: soma MTD de perda no mês; média de kg perdidos só nos dias com produção informada
+            qs_ind_mes_mtd = qs_industria.filter(
+                data__year=ref_ano, data__month=ref_mes_num, data__lte=periodo_fim
+            )
+            soma_cap_ind_mtd = qs_ind_mes_mtd.aggregate(c=Sum('capacidade'))['c']
+            soma_cap_ind_mtd = Decimal(str(soma_cap_ind_mtd)) if soma_cap_ind_mtd is not None else Decimal('0')
+            soma_cap_ind_rate = (
+                qs_ind_mes_mtd.filter(data__day__in=dias_com_producao_ind_list).aggregate(c=Sum('capacidade'))['c']
+            )
+            soma_cap_ind_rate = Decimal(str(soma_cap_ind_rate)) if soma_cap_ind_rate is not None else Decimal('0')
             soma_prod_ref = ProducaoDiaria.objects.filter(ano=ref_ano, mes=ref_mes_num, dia__lte=periodo_fim.day).aggregate(s=Sum('producao_industria'))['s']
             soma_prod_ref = Decimal(str(soma_prod_ref)) if soma_prod_ref is not None else Decimal('0')
             if soma_prod_ref and soma_prod_ref > 0 and fator_eficiencia_industria is not None:
-                avg_perda_ind_dia = soma_cap_ind_ref / Decimal(str(n_dias_com_producao_ind))
+                avg_perda_ind_dia = soma_cap_ind_rate / Decimal(str(n_dias_com_producao_ind))
                 avg_prod_dia = soma_prod_ref / Decimal(str(n_dias_com_producao_ind))
                 projecao_avg_perda_ind_dia = float(avg_perda_ind_dia)
-                perda_projetada_ind = soma_cap_ind_ref + (avg_perda_ind_dia * Decimal(str(n_rest_i)))
+                perda_projetada_ind = soma_cap_ind_mtd + (avg_perda_ind_dia * Decimal(str(n_rest_i)))
                 prod_projetada_ind = soma_prod_ref + (avg_prod_dia * Decimal(str(n_rest_i)))
                 if prod_projetada_ind and prod_projetada_ind > 0:
                     projecao_indicador_ind_val = float((perda_projetada_ind / prod_projetada_ind) * Decimal(str(fator_eficiencia_industria)))
                     projecao_indicador_industria = projecao_indicador_ind_val
                     if perda_maximo_industria is not None and fator_eficiencia_industria is not None and Decimal(str(fator_eficiencia_industria)) > 0:
                         perda_max_total_permitida_ind = (Decimal(str(perda_maximo_industria)) / Decimal(str(fator_eficiencia_industria))) * prod_projetada_ind
-                        perda_restante_permitida_ind = perda_max_total_permitida_ind - soma_cap_ind_ref
+                        perda_restante_permitida_ind = perda_max_total_permitida_ind - soma_cap_ind_mtd
                         if n_rest_i > 0:
                             perda_max_media_restante_ind_dia = float(perda_restante_permitida_ind / Decimal(str(n_rest_i)))
                 projecao_perda_ind_kg_total = float(perda_projetada_ind)
@@ -9153,7 +9208,7 @@ def _analise_paradas_maquina_impl(request, template_name):
         'soma_capacidade_frig': soma_capacidade_frig,
         'soma_suinos_abatidos_frig': soma_suinos_abatidos_frig,
         'perda_maxima_calculada_frig': perda_maxima_calculada_frig,
-        'perda_maxima_planejada_frig_exibicao': float(perda_max_total_permitida_frig) if perda_max_total_permitida_frig is not None else perda_maxima_calculada_frig,
+        'perda_maxima_planejada_frig_exibicao': perda_maxima_calculada_frig,
         'perda_restante_frig': perda_restante_frig,
         'perda_maximo_frig': perda_maximo_frig,
         'perda_maximo_industria': perda_maximo_industria,
@@ -9180,8 +9235,10 @@ def _analise_paradas_maquina_impl(request, template_name):
         'projecao_perda_ind_kg_total': projecao_perda_ind_kg_total,
         'projecao_producao_ind_kg_total': projecao_producao_ind_kg_total,
         'perda_max_media_restante_frig_dia': perda_max_media_restante_frig_dia,
+        'perda_max_media_restante_planej_frig_dia': perda_max_media_restante_planej_frig_dia,
         'perda_max_media_restante_ind_dia': perda_max_media_restante_ind_dia,
         'perda_restante_permitida_frig': float(perda_restante_permitida_frig) if perda_restante_permitida_frig is not None else None,
+        'perda_restante_meta_planejada_frig': perda_restante_meta_planejada_frig,
         'perda_restante_permitida_ind': float(perda_restante_permitida_ind) if perda_restante_permitida_ind is not None else None,
         'dias_uteis_total_frig': dias_uteis_total_frig,
         'dias_uteis_total_industria': dias_uteis_total_industria,
@@ -11601,11 +11658,13 @@ def analise_ordens_de_servico(request):
         OrdemServicoPreventivaFicha,
         OrdemServicoLubrificacaoFicha,
         CentroAtividade,
+        Manutentor,
     )
     from django.db.models import Count, Q, Avg
     from datetime import datetime, timedelta
     from collections import defaultdict
     import json
+    import unicodedata
     
     # Obter filtros de ano e meses (múltiplos)
     ano_filtro = request.GET.get('ano', None)
@@ -11763,16 +11822,51 @@ def analise_ordens_de_servico(request):
     # Tempo Total Necessário: (Ordens Abertas + Solicitações) * 15 min → horas
     tempo_total_necessario_horas = (ordens_abertas + solicitacoes) * 15 / 60
 
-    # Ordens abertas por tipo de ordem (boxes dinâmicos)
-    ordens_abertas_por_tipo_dict = defaultdict(int)
-    for ordem in ordens_filtradas:
-        situacao = (ordem.descr_sitordsetv or '').strip().upper()
-        if situacao == 'ORDEM DE SERVIÇO EM EXECUÇÃO':
-            tipo = (ordem.descr_tpordservtv or '').strip() or 'Não informado'
-            ordens_abertas_por_tipo_dict[tipo] += 1
-    ordens_abertas_por_tipo = [
-        {'tipo': tipo, 'total': total}
-        for tipo, total in sorted(ordens_abertas_por_tipo_dict.items(), key=lambda x: x[1], reverse=True)
+    def _norm_descr_tpmanuttv(val):
+        if val is None:
+            return ''
+        text = str(val).strip()
+        if not text:
+            return ''
+        text = unicodedata.normalize('NFKD', text)
+        text = ''.join(c for c in text if not unicodedata.combining(c))
+        return text.upper()
+
+    def _stats_situacao_ordens(ordens):
+        sit_aberta = 'ORDEM DE SERVIÇO EM EXECUÇÃO'
+        sit_fechada = 'ORDEM DE SERVIÇO FECHADA'
+        total = len(ordens)
+        abertas = 0
+        fechadas = 0
+        outras = 0
+        for o in ordens:
+            s = (o.descr_sitordsetv or '').strip().upper()
+            if s == sit_aberta:
+                abertas += 1
+            elif s == sit_fechada:
+                fechadas += 1
+            else:
+                outras += 1
+        return {'total': total, 'abertas': abertas, 'fechadas': fechadas, 'outras': outras}
+
+    # Corretiva vs Outros: mesma tabela OrdemServicoCorretiva, critério DESCR_TPMANUTTV
+    ordens_corretiva_tp_corretiva = []
+    ordens_corretiva_tp_outros = []
+    for ordem in ordens_corretivas_filtradas:
+        if 'CORRETIVA' in _norm_descr_tpmanuttv(ordem.descr_tpmanuttv):
+            ordens_corretiva_tp_corretiva.append(ordem)
+        else:
+            ordens_corretiva_tp_outros.append(ordem)
+
+    st_cor = _stats_situacao_ordens(ordens_corretiva_tp_corretiva)
+    st_out = _stats_situacao_ordens(ordens_corretiva_tp_outros)
+    st_lub = _stats_situacao_ordens(ordens_lubrificacao_filtradas)
+    st_prev = _stats_situacao_ordens(ordens_preventivas_filtradas)
+    os_quadro_por_tipo = [
+        {'slug': 'corretiva', 'titulo': 'Corretiva', **st_cor},
+        {'slug': 'outros', 'titulo': 'Outros', **st_out},
+        {'slug': 'lubrificacao', 'titulo': 'Lubrificação', **st_lub},
+        {'slug': 'preventiva', 'titulo': 'Preventiva', **st_prev},
     ]
     
     # Ordens com e sem máquina
@@ -11899,6 +11993,87 @@ def analise_ordens_de_servico(request):
     executores_fichas_labels = [item['nm_func_exec_os'][:30] for item in top_executores_fichas]
     executores_fichas_data = [item['total'] for item in top_executores_fichas]
     
+    def _ascii_fold_upper(val):
+        if val is None:
+            return ''
+        text = str(val).strip()
+        if not text:
+            return ''
+        text = unicodedata.normalize('NFKD', text)
+        text = ''.join(c for c in text if not unicodedata.combining(c))
+        return text.upper()
+
+    def _executor_key_ordem(ordem):
+        cd = (ordem.cd_func_exec or '').strip().upper()
+        if cd:
+            return ('mat', cd)
+        lab = _ascii_fold_upper(ordem.nm_func_exec)
+        return ('nome', lab) if lab else None
+
+    def _executor_key_ficha(ficha):
+        cd = (ficha.cd_func_exec_os or '').strip().upper()
+        if cd:
+            return ('mat', cd)
+        lab = _ascii_fold_upper(ficha.nm_func_exec_os)
+        return ('nome', lab) if lab else None
+
+    ordens_por_executor_key = defaultdict(int)
+    for ordem in ordens_filtradas:
+        k = _executor_key_ordem(ordem)
+        if k:
+            ordens_por_executor_key[k] += 1
+
+    fichas_por_executor_key = defaultdict(int)
+    for _, ficha in fichas_filtradas_chaveadas:
+        k = _executor_key_ficha(ficha)
+        if k:
+            fichas_por_executor_key[k] += 1
+
+    manutentores_cadastro = list(Manutentor.objects.filter(ativo=True).order_by('Nome', 'Matricula'))
+    manut_keys = set()
+    for m in manutentores_cadastro:
+        if m.Matricula and str(m.Matricula).strip():
+            manut_keys.add(('mat', str(m.Matricula).strip().upper()))
+        if m.Nome and str(m.Nome).strip():
+            manut_keys.add(('nome', _ascii_fold_upper(m.Nome)))
+
+    tabela_manutentores_analise = []
+    for m in manutentores_cadastro:
+        km = ('mat', str(m.Matricula).strip().upper()) if m.Matricula and str(m.Matricula).strip() else None
+        kn = ('nome', _ascii_fold_upper(m.Nome)) if m.Nome and str(m.Nome).strip() else None
+        n_o = ordens_por_executor_key[km] if km else 0
+        n_f = fichas_por_executor_key[km] if km else 0
+        if kn:
+            n_o += ordens_por_executor_key[kn]
+            n_f += fichas_por_executor_key[kn]
+        tabela_manutentores_analise.append({
+            'manutentor': m,
+            'total_ordens': n_o,
+            'total_fichas': n_f,
+        })
+    tabela_manutentores_analise.sort(
+        key=lambda r: (-r['total_ordens'], -r['total_fichas'], (r['manutentor'].Nome or '').upper())
+    )
+
+    executores_sem_cadastro_analise = []
+    todas_chaves_executor = set(ordens_por_executor_key) | set(fichas_por_executor_key)
+    for k in sorted(todas_chaves_executor, key=lambda x: (x[0], str(x[1]))):
+        if k in manut_keys:
+            continue
+        n_o = ordens_por_executor_key.get(k, 0)
+        n_f = fichas_por_executor_key.get(k, 0)
+        if not n_o and not n_f:
+            continue
+        executores_sem_cadastro_analise.append({
+            'tipo_chave': 'Matrícula (OS)' if k[0] == 'mat' else 'Nome (OS)',
+            'rotulo': k[1],
+            'total_ordens': n_o,
+            'total_fichas': n_f,
+        })
+    executores_sem_cadastro_analise.sort(
+        key=lambda r: (-r['total_ordens'], -r['total_fichas'], r['rotulo'])
+    )
+    
     # Percentuais
     taxa_ordens_com_maquina = (ordens_com_maquina / total_ordens * 100) if total_ordens > 0 else 0
     taxa_ordens_com_executor = (ordens_com_executor / total_ordens * 100) if total_ordens > 0 else 0
@@ -11952,6 +12127,9 @@ def analise_ordens_de_servico(request):
         'total_corretivas': total_corretivas,
         'total_preventivas': total_preventivas,
         'total_lubrificacao': total_lubrificacao,
+        'os_quadro_por_tipo': os_quadro_por_tipo,
+        'tabela_manutentores_analise': tabela_manutentores_analise,
+        'executores_sem_cadastro_analise': executores_sem_cadastro_analise,
         'setores_count': setores_count,
         'unidades_count': unidades_count,
         
@@ -11967,7 +12145,6 @@ def analise_ordens_de_servico(request):
         'ordens_com_solicitante': ordens_com_solicitante,
         'ordens_sem_solicitante': ordens_sem_solicitante,
         'ordens_abertas': ordens_abertas,
-        'ordens_abertas_por_tipo': ordens_abertas_por_tipo,
         'ordens_fechadas': ordens_fechadas,
         'solicitacoes': solicitacoes,
         'tempo_total_necessario_horas': tempo_total_necessario_horas,
@@ -18532,6 +18709,532 @@ def configuracoes_mao_de_obra(request):
     return render(request, 'analise_mao_de_obra/configuracoes_mao_de_obra.html', context)
 
 
+def analise_maquina_manutentor(request):
+    """
+    Por setor (descr_setormanut): máquinas do setor → CentroAtividade.local ↔ Manutentor.local_trab;
+    cruza com vínculos ManutentorMaquina (coerente vs divergente ao local do CA da máquina).
+
+    O Centro de Atividade é resolvido pelo FK na máquina e, se vazio, por cd_tpcentativ (= ca),
+    cd_setormanut (sigla / código numérico / misto) ou descr_setormanut = descrição do CA.
+    """
+    from app.models import Maquina, Manutentor, ManutentorMaquina, TURNO
+    from app.utils import build_centro_atividade_lookups, resolve_centro_atividade_maquina
+
+    GERENC_VAZIO = '__descr_gerenc_vazio__'
+
+    def norm_local(val):
+        return (val or '').strip().casefold()
+
+    valid_turnos = frozenset(v for v, _ in TURNO)
+    turnos_get = [t for t in request.GET.getlist('turno') if t in valid_turnos]
+    turnos_filtro = frozenset(turnos_get) if turnos_get else None
+
+    setores_opcoes = list(
+        Maquina.objects.exclude(descr_setormanut__isnull=True)
+        .exclude(descr_setormanut='')
+        .values_list('descr_setormanut', flat=True)
+        .distinct()
+        .order_by('descr_setormanut')
+    )
+
+    selected = (request.GET.get('descr_setormanut') or '').strip()
+
+    if selected:
+        base_setor = Maquina.objects.filter(descr_setormanut=selected)
+        descr_gerenc_opcoes = list(
+            base_setor.exclude(descr_gerenc__isnull=True)
+            .exclude(descr_gerenc='')
+            .values_list('descr_gerenc', flat=True)
+            .distinct()
+            .order_by('descr_gerenc')
+        )
+        descr_gerenc_tem_vazio = base_setor.filter(
+            Q(descr_gerenc__isnull=True) | Q(descr_gerenc='')
+        ).exists()
+    else:
+        descr_gerenc_opcoes = []
+        descr_gerenc_tem_vazio = False
+
+    allowed_gerenc = set(descr_gerenc_opcoes)
+    if descr_gerenc_tem_vazio:
+        allowed_gerenc.add(GERENC_VAZIO)
+    descr_get = [x for x in request.GET.getlist('descr_gerenc') if x in allowed_gerenc]
+    descr_gerenc_filtro = frozenset(descr_get) if descr_get else None
+
+    context = {
+        'page_title': 'Análise Máquina e Manutentor',
+        'active_page': 'analise_maquina_manutentor',
+        'setores_opcoes': setores_opcoes,
+        'descr_setormanut_selecionado': selected or None,
+        'turno_opcoes': TURNO,
+        'turnos_selecionados': turnos_get,
+        'turnos_filtro_ativo': turnos_filtro is not None,
+        'descr_gerenc_opcoes': descr_gerenc_opcoes,
+        'descr_gerenc_tem_vazio': descr_gerenc_tem_vazio,
+        'descr_gerenc_selecionados': descr_get,
+        'descr_gerenc_vazio_valor': GERENC_VAZIO,
+        'analise': None,
+    }
+
+    if not selected:
+        return render(request, 'planejamento/analise_maquina_manutentor.html', context)
+
+    if not Maquina.objects.filter(descr_setormanut=selected).exists():
+        context['analise'] = {'erro': 'Nenhuma máquina encontrada para este setor.'}
+        return render(request, 'planejamento/analise_maquina_manutentor.html', context)
+
+    maquinas_qs = Maquina.objects.filter(descr_setormanut=selected).select_related('centro_atividade')
+    if descr_gerenc_filtro is not None:
+        qg = Q()
+        vals_g = [v for v in descr_gerenc_filtro if v != GERENC_VAZIO]
+        if GERENC_VAZIO in descr_gerenc_filtro:
+            qg |= Q(descr_gerenc__isnull=True) | Q(descr_gerenc='')
+        if vals_g:
+            qg |= Q(descr_gerenc__in=vals_g)
+        maquinas_qs = maquinas_qs.filter(qg)
+
+    maquinas = list(maquinas_qs.order_by('cd_maquina'))
+
+    if not maquinas:
+        context['analise'] = {
+            'erro': (
+                'Nenhuma máquina encontrada com a descrição de gerência selecionada. '
+                'Inclua mais opções em «Descrição gerência» ou desmarque os filtros.'
+            ),
+        }
+        return render(request, 'planejamento/analise_maquina_manutentor.html', context)
+
+    by_ca, by_sigla_cf, by_desc_cf = build_centro_atividade_lookups()
+    ca_resolvido_por_maquina = {
+        m.id: resolve_centro_atividade_maquina(m, by_ca, by_sigla_cf, by_desc_cf) for m in maquinas
+    }
+
+    ca_por_local_norm = {}
+    centros_por_pk = {}
+    sem_centro_atividade = []
+
+    for m in maquinas:
+        ca, _orig = ca_resolvido_por_maquina[m.id]
+        if not ca:
+            sem_centro_atividade.append(m)
+            continue
+        centros_por_pk[ca.pk] = ca
+        loc_raw = (ca.local or '').strip()
+        if loc_raw:
+            nl = norm_local(loc_raw)
+            ca_por_local_norm.setdefault(nl, loc_raw)
+
+    maquina_ids = [m.id for m in maquinas]
+    assoc_list = list(
+        ManutentorMaquina.objects.filter(maquina_id__in=maquina_ids)
+        .select_related('manutentor', 'maquina')
+        .order_by('maquina__cd_maquina', 'manutentor__Nome')
+    )
+    if turnos_filtro is not None:
+        assoc_list = [r for r in assoc_list if r.manutentor.turno in turnos_filtro]
+    assoc_por_maquina = {}
+    for rel in assoc_list:
+        assoc_por_maquina.setdefault(rel.maquina_id, []).append(rel)
+
+    manut_qs = Manutentor.objects.filter(ativo=True).order_by('Nome', 'Matricula')
+    if turnos_filtro is not None:
+        manut_qs = manut_qs.filter(turno__in=turnos_filtro)
+
+    manutentores_local_compativel = []
+    for man in manut_qs:
+        if norm_local(man.local_trab) in ca_por_local_norm:
+            manutentores_local_compativel.append(man)
+
+    vinc_qs = ManutentorMaquina.objects.filter(maquina_id__in=maquina_ids)
+    if turnos_filtro is not None:
+        vinc_qs = vinc_qs.filter(manutentor__turno__in=turnos_filtro)
+    vinculados_ids = set(vinc_qs.values_list('manutentor_id', flat=True))
+    elegiveis_sem_vinculo = [m for m in manutentores_local_compativel if m.Matricula not in vinculados_ids]
+
+    ativos_manut = Manutentor.objects.filter(ativo=True)
+    if turnos_filtro is not None:
+        ativos_manut = ativos_manut.filter(turno__in=turnos_filtro)
+    ativos_norm_locals = set(norm_local(x) for x in ativos_manut.values_list('local_trab', flat=True))
+    locais_ca_sem_manutentor = sorted(
+        display for norm_k, display in ca_por_local_norm.items() if norm_k not in ativos_norm_locals
+    )
+
+    linhas_maquinas = []
+    for m in maquinas:
+        ca, centro_origem = ca_resolvido_por_maquina[m.id]
+        loc_ca_norm = norm_local(ca.local) if ca else ''
+        loc_ca_display = (ca.local or '').strip() if ca else ''
+        rels = assoc_por_maquina.get(m.id, [])
+        coerentes = []
+        divergentes = []
+        for rel in rels:
+            man = rel.manutentor
+            ok = bool(loc_ca_norm) and norm_local(man.local_trab) == loc_ca_norm
+            if ok:
+                coerentes.append(rel)
+            else:
+                divergentes.append(rel)
+        linhas_maquinas.append({
+            'maquina': m,
+            'centro': ca,
+            'centro_origem': centro_origem,
+            'local_ca': loc_ca_display,
+            'local_ca_norm': loc_ca_norm,
+            'assoc_total': len(rels),
+            'assoc_coerentes': coerentes,
+            'assoc_divergentes': divergentes,
+        })
+
+    compat_manut_set = {str(m.Matricula).strip() for m in manutentores_local_compativel}
+    compat_maq_set = {m.id for m in maquinas}
+    sel_manut_ordered = []
+    _seen_matricula = set()
+    for x in request.GET.getlist('sel_manut'):
+        xs = (x or '').strip()
+        if xs in compat_manut_set and xs not in _seen_matricula:
+            _seen_matricula.add(xs)
+            sel_manut_ordered.append(xs)
+
+    sel_manut_ordered_set = frozenset(sel_manut_ordered)
+    sel_manut_checked_values = {
+        m.Matricula for m in manutentores_local_compativel
+        if str(m.Matricula).strip() in sel_manut_ordered_set
+    }
+    sel_maquina_ordered = []
+    _seen_maq = set()
+    for x in request.GET.getlist('sel_maquina'):
+        try:
+            xi = int(x)
+            if xi in compat_maq_set and xi not in _seen_maq:
+                _seen_maq.add(xi)
+                sel_maquina_ordered.append(xi)
+        except (ValueError, TypeError):
+            pass
+
+    maquina_por_id = {m.id: m for m in maquinas}
+    linha_por_maq = {row['maquina'].id: row for row in linhas_maquinas}
+
+    acao_sugestao = (request.GET.get('acao_sugestao') or '').strip()
+
+    sugestao_divisao = {'ativa': False, 'mensagem': None}
+    if sel_manut_ordered and sel_maquina_ordered:
+        import statistics
+
+        sel_objs = []
+        _seen_mat = set()
+        for mat in sel_manut_ordered:
+            if mat in _seen_mat:
+                continue
+            _seen_mat.add(mat)
+            mo = next(
+                (x for x in manutentores_local_compativel if str(x.Matricula).strip() == mat),
+                None,
+            )
+            if mo:
+                sel_objs.append(mo)
+
+        loads_sector = dict(
+            ManutentorMaquina.objects.filter(
+                manutentor_id__in=[m.Matricula for m in sel_objs],
+                maquina_id__in=maquina_ids,
+            )
+            .values('manutentor_id')
+            .annotate(c=Count('id'))
+            .values_list('manutentor_id', 'c')
+        )
+
+        ja_vinculo = set(
+            ManutentorMaquina.objects.filter(
+                manutentor_id__in=[m.Matricula for m in sel_objs],
+                maquina_id__in=sel_maquina_ordered,
+            ).values_list('manutentor_id', 'maquina_id')
+        )
+
+        def _compat_count(mid):
+            row = linha_por_maq.get(mid)
+            if not row:
+                return 9999
+            loc_n = row['local_ca_norm']
+            if not loc_n:
+                return 9999
+            return sum(1 for man in sel_objs if norm_local(man.local_trab) == loc_n)
+
+        mids_ordered = sorted(
+            sel_maquina_ordered,
+            key=lambda mid: (_compat_count(mid), maquina_por_id[mid].cd_maquina),
+        )
+
+        trabalho_simulado = {m.Matricula: 0 for m in sel_objs}
+        assignments = []
+
+        def _pick_manutentor(compat_list):
+            def score(man):
+                return loads_sector.get(man.Matricula, 0) + trabalho_simulado[man.Matricula]
+
+            return min(compat_list, key=lambda man: (score(man), man.Nome or '', man.Matricula))
+
+        for mid in mids_ordered:
+            mq = maquina_por_id[mid]
+            row = linha_por_maq[mid]
+            loc_n = row['local_ca_norm']
+            loc_disp = row['local_ca']
+
+            if not loc_n:
+                assignments.append({
+                    'maquina': mq,
+                    'manutentor': None,
+                    'tipo': 'sem_local',
+                    'detalhe': 'CA ausente ou sem campo «local» — não há critério para casar com local_trab.',
+                })
+                continue
+
+            compat = [man for man in sel_objs if norm_local(man.local_trab) == loc_n]
+            if not compat:
+                assignments.append({
+                    'maquina': mq,
+                    'manutentor': None,
+                    'tipo': 'sem_compativel',
+                    'detalhe': 'Nenhum dos manutentores marcados tem o mesmo local de trabalho que o CA desta máquina.',
+                    'local_ca': loc_disp or '—',
+                })
+                continue
+
+            escolhido = _pick_manutentor(compat)
+            trabalho_simulado[escolhido.Matricula] += 1
+            assignments.append({
+                'maquina': mq,
+                'manutentor': escolhido,
+                'tipo': 'ok',
+                'compat_qtd': len(compat),
+                'loc_ca': loc_disp or '—',
+                'ja_vinculado': (escolhido.Matricula, mq.id) in ja_vinculo,
+            })
+
+        buckets = {m.Matricula: [] for m in sel_objs}
+        for a in assignments:
+            if a['manutentor']:
+                buckets[a['manutentor'].Matricula].append(a)
+
+        counts = [len(buckets[m.Matricula]) for m in sel_objs]
+        tot_ok = sum(counts)
+        media = statistics.mean(counts) if counts else 0
+        dp = statistics.pstdev(counts) if len(counts) > 1 else 0.0
+        mx_c = max(counts) if counts else 0
+        mn_c = min(counts) if counts else 0
+
+        por_manut = []
+        for man in sel_objs:
+            itens = buckets[man.Matricula]
+            horas = man.horas_semanais
+            dicas = []
+            if itens:
+                locs = sorted({x['loc_ca'] for x in itens})
+                dicas.append(f'Mesmo contexto de local (CA): {", ".join(locs[:3])}{"…" if len(locs) > 3 else ""}.')
+                nv = sum(1 for x in itens if x['ja_vinculado'])
+                if nv:
+                    dicas.append(f'{nv} máquina(s) já possuem vínculo cadastrado com você neste recorte — reforço de carteira, não necessariamente novos vínculos.')
+                if nv < len(itens):
+                    dicas.append(f'{len(itens) - nv} máquina(s) aparecem como alocação sugerida por critério de local + balanceamento de carga.')
+            else:
+                dicas.append('Nenhuma das máquinas marcadas foi atribuída — confira se há compatibilidade de local com o CA.')
+
+            if horas and len(itens) > media + 0.01:
+                dicas.append(
+                    f'Carga sugerida acima da média do grupo ({len(itens)} máqu. vs média {media:.1f}); '
+                    f'combine com horas semanais ({horas} h) ao planejar deslocamentos.'
+                )
+
+            por_manut.append({
+                'manutentor': man,
+                'itens': itens,
+                'total': len(itens),
+                'carga_previa_setor': loads_sector.get(man.Matricula, 0),
+                'dicas': dicas,
+            })
+
+        nao_atribuidas = [a for a in assignments if a['tipo'] != 'ok']
+
+        insights = []
+        if tot_ok and dp <= 0.51:
+            insights.append('A distribuição simulada ficou quase uniforme entre os manutentores selecionados — bom indicativo para turnos paralelos.')
+        elif mx_c - mn_c >= 2 and tot_ok:
+            insights.append(
+                'Há diferença relevante entre quem recebeu mais e menos máquinas — em geral isso reflete quantos «compatíveis» '
+                'existiam por local de CA, não aleatoriedade.'
+            )
+        if nao_atribuidas:
+            insights.append(
+                f'{len(nao_atribuidas)} máquina(s) ficaram sem dono sugerido: revise marcações ou inclua manutentores '
+                f'com local_trab alinhado ao CA.'
+            )
+        if tot_ok == len(sel_maquina_ordered):
+            insights.append('Todas as máquinas marcadas receberam um responsável sugerido — próximo passo é validar no PCM/vínculos reais.')
+
+        from collections import defaultdict
+
+        from app.models import OrdemServicoPreventiva, OrdemServicoPreventivaFicha
+
+        def _horas_preventiva_por_ordens(ids_fechadas_set):
+            """Soma horas (primeiro início → último fim nas fichas) por OS fechada — critério alinhado à análise de mão de obra."""
+            if not ids_fechadas_set:
+                return 0.0
+            ordem_intervals = {}
+            for f in OrdemServicoPreventivaFicha.objects.filter(
+                ordem_servico_id__in=ids_fechadas_set
+            ).only(
+                'dt_ficapomanu', 'dt_inic_iteficmanu', 'dt_fim_iteficmanu', 'ordem_servico_id'
+            ).iterator(chunk_size=2000):
+                oid = f.ordem_servico_id
+                if oid not in ids_fechadas_set:
+                    continue
+                dt_fic = _parse_datetime_os(f.dt_ficapomanu)
+                dt_inic = _parse_datetime_os(f.dt_inic_iteficmanu)
+                dt_fim = _parse_datetime_os(f.dt_fim_iteficmanu)
+                if not dt_inic or not dt_fim:
+                    continue
+                if dt_inic.year == 1900 and dt_fic:
+                    dt_inic = dt_inic.replace(year=dt_fic.year, month=dt_fic.month, day=dt_fic.day)
+                if dt_fim.year == 1900 and dt_fic:
+                    dt_fim = dt_fim.replace(year=dt_fic.year, month=dt_fic.month, day=dt_fic.day)
+                mins = _minutes_between(dt_inic, dt_fim)
+                if mins is None or mins < 0 or mins >= 24 * 60 * 2:
+                    continue
+                ordem_intervals.setdefault(oid, []).append((dt_inic, dt_fim))
+            total_min = 0.0
+            for intervals in ordem_intervals.values():
+                if not intervals:
+                    continue
+                dt_prim = min(i[0] for i in intervals)
+                dt_ult = max(i[1] for i in intervals)
+                mins = _minutes_between(dt_prim, dt_ult)
+                if mins is None or mins < 0 or mins >= 24 * 60 * 2:
+                    continue
+                total_min += mins
+            return total_min / 60.0
+
+        cd_maq_para_manut = {}
+        for a in assignments:
+            if a['tipo'] != 'ok' or not a.get('manutentor'):
+                continue
+            mq = a['maquina']
+            if mq.cd_maquina is None:
+                continue
+            try:
+                ck = int(mq.cd_maquina)
+            except (ValueError, TypeError):
+                continue
+            cd_maq_para_manut[ck] = a['manutentor']
+
+        agg_prev = defaultdict(lambda: {'total': 0, 'fechadas': 0, 'abertas': 0, 'ids_fechadas': set()})
+        codigos_carga = list(cd_maq_para_manut.keys())
+        if codigos_carga:
+            for o in OrdemServicoPreventiva.objects.filter(cd_maquina__in=codigos_carga).only(
+                'id', 'cd_maquina', 'dt_encordmanu'
+            ).iterator(chunk_size=4000):
+                try:
+                    cdv = int(o.cd_maquina) if o.cd_maquina is not None else None
+                except (ValueError, TypeError):
+                    continue
+                man = cd_maq_para_manut.get(cdv)
+                if not man:
+                    continue
+                mk_norm = str(man.Matricula).strip()
+                agg_prev[mk_norm]['total'] += 1
+                if _parse_datetime_os(o.dt_encordmanu):
+                    agg_prev[mk_norm]['fechadas'] += 1
+                    agg_prev[mk_norm]['ids_fechadas'].add(o.id)
+                else:
+                    agg_prev[mk_norm]['abertas'] += 1
+
+        carga_prev_linhas = []
+        total_os_prev = 0
+        total_horas_prev = 0.0
+        for mo_p in sel_objs:
+            mk_norm = str(mo_p.Matricula).strip()
+            bl_p = agg_prev[mk_norm]
+            hrs_p = _horas_preventiva_por_ordens(bl_p['ids_fechadas'])
+            total_os_prev += bl_p['total']
+            total_horas_prev += hrs_p
+            carga_prev_linhas.append({
+                'manutentor': mo_p,
+                'total_ordens': bl_p['total'],
+                'fechadas': bl_p['fechadas'],
+                'abertas': bl_p['abertas'],
+                'horas_apontadas': round(hrs_p, 2),
+                'media_horas_os_fechada': round(hrs_p / bl_p['fechadas'], 2) if bl_p['fechadas'] else None,
+            })
+
+        carga_preventiva_payload = {
+            'por_manutentor': carga_prev_linhas,
+            'total_ordens': total_os_prev,
+            'total_horas_apontadas': round(total_horas_prev, 2),
+            'n_maquinas_atribuidas': len(codigos_carga),
+            'metodologia': (
+                'Ordens de Serviço Preventivas com cd_maquina igual a cada máquina «ganha» na simulação são contadas '
+                'para o manutentor sugerido daquela máquina. OS fechada = dt_encordmanu interpretável. '
+                'Horas apontadas somam, por OS fechada, o intervalo entre o menor início e o maior fim '
+                'nas fichas (OrdemServicoPreventivaFicha), como na análise geral de mão de obra — '
+                'sem filtro de período (histórico completo no banco).'
+            ),
+        }
+
+        sugestao_divisao = {
+            'ativa': True,
+            'mensagem': None,
+            'por_manut': por_manut,
+            'nao_atribuidas': nao_atribuidas,
+            'metricas': {
+                'media': round(media, 2),
+                'dp': round(dp, 2),
+                'min': mn_c,
+                'max': mx_c,
+                'n_manuts': len(sel_objs),
+                'n_maq_marcadas': len(sel_maquina_ordered),
+                'n_atribuidas': tot_ok,
+            },
+            'insights': insights,
+            'carga_preventiva': carga_preventiva_payload,
+        }
+    elif acao_sugestao:
+        sugestao_divisao = {
+            'ativa': False,
+            'mensagem': (
+                'Marque pelo menos um manutentor e uma máquina nas tabelas acima e clique novamente em '
+                '«Gerar sugestão de divisão». Sem caixas marcadas, não há o que simular.'
+            ),
+        }
+    elif request.GET.getlist('sel_manut') or request.GET.getlist('sel_maquina'):
+        sugestao_divisao = {
+            'ativa': False,
+            'mensagem': (
+                'Seleção incompleta ou inválida: confira se os manutentores e máquinas marcados '
+                'ainda aparecem nesta página (mesmo setor e filtros).'
+            ),
+        }
+
+    context['analise'] = {
+        'total_maquinas': len(maquinas),
+        'centros': sorted(centros_por_pk.values(), key=lambda c: (c.ca or 0, c.sigla or '')),
+        'locais_ca_distintos': sorted(set(ca_por_local_norm.values()), key=lambda x: x.casefold()),
+        'sem_centro_atividade': sem_centro_atividade,
+        'sem_local_no_centro': [
+            m for m in maquinas
+            if ca_resolvido_por_maquina[m.id][0] and not (ca_resolvido_por_maquina[m.id][0].local or '').strip()
+        ],
+        'manutentores_local_compativel': manutentores_local_compativel,
+        'elegiveis_sem_vinculo': elegiveis_sem_vinculo,
+        'locais_ca_sem_manutentor': locais_ca_sem_manutentor,
+        'linhas_maquinas': linhas_maquinas,
+        'filtro_turnos': turnos_get,
+        'filtro_descr_gerenc': descr_get,
+        'sel_manut_selecionados': sel_manut_ordered,
+        'sel_manut_checked_values': sel_manut_checked_values,
+        'sel_maquina_selecionados': sel_maquina_ordered,
+        'sugestao_divisao': sugestao_divisao,
+    }
+    return render(request, 'planejamento/analise_maquina_manutentor.html', context)
+
+
 def _parse_tempo_trabalho_horas(tempo_str):
     """Parse tempo_trabalho string (e.g. '8 horas', '8h 30min', '8:30') to decimal hours."""
     if not tempo_str or not isinstance(tempo_str, str):
@@ -19285,9 +19988,10 @@ def editar_manutentor(request, matricula):
 
 def consultar_manutentores(request):
     """Consultar/listar manutentores cadastrados com filtros avançados"""
-    from app.models import Manutentor
-    from datetime import datetime
-    
+    from app.models import Manutentor, SETOR_TRABALHO
+
+    _setor_display = dict(SETOR_TRABALHO)
+
     # Buscar todos os manutentores
     manutentores_list = Manutentor.objects.all()
     
@@ -19307,7 +20011,8 @@ def consultar_manutentores(request):
             Q(Nome__icontains=search_query) |
             Q(Cargo__icontains=search_query) |
             Q(turno__icontains=search_query) |
-            Q(local_trab__icontains=search_query)
+            Q(local_trab__icontains=search_query) |
+            Q(setor_trabalho__icontains=search_query)
         )
     
     # Filtros específicos
@@ -19320,6 +20025,11 @@ def consultar_manutentores(request):
     filtro_local_trab = request.GET.get('filtro_local_trab', '')
     if filtro_local_trab:
         manutentores_list = manutentores_list.filter(local_trab=filtro_local_trab)
+
+    # Filtro por Setor de Trabalho
+    filtro_setor_trabalho = request.GET.get('filtro_setor_trabalho', '')
+    if filtro_setor_trabalho:
+        manutentores_list = manutentores_list.filter(setor_trabalho=filtro_setor_trabalho)
     
     # Filtro por Cargo
     filtro_cargo = request.GET.get('filtro_cargo', '')
@@ -19353,6 +20063,15 @@ def consultar_manutentores(request):
         local_trab=''
     ).values_list('local_trab', flat=True).distinct().order_by('local_trab'))
 
+    setores_vals = list(
+        Manutentor.objects.exclude(setor_trabalho__isnull=True)
+        .exclude(setor_trabalho='')
+        .values_list('setor_trabalho', flat=True)
+        .distinct()
+        .order_by('setor_trabalho')
+    )
+    setores_trabalho_db = [(v, _setor_display.get(v, v)) for v in setores_vals]
+
     # Variáveis que o template espera (algumas podem não existir no modelo)
     postos_unicos = []
     filtro_posto = request.GET.get('filtro_posto', '')
@@ -19376,6 +20095,8 @@ def consultar_manutentores(request):
         # Valores dos filtros ativos
         'filtro_turno': filtro_turno,
         'filtro_local_trab': filtro_local_trab,
+        'filtro_setor_trabalho': filtro_setor_trabalho,
+        'setores_trabalho_db': setores_trabalho_db,
         'filtro_cargo': filtro_cargo,
         'filtro_posto': filtro_posto,
         'filtro_ativo': filtro_ativo,
@@ -23668,7 +24389,8 @@ def analise_geral_orcamento(request):
     
     # Obter filtros de ano e meses (múltiplos)
     ano_filtro = request.GET.get('ano', None)
-    meses_filtro = request.GET.getlist('mes')  # getlist para múltiplos valores
+    meses_na_url = request.GET.getlist('mes')  # vazio = "todos os meses" (rótulo do formulário)
+    meses_explicitos_na_url = bool(meses_na_url)
     
     # Valores padrão: ano atual e mês atual (quando não há filtros na URL)
     hoje = datetime.now()
@@ -23681,22 +24403,23 @@ def analise_geral_orcamento(request):
     except (ValueError, TypeError):
         ano_filtro = hoje.year
     
-    # Converter meses para inteiros e validar
-    meses_filtro_int = []
-    if meses_filtro:
-        for mes in meses_filtro:
+    # Meses vindos explicitamente na URL (antes do default 1–12). Usado no link p/ NF e no mês de
+    # referência das «ocorrências de atraso» — igual analise_notas_fiscais (sem mes → mês corrente).
+    meses_filtro_url_int = []
+    if meses_na_url:
+        for mes in meses_na_url:
             try:
                 mes_int = int(mes)
                 if 1 <= mes_int <= 12:
-                    meses_filtro_int.append(mes_int)
+                    meses_filtro_url_int.append(mes_int)
             except (ValueError, TypeError):
                 continue
-        # Remover duplicatas e ordenar
-        meses_filtro_int = sorted(list(set(meses_filtro_int)))
+        meses_filtro_url_int = sorted(list(set(meses_filtro_url_int)))
     
-    # Se não há meses selecionados, usar o mês atual
+    meses_filtro_int = list(meses_filtro_url_int)
+    # Sem parâmetros mes na URL = ano inteiro (alinha ao texto do filtro e à analise_notas_fiscais)
     if not meses_filtro_int:
-        meses_filtro_int = [hoje.month]
+        meses_filtro_int = list(range(1, 13))
     meses_para_mostrar = meses_filtro_int
     
     # Função auxiliar para parse de datas
@@ -23748,13 +24471,13 @@ def analise_geral_orcamento(request):
         (Q(ano_referencia__isnull=True) & Q(created_at__year=ano_filtro))
     )
     projecoes_filtradas = ProjecaoGasto.objects.filter(q_ano_proj)
-    if meses_filtro_int:
+    if meses_para_mostrar:
         # mes_referencia no DB pode ser '01','02',...'12' (import) ou nome; também previsao_execucao e created_at
         meses_str = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
                      'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO']
-        meses_selecionados_str = [meses_str[m-1] for m in meses_filtro_int]
+        meses_selecionados_str = [meses_str[m-1] for m in meses_para_mostrar]
         q_mes_proj = Q()
-        for mes_num in meses_filtro_int:
+        for mes_num in meses_para_mostrar:
             q_mes_proj |= Q(mes_referencia__in=[str(mes_num), f'{mes_num:02d}'])
         for mes_str in meses_selecionados_str:
             q_mes_proj |= Q(mes_referencia__iexact=mes_str)
@@ -23764,10 +24487,10 @@ def analise_geral_orcamento(request):
             7: ['JULHO', 'JUL'], 8: ['AGOSTO', 'AGO'], 9: ['SETEMBRO', 'SET'],
             10: ['OUTUBRO', 'OUT'], 11: ['NOVEMBRO', 'NOV'], 12: ['DEZEMBRO', 'DEZ']
         }
-        for mes_num in meses_filtro_int:
+        for mes_num in meses_para_mostrar:
             for nome in meses_nomes_variantes.get(mes_num, []):
                 q_mes_proj |= Q(previsao_execucao__icontains=nome)
-        for mes_num in meses_filtro_int:
+        for mes_num in meses_para_mostrar:
             q_mes_proj |= Q(
                 (Q(mes_referencia__isnull=True) | Q(mes_referencia='')) &
                 (Q(previsao_execucao__isnull=True) | Q(previsao_execucao='')) &
@@ -23846,7 +24569,7 @@ def analise_geral_orcamento(request):
         data_emissao = parse_date(nota.data_emissao)
         # Usar APENAS data_emissao para determinar o mês
         if data_emissao and data_emissao.year == ano_filtro:
-            if not meses_filtro_int or data_emissao.month in meses_filtro_int:
+            if data_emissao.month in meses_para_mostrar:
                 notas_filtradas.append(nota)
     
     total_notas = len(notas_filtradas)
@@ -23865,24 +24588,17 @@ def analise_geral_orcamento(request):
     )
     
     for nota in todas_notas_autorizadas:
-        # Usar APENAS data_emissao para determinar o mês
         data_emissao = parse_date(nota.data_emissao)
-        
-        # Se não houver filtro de mês, incluir todas as notas do ano (ou sem data)
-        if not meses_filtro_int:
-            if not data_emissao:
-                # Se não há data_emissao, incluir (assumindo que é do ano filtrado)
-                notas_autorizadas_242_filtradas.append(nota)
-            elif data_emissao.year == ano_filtro:
-                notas_autorizadas_242_filtradas.append(nota)
-        else:
-            # Filtrar por ano e mês específicos baseado em data_emissao
-            if data_emissao and data_emissao.year == ano_filtro:
-                if data_emissao.month in meses_filtro_int:
-                    notas_autorizadas_242_filtradas.append(nota)
+        if data_emissao and data_emissao.year == ano_filtro and data_emissao.month in meses_para_mostrar:
+            notas_autorizadas_242_filtradas.append(nota)
     
-    valor_total_notas_lancadas = sum(
-        (nota.total_nota or Decimal('0')) for nota in notas_autorizadas_242_filtradas
+    # «Total em NF» no dashboard: mesmo critério do KPI «Valor Total» em analise_notas_fiscais
+    # (soma por data_emissão no período + ocorrências de atraso). Mantém-se a lista 242/LANÇADA só para gráficos.
+    valor_total_notas_lancadas = _valor_total_mes_com_ocorrencias_nf_analise_padrao(
+        ano_filtro,
+        meses_para_mostrar,
+        ref_datetime=hoje,
+        meses_explicitos_ocorrencia=meses_filtro_url_int,
     )
     
     # Notas relacionadas a projeções
@@ -23953,8 +24669,30 @@ def analise_geral_orcamento(request):
     # Saldo disponível
     saldo_disponivel = total_orcamento_disponivel - total_gastos
     
-    # Saldo Parcial = Orçamento Disponível − Requisições sem NF − Gastos Previstos (Serv. Concluído NÃO) − Valor NF Lançadas
+    # Saldo Parcial = Orçamento Disponível − Requisições sem NF − Gastos Previstos (Serv. Concluído NÃO) − Total em NF
+    # (Total em NF = mesmo «Valor Total» de analise_notas_fiscais: emissão no período + ocorrências de atraso)
     saldo_parcial = total_orcamento_disponivel - valor_total_requisicoes_sem_nf - valor_servico_concluido_nao - valor_total_notas_lancadas
+
+    def _dec_to_float(v):
+        try:
+            return float(v) if v is not None else 0.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    saldo_parcial_termos_json = json.dumps(
+        {
+            'disponivel': _dec_to_float(total_orcamento_disponivel),
+            'req_sem_nf': _dec_to_float(valor_total_requisicoes_sem_nf),
+            'gastos_prev_nao': _dec_to_float(valor_servico_concluido_nao),
+            'nf_lancadas': _dec_to_float(valor_total_notas_lancadas),
+        },
+        ensure_ascii=False,
+    )
+    saldo_parcial_filtro_key = (
+        f'{ano_filtro}-' + '-'.join(str(m) for m in meses_filtro_url_int)
+        if meses_explicitos_na_url and meses_filtro_url_int
+        else f'{ano_filtro}-todos-meses'
+    )
     
     # Percentual de projeções com NF relacionada
     percentual_projecoes_com_nf = 0
@@ -24226,6 +24964,8 @@ def analise_geral_orcamento(request):
         'percentual_requisicoes_sem_nf_sobre_orcamento': percentual_requisicoes_sem_nf_sobre_orcamento,
         'ano_filtro': ano_filtro,
         'meses_filtro': meses_filtro_int,
+        'meses_filtro_url': meses_filtro_url_int,
+        'meses_explicitos_na_url': meses_explicitos_na_url,
         'anos_disponiveis': anos_disponiveis,
         # KPIs
         'total_orcamento_disponivel': total_orcamento_disponivel,
@@ -24261,6 +25001,8 @@ def analise_geral_orcamento(request):
         'valor_total_notas_lancadas': valor_total_notas_lancadas,
         'percentual_notas_lancadas_sobre_orcamento': percentual_notas_lancadas_sobre_orcamento,
         'saldo_parcial': saldo_parcial,
+        'saldo_parcial_termos_json': saldo_parcial_termos_json,
+        'saldo_parcial_filtro_key': saldo_parcial_filtro_key,
         # Gráficos
         'meses_labels': json.dumps(meses_labels, ensure_ascii=False),
         'meses_orcamento': json.dumps(meses_orcamento, ensure_ascii=False),
@@ -25958,6 +26700,126 @@ def reuniao_projecao_gastos(request):
         'setor_default_color': '#6c757d',
     }
     return render(request, 'orcamento/reuniao_projecao_gastos.html', context)
+
+
+def _valor_total_mes_com_ocorrencias_nf_analise_padrao(
+    ano_filtro,
+    meses_emissao_list,
+    ref_datetime=None,
+    meses_explicitos_ocorrencia=None,
+):
+    """
+    Mesmo valor do KPI «Valor Total» em analise_notas_fiscais (valor_total_mes_com_ocorrencias):
+    soma das notas filtradas por data_emissao (ano + meses) sem filtros de uso/situação/emitente/centro,
+    mais ocorrências de atraso (emissão mês anterior × inclusão/autorização no mês de referência).
+
+    meses_explicitos_ocorrencia: meses que vieram na query (?mes=), antes de expandir para 1–12.
+    Se vazio ou None, mes_referencia das ocorrências = mês de ref_datetime (igual analise_notas_fiscais
+    sem parâmetro mes). Se não vazio, mes_referencia = max dessa lista.
+    """
+    from app.models import NotaFiscal
+    from decimal import Decimal
+    from datetime import datetime
+
+    if ref_datetime is None:
+        ref_datetime = datetime.now()
+    hoje = ref_datetime
+
+    def parse_date(date_str):
+        if not date_str:
+            return None
+        date_str = str(date_str).strip()
+        if not date_str:
+            return None
+        if ' ' in date_str:
+            date_part = date_str.split(' ')[0]
+        else:
+            date_part = date_str
+        date_formats = [
+            '%d/%m/%Y', '%d-%m-%Y', '%d.%m.%Y', '%Y-%m-%d', '%Y/%m/%d',
+            '%d/%m/%y', '%d-%m-%y',
+        ]
+        for fmt in date_formats:
+            try:
+                return datetime.strptime(date_part, fmt)
+            except (ValueError, TypeError):
+                continue
+        if '/' in date_part:
+            parts = date_part.split('/')
+            if len(parts) == 3:
+                try:
+                    day, month, year = parts
+                    if len(year) == 2:
+                        year = '20' + year
+                    return datetime(int(year), int(month), int(day))
+                except (ValueError, TypeError):
+                    pass
+        return None
+
+    meses_emissao_int = sorted(set(int(m) for m in (meses_emissao_list or []) if 1 <= int(m) <= 12))
+    if not meses_emissao_int:
+        meses_para_mostrar = list(range(1, 13))
+    else:
+        meses_para_mostrar = meses_emissao_int
+
+    exp_oc = meses_explicitos_ocorrencia
+    if exp_oc is None:
+        exp_oc = []
+    meses_url_oc = sorted(set(int(m) for m in exp_oc if 1 <= int(m) <= 12))
+
+    todas_notas_list = NotaFiscal.objects.all()
+    notas_filtradas = []
+    for nota in todas_notas_list:
+        data_emissao = parse_date(nota.data_emissao)
+        if not data_emissao:
+            if nota.situacao and 'PENDENTE' in (nota.situacao or '').upper():
+                pass
+            else:
+                continue
+        elif data_emissao.year != ano_filtro:
+            continue
+        if data_emissao and meses_para_mostrar and data_emissao.month not in meses_para_mostrar:
+            continue
+        notas_filtradas.append(nota)
+
+    valor_total_notas = sum((nota.total_nota or Decimal(0)) for nota in notas_filtradas)
+
+    mes_referencia = max(meses_url_oc) if meses_url_oc else hoje.month
+    ano_referencia = ano_filtro
+    if mes_referencia == 1:
+        mes_anterior = 12
+        ano_mes_anterior = ano_referencia - 1
+    else:
+        mes_anterior = mes_referencia - 1
+        ano_mes_anterior = ano_referencia
+
+    notas_base_atraso = list(todas_notas_list)
+    notas_pendencia_pos_emissao = []
+    notas_com_lag_pos_emissao = []
+    for nota in notas_base_atraso:
+        data_emissao = parse_date(nota.data_emissao)
+        if not data_emissao:
+            continue
+        if not (data_emissao.year == ano_mes_anterior and data_emissao.month == mes_anterior):
+            continue
+        data_inclusao = parse_date(nota.data_inclusao)
+        data_autorizacao = parse_date(nota.data_autorizacao)
+        if not data_inclusao and not data_autorizacao:
+            notas_pendencia_pos_emissao.append(nota)
+            continue
+        inclusao_no_mes = bool(
+            data_inclusao and data_inclusao.year == ano_referencia and data_inclusao.month == mes_referencia
+        )
+        autorizacao_no_mes = bool(
+            data_autorizacao and data_autorizacao.year == ano_referencia and data_autorizacao.month == mes_referencia
+        )
+        if inclusao_no_mes and autorizacao_no_mes:
+            notas_com_lag_pos_emissao.append({'nota': nota, 'meses_diferenca': 1})
+
+    valor_pendencia_sem_datas = sum((nota.total_nota or Decimal(0)) for nota in notas_pendencia_pos_emissao)
+    valor_lag_meses = sum((item['nota'].total_nota or Decimal(0)) for item in notas_com_lag_pos_emissao)
+    valor_total_ocorrencias_atraso = valor_pendencia_sem_datas + valor_lag_meses
+    return valor_total_notas + valor_total_ocorrencias_atraso
 
 
 def analise_notas_fiscais(request):

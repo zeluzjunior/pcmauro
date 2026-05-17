@@ -141,8 +141,8 @@ class CentroAtividadeAdmin(admin.ModelAdmin):
 @admin.register(Manutentor)
 class ManutentorAdmin(admin.ModelAdmin):
     """Admin configuration for Manutentor model"""
-    list_display = ('Matricula', 'Nome', 'Cargo', 'turno', 'local_trab', 'created_at')
-    list_filter = ('turno', 'local_trab', 'created_at')
+    list_display = ('Matricula', 'Nome', 'Cargo', 'setor_trabalho', 'turno', 'local_trab', 'created_at')
+    list_filter = ('setor_trabalho', 'turno', 'local_trab', 'created_at')
     search_fields = ('Matricula', 'Nome', 'Cargo')
     readonly_fields = ('created_at', 'updated_at')
     list_per_page = 50
@@ -152,10 +152,10 @@ class ManutentorAdmin(admin.ModelAdmin):
             'fields': ('Matricula', 'Nome', 'Cargo')
         }),
         ('Horários e Tempo de Trabalho', {
-            'fields': ('horario_inicio', 'horario_fim', 'tempo_trabalho')
+            'fields': ('horario_inicio', 'horario_fim', 'tempo_trabalho', 'horas_semanais')
         }),
         ('Classificações', {
-            'fields': ('tipo', 'turno', 'local_trab')
+            'fields': ('setor_trabalho', 'turno', 'local_trab', 'ativo')
         }),
         ('Datas', {
             'fields': ('created_at', 'updated_at'),

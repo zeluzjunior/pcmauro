@@ -179,6 +179,7 @@ urlpatterns = [
     path('analise-mao-de-obra/preventiva/', views.analise_mao_de_obra_preventiva, name="analise_mao_de_obra_preventiva"),
     path('analise-mao-de-obra/calculo/', views.calculo_mao_de_obra, name="calculo_mao_de_obra"),
     path('analise-mao-de-obra/configuracoes/', views.configuracoes_mao_de_obra, name="configuracoes_mao_de_obra"),
+    path('analise-mao-de-obra/analise-maquina-manutentor/', views.analise_maquina_manutentor, name="analise_maquina_manutentor"),
 
     # Manutentores
     path('manutentor/analise/', views.analise_manutentores, name="analise_manutentores"),

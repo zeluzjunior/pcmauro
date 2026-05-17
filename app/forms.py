@@ -436,6 +436,7 @@ class ManutentorForm(forms.ModelForm):
             'horas_semanais',
             'turno',
             'local_trab',
+            'setor_trabalho',
             'ativo',
         ]
         widgets = {
@@ -478,7 +479,12 @@ class ManutentorForm(forms.ModelForm):
             'turno': forms.Select(attrs={
                 'class': 'form-select',
             }),
-            'local_trab': forms.Select(attrs={
+            'local_trab': forms.TextInput(attrs={
+                'class': 'form-control',
+                'maxlength': '255',
+                'placeholder': 'Ex.: Industria, Frigorífico ou texto da planilha RH',
+            }),
+            'setor_trabalho': forms.Select(attrs={
                 'class': 'form-select',
             }),
             'ativo': forms.CheckboxInput(attrs={
@@ -495,6 +501,7 @@ class ManutentorForm(forms.ModelForm):
             'horas_semanais': 'Horas Semanais',
             'turno': 'Turno',
             'local_trab': 'Local de Trabalho',
+            'setor_trabalho': 'Setor de Trabalho',
             'ativo': 'Ativo',
         }
 
@@ -504,7 +511,14 @@ class ManutentorForm(forms.ModelForm):
         self.fields['Matricula'].required = True
         self.fields['tempo_trabalho'].required = True
         self.fields['turno'].required = True
-        self.fields['local_trab'].required = True
+        self.fields['local_trab'].required = False
+        self.fields['setor_trabalho'].required = True
+        if (
+            not self.is_bound
+            and self.instance._state.adding
+            and not self.initial.get('setor_trabalho')
+        ):
+            self.initial['setor_trabalho'] = 'Indefinido'
 
 
 class ManutencaoTerceiroForm(forms.ModelForm):

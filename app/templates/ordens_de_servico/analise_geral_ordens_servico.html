@@ -149,7 +149,7 @@
             </div>
         </div>
         
-        <!-- KPI Cards -->
+        <!-- KPI Cards Row 1: volume e situação -->
         <div class="row mb-2">
             <div class="col-md-3 mb-3">
                 <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
@@ -165,52 +165,6 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-3">
-                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="text-muted mb-2">Com Executor</h6>
-                                <h2 class="mb-0 fw-bold">{{ taxa_ordens_com_executor|floatformat:1 }}%</h2>
-                                <small class="text-muted">{{ ordens_com_executor }} com / {{ ordens_sem_executor }} sem</small>
-                            </div>
-                            <i class="fas fa-user-check fa-3x text-success opacity-25"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3 mb-3">
-                <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="text-muted mb-2">Com Fichas</h6>
-                                <h2 class="mb-0 fw-bold">{{ taxa_ordens_com_fichas|floatformat:1 }}%</h2>
-                                <small class="text-muted">{{ ordens_com_fichas }} com / {{ ordens_sem_fichas }} sem</small>
-                            </div>
-                            <i class="fas fa-file-alt fa-3x text-info opacity-25"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3 mb-3">
-                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="text-muted mb-2">Total de Fichas</h6>
-                                <h2 class="mb-0 fw-bold">{{ total_fichas }}</h2>
-                                <small class="text-muted">Média: {{ media_fichas_por_ordem|floatformat:1 }} por ordem</small>
-                            </div>
-                            <i class="fas fa-file-invoice fa-3x text-warning opacity-25"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- KPI Cards Row 2: Ordens Abertas, Fechadas, Solicitações, Tempo Total -->
-        <div class="row mb-5">
             <div class="col-md-3 mb-3">
                 <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
                     <div class="card-body">
@@ -253,7 +207,53 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- KPI Cards Row 2: Com Executor, Com Fichas, Total de Fichas, Horas necessárias -->
+        <div class="row mb-5">
+            <div class="col-md-2 mb-3">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total de Fichas</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_fichas }}</h2>
+                                <small class="text-muted">Média: {{ media_fichas_por_ordem|floatformat:1 }} por ordem</small>
+                            </div>
+                            <i class="fas fa-file-invoice fa-3x text-warning opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Com Executante:</h6>
+                                <h2 class="mb-0 fw-bold">{{ taxa_ordens_com_executor|floatformat:1 }}%</h2>
+                                <small class="text-muted">{{ ordens_com_executor }} com / {{ ordens_sem_executor }} sem</small>
+                            </div>
+                            <i class="fas fa-user-check fa-3x text-success opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Com Fichas</h6>
+                                <h2 class="mb-0 fw-bold">{{ taxa_ordens_com_fichas|floatformat:1 }}%</h2>
+                                <small class="text-muted">{{ ordens_com_fichas }} com / {{ ordens_sem_fichas }} sem</small>
+                            </div>
+                            <i class="fas fa-file-alt fa-3x text-info opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
                 <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -269,37 +269,27 @@
             </div>
         </div>
 
-        <!-- KPI Cards Row 3: Ordens Abertas por Tipo de Ordem -->
-        {% if ordens_abertas_por_tipo %}
+        <!-- Ordens por tipo (Corretiva / Outros / Lubrificação / Preventiva) — período = DT_ABERTURA_SOLICITA -->
         <div class="row mb-5">
             <div class="col-12 mb-3">
                 <h5 class="mb-0">
-                    <i class="fas fa-tags me-2 text-primary"></i>Ordens Abertas por Tipo de Ordem
+                    <i class="fas fa-th-large me-2 text-primary"></i>Ordens por tipo de manutenção
                 </h5>
-                <small class="text-muted">Baseado em status "Ordem de Serviço em Execução" no período filtrado</small>
+                <small class="text-muted">Contagem conforme os filtros de ano/mês (cada ordem entra no mês de <strong>DT_ABERTURA_SOLICITA</strong>). <strong>Abertas</strong>: &quot;Ordem de Serviço em Execução&quot;. <strong>Fechadas</strong>: &quot;Ordem de Serviço Fechada&quot;. Corretiva e Outros: <strong>OrdemServicoCorretiva</strong>, separadas por <strong>descr_tpmanuttv</strong> (corretiva quando o texto contém corretiva; caso contrário, outros). Lubrificação: <strong>OrdemServicoLubrificacao</strong>. Preventiva: <strong>OrdemServicoPreventiva</strong>.</small>
             </div>
-            <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
-                <div class="card stat-card shadow-sm border-0 h-100">
+            {% for card in os_quadro_por_tipo %}
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card shadow-sm border-0 h-100 {% if card.slug == 'corretiva' %}border-start border-danger border-4{% elif card.slug == 'outros' %}border-start border-secondary border-4{% elif card.slug == 'lubrificacao' %}border-start border-warning border-4{% else %}border-start border-success border-4{% endif %}">
                     <div class="card-body">
-                        <h6 class="text-muted mb-2">Ordens Preventivas</h6>
-                        <h3 class="mb-0 fw-bold text-primary">{{ total_preventivas }}</h3>
-                        <small class="text-muted">No período filtrado</small>
-                    </div>
-                </div>
-            </div>
-            {% for item in ordens_abertas_por_tipo %}
-            <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
-                <div class="card stat-card shadow-sm border-0 h-100">
-                    <div class="card-body">
-                        <h6 class="text-muted mb-2">{{ item.tipo|truncatechars:45 }}</h6>
-                        <h3 class="mb-0 fw-bold text-primary">{{ item.total }}</h3>
-                        <small class="text-muted">ordens abertas</small>
+                        <h6 class="text-muted mb-2">{{ card.titulo }}</h6>
+                        <h3 class="mb-0 fw-bold text-primary">{{ card.total }}</h3>
+                        <small class="text-muted d-block mt-1">no período filtrado</small>
+                        <small class="text-muted d-block">Abertas: {{ card.abertas }} · Fechadas: {{ card.fechadas }}{% if card.outras %} · Outras situações: {{ card.outras }}{% endif %}</small>
                     </div>
                 </div>
             </div>
             {% endfor %}
         </div>
-        {% endif %}
 
         <!-- Charts Row 1: Tipo de Ordem (MUITO IMPORTANTE) e Evolução Temporal -->
         <div class="row mb-5">
@@ -403,6 +393,84 @@
                         <div class="chart-container">
                             <canvas id="executoresFichasChart"></canvas>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Manutentores: cadastro × ordens e fichas no período (DT_ABERTURA_SOLICITA / fichas das OS filtradas) -->
+        <div class="row mb-5">
+            <div class="col-12 mb-3">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-hard-hat me-2"></i>Manutentores — ordens e fichas no período filtrado
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">
+                            Manutentores <strong>ativos</strong> cadastrados no sistema. As colunas contam ordens e fichas cujo executor coincide por <strong>cd_func_exec</strong> / <strong>cd_func_exec_os</strong> (matrícula) ou, se vazio, por <strong>nm_func_exec</strong> / <strong>nm_func_exec_os</strong> (nome normalizado). Mesma base de filtros de ano/mês da página.
+                        </p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Matrícula</th>
+                                        <th>Nome</th>
+                                        <th>Local de trabalho</th>
+                                        <th>Turno</th>
+                                        <th class="text-end">Ordens</th>
+                                        <th class="text-end">Fichas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in tabela_manutentores_analise %}
+                                    {% with m=row.manutentor %}
+                                    <tr class="{% if not row.total_ordens and not row.total_fichas %}table-light{% endif %}">
+                                        <td>
+                                            <a href="{% url 'visualizar_manutentor' m.Matricula %}" class="text-decoration-none">{{ m.Matricula }}</a>
+                                        </td>
+                                        <td>{{ m.Nome|default:"—" }}</td>
+                                        <td><span class="badge bg-secondary">{{ m.local_trab|default:"—" }}</span></td>
+                                        <td><span class="badge bg-light text-dark border">{{ m.get_turno_display|default:"—" }}</span></td>
+                                        <td class="text-end">{% if row.total_ordens %}<span class="badge bg-primary">{{ row.total_ordens }}</span>{% else %}<span class="text-muted">0</span>{% endif %}</td>
+                                        <td class="text-end">{% if row.total_fichas %}<span class="badge bg-info text-dark">{{ row.total_fichas }}</span>{% else %}<span class="text-muted">0</span>{% endif %}</td>
+                                    </tr>
+                                    {% endwith %}
+                                    {% empty %}
+                                    <tr><td colspan="6" class="text-muted text-center py-4">Nenhum manutentor ativo cadastrado.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {% if executores_sem_cadastro_analise %}
+                        <hr class="my-4">
+                        <h6 class="text-warning"><i class="fas fa-exclamation-triangle me-2"></i>Executor na OS / ficha sem cadastro de manutentor ativo</h6>
+                        <p class="text-muted small">Aparecem como matrícula ou nome na importação das ordens, mas não batem com nenhuma matrícula ou nome (normalizado) de manutentor ativo.</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Tipo no dado</th>
+                                        <th>Valor</th>
+                                        <th class="text-end">Ordens</th>
+                                        <th class="text-end">Fichas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for ex in executores_sem_cadastro_analise %}
+                                    <tr>
+                                        <td>{{ ex.tipo_chave }}</td>
+                                        <td><code class="small">{{ ex.rotulo|truncatechars:80 }}</code></td>
+                                        <td class="text-end"><span class="badge bg-secondary">{{ ex.total_ordens }}</span></td>
+                                        <td class="text-end"><span class="badge bg-secondary">{{ ex.total_fichas }}</span></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
