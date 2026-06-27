@@ -437,6 +437,11 @@
                                             Análise de Lubrificação</a>
                                     </li>
                                     <li>
+                                        <a href="{% url 'analise_lubrificacao_por_maquina' %}" class="link-dark rounded">
+                                            <i class="bi bi-gear-wide-connected me-2"></i>
+                                            Análise por Máquina (Plano)</a>
+                                    </li>
+                                    <li>
                                         <a href="{% url 'consultar_ordens_lubrificacao' %}" class="link-dark rounded">
                                             <i class="bi bi-search me-2"></i>
                                             Consultar Ordens de Lubrificação</a>
@@ -565,6 +570,21 @@
                             </div>
                         </li>
 
+                        <!-- Indicadores -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#indicadores-collapse" aria-expanded="false">
+                                <i class="bi bi-speedometer2 me-2"></i>
+                                <span class="btn-toggle-text">Indicadores</span>
+                            </button>
+                            <div class="collapse" id="indicadores-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'analise_indicadores' %}" class="link-dark rounded"><i class="fas fa-chart-line me-2"></i>Análise de Indicadores</a></li>
+                                    <li><a href="{% url 'digitar_indicador' %}" class="link-dark rounded"><i class="fas fa-keyboard me-2"></i>Digitar Indicadores</a></li>
+                                    <li><a href="{% url 'configuracoes_indicadores' %}" class="link-dark rounded"><i class="fas fa-cog me-2"></i>Configurações</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
                         <li class="border-top my-3"></li>
                         
                         <!-- Agenda Geral -->
@@ -585,6 +605,7 @@
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'configuracao_reuniao_pcm' %}" class="link-dark rounded"><i class="bi bi-gear me-2"></i>Configuração Reunião PCM</a></li>
                                     <li><a href="{% url 'reuniao_pcm' %}" class="link-dark rounded"><i class="bi bi-camera-video me-2"></i>Reunião PCM</a></li>
+                                    <li><a href="{% url 'reuniao_projecao_gastos' %}" class="link-dark rounded"><i class="fas fa-users me-2"></i>Reunião Projeção de Gastos</a></li>
                                 </ul>
                             </div>
                         </li>
@@ -659,7 +680,7 @@
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <!-- Level 2: Análise Geral de Orçamento (primeiro item) -->
                                     <li><a href="{% url 'analise_geral_orcamento' %}" class="link-dark rounded"><i class="fas fa-chart-bar me-2"></i>Análise Geral de Orçamento</a></li>
-                                    <li><a href="{% url 'relacionar_projecao_nota_fiscal' %}" class="link-dark rounded"><i class="fas fa-link me-2"></i>Análise: Projeção x Nota Fiscal</a></li>
+                                    <br>
                                     <!-- Level 2: Projeções de Gastos -->
                                     <li>
                                         <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#orcamento-projecoes-gastos-collapse" aria-expanded="false">
@@ -670,7 +691,7 @@
                                             <ul class="btn-toggle-nav-sub list-unstyled fw-normal pb-1">
                                                 <li><a href="{% url 'analise_projecao_gastos' %}" class="link-dark rounded"><i class="fas fa-chart-pie me-2"></i>Análise de Projeções de Gastos</a></li>
                                                 <li><a href="{% url 'consultar_projecao_gastos' %}" class="link-dark rounded"><i class="bi bi-clipboard2-data me-2"></i>Consultar Projeção de Gastos</a></li>
-                                                <li><a href="{% url 'reuniao_projecao_gastos' %}" class="link-dark rounded"><i class="fas fa-users me-2"></i>Reunião Projeção de Gastos</a></li>
+                                                <li><a href="/orcamento/ajuste-planilha-prejecao-gastos/" class="link-dark rounded"><i class="fas fa-file-excel me-2"></i>Ajuste Planilha Projecao de Gastos</a></li>
                                             </ul>
                                         </div>
                                     </li>
@@ -702,6 +723,10 @@
                                             </ul>
                                         </div>
                                     </li>
+                                    <br>
+                                    <li><a href="{% url 'relacionar_projecao_nota_fiscal' %}" class="link-dark rounded"><i class="fas fa-link me-2"></i>Análise: Projeção x Nota Fiscal</a></li>
+
+                                    <br>
                                     <!-- Level 2: Outros -->
                                     <li><a href="{% url 'dados_orcamento' %}" class="link-dark rounded"><i class="fas fa-chart-bar me-2"></i>Configurações de Orçamento</a></li>
                                 </ul>
@@ -801,6 +826,7 @@
                             <div class="collapse" id="manutentor-collapse">
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'analise_manutentores' %}" class="link-dark rounded"><i class="bi bi-reception-4 me-2"></i>Análise de Manutentores</a></li>
+                                    <li><a href="{% url 'analise_percentual_de_horas' %}" class="link-dark rounded"><i class="fas fa-chart-pie me-2"></i>Análise Percentual de Horas</a></li>
 
                                     <li><a href="{% url 'cadastrar_manutentor' %}" class="link-dark rounded">
                                         <i class="bi bi-person-add me-2"></i>
@@ -808,6 +834,19 @@
                                         </li>
                                     <li><a href="{% url 'consultar_manutentores' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Manutentores</a></li>
                                     <li><a href="{% url 'configuracao_manutentores' %}" class="link-dark rounded"><i class="bi bi-wrench me-2"></i>Configuração</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
+                        <!-- Funcionários Manutenção -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#funcionario-manutencao-collapse" aria-expanded="false">
+                                <i class="fas fa-user-cog me-2"></i>
+                                <span class="btn-toggle-text">Funcionários Manutenção</span>
+                            </button>
+                            <div class="collapse" id="funcionario-manutencao-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'consultar_funcionario_manutencao' %}" class="link-dark rounded"><i class="fas fa-search me-2"></i>Consultar Funcionários Manutenção</a></li>
                                 </ul>
                             </div>
                         </li>
@@ -840,6 +879,8 @@
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'importar_maquinas' %}" class="link-dark rounded"><i class="bi bi-gear me-2"></i>Máquinas</a></li>
                                     <li><a href="{% url 'importar_manutentores' %}" class="link-dark rounded"><i class="bi bi-person-plus me-2"></i>Manutentores</a></li>
+                                    <li><a href="{% url 'importar_percentual_de_horas' %}" class="link-dark rounded"><i class="fas fa-clock me-2"></i>Percentual de Horas</a></li>
+                                    <li><a href="{% url 'importar_funcionario_manutencao' %}" class="link-dark rounded"><i class="fas fa-user-cog me-2"></i>Funcionário Manutenção</a></li>
                                     <li>
                                         <button class="btn-toggle-sub collapsed" data-bs-toggle="collapse" data-bs-target="#importar-ordem-servico-collapse" aria-expanded="false">
                                             <i class="fas fa-file-alt"></i>
@@ -855,11 +896,13 @@
                                         </div>
                                     </li>
                                     <li><a href="{% url 'importar_plano_preventiva' %}" class="link-dark rounded"><i class="bi bi-clipboard-check me-2"></i>Plano Preventiva</a></li>
+                                    <li><a href="{% url 'importar_plano_lubrificacao' %}" class="link-dark rounded"><i class="bi bi-droplet-half me-2"></i>Plano Lubrificação</a></li>
                                     <li><a href="{% url 'importar_roteiro_preventiva' %}" class="link-dark rounded"><i class="bi bi-list-check me-2"></i>Roteiro Preventiva</a></li>
                                     <li><a href="{% url 'importar_locais_e_cas' %}" class="link-dark rounded"><i class="bi bi-buildings me-2"></i>Centro de Atividade</a></li>
                                     <li><a href="{% url 'importar_estoque' %}" class="link-dark rounded"><i class="bi bi-box-seam me-2"></i>Estoque</a></li>
                                     <li><a href="{% url 'importar_52_semanas' %}" class="link-dark rounded"><i class="bi bi-calendar-week me-2"></i>52 Semanas</a></li>
                                     <li><a href="{% url 'importar_requisicoes_almoxarifado' %}" class="link-dark rounded"><i class="bi bi-clipboard-check me-2"></i>Requisições Almoxarifado</a></li>
+                                    <li><a href="{% url 'importar_requisicao_por_os_manf0044' %}" class="link-dark rounded"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Requisições por OS (MANF0044)</a></li>
                                     <li><a href="{% url 'importar_projecao_gastos' %}" class="link-dark rounded"><i class="bi bi-graph-up me-2"></i>Projeção de Gastos</a></li>
                                     <li><a href="{% url 'importar_notas_fiscais' %}" class="link-dark rounded"><i class="bi bi-receipt me-2"></i>Notas Fiscais</a></li>
                                     <li><a href="{% url 'importar_controle_nf_e_rc' %}" class="link-dark rounded"><i class="bi bi-table me-2"></i>Planilha de Controle RC e NF</a></li>
@@ -907,6 +950,19 @@
                                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                     <li><a href="{% url 'gerenciar_projeto' %}" class="link-dark rounded"><i class="bi bi-gear me-2"></i>Gerenciar Projeto</a></li>
                                     <li><a href="{% url 'admin:index' %}" class="link-dark rounded"><i class="bi bi-shield-lock me-2"></i>Django Admin</a></li>
+                                </ul>
+                            </div>
+                        </li>
+
+                        <!-- Páginas Desativadas -->
+                        <li class="mb-1">
+                            <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#paginas-desativadas-collapse" aria-expanded="false">
+                                <i class="bi bi-eye-slash me-2"></i>
+                                <span class="btn-toggle-text">Páginas Desativadas</span>
+                            </button>
+                            <div class="collapse" id="paginas-desativadas-collapse">
+                                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                                    <li><a href="{% url 'analise_controle_rc_notas' %}" class="link-dark rounded"><i class="fas fa-file-invoice me-2"></i>Análise: Controle RC x Notas Fiscais</a></li>
                                 </ul>
                             </div>
                         </li>

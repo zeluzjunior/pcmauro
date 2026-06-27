@@ -44,7 +44,7 @@
                                 <div class="form-text">Formatos aceitos: Excel (.xlsx, .xls, .xlsm)</div>
                                 <div class="form-text">
                                     <i class="fas fa-info-circle me-1"></i>
-                                    O arquivo deve conter uma planilha chamada "CONTROLE RC E NF" com os cabeçalhos na linha 3.
+                                    O arquivo deve conter a planilha <strong>CONTROLE RC E NF</strong> (versão Janeiro/2026: cabeçalhos na linha 3, coluna A vazia, coluna <strong>TORNO?</strong> após NF Saída).
                                 </div>
                             </div>
                             <div class="mb-3">
@@ -192,14 +192,14 @@
                         </h5>
                     </div>
                     <div class="card-body">
-                        <h6>Formato do Arquivo:</h6>
+                        <h6>Formato do Arquivo (versão Janeiro/2026):</h6>
                         <ul>
                             <li>O arquivo deve ser um arquivo Excel (.xlsx, .xls ou .xlsm)</li>
                             <li>Deve conter uma planilha chamada <strong>"CONTROLE RC E NF"</strong></li>
-                            <li>A linha 1 deve estar vazia</li>
-                            <li>A linha 2 contém o título</li>
-                            <li>A linha 3 deve conter os cabeçalhos das colunas</li>
-                            <li>Os dados começam na linha 4</li>
+                            <li>Linha 1: vazia · Linha 2: títulos de blocos (NF Saída, Requisição de Compra, etc.)</li>
+                            <li>Linha 3: cabeçalhos das colunas (o sistema detecta automaticamente a linha que contém <strong>ID</strong>)</li>
+                            <li>Coluna A: vazia · Dados a partir da linha 4</li>
+                            <li>Planilhas antigas <em>sem</em> a coluna <strong>TORNO?</strong> continuam compatíveis</li>
                         </ul>
                         
                         <h6 class="mt-4">Colunas Esperadas:</h6>

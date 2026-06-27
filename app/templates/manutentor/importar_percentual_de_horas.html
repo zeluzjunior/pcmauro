@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Importar Percentual de Horas{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'consultar_manutentores' %}" class="text-white">Manutentores</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Importar Percentual de Horas</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Importar Percentual de Horas</h1>
+                <p class="lead">Importe o percentual de horas dos manutentores a partir de arquivo CSV ou Excel</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container">
+        {% if messages %}
+        <div class="row mb-4">
+            <div class="col-lg-8 mx-auto">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="row mb-5">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-upload me-2"></i>Selecionar Arquivo
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'importar_percentual_de_horas' %}" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="fileInput" class="form-label">Arquivo para Importação</label>
+                                <input type="file" class="form-control" id="fileInput" name="file" accept=".xlsx,.xls,.xlsm,.csv" required>
+                                <div class="form-text">Formatos aceitos: CSV (.csv) ou Excel (.xlsx, .xls, .xlsm)</div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="updateExisting" name="update_existing" checked>
+                                    <label class="form-check-label" for="updateExisting">
+                                        Atualizar registros existentes (mesma matrícula)
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-upload me-2"></i>Importar Arquivo
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-5">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Instruções de Importação
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-3">O arquivo deve conter a primeira linha como cabeçalho, com delimitador <strong>;</strong> (ponto e vírgula) no CSV.</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Coluna</th>
+                                        <th>Obrigatório</th>
+                                        <th>Descrição</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>matricula</code></td>
+                                        <td>Sim</td>
+                                        <td>Matrícula do manutentor (chave do registro)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>tempo1</code></td>
+                                        <td>Não</td>
+                                        <td>Tempo 1 (ex.: 26:08:00)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>tempo 2</code></td>
+                                        <td>Não</td>
+                                        <td>Tempo 2 (ex.: 100:43:00)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>tempo3</code></td>
+                                        <td>Não</td>
+                                        <td>Tempo 3 (ex.: 11:05)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>percentual</code></td>
+                                        <td>Não</td>
+                                        <td>Percentual (ex.: 23,38)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>nome</code></td>
+                                        <td>Não</td>
+                                        <td>Nome do manutentor</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="mb-0 text-muted small">
+                            Exemplo de cabeçalho: <code>matricula;tempo1;tempo 2;tempo3;percentual;nome</code>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -482,6 +482,51 @@ class OrdemServicoLubrificacaoFicha(models.Model):
     def __str__(self):
         return f"Ficha OS {self.ordem_servico.cd_ordemserv} - {self.nm_func_exec_os or 'Sem executor'}"
 
+class RequisicaoPorOsMANF0044(models.Model):
+    """
+    Requisições por ordem de serviço — relatório MANF0044 (exportação CSV por máquina/setor).
+    Cada importação substitui os registros do mesmo arquivo de origem.
+    """
+    nome_arquivo_origem = models.CharField(
+        'Arquivo de Origem',
+        max_length=500,
+        db_index=True,
+        help_text='Nome do arquivo CSV importado (identifica o snapshot da máquina/relatório)',
+    )
+
+    cd_unid = models.IntegerField('Código Unidade', blank=True, null=True)
+    nome_unid = models.CharField('Nome Unidade', max_length=255, blank=True, null=True)
+    cd_setormanut = models.CharField('Código Setor Manutenção', max_length=50, blank=True, null=True)
+    descr_setormanut = models.CharField('Descrição Setor Manutenção', max_length=255, blank=True, null=True)
+    cs_qtd_ord_setor = models.IntegerField('Qtd. Ordens no Setor', blank=True, null=True)
+    cd_ordemserv = models.IntegerField('Código Ordem de Serviço', blank=True, null=True, db_index=True)
+    cs_vlr = models.DecimalField('Valor Total OS', max_digits=16, decimal_places=2, blank=True, null=True)
+    cs_qtd_ord = models.IntegerField('Qtd. Itens na OS', blank=True, null=True)
+    cd_requisicao = models.BigIntegerField('Código Requisição', blank=True, null=True, db_index=True)
+    cd_item = models.BigIntegerField('Código Item', blank=True, null=True)
+    descr_item = models.CharField('Descrição Item', max_length=500, blank=True, null=True)
+    qtde_item = models.DecimalField('Quantidade Item', max_digits=16, decimal_places=4, blank=True, null=True)
+    vlr_item = models.DecimalField('Valor Item', max_digits=16, decimal_places=2, blank=True, null=True)
+    cd_unid_medida = models.CharField('Unidade de Medida', max_length=50, blank=True, null=True)
+
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        db_table = 'requisicoes_por_os_manf0044'
+        verbose_name = 'Requisição por OS (MANF0044)'
+        verbose_name_plural = 'Requisições por OS (MANF0044)'
+        ordering = ['nome_arquivo_origem', 'cd_ordemserv', 'cd_requisicao', 'id']
+        indexes = [
+            models.Index(fields=['nome_arquivo_origem']),
+            models.Index(fields=['cd_ordemserv']),
+            models.Index(fields=['cd_requisicao']),
+        ]
+
+    def __str__(self):
+        return f"OS {self.cd_ordemserv} — Req. {self.cd_requisicao} ({self.nome_arquivo_origem})"
+
+
 class CentroAtividade(models.Model):
     """Modelo para armazenar informações de Centros de Atividade (CA)"""
     ca = models.IntegerField('CA', unique=True, db_index=True)
@@ -606,6 +651,50 @@ class ManutentorMaquina(models.Model):
 
     def __str__(self):
         return f"{self.manutentor.Matricula} - {self.maquina.cd_maquina}"
+
+
+class PercentualDeHoras(models.Model):
+    """Percentual de horas por manutentor (importação CSV/planilha)."""
+    matricula = models.CharField('Matrícula', max_length=20, primary_key=True)
+    nome = models.CharField('Nome', max_length=255, blank=True, null=True)
+    tempo1 = models.CharField('Tempo 1', max_length=50, blank=True, null=True)
+    tempo2 = models.CharField('Tempo 2', max_length=50, blank=True, null=True)
+    tempo3 = models.CharField('Tempo 3', max_length=50, blank=True, null=True)
+    percentual = models.DecimalField('Percentual', max_digits=8, decimal_places=2, blank=True, null=True)
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Percentual de Horas'
+        verbose_name_plural = 'Percentuais de Horas'
+        ordering = ['-percentual', 'nome', 'matricula']
+
+    def __str__(self):
+        return f"{self.matricula} - {self.nome or 'Sem nome'} ({self.percentual or '-'}%)"
+
+
+class FuncionarioManutencao(models.Model):
+    """Funcionário da manutenção (importação planilha RH, ex.: HRCL102)."""
+    matricula = models.CharField('Matrícula', max_length=20, primary_key=True)
+    colaborador = models.CharField('Colaborador', max_length=255, blank=True, null=True)
+    cargo = models.CharField('Cargo', max_length=255, blank=True, null=True)
+    admissao = models.DateField('Admissão', blank=True, null=True)
+    situacao_codigo = models.CharField('Situação (código)', max_length=20, blank=True, null=True)
+    situacao_descricao = models.CharField('Situação', max_length=100, blank=True, null=True)
+    escala_turma_codigo = models.CharField('Escala/Turma (código)', max_length=20, blank=True, null=True)
+    escala_turma = models.CharField('Escala/Turma', max_length=20, blank=True, null=True)
+    setor = models.CharField('Setor', max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Funcionário Manutenção'
+        verbose_name_plural = 'Funcionários Manutenção'
+        ordering = ['colaborador', 'matricula']
+
+    def __str__(self):
+        return f"{self.matricula} - {self.colaborador or 'Sem nome'}"
+
 
 class ItemEstoque(models.Model):
     """Modelo para armazenar informações de itens de estoque"""
@@ -1693,8 +1782,13 @@ class ProjecaoGasto(models.Model):
         ('cancelada', 'Cancelada'),
     ]
 
-    # ID do Excel (identificador único do Excel combinado com setor)
-    id_excel = models.IntegerField('ID Excel', db_index=True, null=False)  # ID do Excel - usado em combinação com setor para identificação única
+    # ID do Excel (chave primária — valor exato da coluna ID na planilha, ex: ID_PCM02)
+    id_excel = models.CharField(
+        'ID Excel',
+        max_length=100,
+        primary_key=True,
+        help_text='ID único do registro na planilha Excel (chave primária)',
+    )
     
     # Dados básicos
     setor = models.CharField('Setor', max_length=100, blank=True, null=True, db_index=True)  # SETOR do Excel
@@ -1734,6 +1828,7 @@ class ProjecaoGasto(models.Model):
     nf_servico_recebida = models.CharField('NF de Serviço Recebida', max_length=255, blank=True, null=True)  # NF DE SERVIÇO RECEBIDA (texto)
     nf_enviada_lancamento = models.CharField('NF Enviada para Lançamento', max_length=255, blank=True, null=True)  # NF ENVIADA PARA LANÇAMENTO (texto)
     observacoes = models.TextField('Observações', blank=True, null=True)  # OBSERVAÇÕES do Excel
+    gasto_confirmado = models.CharField('Gasto Confirmado', max_length=255, blank=True, null=True)  # GASTO CONFIRMADO (texto)
     
     # Campos flexíveis para armazenar dados adicionais do Excel
     dados_adicionais = models.JSONField('Dados Adicionais', blank=True, null=True, default=dict)
@@ -1746,18 +1841,15 @@ class ProjecaoGasto(models.Model):
         verbose_name = 'Projeção de Gasto'
         verbose_name_plural = 'Projeções de Gastos'
         ordering = ['-ano_referencia', '-mes_referencia', '-data_abertura_requisicao', '-created_at']
-        # Constraint única composta: id_excel + setor (mesmo ID pode existir para setores diferentes)
-        unique_together = [['id_excel', 'setor']]
         indexes = [
             models.Index(fields=['setor']),
             models.Index(fields=['mes_referencia', 'ano_referencia']),
             models.Index(fields=['data_abertura_requisicao']),
             models.Index(fields=['numero_requisicao_compra']),
-            models.Index(fields=['id_excel', 'setor']),  # Índice para a chave composta
         ]
     
     def __str__(self):
-        id_str = f"ID {self.id_excel}" if self.id_excel else "Sem ID"
+        id_str = self.id_excel or 'Sem ID'
         tipo_str = self.tipo_solicitacao or 'Sem tipo'
         descricao_str = self.descricao or 'Sem descrição'
         return f"{id_str} - {tipo_str} - {descricao_str[:50]}"
@@ -1986,6 +2078,7 @@ class ControleRCeNF(models.Model): # Planilha de Controle RC e NF
     solicitante = models.CharField('Solicitante', max_length=255, blank=True, null=True)
     empresa = models.CharField('Empresa', max_length=255, blank=True, null=True)
     nf_saida = models.CharField('NF Saída', max_length=100, blank=True, null=True, db_index=True)
+    torno = models.CharField('Torno?', max_length=20, blank=True, null=True)
     descricao_servico = models.TextField('Descrição do Serviço', blank=True, null=True)
     ca_rateio = models.CharField('C.A/Rateio', max_length=100, blank=True, null=True)
     uso = models.CharField('Uso', max_length=50, blank=True, null=True)
@@ -2269,6 +2362,77 @@ class ProducaoDiaria(models.Model):
 
     def __str__(self):
         return f"{self.ano}/{self.mes:02d}/{self.dia:02d} – Suínos: {self.suinos_abatidos or '-'} | Indústria: {self.producao_industria or '-'}"
+
+
+class IndicadoresManutencao(models.Model):
+    """
+    Indicadores de manutenção informados diariamente.
+    Um registro por (ano, mes, dia).
+    """
+    ano = models.IntegerField('Ano', db_index=True)
+    mes = models.IntegerField('Mês', choices=[(i, i) for i in range(1, 13)])
+    dia = models.IntegerField('Dia', help_text='Dia do mês (1-31)')
+    indice_dbo = models.DecimalField('Índice DBO', max_digits=15, decimal_places=3, blank=True, null=True)
+    consumo_gas_glp = models.DecimalField('Consumo Gás GLP', max_digits=15, decimal_places=3, blank=True, null=True)
+    perda_suino = models.DecimalField('Perda Suíno', max_digits=15, decimal_places=3, blank=True, null=True)
+    perda_industria = models.DecimalField('Perda Indústria', max_digits=15, decimal_places=3, blank=True, null=True)
+    consumo_agua = models.DecimalField('Consumo Água', max_digits=15, decimal_places=3, blank=True, null=True)
+    consumo_cavaco = models.DecimalField('Consumo Cavaco', max_digits=15, decimal_places=3, blank=True, null=True)
+    consumo_energia = models.DecimalField('Consumo Energia', max_digits=15, decimal_places=3, blank=True, null=True)
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        db_table = 'indicadores_manutencao'
+        verbose_name = 'Indicador de Manutenção'
+        verbose_name_plural = 'Indicadores de Manutenção'
+        ordering = ['ano', 'mes', 'dia']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['ano', 'mes', 'dia'],
+                name='unique_indicadores_manutencao_ano_mes_dia',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['ano', 'mes']),
+        ]
+
+    def __str__(self):
+        return f"{self.ano}/{self.mes:02d}/{self.dia:02d} — DBO: {self.indice_dbo or '-'}"
+
+
+class ConfigIndicadoresManutencao(models.Model):
+    """Valores máximos mensais dos indicadores de manutenção (um registro por ano/mês)."""
+    ano = models.IntegerField('Ano', db_index=True)
+    mes = models.IntegerField('Mês', choices=[(i, i) for i in range(1, 13)])
+    max_indice_dbo = models.DecimalField('Máx. Índice DBO', max_digits=15, decimal_places=3, blank=True, null=True)
+    max_consumo_gas_glp = models.DecimalField('Máx. Consumo Gás GLP', max_digits=15, decimal_places=3, blank=True, null=True)
+    max_perda_suino = models.DecimalField('Máx. Perda Suíno', max_digits=15, decimal_places=3, blank=True, null=True)
+    max_perda_industria = models.DecimalField('Máx. Perda Indústria', max_digits=15, decimal_places=3, blank=True, null=True)
+    max_consumo_agua = models.DecimalField('Máx. Consumo Água', max_digits=15, decimal_places=3, blank=True, null=True)
+    max_consumo_cavaco = models.DecimalField('Máx. Consumo Cavaco', max_digits=15, decimal_places=3, blank=True, null=True)
+    max_consumo_energia = models.DecimalField('Máx. Consumo Energia', max_digits=15, decimal_places=3, blank=True, null=True)
+    created_at = models.DateTimeField('Data de Criação', auto_now_add=True)
+    updated_at = models.DateTimeField('Data de Atualização', auto_now=True)
+
+    class Meta:
+        db_table = 'config_indicadores_manutencao'
+        verbose_name = 'Configuração de Indicadores de Manutenção'
+        verbose_name_plural = 'Configurações de Indicadores de Manutenção'
+        ordering = ['ano', 'mes']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['ano', 'mes'],
+                name='unique_config_indicadores_manutencao_ano_mes',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['ano', 'mes']),
+        ]
+
+    def __str__(self):
+        return f"Config Indicadores {self.ano}/{self.mes:02d}"
+
 
 class Evento(models.Model):
     """Modelo para armazenar eventos com descrição, data, responsável e arquivo anexo"""

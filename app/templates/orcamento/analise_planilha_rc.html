@@ -201,6 +201,216 @@
     }
     .tabela-status-mes-wrapper .label-rc { background: #cfe2ff; color: #084298; }
     .tabela-status-mes-wrapper .label-previsao { background: #fff3cd; color: #664d03; }
+
+    /* Pipeline NF — seção dedicada */
+    .pipeline-nf-section {
+        border-radius: 0.75rem;
+        overflow: hidden;
+        box-shadow: 0 0.35rem 1.25rem rgba(52, 58, 64, 0.12);
+        border: 1px solid rgba(111, 66, 193, 0.2);
+    }
+    .pipeline-nf-section .pipeline-nf-header {
+        background: linear-gradient(125deg, #4c1d95 0%, #6f42c1 45%, #5b21b6 100%);
+        padding: 1.25rem 1.5rem;
+        position: relative;
+    }
+    .pipeline-nf-section .pipeline-nf-header::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse 80% 120% at 100% 0%, rgba(255,255,255,0.12), transparent 55%);
+        pointer-events: none;
+    }
+    .pipeline-nf-section .pipeline-nf-header h5 {
+        position: relative;
+        z-index: 1;
+        letter-spacing: 0.02em;
+    }
+    .pipeline-nf-kpi-strip {
+        background: linear-gradient(180deg, #f8f5ff 0%, #f1f3f5 100%);
+        border-bottom: 1px solid #e9ecef;
+    }
+    .pipeline-nf-kpi-strip .kpi-mini {
+        background: #fff;
+        border-radius: 0.5rem;
+        border: 1px solid #e9ecef;
+        padding: 0.65rem 1rem;
+        text-align: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .pipeline-nf-kpi-strip .kpi-mini .kpi-mini-value {
+        font-size: clamp(0.9rem, 2.8vw, 1.25rem);
+        font-weight: 700;
+        color: #4c1d95;
+        line-height: 1.2;
+        word-break: break-word;
+    }
+    .pipeline-nf-kpi-strip .kpi-mini .kpi-mini-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #6c757d;
+        margin-top: 0.15rem;
+    }
+    .pipeline-nf-body {
+        background: linear-gradient(180deg, #fafbfc 0%, #fff 32%);
+        padding: 1.5rem;
+    }
+    .pipeline-nf-intro {
+        border-left: 4px solid #6f42c1;
+        background: #fff;
+        border-radius: 0.5rem;
+        padding: 1rem 1.15rem;
+        border: 1px solid #e9ecef;
+        border-left-width: 4px;
+        font-size: 0.875rem;
+        color: #495057;
+    }
+    .pipeline-nf-block {
+        margin-top: 1.75rem;
+    }
+    .pipeline-nf-block:first-of-type { margin-top: 0; }
+    .pipeline-nf-block-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #212529;
+        margin-bottom: 0.85rem;
+        padding-bottom: 0.35rem;
+        border-bottom: 2px solid #e9ecef;
+    }
+    .pipeline-nf-block-title .title-icon {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 0.45rem;
+        background: linear-gradient(135deg, #6f42c1, #5b21b6);
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+    }
+    .pipeline-nf-block-title.solic .title-icon {
+        background: linear-gradient(135deg, #495057, #343a40);
+    }
+    .pipeline-nf-data-card {
+        background: #fff;
+        border: 1px solid #e9ecef;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .pipeline-nf-data-card .table {
+        margin-bottom: 0;
+        font-size: 0.82rem;
+    }
+    .pipeline-nf-data-card .table thead th {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #495057;
+        border-bottom-width: 2px;
+        white-space: nowrap;
+    }
+    .pipeline-nf-data-card .table tbody tr:hover { background: rgba(111, 66, 193, 0.04); }
+    .pipeline-nf-data-card tfoot td {
+        background: #f8f9fa !important;
+        font-weight: 600;
+        border-top: 2px solid #dee2e6;
+    }
+    .pipeline-nf-step {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.5rem;
+        height: 1.5rem;
+        padding: 0 0.35rem;
+        border-radius: 0.35rem;
+        background: #ede9fe;
+        color: #5b21b6;
+        font-size: 0.7rem;
+        font-weight: 700;
+        margin-right: 0.5rem;
+        vertical-align: middle;
+    }
+    .pipeline-nf-chart-card {
+        background: #fff;
+        border: 1px solid #e9ecef;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        height: 100%;
+        min-height: 320px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .pipeline-nf-chart-card .chart-container-small {
+        height: 280px;
+        margin-bottom: 0;
+    }
+    .pipeline-nf-chart-card.solic-chart { min-height: 280px; }
+    .pipeline-nf-chart-card.solic-chart .chart-container-small { height: 240px; }
+    .pipeline-nf-chart-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #6c757d;
+        margin-bottom: 0.65rem;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+    .pipeline-nf-accordion.pipeline-nf-accordion {
+        border: 1px solid #e9ecef;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        background: #fff;
+    }
+    .pipeline-nf-accordion .accordion-item {
+        border: 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .pipeline-nf-accordion .accordion-item:last-child { border-bottom: 0; }
+    .pipeline-nf-accordion .accordion-button {
+        font-size: 0.875rem;
+        background: #fafbfc;
+        box-shadow: none !important;
+        color: #212529;
+    }
+    .pipeline-nf-accordion .accordion-button:not(.collapsed) {
+        background: linear-gradient(90deg, #f3e8ff 0%, #fafbfc 100%);
+        color: #212529;
+    }
+    .pipeline-nf-accordion .accordion-button::after {
+        filter: grayscale(0.3);
+    }
+    .pipeline-nf-accordion .accordion-body {
+        background: #f8f9fa !important;
+        border-top: 1px solid #e9ecef;
+    }
+    .pipeline-nf-accordion .accordion-body .table thead th {
+        font-size: 0.68rem;
+    }
+    .pipeline-nf-hint {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-bottom: 0.65rem;
+    }
+    .pipeline-nf-rank {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.65rem;
+        height: 1.65rem;
+        border-radius: 50%;
+        font-size: 0.7rem;
+        font-weight: 700;
+        background: #e9ecef;
+        color: #495057;
+        margin-right: 0.5rem;
+    }
+    .pipeline-nf-rank.rank-1 { background: linear-gradient(135deg, #ffc107, #ffb300); color: #212529; }
+    .pipeline-nf-rank.rank-2 { background: linear-gradient(135deg, #ced4da, #adb5bd); color: #212529; }
+    .pipeline-nf-rank.rank-3 { background: linear-gradient(135deg, #e9c46f, #d4a574); color: #212529; }
 </style>
 {% endblock %}
 
@@ -573,6 +783,221 @@
                     <div class="card-body">
                         <div class="chart-container-small">
                             <canvas id="statusValorChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pipeline NF: status específicos (ControleRCeNF) -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card pipeline-nf-section border-0">
+                    <div class="pipeline-nf-header text-white">
+                        <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 position-relative" style="z-index:1;">
+                            <div>
+                                <h5 class="mb-1 text-white">
+                                    <i class="fas fa-stream me-2 opacity-90"></i>Análise — Pipeline de NF
+                                </h5>
+                                <p class="mb-0 small text-white-50">Status selecionados do fluxo de nota fiscal · Controle RC e NF</p>
+                            </div>
+                            <span class="badge bg-white text-dark fw-semibold px-3 py-2 align-self-center shadow-sm">
+                                <i class="fas fa-filter me-1 text-secondary"></i>Mesmos filtros da página
+                            </span>
+                        </div>
+                    </div>
+                    <div class="pipeline-nf-kpi-strip px-3 py-3">
+                        <div class="row g-2 g-md-3 justify-content-center">
+                            <div class="col-6 col-md-4">
+                                <div class="kpi-mini h-100">
+                                    <div class="kpi-mini-value">{{ pipeline_nf_total_qtd }}</div>
+                                    <div class="kpi-mini-label">Registros (pipeline)</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <div class="kpi-mini h-100">
+                                    <div class="kpi-mini-value">{{ pipeline_nf_total_valor_pedido|currency_br }}</div>
+                                    <div class="kpi-mini-label">Valor total pedido</div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <div class="kpi-mini h-100">
+                                    <div class="kpi-mini-value">{{ pipeline_nf_total_valor_nf|currency_br }}</div>
+                                    <div class="kpi-mini-label">Valor NF</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pipeline-nf-body">
+                        <div class="pipeline-nf-intro mb-0">
+                            <i class="fas fa-info-circle text-primary me-2"></i>
+                            Agrupamento pelos textos exatos da coluna <strong>Status</strong> (pedido gerado, aguardando NF, aprovação, pendente, aprovado para lançar, NF na 198, parcialmente atendido).
+                            A seção <strong>Por solicitante</strong> mostra totais e, ao expandir, o detalhe por cada status do pipeline.
+                        </div>
+
+                        <div class="pipeline-nf-block">
+                            <div class="pipeline-nf-block-title">
+                                <span class="title-icon"><i class="fas fa-list-ol"></i></span>
+                                Visão geral por status (fluxo)
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-lg-7">
+                                    <div class="pipeline-nf-data-card">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover align-middle mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Etapa / status</th>
+                                                        <th class="text-end">Qtd.</th>
+                                                        <th class="text-end">Valor pedido</th>
+                                                        <th class="text-end">Valor NF</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for row in pipeline_nf_rows %}
+                                                    <tr>
+                                                        <td>
+                                                            <span class="pipeline-nf-step">{{ forloop.counter }}</span>
+                                                            <span class="small">{{ row.status }}</span>
+                                                        </td>
+                                                        <td class="text-end fw-semibold">{{ row.total }}</td>
+                                                        <td class="text-end text-nowrap">{{ row.valor_total_pedido|currency_br }}</td>
+                                                        <td class="text-end text-nowrap">{{ row.valor_nf|currency_br }}</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                                <tfoot>
+                                                    <tr>
+                                                        <td>Total nestes status</td>
+                                                        <td class="text-end">{{ pipeline_nf_total_qtd }}</td>
+                                                        <td class="text-end text-nowrap">{{ pipeline_nf_total_valor_pedido|currency_br }}</td>
+                                                        <td class="text-end text-nowrap">{{ pipeline_nf_total_valor_nf|currency_br }}</td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-5">
+                                    <div class="pipeline-nf-chart-card">
+                                        <div class="pipeline-nf-chart-label">
+                                            <i class="fas fa-chart-bar text-primary"></i> Quantidade por etapa
+                                        </div>
+                                        <div class="chart-container-small">
+                                            <canvas id="pipelineNfStatusChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pipeline-nf-block">
+                            <div class="pipeline-nf-block-title solic">
+                                <span class="title-icon"><i class="fas fa-users"></i></span>
+                                Por solicitante
+                            </div>
+                            <div class="row g-3 mb-2">
+                                <div class="col-lg-7">
+                                    {% if pipeline_nf_por_solicitante %}
+                                    <div class="pipeline-nf-data-card">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover align-middle mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>#</th>
+                                                        <th>Solicitante</th>
+                                                        <th class="text-end">Qtd.</th>
+                                                        <th class="text-end">Valor pedido</th>
+                                                        <th class="text-end">Valor NF</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for s in pipeline_nf_por_solicitante %}
+                                                    <tr>
+                                                        <td class="text-nowrap" style="width:1%;">
+                                                            <span class="pipeline-nf-rank {% if forloop.counter == 1 %}rank-1{% elif forloop.counter == 2 %}rank-2{% elif forloop.counter == 3 %}rank-3{% endif %}">{{ forloop.counter }}</span>
+                                                        </td>
+                                                        <td class="small"><span class="fw-medium">{{ s.solicitante }}</span></td>
+                                                        <td class="text-end fw-semibold">{{ s.qtd_total }}</td>
+                                                        <td class="text-end text-nowrap">{{ s.valor_total_pedido|currency_br }}</td>
+                                                        <td class="text-end text-nowrap">{{ s.valor_nf|currency_br }}</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    {% else %}
+                                    <div class="alert alert-light border mb-0 py-3">
+                                        <i class="fas fa-inbox me-2 text-muted"></i>
+                                        <span class="text-muted small">Nenhum registro nestes status do pipeline no período filtrado.</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-lg-5">
+                                    {% if pipeline_nf_por_solicitante %}
+                                    <div class="pipeline-nf-chart-card solic-chart">
+                                        <div class="pipeline-nf-chart-label">
+                                            <i class="fas fa-chart-bar text-secondary"></i> Top 12 solicitantes (quantidade)
+                                        </div>
+                                        <div class="chart-container-small">
+                                            <canvas id="pipelineNfSolicitanteChart"></canvas>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            {% if pipeline_nf_por_solicitante %}
+                            <p class="pipeline-nf-hint mb-2">
+                                <i class="fas fa-chevron-down me-1"></i> Detalhe por status do pipeline — expanda um solicitante.
+                            </p>
+                            <div class="accordion pipeline-nf-accordion" id="accordionPipelineSolic">
+                                {% for s in pipeline_nf_por_solicitante %}
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="heading-pipeline-sol-{{ forloop.counter }}">
+                                        <button class="accordion-button collapsed py-3" type="button" data-bs-toggle="collapse"
+                                                data-bs-target="#collapse-pipeline-sol-{{ forloop.counter }}"
+                                                aria-expanded="false" aria-controls="collapse-pipeline-sol-{{ forloop.counter }}">
+                                            <span class="pipeline-nf-rank {% if forloop.counter == 1 %}rank-1{% elif forloop.counter == 2 %}rank-2{% elif forloop.counter == 3 %}rank-3{% endif %}">{{ forloop.counter }}</span>
+                                            <span class="text-truncate flex-grow-1 text-start me-2" title="{{ s.solicitante }}">{{ s.solicitante }}</span>
+                                            <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 me-2">{{ s.qtd_total }} reg.</span>
+                                            <span class="small text-muted text-nowrap d-none d-lg-inline">{{ s.valor_total_pedido|currency_br }}</span>
+                                        </button>
+                                    </h2>
+                                    <div id="collapse-pipeline-sol-{{ forloop.counter }}" class="accordion-collapse collapse"
+                                         aria-labelledby="heading-pipeline-sol-{{ forloop.counter }}">
+                                        <div class="accordion-body pt-3 pb-3">
+                                            <div class="pipeline-nf-data-card">
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm table-hover align-middle mb-0">
+                                                        <thead class="table-light">
+                                                            <tr>
+                                                                <th>Status</th>
+                                                                <th class="text-end">Qtd.</th>
+                                                                <th class="text-end">Valor pedido</th>
+                                                                <th class="text-end">Valor NF</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {% for ps in s.por_status %}
+                                                            <tr class="{% if ps.total == 0 %}text-muted opacity-50{% endif %}">
+                                                                <td class="small">{{ ps.status }}</td>
+                                                                <td class="text-end">{{ ps.total }}</td>
+                                                                <td class="text-end text-nowrap">{{ ps.valor_total_pedido|currency_br }}</td>
+                                                                <td class="text-end text-nowrap">{{ ps.valor_nf|currency_br }}</td>
+                                                            </tr>
+                                                            {% endfor %}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -1048,6 +1473,98 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
+    }
+
+    // Pipeline NF: barras horizontais (quantidade por status)
+    const pipelineNfCtx = document.getElementById('pipelineNfStatusChart');
+    if (pipelineNfCtx) {
+        const plLabels = {{ pipeline_nf_chart_labels|safe }};
+        const plQtd = {{ pipeline_nf_chart_qtd|safe }};
+        new Chart(pipelineNfCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: plLabels,
+                datasets: [{
+                    label: 'Quantidade',
+                    data: plQtd,
+                    backgroundColor: '#6f42c1',
+                    borderColor: '#5a32a3',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Quantidade: ' + formatarNumeroBR(context.parsed.x);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return formatarNumeroBR(value);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Pipeline NF: top solicitantes (quantidade)
+    const pipelineSolCtx = document.getElementById('pipelineNfSolicitanteChart');
+    if (pipelineSolCtx) {
+        const solLabels = {{ pipeline_nf_sol_chart_labels|safe }};
+        const solQtd = {{ pipeline_nf_sol_chart_qtd|safe }};
+        if (solLabels && solLabels.length) {
+            new Chart(pipelineSolCtx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: solLabels,
+                    datasets: [{
+                        label: 'Quantidade',
+                        data: solQtd,
+                        backgroundColor: '#495057',
+                        borderColor: '#343a40',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Quantidade: ' + formatarNumeroBR(context.parsed.x);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return formatarNumeroBR(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
     }
 
     // Gráfico de Barras: Top 10 Empresas

@@ -1,0 +1,162 @@
+{# Parâmetros: linhas_list, accordion_id (string único), expand_first (opcional) #}
+{% if linhas_list %}
+<div class="accordion pedidos-nf-accordion" id="{{ accordion_id }}">
+    {% for linha in linhas_list %}
+    <div class="accordion-item border shadow-sm mb-2 rounded overflow-hidden
+        {% if linha.status == 'completo' %}border-success{% elif linha.status == 'parcial' %}border-warning{% elif linha.status == 'ausente' %}border-danger{% else %}border-secondary{% endif %}">
+        <h2 class="accordion-header" id="heading-{{ accordion_id }}-{{ forloop.counter }}">
+            <button class="accordion-button {% if not expand_first or not forloop.first %}collapsed{% endif %} py-3"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#collapse-{{ accordion_id }}-{{ forloop.counter }}"
+                    aria-expanded="{% if expand_first and forloop.first %}true{% else %}false{% endif %}"
+                    aria-controls="collapse-{{ accordion_id }}-{{ forloop.counter }}">
+                <div class="d-flex flex-wrap align-items-center gap-2 w-100 me-2">
+                    <span class="fw-bold fs-6"><i class="fas fa-shopping-cart me-1 text-primary"></i>Pedido {{ linha.pedido }}</span>
+                    {% if linha.status == 'completo' %}
+                        <span class="badge bg-success">Completo</span>
+                    {% elif linha.status == 'parcial' %}
+                        <span class="badge bg-warning text-dark">Parcial</span>
+                    {% elif linha.status == 'ausente' %}
+                        <span class="badge bg-danger">Ausente</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Sem nf_servico</span>
+                    {% endif %}
+                    <span class="text-muted small ms-auto d-none d-md-inline">
+                        {{ linha.empresa_principal|truncatechars:35 }}
+                    </span>
+                    <span class="badge bg-light text-dark border">{{ linha.qtd_encontradas }}/{{ linha.qtd_nf }} NF OK</span>
+                    {% if linha.qtd_ausentes %}
+                        <span class="badge bg-danger">{{ linha.qtd_ausentes }} ausente(s)</span>
+                    {% endif %}
+                </div>
+            </button>
+        </h2>
+        <div id="collapse-{{ accordion_id }}-{{ forloop.counter }}"
+             class="accordion-collapse collapse {% if expand_first and forloop.first %}show{% endif %}"
+             aria-labelledby="heading-{{ accordion_id }}-{{ forloop.counter }}">
+            <div class="accordion-body bg-light">
+                <div class="row g-2 mb-3 small">
+                    <div class="col-md-4">
+                        <strong>Empresa:</strong> {{ linha.empresa_principal }}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Data RC:</strong>
+                        {% if linha.data_rc_min %}
+                            {{ linha.data_rc_min|date:"d/m/Y" }}{% if linha.data_rc_max and linha.data_rc_max != linha.data_rc_min %} – {{ linha.data_rc_max|date:"d/m/Y" }}{% endif %}
+                        {% else %}—{% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Registros RC:</strong> {{ linha.qtd_registros }}
+                        {% if linha.qtd_rcs %} · RCs: {{ linha.rcs|join:", " }}{% if linha.qtd_rcs > 5 %} (+{{ linha.qtd_rcs }}){% endif %}{% endif %}
+                    </div>
+                </div>
+                {% if linha.registros_planilha %}
+                <div class="mb-3">
+                    <strong class="small"><i class="fas fa-file-alt me-1 text-primary"></i>Planilha RC</strong>
+                    <span class="text-muted small">({{ linha.registros_planilha|length }} registro(s) — pode haver mais de um por pedido)</span>
+                    <div class="d-flex flex-wrap gap-1 mt-1">
+                        {% for reg in linha.registros_planilha %}
+                        <a href="{% url 'visualizar_planilha_rc' reg.id_excel %}"
+                           class="btn btn-outline-primary btn-sm"
+                           target="_blank"
+                           rel="noopener"
+                           title="{% if reg.empresa %}{{ reg.empresa }}{% else %}Ver registro na planilha RC{% endif %}">
+                            <i class="fas fa-eye me-1"></i>
+                            {% if reg.rc %}RC {{ reg.rc }}{% elif reg.nf_saida %}NF {{ reg.nf_saida }}{% else %}ID {{ reg.id_excel }}{% endif %}
+                            <span class="text-muted ms-1">#{{ reg.id_excel }}</span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if linha.nfs %}
+                <p class="small text-muted mb-2 mb-md-1">
+                    <i class="fas fa-link me-1"></i>NF de serviço no Controle RC e correspondência em NotaFiscal
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered bg-white mb-0 nf-detalhe-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>NF Serviço (Controle)</th>
+                                <th>Status</th>
+                                <th>Valor (Controle)</th>
+                                <th>Nota cadastrada</th>
+                                <th>Emitente</th>
+                                <th>Total NF</th>
+                                <th>Situação</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for nf in linha.nfs %}
+                            <tr class="{% if nf.status == 'ausente' %}table-danger{% else %}table-success{% endif %}">
+                                <td>
+                                    <code>{{ nf.original }}</code>
+                                    {% if nf.original != nf.normalized %}
+                                    <br><small class="text-muted">norm: {{ nf.normalized }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if nf.status == 'encontrada' %}
+                                        <span class="badge bg-success"><i class="fas fa-check me-1"></i>Encontrada</span>
+                                    {% else %}
+                                        <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Ausente</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-nowrap">
+                                    {% if nf.valor_controle %}R$ {{ nf.valor_controle|floatformat:2 }}{% else %}—{% endif %}
+                                </td>
+                                <td>
+                                    {% for nota in nf.notas_fiscais %}
+                                        <div>{{ nota.nota|default:"—" }}</div>
+                                    {% empty %}
+                                        <span class="text-danger">—</span>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    {% for nota in nf.notas_fiscais %}
+                                        <div class="text-truncate" style="max-width: 180px;" title="{{ nota.nome_fantasia_emitente|default:nota.emitente }}">
+                                            {{ nota.nome_fantasia_emitente|default:nota.emitente|default:"—" }}
+                                        </div>
+                                    {% empty %}—{% endfor %}
+                                </td>
+                                <td class="text-nowrap">
+                                    {% for nota in nf.notas_fiscais %}
+                                        <div>{% if nota.total_nota %}R$ {{ nota.total_nota|floatformat:2 }}{% else %}—{% endif %}</div>
+                                    {% empty %}—{% endfor %}
+                                </td>
+                                <td>
+                                    {% for nota in nf.notas_fiscais %}
+                                        <div><small>{{ nota.situacao|default:"—" }}</small></div>
+                                    {% empty %}—{% endfor %}
+                                </td>
+                                <td>
+                                    {% for nota in nf.notas_fiscais %}
+                                        <a href="{% url 'visualizar_nota_fiscal' nota.id %}" class="btn btn-outline-primary btn-sm mb-1" target="_blank" rel="noopener" title="Ver nota fiscal">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    {% endfor %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-secondary mb-0 py-2 small">
+                    <i class="fas fa-info-circle me-1"></i>Nenhum número em <strong>nf_servico</strong> para este pedido no período.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+    <i class="fas fa-inbox fa-2x mb-2 opacity-50"></i>
+    <p class="mb-0">Nenhum pedido encontrado.</p>
+</div>
+{% endif %}

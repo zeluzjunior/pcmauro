@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Visualizar Planilha RC - {{ controle.rc|default:controle.nf_saida|default:controle.id }}{% endblock %}
+{% block title %}Visualizar Planilha RC - {{ controle.rc|default:controle.nf_saida|default:controle.id_excel }}{% endblock %}
 
 {% block content %}
 <!-- Page Header -->
@@ -13,7 +13,7 @@
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'consultar_planilha_rc' %}" class="text-white">Consultar Planilha RC</a></li>
-                        <li class="breadcrumb-item active text-white" aria-current="page">RC {{ controle.rc|default:controle.nf_saida|default:controle.id }}</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">RC {{ controle.rc|default:controle.nf_saida|default:controle.id_excel }}</li>
                     </ol>
                 </nav>
                 <h1 class="display-4 fw-bold mt-3">

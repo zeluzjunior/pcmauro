@@ -119,14 +119,14 @@
     </td>
     <td>
         <div class="action-buttons">
-            <a href="{% url 'visualizar_relacao_projecao_nota' %}?projecao_id={{ match.projecao.id }}&nota_id={{ match.nota.id }}" class="btn btn-sm btn-info mb-1" title="Visualizar detalhes da relação" style="display: block; width: 100%;">
+            <a href="{% url 'visualizar_relacao_projecao_nota' %}?projecao_id={{ match.projecao.id_excel_excel }}&nota_id={{ match.nota.id }}" class="btn btn-sm btn-info mb-1" title="Visualizar detalhes da relação" style="display: block; width: 100%;">
                 <i class="fas fa-eye"></i> Ver Detalhes
             </a>
             {% if match.relacao_confirmada %}
                 <form method="post" action="{% url 'relacionar_projecao_nota_fiscal' %}" style="display: inline;" onsubmit="return confirm('Deseja realmente remover esta relação confirmada?');">
                     {% csrf_token %}
                     <input type="hidden" name="acao" value="remover">
-                    <input type="hidden" name="projecao_id" value="{{ match.projecao.id }}">
+                    <input type="hidden" name="projecao_id" value="{{ match.projecao.id_excel_excel }}">
                     <input type="hidden" name="nota_id" value="{{ match.nota.id }}">
                     {% if match.controle %}
                     <input type="hidden" name="controle_id" value="{{ match.controle.id_excel }}">
@@ -136,25 +136,25 @@
                     </button>
                 </form>
             {% else %}
-                <button type="button" class="btn btn-sm btn-success mb-1" data-bs-toggle="modal" data-bs-target="#confirmModal{{ match.projecao.id }}_{{ match.nota.id }}" title="Confirmar relação" style="width: 100%;">
+                <button type="button" class="btn btn-sm btn-success mb-1" data-bs-toggle="modal" data-bs-target="#confirmModal{{ match.projecao.id_excel_excel }}_{{ match.nota.id }}" title="Confirmar relação" style="width: 100%;">
                     <i class="fas fa-check"></i> Confirmar
                 </button>
-                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ match.projecao.id }}_{{ match.nota.id }}" title="Rejeitar relação" style="width: 100%;">
+                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ match.projecao.id_excel_excel }}_{{ match.nota.id }}" title="Rejeitar relação" style="width: 100%;">
                     <i class="fas fa-times"></i> Rejeitar
                 </button>
                 
                 <!-- Modal Confirmar -->
-                <div class="modal fade" id="confirmModal{{ match.projecao.id }}_{{ match.nota.id }}" tabindex="-1" aria-labelledby="confirmModalLabel{{ match.projecao.id }}_{{ match.nota.id }}" aria-hidden="true">
+                <div class="modal fade" id="confirmModal{{ match.projecao.id_excel_excel }}_{{ match.nota.id }}" tabindex="-1" aria-labelledby="confirmModalLabel{{ match.projecao.id_excel_excel }}_{{ match.nota.id }}" aria-hidden="true">
                     <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title" id="confirmModalLabel{{ match.projecao.id }}_{{ match.nota.id }}">Confirmar Relação</h5>
+                                <h5 class="modal-title" id="confirmModalLabel{{ match.projecao.id_excel_excel }}_{{ match.nota.id }}">Confirmar Relação</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
-                            <form method="post" action="{% url 'relacionar_projecao_nota_fiscal' %}" id="confirmForm{{ match.projecao.id }}_{{ match.nota.id }}">
+                            <form method="post" action="{% url 'relacionar_projecao_nota_fiscal' %}" id="confirmForm{{ match.projecao.id_excel_excel }}_{{ match.nota.id }}">
                                 {% csrf_token %}
                                 <input type="hidden" name="acao" value="confirmar">
-                                <input type="hidden" name="projecao_id" value="{{ match.projecao.id }}">
+                                <input type="hidden" name="projecao_id" value="{{ match.projecao.id_excel_excel }}">
                                 <input type="hidden" name="nota_id" value="{{ match.nota.id }}">
                                 {% if match.controle %}
                                 <input type="hidden" name="controle_id" value="{{ match.controle.id_excel }}">
@@ -172,8 +172,8 @@
                                         {% endif %}
                                     </ul>
                                     <div class="mb-3">
-                                        <label for="observacoes_confirm_{{ match.projecao.id }}_{{ match.nota.id }}" class="form-label">Observações (opcional):</label>
-                                        <textarea class="form-control" id="observacoes_confirm_{{ match.projecao.id }}_{{ match.nota.id }}" name="observacoes" rows="3"></textarea>
+                                        <label for="observacoes_confirm_{{ match.projecao.id_excel_excel }}_{{ match.nota.id }}" class="form-label">Observações (opcional):</label>
+                                        <textarea class="form-control" id="observacoes_confirm_{{ match.projecao.id_excel_excel }}_{{ match.nota.id }}" name="observacoes" rows="3"></textarea>
                                     </div>
                                 </div>
                                 <div class="modal-footer">
@@ -188,17 +188,17 @@
                 </div>
                 
                 <!-- Modal Rejeitar -->
-                <div class="modal fade" id="rejectModal{{ match.projecao.id }}_{{ match.nota.id }}" tabindex="-1" aria-labelledby="rejectModalLabel{{ match.projecao.id }}_{{ match.nota.id }}" aria-hidden="true">
+                <div class="modal fade" id="rejectModal{{ match.projecao.id_excel_excel }}_{{ match.nota.id }}" tabindex="-1" aria-labelledby="rejectModalLabel{{ match.projecao.id_excel_excel }}_{{ match.nota.id }}" aria-hidden="true">
                     <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title" id="rejectModalLabel{{ match.projecao.id }}_{{ match.nota.id }}">Rejeitar Relação</h5>
+                                <h5 class="modal-title" id="rejectModalLabel{{ match.projecao.id_excel_excel }}_{{ match.nota.id }}">Rejeitar Relação</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
-                            <form method="post" action="{% url 'relacionar_projecao_nota_fiscal' %}" id="rejectForm{{ match.projecao.id }}_{{ match.nota.id }}">
+                            <form method="post" action="{% url 'relacionar_projecao_nota_fiscal' %}" id="rejectForm{{ match.projecao.id_excel_excel }}_{{ match.nota.id }}">
                                 {% csrf_token %}
                                 <input type="hidden" name="acao" value="rejeitar">
-                                <input type="hidden" name="projecao_id" value="{{ match.projecao.id }}">
+                                <input type="hidden" name="projecao_id" value="{{ match.projecao.id_excel_excel }}">
                                 <input type="hidden" name="nota_id" value="{{ match.nota.id }}">
                                 {% if match.controle %}
                                 <input type="hidden" name="controle_id" value="{{ match.controle.id_excel }}">
@@ -215,8 +215,8 @@
                                         {% endif %}
                                     </ul>
                                     <div class="mb-3">
-                                        <label for="observacoes_reject_{{ match.projecao.id }}_{{ match.nota.id }}" class="form-label">Motivo da rejeição (opcional):</label>
-                                        <textarea class="form-control" id="observacoes_reject_{{ match.projecao.id }}_{{ match.nota.id }}" name="observacoes" rows="3"></textarea>
+                                        <label for="observacoes_reject_{{ match.projecao.id_excel_excel }}_{{ match.nota.id }}" class="form-label">Motivo da rejeição (opcional):</label>
+                                        <textarea class="form-control" id="observacoes_reject_{{ match.projecao.id_excel_excel }}_{{ match.nota.id }}" name="observacoes" rows="3"></textarea>
                                     </div>
                                 </div>
                                 <div class="modal-footer">

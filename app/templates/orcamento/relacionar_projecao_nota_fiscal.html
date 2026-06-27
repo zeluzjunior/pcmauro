@@ -5,6 +5,38 @@
 
 {% block extra_css %}
 <style>
+    .stat-card .card-body h6 { font-size: 0.8rem; }
+    .stat-card .card-body h2 { font-size: 1.4rem; }
+    .stat-card .card-body small { font-size: 0.7rem; }
+    .stat-card .card-body .fa-3x { font-size: 2rem; }
+    .card .card-header h5 { font-size: 0.95rem; }
+
+    .stat-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .kpi-secondary { border-left-color: #6c757d; }
+    .kpi-purple { border-left-color: #6f42c1; }
+
+    .accordion-button:not(.collapsed) {
+        color: #fff;
+        background-color: #0d6efd;
+        box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .125);
+    }
+    .accordion-button:not(.collapsed)::after {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23fff'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+    }
+    .accordion-button { font-weight: bold; }
+
     .match-score {
         font-size: 1.2rem;
         font-weight: bold;
@@ -12,18 +44,8 @@
     .match-high { color: #198754; }
     .match-medium { color: #ffc107; }
     .match-low { color: #dc3545; }
-    .comparison-table {
-        font-size: 0.9rem;
-    }
-    .match-details {
-        font-size: 0.85rem;
-    }
-    .stat-card {
-        transition: transform 0.2s;
-    }
-    .stat-card:hover {
-        transform: translateY(-5px);
-    }
+    .comparison-table { font-size: 0.9rem; }
+    .match-details { font-size: 0.85rem; }
     .confirmed-badge {
         background-color: #198754;
         color: white;
@@ -40,10 +62,8 @@
         font-size: 0.75rem;
         font-weight: bold;
     }
-    .action-buttons {
-        white-space: nowrap;
-    }
-    /* Prevent modal flickering */
+    .action-buttons { white-space: nowrap; }
+
     .modal-backdrop {
         position: fixed;
         top: 0;
@@ -54,23 +74,11 @@
         background-color: #000;
         transition: opacity 0.15s linear;
     }
-    .modal-backdrop.show {
-        opacity: 0.5;
-    }
-    /* Ensure smooth modal transitions */
-    .modal.fade {
-        transition: opacity 0.15s linear;
-    }
-    .modal.fade:not(.show) {
-        opacity: 0;
-    }
-    .modal.show {
-        display: block;
-    }
-    /* Prevent body scroll issues */
-    body.modal-open {
-        overflow: hidden;
-    }
+    .modal-backdrop.show { opacity: 0.5; }
+    .modal.fade { transition: opacity 0.15s linear; }
+    .modal.fade:not(.show) { opacity: 0; }
+    .modal.show { display: block; }
+    body.modal-open { overflow: hidden; }
 </style>
 {% endblock %}
 
@@ -83,13 +91,11 @@
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
-                        <li class="breadcrumb-item active text-white" aria-current="page">Orçamento e GMD</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Orçamento</li>
                         <li class="breadcrumb-item active text-white" aria-current="page">Relacionar Projeção vs Nota Fiscal</li>
                     </ol>
                 </nav>
-                <h1 class="display-4 fw-bold mt-3">
-                    <i class="fas fa-link me-2"></i>Relacionar Projeção vs Nota Fiscal vs Controle RC/NF
-                </h1>
+                <h1 class="display-4 fw-bold mt-3">Relacionar Projeção vs Nota Fiscal</h1>
                 <p class="lead">Para cada Nota Fiscal, encontre a Projeção de Gasto correspondente. Confirme ou rejeite as correspondências.</p>
             </div>
         </div>
@@ -98,7 +104,7 @@
 
 <!-- Main Content -->
 <section class="py-5">
-    <div class="container">
+    <div class="container-fluid px-5">
         <!-- Messages -->
         {% if messages %}
             {% for message in messages %}
@@ -108,136 +114,91 @@
                 </div>
             {% endfor %}
         {% endif %}
-        <div class="alert alert-light border alert-dismissible fade show" role="alert">
-            <i class="fas fa-info-circle me-2"></i><strong>Análise baseada em Nota Fiscal:</strong> para cada NF, busca-se Projeções de Gasto correspondentes. Exibidas até {{ max_matches_por_nota }} candidatos por NF com score ≥ {{ score_minimo }}%.
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
 
-        <!-- Statistics -->
-        <div class="row mb-4">
-            <div class="col-md-2">
-                <div class="card bg-primary text-white stat-card">
-                    <div class="card-body">
-                        <h5 class="card-title">Total Projeções:</h5>
-                        <p class="card-text display-6">{{ total_projecoes }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card bg-info text-white stat-card">
-                    <div class="card-body">
-                        <h5 class="card-title">Total Notas:</h5>
-                        <p class="card-text display-6">{{ total_notas }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card bg-warning text-dark stat-card">
-                    <div class="card-body">
-                        <h5 class="card-title">Total Controles:</h5>
-                        <p class="card-text display-6">{{ total_controles_rc_nf }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card bg-success text-white stat-card">
-                    <div class="card-body">
-                        <h5 class="card-title">Confirmadas:</h5>
-                        <p class="card-text display-6">{{ total_relacoes_confirmadas }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card bg-primary text-white stat-card">
-                    <div class="card-body">
-                        <h5 class="card-title">UC 242 Matches:</h5>
-                        <p class="card-text display-6">{{ matches_242_count }}</p>
-                        <small>Notas: {{ total_notas_242 }}</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card bg-info text-white stat-card">
-                    <div class="card-body">
-                        <h5 class="card-title">UC 5 Matches:</h5>
-                        <p class="card-text display-6">{{ matches_5_count }}</p>
-                        <small>Notas: {{ total_notas_5 }}</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="row mb-4">
-            <div class="col-md-2">
-                <div class="card bg-warning text-dark stat-card">
-                    <div class="card-body">
-                        <h5 class="card-title">UC 170 Matches:</h5>
-                        <p class="card-text display-6">{{ matches_170_count }}</p>
-                        <small>Notas: {{ total_notas_170 }}</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Filtros -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-secondary text-white">
-                        <h6 class="mb-0">
-                            <i class="fas fa-filter me-2"></i>Filtros de Análise
-                        </h6>
-                    </div>
-                    <div class="card-body">
-                        <form method="get" action="{% url 'relacionar_projecao_nota_fiscal' %}">
-                            <div class="row">
-                                <div class="col-md-3 mb-3">
-                                    <label for="filtro_centro_atividade" class="form-label">Centro de Atividade</label>
-                                    <input type="text" name="filtro_centro_atividade" id="filtro_centro_atividade" class="form-control" value="{{ filtro_centro_atividade }}" placeholder="Código do centro">
-                                </div>
-                                <div class="col-md-2 mb-3">
-                                    <label for="filtro_ano" class="form-label">Ano</label>
-                                    <input type="number" name="filtro_ano" id="filtro_ano" class="form-control" value="{{ filtro_ano }}" placeholder="Ex: 2024">
-                                </div>
-                                <div class="col-md-2 mb-3">
-                                    <label for="filtro_tipo" class="form-label">Tipo</label>
-                                    <input type="text" name="filtro_tipo" id="filtro_tipo" class="form-control" value="{{ filtro_tipo }}" placeholder="Tipo">
-                                </div>
-                                <div class="col-md-2 mb-3">
-                                    <label for="filtro_valor_min" class="form-label">Valor Mín.</label>
-                                    <input type="number" step="0.01" name="filtro_valor_min" id="filtro_valor_min" class="form-control" value="{{ filtro_valor_min }}" placeholder="0.00">
-                                </div>
-                                <div class="col-md-2 mb-3">
-                                    <label for="filtro_valor_max" class="form-label">Valor Máx.</label>
-                                    <input type="number" step="0.01" name="filtro_valor_max" id="filtro_valor_max" class="form-control" value="{{ filtro_valor_max }}" placeholder="0.00">
-                                </div>
-                                <div class="col-md-1 mb-3 d-flex align-items-end">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="mostrar_apenas_proximos" id="mostrar_apenas_proximos" {% if mostrar_apenas_proximos %}checked{% endif %}>
-                                        <label class="form-check-label" for="mostrar_apenas_proximos" title="Mostrar apenas matches com score ≥ 50%">
-                                            ≥50%
-                                        </label>
+        <!-- Filter Section (Accordion) -->
+        <div class="accordion mb-4 filter-accordion" id="filterAccordion">
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingFilter">
+                    <button class="accordion-button {% if not ano_selecionado and not meses_selecionados and not uso_contabil_filtro and not filtro_valor_min and not filtro_valor_max and not mostrar_apenas_proximos and not mostrar_apenas_nao_confirmados %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFilter" aria-expanded="{% if ano_selecionado or meses_selecionados or uso_contabil_filtro or filtro_valor_min or filtro_valor_max or mostrar_apenas_proximos or mostrar_apenas_nao_confirmados %}true{% else %}false{% endif %}" aria-controls="collapseFilter">
+                        <i class="fas fa-filter me-2"></i>Filtros de Análise
+                    </button>
+                </h2>
+                <div id="collapseFilter" class="accordion-collapse collapse {% if ano_selecionado or meses_selecionados or uso_contabil_filtro or filtro_valor_min or filtro_valor_max or mostrar_apenas_proximos or mostrar_apenas_nao_confirmados %}show{% endif %}" aria-labelledby="headingFilter" data-bs-parent="#filterAccordion">
+                    <div class="accordion-body">
+                        <form method="GET" action="{% url 'relacionar_projecao_nota_fiscal' %}" class="row g-3 align-items-end">
+                            <div class="col-md-2">
+                                <label for="ano_filtro" class="form-label">Ano:</label>
+                                <select class="form-select" id="ano_filtro" name="ano">
+                                    {% for ano in anos_disponiveis %}
+                                        <option value="{{ ano }}" {% if ano == ano_selecionado %}selected{% endif %}>{{ ano }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="mes_filtro" class="form-label">Mês(es):</label>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="selecionarTodos" onclick="toggleAllMonths(true)">
+                                            <label class="form-check-label" for="selecionarTodos">Selecionar Todos</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="desmarcarTodos" onclick="toggleAllMonths(false)">
+                                            <label class="form-check-label" for="desmarcarTodos">Desmarcar Todos</label>
+                                        </div>
                                     </div>
+                                </div>
+                                <div class="row mt-2">
+                                    {% for mes_num, mes_nome in meses_choices %}
+                                        <div class="col-md-3 col-sm-4 col-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input mes-checkbox" type="checkbox" id="mes_{{ mes_num }}" name="mes" value="{{ mes_num }}"
+                                                    {% if mes_num in meses_selecionados %}checked{% endif %}>
+                                                <label class="form-check-label" for="mes_{{ mes_num }}">{{ mes_nome }}</label>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
                                 </div>
                             </div>
-                            <div class="row">
-                                <div class="col-md-3 mb-3">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="mostrar_apenas_nao_confirmados" id="mostrar_apenas_nao_confirmados" {% if mostrar_apenas_nao_confirmados %}checked{% endif %}>
-                                        <label class="form-check-label" for="mostrar_apenas_nao_confirmados">
-                                            Apenas não confirmados
-                                        </label>
-                                    </div>
+                            <div class="col-md-2">
+                                <label for="uso_contabil_filtro" class="form-label">Uso Contábil:</label>
+                                <select class="form-select" id="uso_contabil_filtro" name="uso_contabil">
+                                    <option value="">Todos</option>
+                                    {% for uso in uso_contabil_unicos %}
+                                        <option value="{{ uso }}" {% if uso == uso_contabil_filtro %}selected{% endif %}>{{ uso }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="filtro_valor_min" class="form-label">Valor Mín.</label>
+                                <input type="number" step="0.01" name="filtro_valor_min" id="filtro_valor_min" class="form-control" value="{{ filtro_valor_min }}" placeholder="0.00">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="filtro_valor_max" class="form-label">Valor Máx.</label>
+                                <input type="number" step="0.01" name="filtro_valor_max" id="filtro_valor_max" class="form-control" value="{{ filtro_valor_max }}" placeholder="0.00">
+                            </div>
+                            <div class="w-100"></div>
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="mostrar_apenas_proximos" id="mostrar_apenas_proximos" {% if mostrar_apenas_proximos %}checked{% endif %}>
+                                    <label class="form-check-label" for="mostrar_apenas_proximos" title="Mostrar apenas matches com score ≥ 50%">
+                                        Apenas matches com score ≥ 50%
+                                    </label>
                                 </div>
-                                <div class="col-md-9">
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-filter me-2"></i>Filtrar
-                                    </button>
-                                    {% if filtro_centro_atividade or filtro_ano or filtro_tipo or filtro_valor_min or filtro_valor_max %}
-                                    <a href="{% url 'relacionar_projecao_nota_fiscal' %}" class="btn btn-outline-secondary">
-                                        <i class="fas fa-times me-1"></i>Limpar Filtros
-                                    </a>
-                                    {% endif %}
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" name="mostrar_apenas_nao_confirmados" id="mostrar_apenas_nao_confirmados" {% if mostrar_apenas_nao_confirmados %}checked{% endif %}>
+                                    <label class="form-check-label" for="mostrar_apenas_nao_confirmados">
+                                        Apenas não confirmados
+                                    </label>
                                 </div>
+                            </div>
+                            <div class="col-md-8 d-flex justify-content-end">
+                                <button type="submit" class="btn btn-primary me-2">
+                                    <i class="fas fa-filter me-1"></i>Aplicar Filtros
+                                </button>
+                                <a href="{% url 'relacionar_projecao_nota_fiscal' %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-sync-alt me-1"></i>Limpar
+                                </a>
                             </div>
                         </form>
                     </div>
@@ -245,7 +206,128 @@
             </div>
         </div>
 
+        <!-- KPI Cards -->
+        <div class="mb-5">
+            <div class="row mb-3">
+                <div class="col-12">
+                    <div class="alert alert-light border border-2 border-info border-opacity-75 d-flex align-items-center gap-3 py-3 mb-0" role="note">
+                        <i class="fas fa-info-circle fa-2x text-info flex-shrink-0"></i>
+                        <p class="mb-0 text-dark fw-semibold">
+                            <strong>Análise baseada em Nota Fiscal:</strong> para cada NF do período selecionado, busca-se Projeções de Gasto correspondentes.
+                            Exibidas até {{ max_matches_por_nota }} candidatos por NF com score ≥ {{ score_minimo }}%.
+                            Os indicadores abaixo referem-se aos filtros selecionados acima.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Total Projeções</h6>
+                                    <h2 class="mb-0 fw-bold format-number">{{ total_projecoes }}</h2>
+                                    <small class="text-muted">Projeções de gasto cadastradas</small>
+                                </div>
+                                <i class="fas fa-chart-line fa-3x text-primary opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Total Notas</h6>
+                                    <h2 class="mb-0 fw-bold format-number">{{ total_notas }}</h2>
+                                    <small class="text-muted">Notas fiscais cadastradas</small>
+                                </div>
+                                <i class="fas fa-file-invoice fa-3x text-info opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Total Controles</h6>
+                                    <h2 class="mb-0 fw-bold format-number">{{ total_controles_rc_nf }}</h2>
+                                    <small class="text-muted">Registros de Controle RC/NF</small>
+                                </div>
+                                <i class="fas fa-clipboard-list fa-3x text-warning opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Confirmadas</h6>
+                                    <h2 class="mb-0 fw-bold format-number">{{ total_relacoes_confirmadas }}</h2>
+                                    <small class="text-muted">Relações confirmadas</small>
+                                </div>
+                                <i class="fas fa-check-circle fa-3x text-success opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-3 g-2">
+                <div class="col mb-0">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">UC 242 Matches</h6>
+                                    <h2 class="mb-0 fw-bold format-number">{{ matches_242_count }}</h2>
+                                    <small class="text-muted">{{ total_notas_242 }} nota(s) analisada(s)</small>
+                                </div>
+                                <i class="fas fa-link fa-3x text-primary opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col mb-0">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">UC 5 Matches</h6>
+                                    <h2 class="mb-0 fw-bold format-number">{{ matches_5_count }}</h2>
+                                    <small class="text-muted">{{ total_notas_5 }} nota(s) analisada(s)</small>
+                                </div>
+                                <i class="fas fa-link fa-3x text-info opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col mb-0">
+                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">UC 170 Matches</h6>
+                                    <h2 class="mb-0 fw-bold format-number">{{ matches_170_count }}</h2>
+                                    <small class="text-muted">{{ total_notas_170 }} nota(s) analisada(s)</small>
+                                </div>
+                                <i class="fas fa-link fa-3x text-warning opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Tabs: Uso Contábil 242, 5, 170 -->
+        <div class="mb-5">
         <ul class="nav nav-tabs mb-3" id="ucTabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link {% if active_uc_tab == '242' %}active{% endif %}" id="tab-242" data-bs-toggle="tab" data-bs-target="#panel-242" type="button" role="tab">
@@ -267,8 +349,8 @@
         <div class="tab-content" id="ucTabContent">
             <!-- Panel UC 242 -->
             <div class="tab-pane fade {% if active_uc_tab == '242' %}show active{% endif %}" id="panel-242" role="tabpanel">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-primary text-white">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-dark text-white">
                         <h5 class="mb-0">
                             <i class="fas fa-link me-2"></i>Uso Contábil 242 - Possíveis Correspondências
                             <small class="ms-2">({{ matches_242_count }} registro{{ matches_242_count|pluralize }})</small>
@@ -277,8 +359,8 @@
                     <div class="card-body">
                         {% if matches_242 %}
                         <div class="table-responsive">
-                            <table class="table table-hover comparison-table">
-                                <thead>
+                            <table class="table table-hover table-striped comparison-table">
+                                <thead class="table-light">
                                     <tr>
                                         <th style="width: 5%;">Score</th>
                                         <th style="width: 11%;">Projeção</th>
@@ -326,8 +408,8 @@
 
             <!-- Panel UC 5 -->
             <div class="tab-pane fade {% if active_uc_tab == '5' %}show active{% endif %}" id="panel-5" role="tabpanel">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-info text-white">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-dark text-white">
                         <h5 class="mb-0">
                             <i class="fas fa-link me-2"></i>Uso Contábil 5 - Possíveis Correspondências
                             <small class="ms-2">({{ matches_5_count }} registro{{ matches_5_count|pluralize }})</small>
@@ -336,8 +418,8 @@
                     <div class="card-body">
                         {% if matches_5 %}
                         <div class="table-responsive">
-                            <table class="table table-hover comparison-table">
-                                <thead>
+                            <table class="table table-hover table-striped comparison-table">
+                                <thead class="table-light">
                                     <tr>
                                         <th style="width: 5%;">Score</th>
                                         <th style="width: 11%;">Projeção</th>
@@ -385,8 +467,8 @@
 
             <!-- Panel UC 170 -->
             <div class="tab-pane fade {% if active_uc_tab == '170' %}show active{% endif %}" id="panel-170" role="tabpanel">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-warning text-dark">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-dark text-white">
                         <h5 class="mb-0">
                             <i class="fas fa-link me-2"></i>Uso Contábil 170 - Possíveis Correspondências
                             <small class="ms-2">({{ matches_170_count }} registro{{ matches_170_count|pluralize }})</small>
@@ -395,8 +477,8 @@
                     <div class="card-body">
                         {% if matches_170 %}
                         <div class="table-responsive">
-                            <table class="table table-hover comparison-table">
-                                <thead>
+                            <table class="table table-hover table-striped comparison-table">
+                                <thead class="table-light">
                                     <tr>
                                         <th style="width: 5%;">Score</th>
                                         <th style="width: 11%;">Projeção</th>
@@ -442,12 +524,20 @@
                 </div>
             </div>
         </div>
+        </div>
     </div>
 </section>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+function toggleAllMonths(select) {
+    const checkboxes = document.querySelectorAll('.mes-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = select;
+    });
+}
+
 // Ensure modals work properly and prevent flickering
 (function() {
     'use strict';

@@ -1,0 +1,517 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Análise Controle RC x Notas Fiscais{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card .card-body h6 { font-size: 0.8rem; }
+    .stat-card .card-body h2 { font-size: 1.4rem; }
+    .stat-card .card-body small { font-size: 0.7rem; }
+    .stat-card .card-body .fa-3x { font-size: 2rem; }
+    .filter-card .card-header { font-size: 0.85rem; }
+    .filter-card .card-body .form-label { font-size: 0.75rem; }
+    .filter-card .card-body .form-select { font-size: 0.8rem; }
+    .card .card-header h5 { font-size: 0.95rem; }
+
+    .stat-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .kpi-secondary { border-left-color: #6c757d; }
+
+    .filter-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #fff 100%);
+        border: 1px solid #e9ecef;
+        border-radius: 0.5rem;
+    }
+    .filter-card .card-header {
+        background: transparent;
+        border-bottom: 1px solid #e9ecef;
+        font-weight: 600;
+        font-size: 0.85rem;
+        padding: 0.5rem 1rem;
+        color: #212529;
+    }
+    .filter-accordion .accordion-body .form-label,
+    .filter-accordion .accordion-body .card-header {
+        color: #212529 !important;
+    }
+    .month-filter-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.4rem;
+    }
+    .month-filter-item {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem 0.25rem;
+        border-radius: 0.4rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 0.75rem;
+        font-weight: 500;
+        border: 2px solid #e9ecef;
+        background: #f8f9fa;
+    }
+    .month-filter-item:hover {
+        background: #e9ecef;
+        border-color: #ced4da;
+        transform: translateY(-1px);
+    }
+    .month-filter-item.checked {
+        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+        border-color: #0d6efd;
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(13, 110, 253, 0.35);
+    }
+    .month-filter-item input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .status-card-link {
+        text-decoration: none;
+        color: inherit;
+        display: block;
+        height: 100%;
+    }
+    .status-card-link:hover .stat-card {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .status-card-link.active-filter .stat-card {
+        box-shadow: 0 0 0 2px #0d6efd, 0 0.5rem 1rem rgba(13, 110, 253, 0.2) !important;
+        transform: translateY(-2px);
+    }
+
+    .nav-tabs .nav-link { font-weight: 500; }
+    .pedidos-nf-accordion .accordion-button:not(.collapsed) {
+        background-color: #f8f9fa;
+        box-shadow: none;
+    }
+    .nf-detalhe-table th, .nf-detalhe-table td { font-size: 0.82rem; vertical-align: middle; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white">Orçamento e GMD</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Controle RC x Notas Fiscais</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="fas fa-file-invoice me-2"></i>Análise Controle RC x Notas Fiscais
+                </h1>
+                <p class="lead mb-0">Correlação entre <strong>nf_servico</strong> (Controle RC) e <strong>nota</strong> (NotaFiscal), agrupada por pedido</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container-fluid px-5">
+        <!-- Filtros -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="accordion filter-accordion shadow-sm" id="filtrosAccordion">
+                    <div class="accordion-item shadow-sm border-0 rounded-3 overflow-hidden">
+                        <h2 class="accordion-header" id="filtrosHeading">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="true">
+                                <i class="fas fa-sliders-h me-2 text-primary"></i>
+                                <strong>Filtros</strong>
+                                <span class="badge bg-primary ms-2">{{ periodo_label }}</span>
+                                {% if filtro_status or busca_pedido %}<span class="badge bg-secondary ms-1">+ outros</span>{% endif %}
+                            </button>
+                        </h2>
+                        <div id="filtrosCollapse" class="accordion-collapse collapse show" aria-labelledby="filtrosHeading">
+                            <div class="accordion-body pt-4 pb-4">
+                                <form method="get" id="filtrosForm">
+                                    <input type="hidden" name="aba" value="{{ aba }}">
+                                    <div class="row g-4">
+                                        <div class="col-lg-4">
+                                            <div class="card filter-card h-100 border-0 shadow-sm">
+                                                <div class="card-header d-flex align-items-center">
+                                                    <i class="fas fa-calendar-alt text-primary me-2"></i>Data da RC
+                                                </div>
+                                                <div class="card-body">
+                                                    <label for="ano" class="form-label small fw-semibold">Ano</label>
+                                                    <select class="form-select form-select-sm mb-2" id="ano" name="ano">
+                                                        {% for ano in anos_disponiveis %}
+                                                        <option value="{{ ano }}" {% if ano == ano_filtro %}selected{% endif %}>{{ ano }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                    <label class="form-label small fw-semibold d-block">Meses</label>
+                                                    <div class="month-filter-grid">
+                                                        {% for i in "123456789012" %}
+                                                        {% with mes_num=forloop.counter %}
+                                                        <label class="month-filter-item {% if mes_num in meses_filtro %}checked{% endif %}">
+                                                            <input type="checkbox" name="mes" value="{{ mes_num }}" {% if mes_num in meses_filtro %}checked{% endif %}>
+                                                            {{ meses_nomes_curtos|get_item:mes_num }}
+                                                        </label>
+                                                        {% endwith %}
+                                                        {% endfor %}
+                                                    </div>
+                                                    <div class="mt-2">
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleMeses(true)">Todos</button>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleMeses(false)">Nenhum</button>
+                                                    </div>
+                                                    <p class="text-muted small mt-2 mb-0">Padrão: mês atual, se nenhum mês na URL.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-4">
+                                            <div class="card filter-card h-100 border-0 shadow-sm">
+                                                <div class="card-header d-flex align-items-center">
+                                                    <i class="fas fa-tags text-info me-2"></i>Pedido e situação
+                                                </div>
+                                                <div class="card-body">
+                                                    <label for="q" class="form-label small fw-semibold">Buscar pedido</label>
+                                                    <input type="text" class="form-control form-control-sm mb-2" id="q" name="q" value="{{ busca_pedido }}" placeholder="Número do pedido...">
+                                                    <label for="status" class="form-label small fw-semibold">Situação da correlação</label>
+                                                    <select class="form-select form-select-sm" id="status" name="status">
+                                                        <option value="">Todas as situações</option>
+                                                        <option value="completo" {% if filtro_status == 'completo' %}selected{% endif %}>Completo — todas as NF encontradas</option>
+                                                        <option value="parcial" {% if filtro_status == 'parcial' %}selected{% endif %}>Parcial — algumas NF encontradas</option>
+                                                        <option value="ausente" {% if filtro_status == 'ausente' %}selected{% endif %}>Ausente — nenhuma NF encontrada</option>
+                                                        <option value="sem_nf_servico" {% if filtro_status == 'sem_nf_servico' %}selected{% endif %}>Sem nf_servico — nada a comparar</option>
+                                                    </select>
+                                                    <p class="text-muted small mt-2 mb-0" id="statusHelpText">
+                                                        {% if filtro_status == 'completo' %}
+                                                            <strong>Completo:</strong> todas as NF de nf_servico encontradas em NotaFiscal.
+                                                        {% elif filtro_status == 'parcial' %}
+                                                            <strong>Parcial:</strong> só parte dos números existe em NotaFiscal.
+                                                        {% elif filtro_status == 'ausente' %}
+                                                            <strong>Ausente:</strong> nenhum número encontrado em NotaFiscal.
+                                                        {% elif filtro_status == 'sem_nf_servico' %}
+                                                            <strong>Sem nf_servico:</strong> sem número válido para comparar.
+                                                        {% else %}
+                                                            Compara <code>nf_servico</code> com <code>nota</code>. Não é o status da planilha Excel.
+                                                        {% endif %}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-4 d-flex align-items-stretch">
+                                            <div class="card filter-card border-0 shadow-sm w-100">
+                                                <div class="card-header d-flex align-items-center">
+                                                    <i class="fas fa-play text-success me-2"></i>Aplicar
+                                                </div>
+                                                <div class="card-body d-flex flex-column justify-content-between">
+                                                    <p class="text-muted small mb-3">
+                                                        {{ total_registros_rc_periodo }} registro(s) RC no período<br>
+                                                        {{ total_pedidos_base }} pedido(s) distintos
+                                                    </p>
+                                                    <div class="d-flex gap-2 flex-wrap">
+                                                        <button type="submit" class="btn btn-primary btn-sm">
+                                                            <i class="fas fa-search me-1"></i>Filtrar
+                                                        </button>
+                                                        <a href="{% url 'analise_controle_rc_notas' %}" class="btn btn-outline-secondary btn-sm">Limpar</a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="mb-5">
+            <div class="row mb-3">
+                <div class="col-12">
+                    <div class="alert alert-light border border-2 border-info border-opacity-75 d-flex align-items-center gap-3 py-3 mb-0">
+                        <i class="fas fa-info-circle fa-2x text-info flex-shrink-0"></i>
+                        <p class="mb-0 text-dark fw-semibold">Dados do período <strong>{{ periodo_label }}</strong> — correlação por pedido entre Controle RC (<code>nf_servico</code>) e cadastro de Notas Fiscais (<code>nota</code>).</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-3 g-2">
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Pedidos no período</h6>
+                                    <h2 class="mb-0 fw-bold">{{ total_pedidos_base }}</h2>
+                                    <small class="text-muted">Com pedido e data RC filtrada</small>
+                                </div>
+                                <i class="fas fa-shopping-cart fa-3x text-primary opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Cobertura NF</h6>
+                                    <h2 class="mb-0 fw-bold text-success">{{ taxa_cobertura|floatformat:0 }}%</h2>
+                                    <small class="text-muted">{{ total_nfs_encontradas }}/{{ total_nfs_controle }} NF serviço</small>
+                                </div>
+                                <i class="fas fa-link fa-3x text-success opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com pendência</h6>
+                                    <h2 class="mb-0 fw-bold text-warning">{{ pedidos_pendentes }}</h2>
+                                    <small class="text-muted">Parcial, ausente ou sem nf_servico</small>
+                                </div>
+                                <i class="fas fa-exclamation-triangle fa-3x text-warning opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Pedidos OK</h6>
+                                    <h2 class="mb-0 fw-bold">{{ pedidos_completos }}</h2>
+                                    <small class="text-muted">Todas as NF encontradas</small>
+                                </div>
+                                <i class="fas fa-check-circle fa-3x text-info opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtros por situação (clique para filtrar) -->
+            <div class="row mb-2">
+                <div class="col-12">
+                    <h6 class="text-muted mb-0">
+                        <i class="fas fa-filter me-1"></i>Filtrar por situação da correlação
+                        <span class="fw-normal small">— clique no card</span>
+                    </h6>
+                </div>
+            </div>
+            <div class="row mb-3 g-2">
+                <div class="col mb-0">
+                    <a href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}&aba=todos&status=completo" class="status-card-link {% if filtro_status == 'completo' %}active-filter{% endif %}">
+                        <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Completo</h6>
+                                        <h2 class="mb-0 fw-bold">{{ pedidos_completos }}</h2>
+                                        <small class="text-muted">Todas as NF em NotaFiscal</small>
+                                    </div>
+                                    <i class="fas fa-check-double fa-3x text-success opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <div class="col mb-0">
+                    <a href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}&aba=pendencias&status=parcial" class="status-card-link {% if filtro_status == 'parcial' %}active-filter{% endif %}">
+                        <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Parcial</h6>
+                                        <h2 class="mb-0 fw-bold">{{ pedidos_parciais }}</h2>
+                                        <small class="text-muted">Parte das NF encontradas</small>
+                                    </div>
+                                    <i class="fas fa-adjust fa-3x text-warning opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <div class="col mb-0">
+                    <a href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}&aba=pendencias&status=ausente" class="status-card-link {% if filtro_status == 'ausente' %}active-filter{% endif %}">
+                        <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Ausente</h6>
+                                        <h2 class="mb-0 fw-bold">{{ pedidos_ausentes }}</h2>
+                                        <small class="text-muted">Nenhuma NF em NotaFiscal</small>
+                                    </div>
+                                    <i class="fas fa-times-circle fa-3x text-danger opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <div class="col mb-0">
+                    <a href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}&aba=pendencias&status=sem_nf_servico" class="status-card-link {% if filtro_status == 'sem_nf_servico' %}active-filter{% endif %}">
+                        <div class="card stat-card kpi-card kpi-secondary shadow-sm border-0 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted mb-2">Sem nf_servico</h6>
+                                        <h2 class="mb-0 fw-bold">{{ pedidos_sem_nf_servico }}</h2>
+                                        <small class="text-muted">Nada a comparar</small>
+                                    </div>
+                                    <i class="fas fa-minus-circle fa-3x text-secondary opacity-25"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Legenda das classificações -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card border-0 bg-light shadow-sm">
+                        <div class="card-body py-3 small text-muted">
+                            <strong class="text-dark">O que significa cada situação:</strong>
+                            <span class="ms-2"><span class="badge bg-success">Completo</span> tem nf_servico e todas existem em NotaFiscal.</span>
+                            <span class="ms-2"><span class="badge bg-warning text-dark">Parcial</span> só parte encontrada.</span>
+                            <span class="ms-2"><span class="badge bg-danger">Ausente</span> nenhuma encontrada.</span>
+                            <span class="ms-2"><span class="badge bg-secondary">Sem nf_servico</span> campo vazio ou &quot;-&quot;.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Abas -->
+        <ul class="nav nav-tabs mb-4">
+            <li class="nav-item">
+                <a class="nav-link {% if aba == 'resumo' %}active{% endif %}" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}&aba=resumo{% if busca_pedido %}&q={{ busca_pedido }}{% endif %}{% if filtro_status %}&status={{ filtro_status }}{% endif %}">
+                    <i class="fas fa-chart-pie me-1"></i>Resumo
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if aba == 'pendencias' %}active{% endif %}" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}&aba=pendencias{% if busca_pedido %}&q={{ busca_pedido }}{% endif %}">
+                    <i class="fas fa-exclamation-triangle me-1"></i>Pendências
+                    {% if pedidos_pendentes %}<span class="badge bg-warning text-dark ms-1">{{ pedidos_pendentes }}</span>{% endif %}
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if aba == 'todos' %}active{% endif %}" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}&aba=todos{% if busca_pedido %}&q={{ busca_pedido }}{% endif %}{% if filtro_status %}&status={{ filtro_status }}{% endif %}">
+                    <i class="fas fa-list me-1"></i>Todos os pedidos
+                </a>
+            </li>
+        </ul>
+
+        {% if aba == 'resumo' %}
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0"><i class="fas fa-exclamation-circle me-2"></i>Pedidos que precisam de atenção</h5>
+                {% if linhas_resumo_pendencias %}
+                <a href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}&aba=pendencias" class="btn btn-dark btn-sm">
+                    Ver todas ({{ pedidos_pendentes }})
+                </a>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if linhas_resumo_pendencias %}
+                    {% include 'orcamento/_accordion_pedidos_nf.html' with linhas_list=linhas_resumo_pendencias accordion_id='accordionResumo' expand_first=True %}
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                    <p class="mb-0">Nenhuma pendência no período selecionado.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="card shadow-sm border-0">
+            <div class="card-header {% if aba == 'pendencias' %}bg-warning text-dark{% else %}bg-primary text-white{% endif %} d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0">
+                    {% if aba == 'pendencias' %}
+                        <i class="fas fa-exclamation-triangle me-2"></i>Pedidos com pendência
+                    {% else %}
+                        <i class="fas fa-list me-2"></i>Todos os pedidos
+                    {% endif %}
+                </h5>
+                <span class="small {% if aba == 'pendencias' %}text-dark{% else %}text-white-50{% endif %}">{{ total_pedidos }} pedido(s) · pág. {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span>
+            </div>
+            <div class="card-body">
+                {% include 'orcamento/_accordion_pedidos_nf.html' with linhas_list=page_obj accordion_id='accordionLista' expand_first=False %}
+            </div>
+            {% if page_obj.paginator.num_pages > 1 %}
+            <div class="card-footer bg-white">
+                <nav>
+                    <ul class="pagination pagination-sm justify-content-center mb-0">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}&aba={{ aba }}{% if busca_pedido %}&q={{ busca_pedido }}{% endif %}{% if filtro_status %}&status={{ filtro_status }}{% endif %}&page={{ page_obj.previous_page_number }}">Anterior</a>
+                        </li>
+                        {% endif %}
+                        <li class="page-item disabled"><span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?ano={{ ano_filtro }}{% for m in meses_filtro %}&mes={{ m }}{% endfor %}&aba={{ aba }}{% if busca_pedido %}&q={{ busca_pedido }}{% endif %}{% if filtro_status %}&status={{ filtro_status }}{% endif %}&page={{ page_obj.next_page_number }}">Próxima</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleMeses(checked) {
+    document.querySelectorAll('input[name="mes"]').forEach(function(cb) {
+        cb.checked = checked;
+        cb.closest('.month-filter-item').classList.toggle('checked', checked);
+    });
+}
+document.querySelectorAll('.month-filter-item').forEach(function(label) {
+    label.addEventListener('click', function() {
+        var cb = this.querySelector('input');
+        setTimeout(function() {
+            label.classList.toggle('checked', cb.checked);
+        }, 0);
+    });
+});
+
+var statusHelp = {
+    '': 'Compara <code>nf_servico</code> com <code>nota</code>. Não é o status da planilha Excel.',
+    'completo': '<strong>Completo:</strong> todas as NF de nf_servico encontradas em NotaFiscal.',
+    'parcial': '<strong>Parcial:</strong> só parte dos números existe em NotaFiscal.',
+    'ausente': '<strong>Ausente:</strong> nenhum número encontrado em NotaFiscal.',
+    'sem_nf_servico': '<strong>Sem nf_servico:</strong> sem número válido para comparar.'
+};
+var statusSelect = document.getElementById('status');
+var statusHelpEl = document.getElementById('statusHelpText');
+if (statusSelect && statusHelpEl) {
+    statusSelect.addEventListener('change', function() {
+        statusHelpEl.innerHTML = statusHelp[this.value] || statusHelp[''];
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,428 @@
+{% extends 'base.html' %}
+{% load static form_extras %}
+
+{% block title %}Análise de Indicadores{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .stat-card { transition: transform 0.2s; border-left: 4px solid; }
+    .stat-card:hover { transform: translateY(-3px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .chart-container { position: relative; height: 280px; }
+    .status-ok { background-color: rgba(25, 135, 84, 0.08); }
+    .status-alerta { background-color: rgba(220, 53, 69, 0.12); font-weight: 600; }
+    .status-sem { color: #6c757d; }
+    .accordion-button:not(.collapsed) { background-color: rgba(25, 135, 84, 0.08); }
+    .matriz-diaria th, .matriz-diaria td { font-size: 0.78rem; padding: 0.35rem 0.25rem !important; text-align: center; white-space: nowrap; }
+    .matriz-diaria th.indicador-col, .matriz-diaria td.indicador-col { text-align: left; min-width: 10rem; position: sticky; left: 0; background: #fff; z-index: 1; }
+    .matriz-diaria thead th.indicador-col { background: #f8f9fa; z-index: 2; }
+    .matriz-diaria .celula-alerta { background-color: rgba(220, 53, 69, 0.18); color: #842029; font-weight: 600; }
+    .matriz-diaria .celula-ok { background-color: rgba(25, 135, 84, 0.1); }
+    .matriz-diaria .celula-vazia { color: #adb5bd; }
+
+    /* Visão executiva — tabela KPI */
+    .exec-kpi-wrapper { border-radius: 0; overflow: hidden; }
+    .exec-kpi-table { --exec-accent: #198754; margin-bottom: 0; border-collapse: separate; border-spacing: 0; }
+    .exec-kpi-table thead th {
+        background: linear-gradient(135deg, #146c43 0%, #198754 100%);
+        color: #fff; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+        border: none; padding: 0.85rem 1rem; white-space: nowrap;
+    }
+    .exec-kpi-table tbody tr { transition: background-color 0.15s ease, box-shadow 0.15s ease; }
+    .exec-kpi-table tbody tr:not(.exec-row-acima-meta):hover td { background-color: rgba(25, 135, 84, 0.04); }
+    .exec-kpi-table tbody td {
+        border: none; border-bottom: 1px solid rgba(0,0,0,.06);
+        padding: 0.9rem 1rem; vertical-align: middle;
+        background-color: #fff;
+        transition: background-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .exec-kpi-table tbody tr.exec-row-acima-meta td {
+        background-color: #fef5f5;
+        border-bottom-color: #f3d4d4;
+    }
+    .exec-kpi-table tbody tr.exec-row-acima-meta td:first-child {
+        box-shadow: inset 5px 0 0 #d98888;
+    }
+    .exec-kpi-table tbody tr.exec-row-acima-meta:hover td {
+        background-color: #fceaea;
+    }
+    .exec-kpi-table tbody tr:last-child td { border-bottom: none; }
+    .exec-col-indicador { min-width: 14rem; }
+    .exec-col-meta { width: 7rem; }
+    .exec-col-atual { min-width: 12rem; }
+    .exec-col-data { width: 9rem; }
+    .exec-col-status { width: 8rem; }
+    .exec-indicador-cell { display: flex; align-items: center; gap: 0.75rem; }
+    .exec-accent { width: 4px; align-self: stretch; border-radius: 4px; flex-shrink: 0; min-height: 2rem; }
+    .exec-accent-primary { background: #0d6efd; }
+    .exec-accent-danger { background: #dc3545; }
+    .exec-accent-warning { background: #ffc107; }
+    .exec-accent-success { background: #198754; }
+    .exec-accent-info { background: #0dcaf0; }
+    .exec-accent-secondary { background: #6c757d; }
+    .exec-accent-dark { background: #212529; }
+    .exec-meta-value { font-variant-numeric: tabular-nums; font-weight: 600; color: #495057; }
+    .exec-valor-acima { color: #b85c5c; }
+    .exec-atual-block { min-width: 10rem; }
+    .exec-atual-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.35rem; }
+    .exec-atual-value { font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+    .exec-pct-badge {
+        font-size: 0.72rem; font-weight: 600; padding: 0.15rem 0.45rem; border-radius: 999px;
+        font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+    .exec-pct-ok { background: rgba(25, 135, 84, 0.12); color: #146c43; }
+    .exec-pct-atencao { background: rgba(255, 193, 7, 0.2); color: #997404; }
+    .exec-pct-acima { background: #f5d0d0; color: #9e4a4a; }
+    .exec-progress-track {
+        position: relative; height: 6px; background: #e9ecef; border-radius: 999px; overflow: hidden;
+    }
+    .exec-progress-track.exec-progress-acima { background: #f3dddd; }
+    .exec-progress-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
+    .exec-fill-ok { background: linear-gradient(90deg, #20c997, #198754); }
+    .exec-fill-atencao { background: linear-gradient(90deg, #ffc107, #fd7e14); }
+    .exec-fill-acima { background: linear-gradient(90deg, #e8a0a0, #d98888); }
+    .exec-progress-overflow {
+        position: absolute; top: 0; left: 0; height: 100%; max-width: 100%;
+        background: repeating-linear-gradient(45deg, rgba(217,136,136,.4), rgba(217,136,136,.4) 4px, rgba(217,136,136,.18) 4px, rgba(217,136,136,.18) 8px);
+        border-radius: 999px; pointer-events: none;
+    }
+    .exec-data-chip {
+        display: inline-flex; align-items: center; font-size: 0.82rem; color: #495057;
+        background: #f8f9fa; padding: 0.25rem 0.55rem; border-radius: 0.375rem;
+    }
+    .exec-status-pill {
+        display: inline-flex; align-items: center; gap: 0.4rem;
+        font-size: 0.78rem; font-weight: 600; padding: 0.3rem 0.65rem; border-radius: 999px;
+    }
+    .exec-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .exec-status-ok { background: rgba(25, 135, 84, 0.12); color: #146c43; }
+    .exec-status-ok .exec-status-dot { background: #198754; }
+    .exec-status-alerta { background: rgba(220, 53, 69, 0.12); color: #842029; }
+    .exec-status-alerta .exec-status-dot { background: #dc3545; }
+    .exec-status-sem_limite { background: rgba(108, 117, 125, 0.12); color: #495057; }
+    .exec-status-sem_limite .exec-status-dot { background: #6c757d; }
+    .exec-status-sem_dado { background: rgba(0, 0, 0, 0.04); color: #6c757d; }
+    .exec-status-sem_dado .exec-status-dot { background: #adb5bd; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(25, 135, 84, 0.55), rgba(25, 135, 84, 0.55)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center;">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                <li class="breadcrumb-item active text-white" aria-current="page">Indicadores</li>
+                <li class="breadcrumb-item active text-white" aria-current="page">Análise</li>
+            </ol>
+        </nav>
+        <h1 class="display-5 fw-bold mt-3"><i class="fas fa-chart-line me-2"></i>Análise de Indicadores</h1>
+        <p class="lead mb-0">Comparativo entre valores diários informados e limites máximos configurados — {{ mes_nome }}/{{ ano_filtro }}</p>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <form method="get" class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label for="ano" class="form-label"><i class="fas fa-calendar me-1"></i>Ano</label>
+                        <select class="form-select" id="ano" name="ano">
+                            {% for y in anos_disponiveis %}
+                            <option value="{{ y }}" {% if y == ano_filtro %}selected{% endif %}>{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="mes" class="form-label"><i class="fas fa-calendar-alt me-1"></i>Mês</label>
+                        <select class="form-select" id="mes" name="mes">
+                            {% for m_num, m_nome in meses %}
+                            <option value="{{ m_num }}" {% if m_num == mes_filtro %}selected{% endif %}>{{ m_nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <button type="submit" class="btn btn-success me-2"><i class="fas fa-search me-1"></i>Analisar</button>
+                        <a href="{% url 'digitar_indicador' %}?ano={{ ano_filtro }}" class="btn btn-outline-primary btn-sm"><i class="fas fa-keyboard me-1"></i>Digitar</a>
+                        <a href="{% url 'configuracoes_indicadores' %}?ano={{ ano_filtro }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-cog me-1"></i>Configurações</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if not tem_dados %}
+        <div class="alert alert-warning shadow-sm mb-4">
+            <h5 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Sem dados para {{ mes_nome }}/{{ ano_filtro }}</h5>
+            <p class="mb-2">Não há indicadores digitados para o período selecionado.</p>
+            <a href="{% url 'digitar_indicador' %}?ano={{ ano_filtro }}" class="btn btn-warning btn-sm"><i class="fas fa-keyboard me-1"></i>Digitar Indicadores</a>
+        </div>
+        {% endif %}
+
+        {% if not tem_config %}
+        <div class="alert alert-info shadow-sm mb-4">
+            <h5 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Limites máximos não configurados</h5>
+            <p class="mb-2">Não há valores máximos definidos para {{ mes_nome }}/{{ ano_filtro }}. A análise de conformidade ficará incompleta.</p>
+            <a href="{% url 'configuracoes_indicadores' %}?ano={{ ano_filtro }}" class="btn btn-info btn-sm text-white"><i class="fas fa-cog me-1"></i>Configurar limites</a>
+        </div>
+        {% endif %}
+
+        <div class="row g-3 mb-4">
+            <div class="col-lg-3 col-md-6">
+                <div class="card stat-card kpi-primary shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">Dias com dados</h6>
+                        <h2 class="mb-0">{{ total_dias_com_dados }} <small class="fs-6 text-muted">/ {{ ultimo_dia }}</small></h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="card stat-card kpi-danger shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">Dias acima do máximo</h6>
+                        <h2 class="mb-0 text-danger">{{ total_alertas_mes }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="card stat-card kpi-warning shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">Indicadores em alerta</h6>
+                        <h2 class="mb-0 text-warning">{{ indicadores_com_alerta }} <small class="fs-6 text-muted">/ 7</small></h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="card stat-card kpi-success shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">Período</h6>
+                        <h2 class="mb-0 fs-4">{{ mes_nome }} {{ ano_filtro }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Visão executiva (topo) — resumo compacto + matriz diária -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-tachometer-alt me-2"></i>Visão executiva — {{ mes_nome }}/{{ ano_filtro }}</h5>
+                <p class="small text-muted mb-0 mt-1">Resumo rápido e matriz diária. O resumo estatístico completo está ao final da página.</p>
+            </div>
+            <div class="card-body p-0 border-bottom">
+                <div class="table-responsive">
+                    {% include 'indicador_itens_controle/_visao_executiva_indicadores.html' %}
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="p-3 bg-light border-bottom">
+                    <h6 class="mb-0"><i class="fas fa-th me-2"></i>Matriz diária — valores informados</h6>
+                    <p class="small text-muted mb-0">Células em vermelho: valor acima do máximo configurado.</p>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-bordered matriz-diaria mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="indicador-col">Indicador</th>
+                                {% for item in analise_por_indicador %}
+                                {% if forloop.first %}
+                                    {% for d in item.dias_dados %}
+                                    <th>{{ d.dia }}</th>
+                                    {% endfor %}
+                                {% endif %}
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in analise_por_indicador %}
+                            <tr>
+                                <td class="indicador-col fw-semibold text-{{ item.color }}">
+                                    <i class="fas {{ item.icon }} me-1"></i>{{ item.label }}
+                                </td>
+                                {% for d in item.dias_dados %}
+                                <td class="{% if d.acima %}celula-alerta{% elif d.valor is not None %}celula-ok{% else %}celula-vazia{% endif %}" title="Dia {{ d.dia }} — {% if d.valor is not None %}{{ d.valor|number_br:3 }}{% else %}sem valor{% endif %}{% if d.maximo is not None %} (máx. {{ d.maximo|number_br:3 }}){% endif %}">
+                                    {% if d.valor is not None %}{{ d.valor|number_br:3 }}{% else %}—{% endif %}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion shadow-sm mb-4" id="accordionIndicadores">
+            {% for item in analise_por_indicador %}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading{{ item.name }}">
+                    <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ item.name }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
+                        <i class="fas {{ item.icon }} me-2 text-{{ item.color }}"></i>
+                        {{ item.label }}
+                        {% if item.dias_acima_max %}
+                        <span class="badge bg-danger ms-2">{{ item.dias_acima_max }} dia(s) acima</span>
+                        {% elif item.dias_com_valor and item.maximo is not None %}
+                        <span class="badge bg-success ms-2">Dentro do limite</span>
+                        {% endif %}
+                    </button>
+                </h2>
+                <div id="collapse{{ item.name }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#accordionIndicadores">
+                    <div class="accordion-body">
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-3 col-lg-2"><div class="p-3 bg-light rounded"><small class="text-muted d-block">Máximo configurado</small><strong>{% if item.maximo is not None %}{{ item.maximo|number_br:3 }}{% else %}—{% endif %}</strong></div></div>
+                            <div class="col-md-3 col-lg-2"><div class="p-3 bg-light rounded"><small class="text-muted d-block">Média do mês</small><strong>{% if item.media is not None %}{{ item.media|number_br:3 }}{% else %}—{% endif %}</strong></div></div>
+                            <div class="col-md-3 col-lg-2"><div class="p-3 bg-light rounded"><small class="text-muted d-block">Máximo observado</small><strong>{% if item.valor_max_observado is not None %}{{ item.valor_max_observado|number_br:3 }}{% else %}—{% endif %}</strong></div></div>
+                            <div class="col-md-3 col-lg-2"><div class="p-3 bg-light rounded"><small class="text-muted d-block">Conformidade</small><strong>{% if item.conformidade is not None %}{{ item.conformidade|number_br:1 }}%{% else %}—{% endif %}</strong></div></div>
+                            <div class="col-md-6 col-lg-4"><div class="p-3 bg-light rounded border-start border-3 border-purple" style="border-color: #6f42c1 !important;"><small class="text-muted d-block">Projeção dia {{ ultimo_dia }} <span class="text-muted">(tendência)</span></small><strong class="text-purple" style="color: #6f42c1;">{% if item.projecao_fim_mes is not None %}{{ item.projecao_fim_mes|number_br:3 }}{% else %}—{% endif %}</strong></div></div>
+                        </div>
+
+                        <div class="card border-0 bg-light mb-4">
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="chart-{{ item.name }}"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Dia</th>
+                                        <th class="text-end">Valor informado</th>
+                                        <th class="text-end">Máximo</th>
+                                        <th class="text-end">% do máximo</th>
+                                        <th class="text-center">Situação</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for d in item.dias_dados %}
+                                    {% if d.valor is not None %}
+                                    <tr class="{% if d.acima %}status-alerta{% elif d.valor is not None and d.maximo is not None %}status-ok{% endif %}">
+                                        <td>{{ d.dia }}</td>
+                                        <td class="text-end">{% if d.valor is not None %}{{ d.valor|number_br:3 }}{% else %}<span class="status-sem">—</span>{% endif %}</td>
+                                        <td class="text-end">{% if d.maximo is not None %}{{ d.maximo|number_br:3 }}{% else %}—{% endif %}</td>
+                                        <td class="text-end">{% if d.pct_max is not None %}{{ d.pct_max|number_br:1 }}%{% else %}—{% endif %}</td>
+                                        <td class="text-center">
+                                            {% if d.valor is None %}<span class="badge bg-light text-dark">Sem valor</span>
+                                            {% elif d.maximo is None %}<span class="badge bg-secondary">Sem limite</span>
+                                            {% elif d.acima %}<span class="badge bg-danger">Acima</span>
+                                            {% else %}<span class="badge bg-success">OK</span>{% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% include 'indicador_itens_controle/_resumo_mensal_indicadores.html' with resumo_titulo="Resumo mensal por indicador" resumo_subtitulo="Tabela completa com média, mínimo, máximo, conformidade e status." resumo_card_id="resumo-mensal-final" resumo_card_class="mb-0" %}
+    </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const indicadores = [
+        {% for item in analise_por_indicador %}
+        {
+            id: 'chart-{{ item.name }}',
+            label: '{{ item.label|escapejs }}',
+            valores: {{ item.chart_valores_json|safe }},
+            projecao: {{ item.chart_projecao_json|safe }},
+            maximo: {{ item.chart_max_json|safe }},
+            color: '{{ item.color }}'
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const colorMap = {
+        primary: '#0d6efd', danger: '#dc3545', warning: '#ffc107',
+        success: '#198754', info: '#0dcaf0', secondary: '#6c757d', dark: '#212529'
+    };
+
+    indicadores.forEach(function(ind) {
+        const canvas = document.getElementById(ind.id);
+        if (!canvas || typeof Chart === 'undefined') return;
+
+        const datasets = [{
+            label: ind.label,
+            data: ind.valores,
+            borderColor: colorMap[ind.color] || '#0d6efd',
+            backgroundColor: (colorMap[ind.color] || '#0d6efd') + '33',
+            tension: 0.2,
+            fill: true,
+            spanGaps: false,
+            pointRadius: 3,
+        }];
+
+        if (ind.maximo !== null) {
+            datasets.push({
+                label: 'Máximo configurado',
+                data: ind.valores.map(function() { return ind.maximo; }),
+                borderColor: '#dc3545',
+                borderDash: [6, 4],
+                borderWidth: 2,
+                pointRadius: 0,
+                fill: false,
+            });
+        }
+
+        const temProjecao = ind.projecao && ind.projecao.some(function(v) { return v !== null && v !== undefined; });
+        if (temProjecao) {
+            datasets.push({
+                label: 'Projeção (tendência)',
+                data: ind.projecao,
+                borderColor: '#6f42c1',
+                backgroundColor: 'rgba(111, 66, 193, 0.08)',
+                borderDash: [8, 4],
+                borderWidth: 2,
+                tension: 0,
+                fill: false,
+                spanGaps: true,
+                pointRadius: function(ctx) {
+                    return ctx.dataIndex === ind.projecao.length - 1 ? 4 : 0;
+                },
+                pointBackgroundColor: '#6f42c1',
+            });
+        }
+
+        new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: Array.from({length: ind.valores.length}, function(_, i) { return String(i + 1); }),
+                datasets: datasets,
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                const v = ctx.parsed.y;
+                                if (v === null || v === undefined) return ctx.dataset.label + ': —';
+                                return ctx.dataset.label + ': ' + v.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 3});
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { title: { display: true, text: 'Dia do mês' } },
+                    y: { title: { display: true, text: 'Valor' }, beginAtZero: true }
+                }
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

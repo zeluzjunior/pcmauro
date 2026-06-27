@@ -1,0 +1,52 @@
+{% load form_extras %}
+<div class="card shadow-sm {% if resumo_card_class %}{{ resumo_card_class }}{% else %}mb-4{% endif %}" {% if resumo_card_id %}id="{{ resumo_card_id }}"{% endif %}>
+    <div class="card-header bg-light">
+        <h5 class="mb-0">
+            <i class="fas fa-table me-2"></i>{{ resumo_titulo|default:"Resumo mensal por indicador" }}
+        </h5>
+        {% if resumo_subtitulo %}
+        <p class="small text-muted mb-0 mt-1">{{ resumo_subtitulo }}</p>
+        {% endif %}
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Indicador</th>
+                        <th class="text-end">Máximo config.</th>
+                        <th class="text-end">Média</th>
+                        <th class="text-end">Mín. observado</th>
+                        <th class="text-end">Máx. observado</th>
+                        <th class="text-center">Dias c/ valor</th>
+                        <th class="text-center">Dias acima</th>
+                        <th class="text-end">Conformidade</th>
+                        <th class="text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in resumo_mensal %}
+                    <tr class="{% if item.status == 'alerta' %}table-danger{% elif item.status == 'ok' %}table-success{% endif %}">
+                        <td class="fw-semibold text-{{ item.color }}">
+                            <i class="fas {{ item.icon }} me-2"></i>{{ item.label }}
+                        </td>
+                        <td class="text-end">{% if item.maximo is not None %}{{ item.maximo|number_br:3 }}{% else %}—{% endif %}</td>
+                        <td class="text-end">{% if item.media is not None %}{{ item.media|number_br:3 }}{% else %}—{% endif %}</td>
+                        <td class="text-end">{% if item.valor_min_observado is not None %}{{ item.valor_min_observado|number_br:3 }}{% else %}—{% endif %}</td>
+                        <td class="text-end">{% if item.valor_max_observado is not None %}{{ item.valor_max_observado|number_br:3 }}{% else %}—{% endif %}</td>
+                        <td class="text-center">{{ item.dias_com_valor }}</td>
+                        <td class="text-center {% if item.dias_acima_max %}text-danger fw-bold{% endif %}">{{ item.dias_acima_max }}</td>
+                        <td class="text-end">{% if item.conformidade is not None %}{{ item.conformidade|number_br:1 }}%{% else %}—{% endif %}</td>
+                        <td class="text-center">
+                            {% if item.status == 'ok' %}<span class="badge bg-success">OK</span>
+                            {% elif item.status == 'alerta' %}<span class="badge bg-danger">Alerta</span>
+                            {% elif item.status == 'sem_limite' %}<span class="badge bg-secondary">Sem limite</span>
+                            {% else %}<span class="badge bg-light text-dark">Sem dado</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

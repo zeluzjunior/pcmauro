@@ -7,11 +7,18 @@
 {% block extra_css %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
+    .stat-card .card-body h6 { font-size: 0.8rem; }
+    .stat-card .card-body h2 { font-size: 1.4rem; }
+    .stat-card .card-body small { font-size: 0.7rem; }
+    .stat-card .card-body .fa-3x { font-size: 2rem; }
+    .card .card-header h5 { font-size: 0.95rem; }
+
     .stat-card {
-        transition: transform 0.2s;
+        transition: transform 0.2s, box-shadow 0.2s;
     }
     .stat-card:hover {
         transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
     }
     .kpi-card {
         border-left: 4px solid;
@@ -21,6 +28,7 @@
     .kpi-warning { border-left-color: #ffc107; }
     .kpi-info { border-left-color: #0dcaf0; }
     .kpi-danger { border-left-color: #dc3545; }
+    .kpi-secondary { border-left-color: #6c757d; }
     .kpi-purple { border-left-color: #6f42c1; }
 
     .chart-container {
@@ -76,7 +84,7 @@
 
 <!-- Main Content -->
 <section class="py-5">
-    <div class="container">
+    <div class="container-fluid px-5">
         <!-- Filter Section (Accordion) -->
         <div class="accordion mb-4 filter-accordion" id="filterAccordion">
             <div class="accordion-item">
@@ -171,56 +179,106 @@
 
         <!-- KPI Cards -->
         <div class="mb-5">
-            <!-- Cards Gerais -->
             <div class="row mb-3">
-                <div class="col-md-3 mb-3">
-                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+                <div class="col-12">
+                    <div class="alert alert-light border border-2 border-info border-opacity-75 d-flex align-items-center gap-3 py-3 mb-0" role="note">
+                        <i class="fas fa-info-circle fa-2x text-info flex-shrink-0"></i>
+                        <p class="mb-0 text-dark fw-semibold">Os indicadores abaixo referem-se ao período e filtros selecionados acima.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cards gerais -->
+            <div class="row mb-3">
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <h6 class="text-muted mb-1 small">Total de Notas Fiscais</h6>
-                            <h3 class="mb-1 fw-bold format-number">{{ total_notas }}</h3>
-                            <small class="text-muted">Notas cadastradas</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Total de Notas Fiscais</h6>
+                                    <h2 class="mb-0 fw-bold format-number">{{ total_notas }}</h2>
+                                    <small class="text-muted">Notas cadastradas no período</small>
+                                </div>
+                                <i class="fas fa-file-invoice fa-3x text-primary opacity-25"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <h6 class="text-muted mb-1 small">Valor Total</h6>
-                            <h3 class="mb-1 fw-bold">{{ valor_total_mes_com_ocorrencias|currency_br }}</h3>
-                            <small class="text-muted">Notas filtradas + ocorrências de atraso</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Valor Total</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_total_mes_com_ocorrencias|currency_br }}</h2>
+                                    <small class="text-muted">Notas filtradas + ocorrências de atraso</small>
+                                </div>
+                                <i class="fas fa-dollar-sign fa-3x text-success opacity-25"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <h6 class="text-muted mb-1 small">Valor Médio</h6>
-                            <h3 class="mb-1 fw-bold">{{ valor_medio|currency_br }}</h3>
-                            <small class="text-muted">Por nota fiscal</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Valor NF do Mês Anterior</h6>
+                                    <h2 class="mb-0 fw-bold">{{ valor_total_ocorrencias_atraso|currency_br }}</h2>
+                                    <small class="text-muted">Emitida no mês passado, lançada no mês atual</small>
+                                </div>
+                                <i class="fas fa-history fa-3x text-info opacity-25"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+                <div class="col mb-3">
+                    <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <h6 class="text-muted mb-1 small">Com Projeção</h6>
-                            <h3 class="mb-1 fw-bold format-number">{{ notas_com_projecao }}</h3>
-                            <small class="text-muted">{{ percentual_com_projecao|floatformat:1 }}% do total</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Com Projeção</h6>
+                                    <h2 class="mb-0 fw-bold format-number">{{ notas_com_projecao }}</h2>
+                                    <small class="text-muted">{{ percentual_com_projecao|floatformat:1 }}% do total</small>
+                                </div>
+                                <i class="fas fa-chart-line fa-3x text-warning opacity-25"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <!-- Cards por Situação (6 boxes fixos: LANÇADA, PENDENTE, AUTORIZADA, AGUARDANDO AUTORIZAÇÃO, CANCELADA, Sem situação) -->
-            <div class="row mb-3">
+
+            <!-- Cards por situação -->
+            <div class="row mb-3 g-2">
                 {% for item in situacao_stats %}
-                <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-                    <div class="card stat-card kpi-card {% cycle 'kpi-primary' 'kpi-success' 'kpi-info' 'kpi-warning' 'kpi-danger' %} shadow-sm border-0">
+                <div class="col mb-0">
+                    <div class="card stat-card kpi-card shadow-sm border-0 h-100
+                        {% if item.situacao == 'LANÇADA' %}kpi-success
+                        {% elif item.situacao == 'PENDENTE' %}kpi-warning
+                        {% elif item.situacao == 'AUTORIZADA' %}kpi-info
+                        {% elif item.situacao == 'AGUARDANDO AUTORIZAÇÃO' %}kpi-primary
+                        {% elif item.situacao == 'CANCELADA' %}kpi-danger
+                        {% else %}kpi-secondary{% endif %}">
                         <div class="card-body">
-                            <h6 class="text-muted mb-1 small">{{ item.situacao }}</h6>
-                            <h3 class="mb-1 fw-bold">{{ item.valor_total|currency_br }}</h3>
-                            <small class="text-muted">{{ item.percentual|floatformat:1 }}% do total</small>
-                            <div class="mt-2">
-                                <small class="text-muted d-block">{{ item.quantidade }} registro(s)</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">{{ item.situacao }}</h6>
+                                    <h2 class="mb-0 fw-bold">{{ item.valor_total|currency_br }}</h2>
+                                    <small class="text-muted">{{ item.percentual|floatformat:1 }}% do total · {{ item.quantidade }} registro(s)</small>
+                                </div>
+                                {% if item.situacao == 'LANÇADA' %}
+                                    <i class="fas fa-check-circle fa-3x text-success opacity-25"></i>
+                                {% elif item.situacao == 'PENDENTE' %}
+                                    <i class="fas fa-clock fa-3x text-warning opacity-25"></i>
+                                {% elif item.situacao == 'AUTORIZADA' %}
+                                    <i class="fas fa-thumbs-up fa-3x text-info opacity-25"></i>
+                                {% elif item.situacao == 'AGUARDANDO AUTORIZAÇÃO' %}
+                                    <i class="fas fa-hourglass-half fa-3x text-primary opacity-25"></i>
+                                {% elif item.situacao == 'CANCELADA' %}
+                                    <i class="fas fa-ban fa-3x text-danger opacity-25"></i>
+                                {% else %}
+                                    <i class="fas fa-question-circle fa-3x text-secondary opacity-25"></i>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -241,60 +299,76 @@
                             Mês em análise: <strong>{{ mes_referencia_nome }}/{{ ano_referencia }}</strong>.
                             A seção considera notas com <strong>emissão em {{ mes_anterior_nome }}/{{ ano_mes_anterior }}</strong>.
                         </p>
-                        <div class="row mb-3">
-                            <div class="col-md-4 mb-3">
+                        <div class="row mb-3 g-2">
+                            <div class="col mb-0">
                                 <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
                                     <div class="card-body">
-                                        <h6 class="text-muted mb-1 small">Total de Ocorrências</h6>
-                                        <h3 class="mb-1 fw-bold format-number">{{ ocorrencias_atraso_total }}</h3>
-                                        <small class="text-muted">{{ percentual_atraso_total|floatformat:1 }}% das notas filtradas</small>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Total de Ocorrências</h6>
+                                                <h2 class="mb-0 fw-bold format-number">{{ ocorrencias_atraso_total }}</h2>
+                                                <small class="text-muted">{{ percentual_atraso_total|floatformat:1 }}% das notas filtradas</small>
+                                            </div>
+                                            <i class="fas fa-exclamation-triangle fa-3x text-danger opacity-25"></i>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4 mb-3">
+                            <div class="col mb-0">
                                 <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
                                     <div class="card-body">
-                                        <h6 class="text-muted mb-1 small">Sem Inclusão/Autorização</h6>
-                                        <h3 class="mb-1 fw-bold format-number">{{ notas_pendencia_sem_datas }}</h3>
-                                        <small class="text-muted">Emissão em {{ mes_anterior_nome }}/{{ ano_mes_anterior }} e sem data de inclusão/autorização</small>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Sem Inclusão/Autorização</h6>
+                                                <h2 class="mb-0 fw-bold format-number">{{ notas_pendencia_sem_datas }}</h2>
+                                                <small class="text-muted">Emissão em {{ mes_anterior_nome }}/{{ ano_mes_anterior }}</small>
+                                            </div>
+                                            <i class="fas fa-calendar-times fa-3x text-warning opacity-25"></i>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4 mb-3">
+                            <div class="col mb-0">
                                 <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
                                     <div class="card-body">
-                                        <h6 class="text-muted mb-1 small">Inclusão e Autorização no Mês em Análise</h6>
-                                        <h3 class="mb-1 fw-bold format-number">{{ notas_lag_meses }}</h3>
-                                        <small class="text-muted">Emissão em {{ mes_anterior_nome }}/{{ ano_mes_anterior }} com inclusão e autorização em {{ mes_referencia_nome }}/{{ ano_referencia }}</small>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Inclusão e Autorização no Mês</h6>
+                                                <h2 class="mb-0 fw-bold format-number">{{ notas_lag_meses }}</h2>
+                                                <small class="text-muted">Emissão mês ant. · inclusão em {{ mes_referencia_nome }}/{{ ano_referencia }}</small>
+                                            </div>
+                                            <i class="fas fa-calendar-check fa-3x text-info opacity-25"></i>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="row mb-3">
-                            <div class="col-md-4 mb-3">
-                                <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
-                                    <div class="card-body">
-                                        <h6 class="text-muted mb-1 small">Valor Total das Ocorrências</h6>
-                                        <h3 class="mb-1 fw-bold">{{ valor_total_ocorrencias_atraso|currency_br }}</h3>
-                                        <small class="text-muted">Soma dos valores exibidos nesta seção</small>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4 mb-3">
+                        <div class="row mb-3 g-2">
+                            <div class="col mb-0">
                                 <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
                                     <div class="card-body">
-                                        <h6 class="text-muted mb-1 small">Valor sem Inclusão/Autorização</h6>
-                                        <h3 class="mb-1 fw-bold">{{ valor_pendencia_sem_datas|currency_br }}</h3>
-                                        <small class="text-muted">{{ notas_pendencia_sem_datas }} ocorrência(s)</small>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Valor sem Inclusão/Autorização</h6>
+                                                <h2 class="mb-0 fw-bold">{{ valor_pendencia_sem_datas|currency_br }}</h2>
+                                                <small class="text-muted">{{ notas_pendencia_sem_datas }} ocorrência(s)</small>
+                                            </div>
+                                            <i class="fas fa-money-bill-wave fa-3x text-warning opacity-25"></i>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4 mb-3">
+                            <div class="col mb-0">
                                 <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
                                     <div class="card-body">
-                                        <h6 class="text-muted mb-1 small">Valor com Inclusão/Autorização no Mês</h6>
-                                        <h3 class="mb-1 fw-bold">{{ valor_lag_meses|currency_br }}</h3>
-                                        <small class="text-muted">{{ notas_lag_meses }} ocorrência(s)</small>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="text-muted mb-2">Valor com Inclusão/Autorização no Mês</h6>
+                                                <h2 class="mb-0 fw-bold">{{ valor_lag_meses|currency_br }}</h2>
+                                                <small class="text-muted">{{ notas_lag_meses }} ocorrência(s)</small>
+                                            </div>
+                                            <i class="fas fa-money-check-alt fa-3x text-info opacity-25"></i>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

@@ -55,6 +55,7 @@
     .kpi-warning { border-left-color: #ffc107; }
     .kpi-info { border-left-color: #0dcaf0; }
     .kpi-danger { border-left-color: #dc3545; }
+    .kpi-secondary { border-left-color: #6c757d; }
 </style>
 {% endblock %}
 
@@ -149,60 +150,74 @@
             </div>
         </div>
         
-        <!-- KPI Cards Row 1: volume e situação -->
-        <div class="row mb-2">
-            <div class="col-md-3 mb-3">
-                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0">
+        <!-- KPI Cards Row 1: volume e situação (Corretiva + Preventiva + Lubrificação, mês de dt_abertura_solicita) -->
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-5 mb-2">
+            <div class="col mb-3">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 class="text-muted mb-2">Total de Ordens</h6>
                                 <h2 class="mb-0 fw-bold">{{ total_ordens }}</h2>
-                                <small class="text-muted">Todas as ordens analisadas</small>
+                                <small class="text-muted">Criadas no período filtrado</small>
                             </div>
                             <i class="fas fa-clipboard-list fa-3x text-primary opacity-25"></i>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-3">
-                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0">
+            <div class="col mb-3">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 class="text-muted mb-2">Ordens Abertas</h6>
                                 <h2 class="mb-0 fw-bold">{{ ordens_abertas }}</h2>
-                                <small class="text-muted">Ordem de Serviço em Execução</small>
+                                <small class="text-muted">Sem data em dt_encordmanu</small>
                             </div>
                             <i class="fas fa-folder-open fa-3x text-warning opacity-25"></i>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-3">
-                <div class="card stat-card kpi-card kpi-success shadow-sm border-0">
+            <div class="col mb-3">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 class="text-muted mb-2">Ordens Fechadas</h6>
                                 <h2 class="mb-0 fw-bold">{{ ordens_fechadas }}</h2>
-                                <small class="text-muted">Ordem de Serviço Fechada</small>
+                                <small class="text-muted">Com data em dt_encordmanu</small>
                             </div>
                             <i class="fas fa-check-circle fa-3x text-success opacity-25"></i>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-3">
-                <div class="card stat-card kpi-card kpi-info shadow-sm border-0">
+            <div class="col mb-3">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 class="text-muted mb-2">Solicitações</h6>
                                 <h2 class="mb-0 fw-bold">{{ solicitacoes }}</h2>
-                                <small class="text-muted">Solicitação Aberta</small>
+                                <small class="text-muted">descr_sitordsetv: Solicitação Aberta</small>
                             </div>
                             <i class="fas fa-paper-plane fa-3x text-info opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col mb-3">
+                <div class="card stat-card kpi-card kpi-secondary shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Outros Tipos</h6>
+                                <h2 class="mb-0 fw-bold">{{ outros_tipos }}</h2>
+                                <small class="text-muted">Abertas que não são solicitação</small>
+                            </div>
+                            <i class="fas fa-layer-group fa-3x text-secondary opacity-25"></i>
                         </div>
                     </div>
                 </div>
@@ -260,7 +275,7 @@
                             <div>
                                 <h6 class="text-muted mb-2">Horas necessárias para zerar OS</h6>
                                 <h2 class="mb-0 fw-bold">{{ tempo_total_necessario_horas|floatformat:1 }} horas</h2>
-                                <small class="text-muted">(Abertas + Solicitações) e supondo 15 min por OS</small>
+                                <small class="text-muted">Ordens abertas (sem dt_encordmanu), 15 min por OS</small>
                             </div>
                             <i class="fas fa-clock fa-3x text-primary opacity-25"></i>
                         </div>
@@ -275,7 +290,7 @@
                 <h5 class="mb-0">
                     <i class="fas fa-th-large me-2 text-primary"></i>Ordens por tipo de manutenção
                 </h5>
-                <small class="text-muted">Contagem conforme os filtros de ano/mês (cada ordem entra no mês de <strong>DT_ABERTURA_SOLICITA</strong>). <strong>Abertas</strong>: &quot;Ordem de Serviço em Execução&quot;. <strong>Fechadas</strong>: &quot;Ordem de Serviço Fechada&quot;. Corretiva e Outros: <strong>OrdemServicoCorretiva</strong>, separadas por <strong>descr_tpmanuttv</strong> (corretiva quando o texto contém corretiva; caso contrário, outros). Lubrificação: <strong>OrdemServicoLubrificacao</strong>. Preventiva: <strong>OrdemServicoPreventiva</strong>.</small>
+                <small class="text-muted">Contagem conforme os filtros de ano/mês (cada ordem entra no mês de <strong>dt_abertura_solicita</strong>). <strong>Abertas</strong>: sem <strong>dt_encordmanu</strong>. <strong>Fechadas</strong>: com <strong>dt_encordmanu</strong>. Corretiva e Outros: <strong>OrdemServicoCorretiva</strong>, separadas por <strong>descr_tpordservtv</strong> (tipo da ordem: CORRETIVA / OUTROS). Lubrificação: <strong>OrdemServicoLubrificacao</strong>. Preventiva: <strong>OrdemServicoPreventiva</strong>.</small>
             </div>
             {% for card in os_quadro_por_tipo %}
             <div class="col-md-3 mb-3">
@@ -284,7 +299,7 @@
                         <h6 class="text-muted mb-2">{{ card.titulo }}</h6>
                         <h3 class="mb-0 fw-bold text-primary">{{ card.total }}</h3>
                         <small class="text-muted d-block mt-1">no período filtrado</small>
-                        <small class="text-muted d-block">Abertas: {{ card.abertas }} · Fechadas: {{ card.fechadas }}{% if card.outras %} · Outras situações: {{ card.outras }}{% endif %}</small>
+                        <small class="text-muted d-block">Abertas: {{ card.abertas }} · Fechadas: {{ card.fechadas }} · Solicitações: {{ card.solicitacoes }} · Outros tipos: {{ card.outras }}</small>
                     </div>
                 </div>
             </div>

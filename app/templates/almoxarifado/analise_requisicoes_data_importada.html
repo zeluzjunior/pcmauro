@@ -217,7 +217,7 @@
             {% for mes_num, dias in meses_dados.items %}
             <div class="accordion-item month-section shadow-sm mb-3">
                 <h2 class="accordion-header" id="heading{{ mes_num }}">
-                    <button class="accordion-button {% if forloop.first %}{% else %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ mes_num }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse{{ mes_num }}">
+                    <button class="accordion-button {% if mes_num == mes_atual %}{% else %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ mes_num }}" aria-expanded="{% if mes_num == mes_atual %}true{% else %}false{% endif %}" aria-controls="collapse{{ mes_num }}">
                         <div class="w-100 d-flex justify-content-between align-items-center">
                             <div>
                                 <i class="fas fa-calendar me-2"></i><strong>{{ nomes_meses|get_item:mes_num }} {{ ano_atual }}</strong>
@@ -230,7 +230,7 @@
                         </div>
                     </button>
                 </h2>
-                <div id="collapse{{ mes_num }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading{{ mes_num }}" data-bs-parent="#mesesAccordion">
+                <div id="collapse{{ mes_num }}" class="accordion-collapse collapse {% if mes_num == mes_atual %}show{% endif %}" aria-labelledby="heading{{ mes_num }}" data-bs-parent="#mesesAccordion">
                     <div class="accordion-body p-0">
                         <div class="month-stats">
                             <div class="row">

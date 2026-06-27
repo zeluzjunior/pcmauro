@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% load static form_extras %}
+
+{% block title %}Digitar Indicadores de Manutenção{% endblock %}
+
+{% block extra_css %}
+<style>
+    .producao-diaria-table th.dia-col { width: 160px; min-width: 160px; }
+    .producao-diaria-table td.dia-cell { padding: 0.5rem; vertical-align: middle; }
+    .producao-diaria-table td.dia-cell input {
+        width: 100%; min-width: 4rem; max-width: 5.5rem; min-height: 2.25rem;
+        font-size: 0.9rem; padding: 0.4rem 0.5rem;
+        text-align: center; border-radius: 0.25rem;
+    }
+    .producao-diaria-table td.dia-cell input:focus { border-color: var(--bs-primary); box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.25); }
+    .producao-diaria-table thead th { padding: 0.6rem; text-align: center; }
+    .producao-diaria-table .label-cell { background-color: rgba(0,0,0,.03); font-weight: 600; position: sticky; left: 0; z-index: 1; }
+    .producao-diaria-table thead th.dia-col { position: sticky; left: 0; z-index: 2; background-color: var(--bs-light, #f8f9fa) !important; }
+    .producao-diaria-table th.dia-header { min-width: 3rem; }
+    .producao-diaria-table th.week-sep { border-left: 2px solid rgba(0,0,0,.2) !important; }
+    .producao-diaria-table td.week-sep { border-left: 2px solid rgba(0,0,0,.2) !important; }
+    .producao-diaria-table th.weekend-col { background-color: rgba(220, 53, 69, 0.08); color: #721c24; }
+    .producao-diaria-table td.weekend-cell { background-color: rgba(220, 53, 69, 0.05); }
+    .producao-diaria-table .week-label-cell { width: 140px; min-width: 140px; font-weight: 600; background-color: rgba(0,0,0,.03); position: sticky; left: 0; z-index: 1; }
+    .producao-diaria-table .day-in-week { min-width: 4.5rem; }
+    .producao-diaria-table .day-num-small { font-size: 0.75rem; color: #666; }
+    .section-indicador { border-left: 3px solid var(--section-color, #0d6efd); }
+    .table-responsive { border-radius: 0.375rem; overflow: auto; }
+    .accordion-item { margin-bottom: 0.25rem; border-radius: 0.375rem !important; overflow: hidden; }
+    .accordion-button { padding: 0.75rem 1.25rem; }
+    .accordion-button:not(.collapsed) { background-color: rgba(13, 110, 253, 0.08); }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-4 text-white" style="background-image: linear-gradient(rgba(25, 135, 84, 0.55), rgba(25, 135, 84, 0.55)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Indicadores</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Digitar Indicadores</li>
+                    </ol>
+                </nav>
+                <h1 class="display-5 fw-bold mt-2 mb-1">Digitar Indicadores de Manutenção</h1>
+                <p class="lead mb-0 opacity-90">Informe os indicadores por dia de cada mês — Ano <strong>{{ ano_atual }}</strong></p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-4">
+    <div class="container">
+        {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <p class="text-muted mb-4">
+            Expandir o mês desejado, preencher os valores e clicar em <strong>Salvar este mês</strong>.
+            Cada mês é gravado separadamente (evita limite de campos do formulário).
+            Valores opcionais — deixe em branco quando não houver dado.
+            Use até <strong>3 casas decimais</strong> no padrão brasileiro: <strong>1.234,567</strong> (ponto = milhar, vírgula = decimal).
+        </p>
+
+        <div class="accordion shadow-sm" id="accordionMeses">
+            {% for mes_num, mes_nome, ultimo_dia, dias_dados, semanas_list in config_por_mes %}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading{{ mes_num }}">
+                    <button class="accordion-button {% if mes_num != mes_aberto %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ mes_num }}" aria-expanded="{% if mes_num == mes_aberto %}true{% else %}false{% endif %}" aria-controls="collapse{{ mes_num }}">
+                        <i class="fas fa-calendar-alt me-2 text-success"></i>
+                        {{ mes_nome }}
+                    </button>
+                </h2>
+                <div id="collapse{{ mes_num }}" class="accordion-collapse collapse {% if mes_num == mes_aberto %}show{% endif %}" aria-labelledby="heading{{ mes_num }}" data-bs-parent="#accordionMeses">
+                    <div class="accordion-body">
+                        <form method="post" action="{% url 'digitar_indicador' %}?ano={{ ano_atual }}" novalidate data-skip-loading>
+                            {% csrf_token %}
+                            <input type="hidden" name="ano" value="{{ ano_atual }}">
+                            <input type="hidden" name="mes_salvar" value="{{ mes_num }}">
+
+                            {% for campo in indicador_campos %}
+                            <div class="section-indicador mb-4 ps-3" style="--section-color: var(--bs-{{ campo.color }});">
+                                <h6 class="text-{{ campo.color }} border-bottom pb-2 mb-3">
+                                    <i class="fas {{ campo.icon }} me-2"></i>{{ campo.label }}
+                                </h6>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered align-middle producao-diaria-table mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th class="week-label-cell">Semana</th>
+                                                <th class="text-center day-in-week">Seg</th>
+                                                <th class="text-center day-in-week">Ter</th>
+                                                <th class="text-center day-in-week">Qua</th>
+                                                <th class="text-center day-in-week">Qui</th>
+                                                <th class="text-center day-in-week">Sex</th>
+                                                <th class="text-center day-in-week">Sáb</th>
+                                                <th class="text-center day-in-week">Dom</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for week_label, day_list in semanas_list %}
+                                            <tr>
+                                                <td class="week-label-cell">{{ week_label }}</td>
+                                                {% for dia, obj, dia_nome, dia_nome_long, wd, valores in day_list %}
+                                                {% if dia %}
+                                                <td class="dia-cell day-in-week {% if wd >= 5 %}weekend-cell{% endif %}">
+                                                    <span class="day-num-small d-block" title="{% if wd < 5 %}{{ dia_nome_long }}-feira{% else %}{{ dia_nome_long }}{% endif %}">{{ dia }} ({{ dia_nome }})</span>
+                                                    {% with valor=valores|get_item:campo.name %}
+                                                    <input type="text" inputmode="decimal" class="form-control form-control-sm mt-1" placeholder="—" name="mes_{{ mes_num }}_dia_{{ dia }}_{{ campo.name }}" value="{% if valor is not None %}{{ valor }}{% endif %}" title="Dia {{ dia }} — {{ campo.label }} (ex: 1,111)">
+                                                    {% endwith %}
+                                                </td>
+                                                {% else %}
+                                                <td class="dia-cell day-in-week bg-light"></td>
+                                                {% endif %}
+                                                {% endfor %}
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            {% endfor %}
+
+                            <p class="small text-muted mt-3 mb-3">Colunas Seg–Dom. Sábado e Domingo em destaque.</p>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save me-2"></i>Salvar {{ mes_nome }} {{ ano_atual }}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}

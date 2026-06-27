@@ -139,3 +139,6 @@ DEFAULT_FROM_EMAIL = 'noreply@meuprojeto.com'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Formulários com grade anual (ex.: indicadores: 12 meses × 31 dias × 7 campos)
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000

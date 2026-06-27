@@ -1,0 +1,505 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Análise de Lubrificação por Máquina{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .stat-card {
+        transition: transform 0.2s;
+        border-left: 4px solid;
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .chart-container {
+        position: relative;
+        height: 320px;
+    }
+    .filter-row th {
+        background-color: #e9ecef !important;
+        padding: 4px 8px !important;
+    }
+    .filter-row .filter-input {
+        width: 100%;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center;">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'analise_lubrificacao' %}" class="text-white">Lubrificações</a></li>
+                <li class="breadcrumb-item active text-white" aria-current="page">Análise por Máquina</li>
+            </ol>
+        </nav>
+        <h1 class="display-5 fw-bold mt-3"><i class="bi bi-gear-wide-connected me-2"></i>Análise de Lubrificação por Máquina</h1>
+        <p class="lead mb-0">Cobertura do plano no cadastro SIGA: máquinas com e <strong>sem</strong> ações de lubrificação, por <code>cd_setormanut</code></p>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        {% if plano_vazio %}
+        <div class="alert alert-warning shadow-sm mb-4">
+            <h5 class="alert-heading"><i class="bi bi-exclamation-triangle me-2"></i>Nenhum plano importado</h5>
+            <p class="mb-2">Importe o arquivo <strong>PLANO DE LUBRIFICAÇÃO.csv</strong> para comparar máquinas com ações no plano.</p>
+            <a href="{% url 'importar_plano_lubrificacao' %}" class="btn btn-warning btn-sm">
+                <i class="bi bi-upload me-1"></i>Importar Plano de Lubrificação
+            </a>
+        </div>
+        {% endif %}
+
+        <!-- Filtros -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <form method="get" class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label for="visao" class="form-label"><i class="fas fa-eye me-1"></i>Exibir</label>
+                        <select class="form-select" id="visao" name="visao">
+                            <option value="todos" {% if filtro_visao == 'todos' %}selected{% endif %}>Com e sem plano</option>
+                            <option value="com_plano" {% if filtro_visao == 'com_plano' %}selected{% endif %}>Somente com ações no plano</option>
+                            <option value="sem_plano" {% if filtro_visao == 'sem_plano' %}selected{% endif %}>Somente sem ações no plano</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="setor" class="form-label"><i class="fas fa-filter me-1"></i>Setor de manutenção</label>
+                        <select class="form-select" id="setor" name="setor">
+                            <option value="">Todos os setores</option>
+                            {% for s in setores_disponiveis %}
+                            <option value="{{ s }}" {% if filtro_setor == s %}selected{% endif %}>{{ s }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-primary me-2"><i class="fas fa-search me-1"></i>Filtrar</button>
+                        {% if filtro_setor or filtro_visao != 'todos' %}
+                        <a href="{% url 'analise_lubrificacao_por_maquina' %}" class="btn btn-outline-secondary">Limpar</a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- KPIs cobertura -->
+        <div class="row g-3 mb-4">
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card stat-card kpi-primary shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">Cadastro ativo</h6>
+                        <h2 class="mb-0">{{ total_maquinas_cadastro }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card stat-card kpi-success shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">Com plano</h6>
+                        <h2 class="mb-0 text-success">{{ total_cadastro_com_plano }}</h2>
+                        {% if filtro_setor %}<small class="text-muted">{{ total_maquinas_filtradas }} no setor</small>{% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card stat-card kpi-danger shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">Sem plano</h6>
+                        <h2 class="mb-0 text-danger">{{ total_maquinas_sem_plano }}</h2>
+                        {% if filtro_setor %}<small class="text-muted">no filtro</small>
+                        {% else %}<small class="text-muted">{{ total_cadastro_sem_plano }} no total</small>{% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card stat-card kpi-info shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">Cobertura</h6>
+                        <h2 class="mb-0">{{ taxa_cobertura }}%</h2>
+                    </div>
+                </div>
+            </div>
+            {% if not plano_vazio %}
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card stat-card kpi-warning shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">Linhas no plano</h6>
+                        <h2 class="mb-0">{{ total_linhas_plano|floatformat:0 }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card stat-card kpi-warning shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">Plano s/ cadastro</h6>
+                        <h2 class="mb-0">{{ sem_cadastro }}</h2>
+                        <small class="text-muted">só no CSV</small>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Gráficos cobertura -->
+        <div class="row mb-5">
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-pie-chart me-2"></i>Cadastro: com vs sem plano</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="chartCoberturaGlobal"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-8">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-bar-chart-steps me-2"></i>Cobertura por setor (cadastro ativo)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="chartCoberturaSetor"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if not plano_vazio and mostrar_com_plano %}
+        <div class="row mb-5">
+            <div class="col-lg-7">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Top máquinas — ações no plano</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="chartTopMaquinas"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-pie-chart me-2"></i>Com plano — por setor</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="chartSetores"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if mostrar_com_plano and not plano_vazio %}
+        <!-- Accordion: COM plano -->
+        <div class="card shadow-sm border-0 mb-5">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Com ações no plano de lubrificação</h5>
+                <small class="d-block mt-1">Máquinas presentes no arquivo importado ({{ total_maquinas_filtradas }}{% if filtro_setor %} no setor{% endif %})</small>
+            </div>
+            <div class="card-body p-0">
+                {% if not setores_list %}
+                <p class="p-4 text-muted mb-0">Nenhuma máquina encontrada para o filtro selecionado.</p>
+                {% else %}
+                <div class="accordion accordion-flush" id="accordionSetores">
+                    {% for setor in setores_list %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingSetor{{ forloop.counter }}">
+                            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#collapseSetor{{ forloop.counter }}"
+                                    aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
+                                <strong>
+                                    <i class="fas fa-wrench me-2"></i>{{ setor.cd_setormanut }}
+                                    {% if setor.descr_setormanut %} — {{ setor.descr_setormanut }}{% endif %}
+                                </strong>
+                                <span class="badge bg-warning text-dark ms-2">{{ setor.total_maquinas }} máquina(s)</span>
+                                <span class="badge bg-secondary ms-1">{{ setor.total_acoes }} ações</span>
+                            </button>
+                        </h2>
+                        <div id="collapseSetor{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+                             data-bs-parent="#accordionSetores">
+                            <div class="accordion-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-sm mb-0 table-maquinas-setor">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Código</th>
+                                                <th>Descrição</th>
+                                                <th>Patrimônio</th>
+                                                <th class="text-center">Ações</th>
+                                                <th class="text-center">Pontos</th>
+                                                <th class="text-center">Tarefas</th>
+                                                <th class="text-center">Cadastro</th>
+                                                <th class="text-center">Detalhe</th>
+                                            </tr>
+                                            <tr class="filter-row">
+                                                <th></th>
+                                                <th><input type="text" class="filter-input" placeholder="Código..." data-col="1"></th>
+                                                <th><input type="text" class="filter-input" placeholder="Descrição..." data-col="2"></th>
+                                                <th><input type="text" class="filter-input" placeholder="Patrimônio..." data-col="3"></th>
+                                                <th colspan="5"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for m in setor.maquinas %}
+                                            <tr>
+                                                <td>{{ forloop.counter }}</td>
+                                                <td><span class="badge bg-primary">{{ m.cd_maquina }}</span></td>
+                                                <td>{{ m.descr_maquina|truncatewords:18 }}</td>
+                                                <td>{{ m.nro_patrimonio }}</td>
+                                                <td class="text-center"><span class="badge bg-dark">{{ m.qtd_acoes }}</span></td>
+                                                <td class="text-center">{{ m.qtd_pontos }}</td>
+                                                <td class="text-center">{{ m.qtd_tarefas }}</td>
+                                                <td class="text-center">
+                                                    {% if m.no_cadastro %}
+                                                    <span class="badge bg-success" title="Setor via {{ m.setor_fonte }}">SIM</span>
+                                                    {% else %}
+                                                    <span class="badge bg-danger" title="Apenas no plano importado">NÃO</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-center">
+                                                    {% if m.maquina_id %}
+                                                    <a href="{% url 'visualizar_maquina' m.maquina_id %}" class="btn btn-sm btn-outline-primary" title="Ver máquina">
+                                                        <i class="bi bi-eye"></i>
+                                                    </a>
+                                                    {% else %}
+                                                    <span class="text-muted">—</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if mostrar_sem_plano %}
+        <!-- Accordion: SEM plano -->
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="fas fa-times-circle me-2"></i>Sem ações no plano de lubrificação</h5>
+                <small class="d-block mt-1 opacity-75">Máquinas ativas no cadastro SIGA ausentes do plano importado ({{ total_maquinas_sem_plano }}{% if filtro_setor %} no setor{% endif %})</small>
+            </div>
+            <div class="card-body p-0">
+                {% if not setores_sem_plano_list %}
+                <p class="p-4 text-muted mb-0">
+                    {% if plano_vazio %}
+                    Todas as máquinas ativas aparecem aqui até importar o plano — ou nenhuma máquina ativa no cadastro.
+                    {% else %}
+                    Nenhuma máquina ativa sem plano para o filtro selecionado (cobertura total neste recorte).
+                    {% endif %}
+                </p>
+                {% else %}
+                <div class="accordion accordion-flush" id="accordionSemPlano">
+                    {% for setor in setores_sem_plano_list %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingSem{{ forloop.counter }}">
+                            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#collapseSem{{ forloop.counter }}"
+                                    aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
+                                <strong>
+                                    <i class="fas fa-wrench me-2"></i>{{ setor.cd_setormanut }}
+                                    {% if setor.descr_setormanut %} — {{ setor.descr_setormanut }}{% endif %}
+                                </strong>
+                                <span class="badge bg-danger ms-2">{{ setor.total_maquinas }} sem plano</span>
+                            </button>
+                        </h2>
+                        <div id="collapseSem{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+                             data-bs-parent="#accordionSemPlano">
+                            <div class="accordion-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-sm mb-0 table-maquinas-setor">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Código</th>
+                                                <th>Descrição</th>
+                                                <th>Gerência</th>
+                                                <th>Patrimônio</th>
+                                                <th class="text-center">Status</th>
+                                                <th class="text-center">Detalhe</th>
+                                            </tr>
+                                            <tr class="filter-row">
+                                                <th></th>
+                                                <th><input type="text" class="filter-input" placeholder="Código..." data-col="1"></th>
+                                                <th><input type="text" class="filter-input" placeholder="Descrição..." data-col="2"></th>
+                                                <th><input type="text" class="filter-input" placeholder="Gerência..." data-col="3"></th>
+                                                <th><input type="text" class="filter-input" placeholder="Patrimônio..." data-col="4"></th>
+                                                <th colspan="2"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for m in setor.maquinas %}
+                                            <tr>
+                                                <td>{{ forloop.counter }}</td>
+                                                <td><span class="badge bg-secondary">{{ m.cd_maquina }}</span></td>
+                                                <td>{{ m.descr_maquina|truncatewords:18 }}</td>
+                                                <td><small>{{ m.descr_gerenc|truncatewords:6 }}</small></td>
+                                                <td>{{ m.nro_patrimonio }}</td>
+                                                <td class="text-center"><span class="badge bg-danger">Sem plano</span></td>
+                                                <td class="text-center">
+                                                    <a href="{% url 'visualizar_maquina' m.maquina_id %}" class="btn btn-sm btn-outline-primary" title="Ver máquina">
+                                                        <i class="bi bi-eye"></i>
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const coberturaGlobal = {{ chart_cobertura_global|safe }};
+    const ctxGlobal = document.getElementById('chartCoberturaGlobal');
+    if (ctxGlobal && coberturaGlobal.some(v => v > 0)) {
+        new Chart(ctxGlobal, {
+            type: 'doughnut',
+            data: {
+                labels: ['Com plano', 'Sem plano'],
+                datasets: [{
+                    data: coberturaGlobal,
+                    backgroundColor: ['#198754', '#dc3545']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+    }
+
+    const cobLabels = {{ cobertura_labels|safe }};
+    const cobCom = {{ cobertura_com_data|safe }};
+    const cobSem = {{ cobertura_sem_data|safe }};
+    const ctxCob = document.getElementById('chartCoberturaSetor');
+    if (ctxCob && cobLabels.length) {
+        new Chart(ctxCob, {
+            type: 'bar',
+            data: {
+                labels: cobLabels,
+                datasets: [
+                    { label: 'Com plano', data: cobCom, backgroundColor: 'rgba(25, 135, 84, 0.8)' },
+                    { label: 'Sem plano', data: cobSem, backgroundColor: 'rgba(220, 53, 69, 0.8)' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
+                plugins: { legend: { position: 'top' } }
+            }
+        });
+    }
+
+    const labels = {{ chart_labels|safe }};
+    const data = {{ chart_data|safe }};
+    const ctx1 = document.getElementById('chartTopMaquinas');
+    if (ctx1 && labels.length) {
+        new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Ações no plano',
+                    data: data,
+                    backgroundColor: 'rgba(255, 152, 0, 0.7)',
+                    borderColor: 'rgba(255, 152, 0, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+            }
+        });
+    }
+
+    const setorLabels = {{ setores_chart_labels|safe }};
+    const setorData = {{ setores_chart_data|safe }};
+    const ctx2 = document.getElementById('chartSetores');
+    if (ctx2 && setorLabels.length) {
+        new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+                labels: setorLabels,
+                datasets: [{
+                    data: setorData,
+                    backgroundColor: [
+                        '#0d6efd', '#198754', '#ffc107', '#dc3545', '#0dcaf0',
+                        '#6610f2', '#fd7e14', '#20c997', '#6c757d', '#e83e8c'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+    }
+
+    document.querySelectorAll('.table-maquinas-setor').forEach(function(table) {
+        const inputs = table.querySelectorAll('.filter-input');
+        inputs.forEach(function(input) {
+            input.addEventListener('keyup', function() {
+                const col = parseInt(input.getAttribute('data-col'), 10);
+                const term = input.value.toLowerCase();
+                table.querySelectorAll('tbody tr').forEach(function(row) {
+                    const cell = row.cells[col];
+                    if (!cell) return;
+                    const text = (cell.textContent || '').toLowerCase();
+                    row.style.display = text.indexOf(term) > -1 ? '' : 'none';
+                });
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

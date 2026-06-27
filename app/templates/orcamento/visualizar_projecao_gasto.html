@@ -2,7 +2,7 @@
 {% load static %}
 {% load form_extras %}
 
-{% block title %}Visualizar Projeção de Gasto #{{ projecao.id }}{% endblock %}
+{% block title %}Visualizar Projeção de Gasto {{ projecao.id_excel }}{% endblock %}
 
 {% block content %}
 <!-- Page Header -->
@@ -14,13 +14,13 @@
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'consultar_projecao_gastos' %}" class="text-white">Consultar Projeção de Gastos</a></li>
-                        <li class="breadcrumb-item active text-white" aria-current="page">Projeção #{{ projecao.id }}</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">{{ projecao.id_excel }}</li>
                     </ol>
                 </nav>
                 <h1 class="display-4 fw-bold mt-3">
                     <i class="bi bi-clipboard2-data me-2"></i>Visualizar Projeção de Gasto
                 </h1>
-                <p class="lead">Detalhes completos da Projeção #{{ projecao.id }}</p>
+                <p class="lead">Detalhes completos da projeção {{ projecao.id_excel }}</p>
                 <a href="{% url 'consultar_projecao_gastos' %}" class="btn btn-light btn-sm mt-2">
                     <i class="bi bi-arrow-left me-1"></i>Voltar à consulta
                 </a>
@@ -45,7 +45,7 @@
                         <div class="row">
                             <div class="col-md-3 mb-3">
                                 <label class="form-label fw-bold">ID Excel</label>
-                                <p class="form-control-plaintext">{% if projecao.id_excel is not None %}{{ projecao.id_excel|number_br:0 }}{% else %}-{% endif %}</p>
+                                <p class="form-control-plaintext">{{ projecao.id_excel|default:"-" }}</p>
                             </div>
                             <div class="col-md-3 mb-3">
                                 <label class="form-label fw-bold">Setor</label>

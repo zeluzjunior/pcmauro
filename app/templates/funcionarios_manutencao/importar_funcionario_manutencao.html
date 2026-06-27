@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Importar Funcionário Manutenção{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Importar Funcionário Manutenção</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Importar Funcionário Manutenção</h1>
+                <p class="lead">Importe a planilha RH (ex.: HRCL102) para a tabela de funcionários da manutenção</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        {% if messages %}
+        <div class="row mb-4">
+            <div class="col-lg-8 mx-auto">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="row mb-5">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-upload me-2"></i>Selecionar Arquivo
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'importar_funcionario_manutencao' %}" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="fileInput" class="form-label">Arquivo para Importação</label>
+                                <input type="file" class="form-control" id="fileInput" name="file" accept=".xlsx,.xls,.xlsm,.csv" required>
+                                <div class="form-text">Formatos aceitos: Excel (.xlsx, .xls, .xlsm) ou CSV (.csv)</div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="updateExisting" name="update_existing" checked>
+                                    <label class="form-check-label" for="updateExisting">
+                                        Atualizar registros existentes (mesma matrícula)
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-upload me-2"></i>Importar Arquivo
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-5">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Instruções de Importação
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-3">
+                            Planilha no formato <strong>HRCL102</strong>: primeira linha como cabeçalho.
+                            A chave do registro é a coluna <strong>Matricula</strong> (coluna A).
+                        </p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Coluna</th>
+                                        <th>Obrigatório</th>
+                                        <th>Descrição</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>Matricula</code></td>
+                                        <td>Sim</td>
+                                        <td>Matrícula do funcionário (chave primária)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>Colaborador</code></td>
+                                        <td>Não</td>
+                                        <td>Nome do colaborador</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>Cargo</code></td>
+                                        <td>Não</td>
+                                        <td>Cargo (ex.: ELETRICISTA MANUTENCAO I)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>Admissão</code></td>
+                                        <td>Não</td>
+                                        <td>Data de admissão</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>Situação</code></td>
+                                        <td>Não</td>
+                                        <td>Código da situação (ex.: 001, 002)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Coluna F</td>
+                                        <td>Não</td>
+                                        <td>Descrição da situação (ex.: Trabalhando, Férias)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>Escala/Turma</code></td>
+                                        <td>Não</td>
+                                        <td>Código da escala/turma</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Coluna H</td>
+                                        <td>Não</td>
+                                        <td>Turno da escala (ex.: 1, 3, 5)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>Setor</code></td>
+                                        <td>Não</td>
+                                        <td>Setor / atividade (ex.: Ativ. Manutenção Elétrica 1ºT)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

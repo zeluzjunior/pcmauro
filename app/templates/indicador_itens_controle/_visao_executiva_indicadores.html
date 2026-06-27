@@ -1,0 +1,81 @@
+{% load form_extras %}
+<div class="exec-kpi-wrapper">
+    <table class="table exec-kpi-table align-middle mb-0">
+        <thead>
+            <tr>
+                <th class="exec-col-indicador">Indicador</th>
+                <th class="text-center exec-col-meta">Meta</th>
+                <th class="exec-col-atual">Indicador atual</th>
+                <th class="text-center exec-col-data">Última atualização</th>
+                <th class="text-center exec-col-status">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in resumo_mensal %}
+            <tr class="exec-row exec-row-{{ item.status }}{% if item.acima_meta_atual %} exec-row-acima-meta{% endif %}">
+                <td class="exec-col-indicador">
+                    <div class="exec-indicador-cell">
+                        <span class="exec-accent exec-accent-{{ item.color }}"></span>
+                        <span class="exec-indicador-info">
+                            <i class="fas {{ item.icon }} text-{{ item.color }} me-2"></i>
+                            <span class="fw-semibold">{{ item.label }}</span>
+                        </span>
+                    </div>
+                </td>
+                <td class="text-center exec-col-meta">
+                    {% if item.maximo is not None %}
+                    <span class="exec-meta-value">{{ item.maximo|number_br:3 }}</span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+                <td class="exec-col-atual">
+                    {% if item.indicador_atual is not None %}
+                    <div class="exec-atual-block">
+                        <div class="exec-atual-top">
+                            <span class="exec-atual-value {% if item.acima_meta_atual %}exec-valor-acima{% elif item.status == 'ok' %}text-success{% endif %}">
+                                {{ item.indicador_atual|number_br:3 }}
+                            </span>
+                            {% if item.pct_atual is not None %}
+                            <span class="exec-pct-badge {% if item.acima_meta_atual %}exec-pct-acima{% elif item.pct_atual >= 85 %}exec-pct-atencao{% else %}exec-pct-ok{% endif %}">
+                                {{ item.pct_atual|number_br:1 }}%
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% if item.pct_atual is not None %}
+                        <div class="exec-progress-track{% if item.acima_meta_atual %} exec-progress-acima{% endif %}" title="{{ item.pct_atual|number_br:1 }}% da meta">
+                            <div class="exec-progress-fill {% if item.acima_meta_atual %}exec-fill-acima{% elif item.pct_atual >= 85 %}exec-fill-atencao{% else %}exec-fill-ok{% endif %}"
+                                 style="width: {% if item.pct_atual > 100 %}100{% else %}{{ item.pct_atual|floatformat:0 }}{% endif %}%;"></div>
+                            {% if item.pct_atual > 100 %}
+                            <div class="exec-progress-overflow" style="width: {{ item.pct_atual|floatformat:0 }}%;"></div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+                <td class="text-center exec-col-data">
+                    {% if item.ultima_atualizacao_dia %}
+                    <span class="exec-data-chip">
+                        <i class="fas fa-calendar-day me-1 opacity-75"></i>Dia {{ item.ultima_atualizacao_dia }}
+                    </span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+                <td class="text-center exec-col-status">
+                    <span class="exec-status-pill exec-status-{{ item.status }}">
+                        <span class="exec-status-dot"></span>
+                        {% if item.status == 'ok' %}OK
+                        {% elif item.status == 'alerta' %}Alerta
+                        {% elif item.status == 'sem_limite' %}Sem limite
+                        {% else %}Sem dado{% endif %}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

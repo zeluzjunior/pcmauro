@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% load static form_extras %}
+
+{% block title %}Configurações dos Indicadores{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(25, 135, 84, 0.55), rgba(25, 135, 84, 0.55)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Indicadores</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Configurações</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Configurações dos Indicadores</h1>
+                <p class="lead">Defina o valor máximo permitido para cada indicador, mês a mês</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <p class="text-muted mb-4">
+            Configure os <strong>valores máximos</strong> por mês para cada indicador de manutenção.
+            <strong>Formato brasileiro:</strong> use vírgula para decimais (ex: <strong>1,111</strong>) e ponto para milhares (ex: <strong>1.500,250</strong>).
+            Até <strong>3 casas decimais</strong>.
+        </p>
+
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+            <label for="anoConfigSelect" class="mb-0 fw-semibold text-secondary small">Ano da configuração</label>
+            <select id="anoConfigSelect" class="form-select form-select-sm" style="max-width: 110px;" title="Trocar o ano recarrega a página">
+                {% for y in anos_config_choices %}
+                <option value="{{ y }}" {% if y == ano_edicao %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <form method="post" action="" id="form-config-indicadores">
+            {% csrf_token %}
+            <input type="hidden" name="salvar_config_indicadores" value="1">
+            <input type="hidden" name="config_ano" value="{{ ano_edicao }}">
+
+            <div class="accordion shadow-sm" id="accordionMeses">
+                {% for mes_num, mes_nome, cfg, maximos in config_por_mes %}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading{{ mes_num }}">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ mes_num }}" aria-expanded="false" aria-controls="collapse{{ mes_num }}">
+                            <i class="fas fa-calendar-alt me-2 text-success"></i>
+                            {{ mes_nome }}
+                        </button>
+                    </h2>
+                    <div id="collapse{{ mes_num }}" class="accordion-collapse collapse" aria-labelledby="heading{{ mes_num }}" data-bs-parent="#accordionMeses">
+                        <div class="accordion-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 45%;">Indicador</th>
+                                            <th>Valor máximo ({{ mes_nome }})</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for campo in indicador_campos %}
+                                        <tr>
+                                            <td class="fw-semibold text-{{ campo.color }}">
+                                                <i class="fas {{ campo.icon }} me-2"></i>{{ campo.label }}
+                                            </td>
+                                            <td>
+                                                {% with v=maximos|get_item:campo.name %}
+                                                <input type="text" inputmode="decimal" class="form-control form-control-sm" placeholder="Ex: 1,111" name="mes_{{ mes_num }}_max_{{ campo.name }}" value="{% if v is not None %}{{ v|number_br:3 }}{% endif %}" title="Máximo — {{ campo.label }} ({{ mes_nome }})">
+                                                {% endwith %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="mt-4 pt-3 border-top">
+                <p class="small text-muted mb-2">As alterações serão salvas para todos os meses do ano {{ ano_edicao }}.</p>
+                <button type="submit" class="btn btn-success btn-lg">
+                    <i class="fas fa-save me-2"></i>Salvar Configuração
+                </button>
+            </div>
+        </form>
+    </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var anoSel = document.getElementById('anoConfigSelect');
+    if (anoSel) {
+        anoSel.addEventListener('change', function() {
+            var u = new URL(window.location.href);
+            u.searchParams.set('ano', this.value);
+            window.location.href = u.toString();
+        });
+    }
+});
+</script>
+{% endblock %}

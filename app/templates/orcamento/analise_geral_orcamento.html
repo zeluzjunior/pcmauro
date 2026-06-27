@@ -205,11 +205,11 @@
         <div class="row mt-4 mb-4">
             <div class="col-12">
                 <h5 class="mb-2 text-primary">
-                    <i class="fas fa-wallet me-2"></i>Orçamento:
+                    <i class="fas fa-wallet me-2"></i>Orçamento: Conta de Manutenção de Máquinas 20 (Uso 242)
                 </h5>
                 <p class="text-muted small mb-3">
                     Em cada cartão, use <strong>Incluir no Saldo Parcial</strong> para definir o que entra no cálculo (por padrão, todos marcados = mesmo resultado do servidor).
-                    Fórmula: Orçamento disponível − Requisições sem NF − Gastos previstos (serviço concluído = NÃO) − Total em NF (igual «Valor Total» em Análise de Notas Fiscais).
+                    Fórmula: Orçamento disponível − Requisições sem NF − Gastos previstos (serviço concluído = NÃO) − Total em NF (notas com uso contábil 242).
                 </p>
             </div>
             <script type="application/json" id="saldo-parcial-terms-json">{{ saldo_parcial_termos_json|safe }}</script>
@@ -289,7 +289,6 @@
                             <div class="card-body py-2 px-2 d-flex flex-column justify-content-center">
                                 <h6 class="text-muted mb-2">Saldo Parcial</h6>
                                 <h4 id="saldoParcialValor" class="mb-1 fw-bold text-primary" title="Recalculado conforme os itens incluídos abaixo">{{ saldo_parcial|floatformat:2 }}</h4>
-                                <p id="saldoParcialFormula" class="mb-0 small text-muted" style="line-height: 1.25;"></p>
                                 <button type="button" class="btn btn-sm btn-outline-primary mt-2 align-self-start" id="saldoParcialResetFormula">Marcar todos</button>
                             </div>
                         </div>
@@ -500,7 +499,7 @@
                                             <div>
                                                 <h6 class="text-muted mb-2">Total em NF</h6>
                                                 <h4 class="mb-0 fw-bold format-currency">{{ valor_total_notas_lancadas|floatformat:2 }}</h4>
-                                                <small class="text-muted">Mesmo «Valor Total» de <a href="{% url 'analise_notas_fiscais' %}?ano={{ ano_filtro }}{% if meses_explicitos_na_url %}{% for m in meses_filtro_url %}&mes={{ m }}{% endfor %}{% endif %}" target="_blank" rel="noopener noreferrer">Análise de Notas Fiscais</a> (data de emissão + ocorrências de atraso).</small>
+                                                <small class="text-muted">Notas com <strong>uso contábil 242</strong> (data de emissão + ocorrências de atraso). Ver <a href="{% url 'analise_notas_fiscais' %}?ano={{ ano_filtro }}&uso_contabil=242{% if meses_explicitos_na_url %}{% for m in meses_filtro_url %}&mes={{ m }}{% endfor %}{% endif %}" target="_blank" rel="noopener noreferrer">Análise de Notas Fiscais</a>.</small>
                                             </div>
                                             <i class="fas fa-file-invoice-dollar fa-2x text-success opacity-25"></i>
                                         </div>
@@ -672,12 +671,6 @@ function initSaldoParcialToggle() {
     }
     const filterKey = keyEl.value || 'default';
     const storageKey = 'orc_analise_saldo_inc_' + filterKey;
-    const labels = {
-        disponivel: 'Orç. disponível',
-        req_sem_nf: 'Req. sem NF',
-        gastos_prev_nao: 'Gastos prev. (serv. concl. = NÃO)',
-        nf_lancadas: 'Total em NF'
-    };
     const order = ['disponivel', 'req_sem_nf', 'gastos_prev_nao', 'nf_lancadas'];
     const checks = {};
     order.forEach(function (t) {
@@ -724,17 +717,6 @@ function initSaldoParcialToggle() {
         if (inc('nf_lancadas')) saldo -= v('nf_lancadas');
         var el = document.getElementById('saldoParcialValor');
         if (el) el.textContent = formatarMoeda(saldo);
-        var parts = [];
-        if (inc('disponivel')) parts.push(labels.disponivel + ' (' + formatarMoeda(v('disponivel')) + ')');
-        else parts.push('0 (orç. disponível excluído)');
-        var subs = [];
-        if (inc('req_sem_nf')) subs.push('− ' + labels.req_sem_nf + ' (' + formatarMoeda(v('req_sem_nf')) + ')');
-        if (inc('gastos_prev_nao')) subs.push('− ' + labels.gastos_prev_nao + ' (' + formatarMoeda(v('gastos_prev_nao')) + ')');
-        if (inc('nf_lancadas')) subs.push('− ' + labels.nf_lancadas + ' (' + formatarMoeda(v('nf_lancadas')) + ')');
-        var formulaEl = document.getElementById('saldoParcialFormula');
-        if (formulaEl) {
-            formulaEl.textContent = parts[0] + (subs.length ? ' ' + subs.join(' ') : '') + ' = ' + formatarMoeda(saldo);
-        }
         updateCardVisual();
         saveState();
     }

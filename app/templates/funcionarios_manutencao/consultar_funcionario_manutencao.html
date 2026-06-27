@@ -1,0 +1,411 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load form_extras %}
+
+{% block title %}Consultar Funcionários Manutenção{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid transparent;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .kpi-card {
+        border-left: 4px solid;
+    }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .table-container {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+    }
+    .filter-input {
+        width: 100%;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        margin-top: 4px;
+    }
+    .filter-input:focus {
+        outline: none;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    .filter-header {
+        padding: 8px !important;
+    }
+    .filter-row th {
+        background-color: #e9ecef;
+        padding: 4px 8px !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 153, 0, 0.171)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Funcionários Manutenção</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Consultar</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Consultar Funcionários Manutenção</h1>
+                <p class="lead">Visualize os funcionários da manutenção importados da planilha RH (HRCL102)</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Total</h6>
+                                <h2 class="mb-0 fw-bold">{{ total_count|number_br:0 }}</h2>
+                                <small class="text-muted">Funcionários</small>
+                            </div>
+                            <i class="fas fa-users fa-3x text-primary opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Mostrando</h6>
+                                <h2 class="mb-0 fw-bold">{{ funcionarios|length|number_br:0 }}</h2>
+                                <small class="text-muted">Nesta página</small>
+                            </div>
+                            <i class="fas fa-eye fa-3x text-info opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Setores</h6>
+                                <h2 class="mb-0 fw-bold">{{ setores_count|number_br:0 }}</h2>
+                                <small class="text-muted">Setores distintos</small>
+                            </div>
+                            <i class="fas fa-building fa-3x text-success opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card kpi-card kpi-warning shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-2">Trabalhando</h6>
+                                <h2 class="mb-0 fw-bold">{{ trabalhando_count|number_br:0 }}</h2>
+                                <small class="text-muted">{{ cargos_count|number_br:0 }} cargos distintos</small>
+                            </div>
+                            <i class="fas fa-user-check fa-3x text-warning opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <form method="get" action="{% url 'consultar_funcionario_manutencao' %}" class="d-flex">
+                    <input type="text" name="search" class="form-control me-2" placeholder="Buscar por matrícula, colaborador, cargo ou setor..." value="{{ request.GET.search }}">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-secondary text-white">
+                        <button class="btn btn-link text-white text-decoration-none p-0 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" aria-expanded="false" aria-controls="filtrosCollapse">
+                            <h5 class="mb-0">
+                                <i class="fas fa-filter me-2"></i>Filtros Avançados
+                                <i class="fas fa-chevron-down float-end"></i>
+                            </h5>
+                        </button>
+                    </div>
+                    <div class="collapse" id="filtrosCollapse">
+                        <div class="card-body">
+                            <form method="get" id="filtrosForm">
+                                <input type="hidden" name="search" value="{{ request.GET.search }}">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="filtro_setor" class="form-label">Setor</label>
+                                        <select class="form-select" id="filtro_setor" name="filtro_setor">
+                                            <option value="">Todos os setores</option>
+                                            {% for setor in setores_unicos %}
+                                                <option value="{{ setor }}" {% if filtro_setor == setor %}selected{% endif %}>{{ setor|truncatewords:8 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="filtro_situacao" class="form-label">Situação</label>
+                                        <select class="form-select" id="filtro_situacao" name="filtro_situacao">
+                                            <option value="">Todas as situações</option>
+                                            {% for situacao in situacoes_unicas %}
+                                                <option value="{{ situacao }}" {% if filtro_situacao == situacao %}selected{% endif %}>{{ situacao }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="filtro_cargo" class="form-label">Cargo</label>
+                                        <select class="form-select" id="filtro_cargo" name="filtro_cargo">
+                                            <option value="">Todos os cargos</option>
+                                            {% for cargo in cargos_unicos %}
+                                                <option value="{{ cargo }}" {% if filtro_cargo == cargo %}selected{% endif %}>{{ cargo|truncatewords:6 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary me-2">
+                                            <i class="fas fa-filter me-2"></i>Aplicar Filtros
+                                        </button>
+                                        <a href="{% url 'consultar_funcionario_manutencao' %}" class="btn btn-outline-secondary">
+                                            <i class="fas fa-times me-2"></i>Limpar Filtros
+                                        </a>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-list me-2"></i>Lista de Funcionários Manutenção
+                </h5>
+                <a href="{% url 'importar_funcionario_manutencao' %}" class="btn btn-sm btn-light">
+                    <i class="fas fa-upload me-1"></i>Importar dados
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table class="table table-hover table-striped mb-0" id="funcionariosTable">
+                        <thead>
+                            <tr>
+                                <th>Matrícula</th>
+                                <th>Colaborador</th>
+                                <th>Cargo</th>
+                                <th>Admissão</th>
+                                <th>Situação</th>
+                                <th>Escala/Turma</th>
+                                <th>Setor</th>
+                            </tr>
+                            <tr class="filter-row">
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Matrícula..." data-column="0">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Colaborador..." data-column="1">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Cargo..." data-column="2">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Admissão..." data-column="3">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Situação..." data-column="4">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Escala..." data-column="5">
+                                </th>
+                                <th class="filter-header">
+                                    <input type="text" class="filter-input" placeholder="Filtrar Setor..." data-column="6">
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if funcionarios %}
+                                {% for funcionario in funcionarios %}
+                                <tr>
+                                    <td><strong>{{ funcionario.matricula }}</strong></td>
+                                    <td>{{ funcionario.colaborador|default:"-" }}</td>
+                                    <td>
+                                        {% if funcionario.cargo %}
+                                            <span class="badge bg-secondary">{{ funcionario.cargo|truncatewords:4 }}</span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if funcionario.admissao %}
+                                            <small>{{ funcionario.admissao|date:"d/m/Y" }}</small>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if funcionario.situacao_descricao %}
+                                            <span class="badge {% if 'Trabalhando' in funcionario.situacao_descricao %}bg-success{% elif 'Férias' in funcionario.situacao_descricao or 'Ferias' in funcionario.situacao_descricao %}bg-warning text-dark{% else %}bg-info{% endif %}">
+                                                {{ funcionario.situacao_descricao }}
+                                            </span>
+                                            {% if funcionario.situacao_codigo %}
+                                                <br><small class="text-muted">Cód: {{ funcionario.situacao_codigo }}</small>
+                                            {% endif %}
+                                        {% else %}
+                                            {{ funcionario.situacao_codigo|default:"-" }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if funcionario.escala_turma_codigo or funcionario.escala_turma %}
+                                            {% if funcionario.escala_turma_codigo %}
+                                                <span class="badge bg-info">{{ funcionario.escala_turma_codigo }}</span>
+                                            {% endif %}
+                                            {% if funcionario.escala_turma %}
+                                                <br><small class="text-muted">Turno: {{ funcionario.escala_turma }}</small>
+                                            {% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ funcionario.setor|default:"-"|truncatewords:6 }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-5">
+                                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                        <p class="text-muted">Nenhum funcionário encontrado.</p>
+                                        <a href="{% url 'importar_funcionario_manutencao' %}" class="btn btn-primary">
+                                            <i class="fas fa-upload me-2"></i>Importar Planilha HRCL102
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        {% if funcionarios.has_other_pages %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if funcionarios.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1">Primeira</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ funcionarios.previous_page_number }}">Anterior</a>
+                            </li>
+                        {% endif %}
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Página {{ funcionarios.number|number_br:0 }} de {{ funcionarios.paginator.num_pages|number_br:0 }}
+                            </span>
+                        </li>
+                        {% if funcionarios.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ funcionarios.next_page_number }}">Próxima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ funcionarios.paginator.num_pages }}">Última</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('funcionariosTable');
+    const filterInputs = document.querySelectorAll('.filter-input');
+
+    if (!table || !filterInputs.length) return;
+
+    function filterTable() {
+        const filters = [];
+        filterInputs.forEach(input => {
+            const columnIndex = parseInt(input.getAttribute('data-column'));
+            filters[columnIndex] = input.value.toLowerCase().trim();
+        });
+
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            if (row.cells.length < 7) return;
+
+            let showRow = true;
+            for (let i = 0; i < filters.length; i++) {
+                if (filters[i]) {
+                    const cell = row.cells[i];
+                    if (cell) {
+                        const cellText = cell.textContent.toLowerCase().trim();
+                        if (!cellText.includes(filters[i])) {
+                            showRow = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            row.style.display = showRow ? '' : 'none';
+        });
+    }
+
+    filterInputs.forEach(input => {
+        input.addEventListener('input', filterTable);
+        input.addEventListener('keyup', filterTable);
+    });
+
+    const clearFiltersBtn = document.createElement('button');
+    clearFiltersBtn.type = 'button';
+    clearFiltersBtn.className = 'btn btn-sm btn-outline-secondary mt-2';
+    clearFiltersBtn.innerHTML = '<i class="fas fa-times me-1"></i>Limpar Filtros';
+    clearFiltersBtn.addEventListener('click', function() {
+        filterInputs.forEach(input => { input.value = ''; });
+        filterTable();
+    });
+
+    const tableContainer = document.querySelector('.table-container');
+    if (tableContainer) {
+        const clearBtnContainer = document.createElement('div');
+        clearBtnContainer.className = 'p-2 border-top';
+        clearBtnContainer.appendChild(clearFiltersBtn);
+        tableContainer.parentElement.appendChild(clearBtnContainer);
+    }
+});
+</script>
+{% endblock %}

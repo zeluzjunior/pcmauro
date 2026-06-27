@@ -1,0 +1,396 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Análise de Percentual de Horas{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .stat-card .card-body h6 { font-size: 0.8rem; }
+    .stat-card .card-body h2 { font-size: 1.4rem; }
+    .stat-card .card-body small { font-size: 0.7rem; }
+    .stat-card .card-body .fa-3x { font-size: 2rem; }
+    .card .card-header h5 { font-size: 0.95rem; }
+    .stat-card { transition: transform 0.2s, box-shadow 0.2s; }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .kpi-card { border-left: 4px solid; }
+    .kpi-primary { border-left-color: #0d6efd; }
+    .kpi-success { border-left-color: #198754; }
+    .kpi-warning { border-left-color: #ffc107; }
+    .kpi-info { border-left-color: #0dcaf0; }
+    .kpi-danger { border-left-color: #dc3545; }
+    .kpi-secondary { border-left-color: #6c757d; }
+    .kpi-purple { border-left-color: #6f42c1; }
+    .chart-container { position: relative; height: 320px; margin-bottom: 20px; }
+    .percent-badge-alto { background-color: #198754; }
+    .percent-badge-medio { background-color: #ffc107; color: #212529; }
+    .percent-badge-baixo { background-color: #dc3545; }
+    .percent-badge-extremo { background-color: #6f42c1; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Manutentores</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Análise Percentual de Horas</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">Análise de Percentual de Horas</h1>
+                <p class="lead">Dashboard com indicadores e detalhamento dos percentuais importados</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container-fluid px-5">
+
+        {% if total_registros == 0 and not busca and not faixa %}
+        <div class="alert alert-info d-flex align-items-center gap-3">
+            <i class="fas fa-info-circle fa-2x"></i>
+            <div>
+                Nenhum registro encontrado. Importe o arquivo CSV em
+                <a href="{% url 'importar_percentual_de_horas' %}" class="alert-link">Importar Percentual de Horas</a>.
+            </div>
+        </div>
+        {% else %}
+
+        <!-- Filtros -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Filtros</h5>
+            </div>
+            <div class="card-body">
+                <form method="get" class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label for="busca" class="form-label">Buscar</label>
+                        <input type="text" class="form-control" id="busca" name="busca" value="{{ busca }}" placeholder="Matrícula ou nome">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="faixa" class="form-label">Faixa de percentual</label>
+                        <select class="form-select" id="faixa" name="faixa">
+                            <option value="">Todas</option>
+                            <option value="abaixo_20" {% if faixa == 'abaixo_20' %}selected{% endif %}>Abaixo de 20%</option>
+                            <option value="20_50" {% if faixa == '20_50' %}selected{% endif %}>20% a 50%</option>
+                            <option value="50_70" {% if faixa == '50_70' %}selected{% endif %}>50% a 70%</option>
+                            <option value="70_100" {% if faixa == '70_100' %}selected{% endif %}>70% a 100%</option>
+                            <option value="acima_100" {% if faixa == 'acima_100' %}selected{% endif %}>Acima de 100%</option>
+                        </select>
+                    </div>
+                    <div class="col-md-5 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-filter me-1"></i>Aplicar</button>
+                        <a href="{% url 'analise_percentual_de_horas' %}" class="btn btn-outline-secondary"><i class="fas fa-sync-alt me-1"></i>Limpar</a>
+                        <a href="{% url 'importar_percentual_de_horas' %}" class="btn btn-outline-success ms-auto"><i class="fas fa-upload me-1"></i>Importar dados</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="row mb-4">
+            <div class="col mb-3">
+                <div class="card stat-card kpi-card kpi-primary shadow-sm border-0 h-100">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Total de Registros</h6>
+                            <h2 class="mb-0 fw-bold">{{ total_registros }}</h2>
+                            <small class="text-muted">Manutentores na base importada</small>
+                        </div>
+                        <i class="fas fa-users fa-3x text-primary opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col mb-3">
+                <div class="card stat-card kpi-card kpi-info shadow-sm border-0 h-100">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Percentual Médio</h6>
+                            <h2 class="mb-0 fw-bold">{% if media_percentual %}{{ media_percentual|floatformat:2 }}%{% else %}—{% endif %}</h2>
+                            <small class="text-muted">Média dos registros filtrados</small>
+                        </div>
+                        <i class="fas fa-percent fa-3x text-info opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col mb-3">
+                <div class="card stat-card kpi-card kpi-success shadow-sm border-0 h-100">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Maior Percentual</h6>
+                            <h2 class="mb-0 fw-bold">{% if maximo_percentual %}{{ maximo_percentual|floatformat:2 }}%{% else %}—{% endif %}</h2>
+                            <small class="text-muted">Valor máximo</small>
+                        </div>
+                        <i class="fas fa-arrow-up fa-3x text-success opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col mb-3">
+                <div class="card stat-card kpi-card kpi-danger shadow-sm border-0 h-100">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Menor Percentual</h6>
+                            <h2 class="mb-0 fw-bold">{% if minimo_percentual %}{{ minimo_percentual|floatformat:2 }}%{% else %}—{% endif %}</h2>
+                            <small class="text-muted">Valor mínimo</small>
+                        </div>
+                        <i class="fas fa-arrow-down fa-3x text-danger opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col mb-3">
+                <div class="card stat-card kpi-card kpi-secondary shadow-sm border-0 h-100">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Com cadastro Manutentor</h6>
+                            <h2 class="mb-0 fw-bold">{{ com_manutentor }}</h2>
+                            <small class="text-muted">{{ sem_manutentor }} sem vínculo</small>
+                        </div>
+                        <i class="fas fa-user-check fa-3x text-secondary opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Faixas resumo -->
+        <div class="row mb-4 g-2">
+            {% for card in faixas_cards %}
+            <div class="col mb-0">
+                <div class="card stat-card kpi-card {{ card.css }} shadow-sm border-0 h-100">
+                    <div class="card-body text-center py-3">
+                        <h6 class="text-muted mb-1">{{ card.label }}</h6>
+                        <h3 class="mb-0 fw-bold">{{ card.count }}</h3>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Gráficos -->
+        <div class="row mb-5">
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Distribuição por Faixa</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="faixasChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Top 10 — Maiores Percentuais</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="topChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rankings -->
+        <div class="row mb-5">
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-trophy me-2"></i>Top 10 — Maiores Percentuais</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Matrícula</th>
+                                        <th>Nome</th>
+                                        <th class="text-end">Percentual</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for r in top_maiores %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>{{ r.matricula }}</td>
+                                        <td>{{ r.nome|default:"—" }}</td>
+                                        <td class="text-end fw-bold">{{ r.percentual|floatformat:2 }}%</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="4" class="text-center text-muted">Sem dados</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0"><i class="fas fa-sort-amount-down me-2"></i>Top 10 — Menores Percentuais</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Matrícula</th>
+                                        <th>Nome</th>
+                                        <th class="text-end">Percentual</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for r in top_menores %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>{{ r.matricula }}</td>
+                                        <td>{{ r.nome|default:"—" }}</td>
+                                        <td class="text-end fw-bold">{{ r.percentual|floatformat:2 }}%</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="4" class="text-center text-muted">Sem dados</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela completa -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-table me-2"></i>Detalhamento Completo</h5>
+                        <span class="badge bg-light text-dark">{{ total_registros }} registro(s)</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Matrícula</th>
+                                        <th>Nome</th>
+                                        <th>Tempo 1</th>
+                                        <th>Tempo 2</th>
+                                        <th>Tempo 3</th>
+                                        <th class="text-end">Percentual</th>
+                                        <th>Turno</th>
+                                        <th>Local</th>
+                                        <th>Atualizado em</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in registros_enriquecidos %}
+                                    {% with r=item.registro m=item.manutentor %}
+                                    <tr>
+                                        <td><strong>{{ r.matricula }}</strong></td>
+                                        <td>{{ r.nome|default:"—" }}</td>
+                                        <td>{{ r.tempo1|default:"—" }}</td>
+                                        <td>{{ r.tempo2|default:"—" }}</td>
+                                        <td>{{ r.tempo3|default:"—" }}</td>
+                                        <td class="text-end">
+                                            {% if r.percentual %}
+                                                {% if r.percentual > 100 %}
+                                                    <span class="badge percent-badge-extremo">{{ r.percentual|floatformat:2 }}%</span>
+                                                {% elif r.percentual >= 70 %}
+                                                    <span class="badge percent-badge-alto">{{ r.percentual|floatformat:2 }}%</span>
+                                                {% elif r.percentual >= 50 %}
+                                                    <span class="badge percent-badge-medio">{{ r.percentual|floatformat:2 }}%</span>
+                                                {% elif r.percentual >= 20 %}
+                                                    <span class="badge bg-info">{{ r.percentual|floatformat:2 }}%</span>
+                                                {% else %}
+                                                    <span class="badge percent-badge-baixo">{{ r.percentual|floatformat:2 }}%</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{% if m %}{{ m.turno|default:"—" }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                                        <td>{% if m %}{{ m.local_trab|default:"—" }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                                        <td><small class="text-muted">{{ r.updated_at|date:"d/m/Y H:i" }}</small></td>
+                                    </tr>
+                                    {% endwith %}
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="9" class="text-center text-muted py-4">Nenhum registro encontrado com os filtros aplicados.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const faixasCtx = document.getElementById('faixasChart');
+    if (faixasCtx) {
+        new Chart(faixasCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: {{ chart_faixas_labels|safe }},
+                datasets: [{
+                    label: 'Quantidade',
+                    data: {{ chart_faixas_data|safe }},
+                    backgroundColor: ['#dc3545', '#ffc107', '#0dcaf0', '#198754', '#6f42c1'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            }
+        });
+    }
+
+    const topCtx = document.getElementById('topChart');
+    if (topCtx) {
+        new Chart(topCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: {{ chart_top_labels|safe }},
+                datasets: [{
+                    label: 'Percentual (%)',
+                    data: {{ chart_top_data|safe }},
+                    backgroundColor: '#0d6efd',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true } }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

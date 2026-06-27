@@ -1,0 +1,372 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Ajuste Planilha Projecao de Gastos{% endblock %}
+
+{% block extra_css %}
+<style>
+    .upload-card {
+        border: 0;
+        box-shadow: none;
+    }
+    .helper-box {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 0.5rem;
+        padding: 1rem;
+    }
+    .page-section-card .card-header h5 {
+        font-size: 0.95rem;
+    }
+    .section-divider {
+        border-top: 3px solid #dee2e6;
+        margin: 2.5rem 0;
+        position: relative;
+    }
+    .section-divider-label {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #f8f9fa;
+        padding: 0 1.25rem;
+        color: #6c757d;
+        font-weight: 600;
+        font-size: 0.9rem;
+        white-space: nowrap;
+    }
+    .page-section-card-complete .card-header {
+        background-color: #198754 !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-5 text-white" style="background-image: linear-gradient(rgba(255, 152, 0, 0.5), rgba(255, 152, 0, 0.5)), url('{% static 'images/aurora_coop_castro.jpg' %}'); background-size: cover; background-position: center; background-repeat: no-repeat; position: relative;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-white">Home</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Orçamento</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Ajuste Planilha Projeção de Gastos</li>
+                    </ol>
+                </nav>
+                <h1 class="display-4 fw-bold mt-3">
+                    <i class="bi bi-file-earmark-excel me-2"></i>Ajuste Planilha Projeção de Gastos
+                </h1>
+                <p class="lead">Ferramentas para ajustar e exportar a planilha de projeção de gastos com dados do sistema.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<section class="py-5">
+    <div class="container-fluid px-5">
+
+        <div class="alert alert-info mb-4" role="alert">
+            <i class="fas fa-info-circle me-2"></i>
+            O arquivo baixado preserva a estrutura original (botões com Office Script, desenhos e validações).
+            Arquivos <strong>.xlsm</strong> com macros VBA são suportados; <strong>.xlsx</strong> não pode conter macros VBA.
+            Após atualizar o sistema, reprocesse a planilha — arquivos gerados antes da correção podem abrir com erro de formato.
+        </div>
+
+        <!-- Seção: Ajuste completo (todos os processos) -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-0 page-section-card page-section-card-complete">
+                    <div class="card-header text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-layer-group me-2"></i>Ajuste Completo da Planilha (todos os processos)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-4">
+                            Envie a planilha uma única vez para executar, em sequência, os três ajustes:
+                            <strong>Reunião</strong>, <strong>NF por Requisição de Compra</strong> e
+                            <strong>demais dados por Requisição de Compra</strong>.
+                        </p>
+
+                        <div class="row justify-content-center">
+                            <div class="col-xl-10 col-lg-11">
+                                <div class="accordion" id="uploadAccordionCompleto">
+                                    <div class="accordion-item upload-card">
+                                        <h2 class="accordion-header" id="uploadCompletoHeading">
+                                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#uploadCompletoCollapse" aria-expanded="true" aria-controls="uploadCompletoCollapse">
+                                                <i class="fas fa-upload me-2"></i><strong>Upload do Arquivo</strong>
+                                            </button>
+                                        </h2>
+                                        <div id="uploadCompletoCollapse" class="accordion-collapse collapse show" aria-labelledby="uploadCompletoHeading" data-bs-parent="#uploadAccordionCompleto">
+                                            <div class="accordion-body">
+                                                <form method="post" enctype="multipart/form-data" class="row g-3">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="secao" value="completo">
+                                                    <div class="col-12">
+                                                        <label for="file_completo" class="form-label">Arquivo Excel</label>
+                                                        <input type="file" class="form-control" id="file_completo" name="file_completo" accept=".xlsx,.xls,.xlsm" required>
+                                                        <div class="form-text">Formatos aceitos: .xlsx, .xls, .xlsm</div>
+                                                    </div>
+                                                    <div class="col-12 d-grid d-md-flex gap-2">
+                                                        <button type="submit" class="btn btn-success btn-lg">
+                                                            <i class="fas fa-cogs me-2"></i>Processar Ajuste Completo
+                                                        </button>
+                                                        <a href="{% url 'ajuste_planilha_prejecao_gastos' %}" class="btn btn-outline-secondary btn-lg">
+                                                            <i class="fas fa-eraser me-2"></i>Limpar
+                                                        </a>
+                                                    </div>
+                                                </form>
+
+                                                <div class="helper-box mt-4">
+                                                    <h6 class="mb-2"><i class="fas fa-info-circle me-2"></i>Orientação</h6>
+                                                    <p class="mb-2 text-muted">Ordem de execução:</p>
+                                                    <ol class="text-muted mb-2">
+                                                        <li><strong>GASTO CONFIRMADO</strong> ← classificação da reunião (por <strong>ID</strong>)</li>
+                                                        <li><strong>NF PARA LANÇAMENTO</strong> e <strong>NF DE SERVIÇO RECEBIDA</strong> ← Controle RC/NF (por <strong>REQUISIÇÃO DE COMPRA</strong> / RC)</li>
+                                                        <li><strong>PEDIDO DE COMPRA</strong>, <strong>SOLICITANTE</strong>, <strong>ORDEM DE SERVIÇO</strong>, <strong>DATA ABERTURA DA REQUISIÇÃO</strong> e <strong>OBSERVAÇÃO</strong> ← Controle RC/NF (por <strong>REQUISIÇÃO DE COMPRA</strong> / RC)</li>
+                                                    </ol>
+                                                    <p class="mb-2 text-muted">
+                                                        <strong>Apenas células vazias são preenchidas</strong> — valores já existentes não são alterados.
+                                                    </p>
+                                                    <p class="mb-0 text-muted">
+                                                        <span class="d-inline-block px-2 py-1 rounded" style="background-color: #FFFF00;">&nbsp;</span>
+                                                        Células preenchidas pelo sistema são destacadas em <strong>amarelo</strong> no arquivo gerado.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-divider">
+            <span class="section-divider-label">Processos individuais</span>
+        </div>
+
+        <!-- Seção: Ajustar e Preencher Planilha com Dados da Reunião de Previsão de Gastos -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-0 page-section-card">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-excel me-2"></i>Ajustar e Preencher Planilha com Dados da Reunião de Previsão de Gastos
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-4">
+                            Envie a planilha de projeção de gastos para preencher automaticamente a coluna
+                            <strong>GASTO CONFIRMADO</strong> com a classificação definida na reunião de previsão de gastos.
+                        </p>
+
+                        <div class="row justify-content-center">
+                            <div class="col-xl-10 col-lg-11">
+                                <div class="accordion" id="uploadAccordion">
+                                    <div class="accordion-item upload-card">
+                                        <h2 class="accordion-header" id="uploadHeading">
+                                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#uploadCollapse" aria-expanded="true" aria-controls="uploadCollapse">
+                                                <i class="fas fa-upload me-2"></i><strong>Upload do Arquivo</strong>
+                                            </button>
+                                        </h2>
+                                        <div id="uploadCollapse" class="accordion-collapse collapse show" aria-labelledby="uploadHeading" data-bs-parent="#uploadAccordion">
+                                            <div class="accordion-body">
+                                                <form method="post" enctype="multipart/form-data" class="row g-3">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="secao" value="reuniao">
+                                                    <div class="col-12">
+                                                        <label for="file" class="form-label">Arquivo Excel</label>
+                                                        <input type="file" class="form-control" id="file" name="file" accept=".xlsx,.xls,.xlsm" required>
+                                                        <div class="form-text">Formatos aceitos: .xlsx, .xls, .xlsm</div>
+                                                    </div>
+                                                    <div class="col-12 d-grid d-md-flex gap-2">
+                                                        <button type="submit" class="btn btn-primary btn-lg">
+                                                            <i class="fas fa-upload me-2"></i>Enviar Arquivo
+                                                        </button>
+                                                        <a href="{% url 'ajuste_planilha_prejecao_gastos' %}" class="btn btn-outline-secondary btn-lg">
+                                                            <i class="fas fa-eraser me-2"></i>Limpar
+                                                        </a>
+                                                    </div>
+                                                </form>
+
+                                                <div class="helper-box mt-4">
+                                                    <h6 class="mb-2"><i class="fas fa-info-circle me-2"></i>Orientação</h6>
+                                                    <p class="mb-2 text-muted">
+                                                        O sistema localiza as colunas <strong>ID</strong> e <strong>GASTO CONFIRMADO</strong> na planilha enviada
+                                                        e preenche essa última com a <em>classificação da reunião</em> cadastrada no banco de dados.
+                                                        <strong>Apenas células vazias são preenchidas</strong> — valores já existentes não são alterados.
+                                                    </p>
+                                                    <p class="mb-0 text-muted">
+                                                        <span class="d-inline-block px-2 py-1 rounded" style="background-color: #FFFF00;">&nbsp;</span>
+                                                        Células preenchidas pelo sistema são destacadas em <strong>amarelo</strong> no arquivo gerado.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção: Ajuste e Preenchimento de NF baseado no número da Requisição de Compra -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-0 page-section-card">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-invoice me-2"></i>Ajuste e Preenchimento de NF baseado no número da Requisição de Compra
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-4">
+                            Envie a planilha de projeção de gastos para preencher automaticamente os dados de
+                            <strong>Nota Fiscal</strong> com base no <strong>número da Requisição de Compra</strong>.
+                        </p>
+
+                        <div class="row justify-content-center">
+                            <div class="col-xl-10 col-lg-11">
+                                <div class="accordion" id="uploadAccordionPedido">
+                                    <div class="accordion-item upload-card">
+                                        <h2 class="accordion-header" id="uploadPedidoHeading">
+                                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#uploadPedidoCollapse" aria-expanded="true" aria-controls="uploadPedidoCollapse">
+                                                <i class="fas fa-upload me-2"></i><strong>Upload do Arquivo</strong>
+                                            </button>
+                                        </h2>
+                                        <div id="uploadPedidoCollapse" class="accordion-collapse collapse show" aria-labelledby="uploadPedidoHeading" data-bs-parent="#uploadAccordionPedido">
+                                            <div class="accordion-body">
+                                                <form method="post" enctype="multipart/form-data" class="row g-3">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="secao" value="nf_requisicao_compra">
+                                                    <div class="col-12">
+                                                        <label for="file_pedido" class="form-label">Arquivo Excel</label>
+                                                        <input type="file" class="form-control" id="file_pedido" name="file_pedido" accept=".xlsx,.xls,.xlsm" required>
+                                                        <div class="form-text">Formatos aceitos: .xlsx, .xls, .xlsm</div>
+                                                    </div>
+                                                    <div class="col-12 d-grid d-md-flex gap-2">
+                                                        <button type="submit" class="btn btn-primary btn-lg">
+                                                            <i class="fas fa-upload me-2"></i>Enviar Arquivo
+                                                        </button>
+                                                        <a href="{% url 'ajuste_planilha_prejecao_gastos' %}" class="btn btn-outline-secondary btn-lg">
+                                                            <i class="fas fa-eraser me-2"></i>Limpar
+                                                        </a>
+                                                    </div>
+                                                </form>
+
+                                                <div class="helper-box mt-4">
+                                                    <h6 class="mb-2"><i class="fas fa-info-circle me-2"></i>Orientação</h6>
+                                                    <p class="mb-2 text-muted">
+                                                        O sistema compara o <strong>REQUISIÇÃO DE COMPRA</strong> da planilha com o campo
+                                                        <strong>RC</strong> do Controle RC/NF. Quando os números coincidem:
+                                                    </p>
+                                                    <ul class="text-muted mb-2">
+                                                        <li>preenche <strong>NF PARA LANÇAMENTO: SERVIÇO OU MATERIAL</strong> (ou <strong>NF: SERVIÇO OU MATERIAL</strong>) com <em>nf_servico</em> ou <em>nf_saida</em>;</li>
+                                                        <li>preenche <strong>NF DE SERVIÇO RECEBIDA</strong> com <strong>SIM</strong>.</li>
+                                                    </ul>
+                                                    <p class="mb-2 text-muted">
+                                                        <strong>Apenas células vazias são preenchidas</strong> — se a linha já tiver valor em alguma dessas colunas, o sistema não substitui o conteúdo existente.
+                                                    </p>
+                                                    <p class="mb-0 text-muted">
+                                                        <span class="d-inline-block px-2 py-1 rounded" style="background-color: #FFFF00;">&nbsp;</span>
+                                                        Células preenchidas pelo sistema são destacadas em <strong>amarelo</strong> no arquivo gerado.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção: Preencher demais dados baseado no Número do Pedido de Compra -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm border-0 page-section-card">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-shopping-cart me-2"></i>Preencher demais dados baseado no Número da REQUISIÇÃO de Compra:
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-4">
+                            Envie a planilha de projeção de gastos para preencher automaticamente os demais campos
+                            com base no <strong>número da Requisição de Compra</strong> (coluna <strong>REQUISIÇÃO DE COMPRA</strong>),
+                            relacionado ao campo <strong>RC</strong> do Controle RC/NF.
+                        </p>
+
+                        <div class="row justify-content-center">
+                            <div class="col-xl-10 col-lg-11">
+                                <div class="accordion" id="uploadAccordionDemaisDados">
+                                    <div class="accordion-item upload-card">
+                                        <h2 class="accordion-header" id="uploadDemaisDadosHeading">
+                                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#uploadDemaisDadosCollapse" aria-expanded="true" aria-controls="uploadDemaisDadosCollapse">
+                                                <i class="fas fa-upload me-2"></i><strong>Upload do Arquivo</strong>
+                                            </button>
+                                        </h2>
+                                        <div id="uploadDemaisDadosCollapse" class="accordion-collapse collapse show" aria-labelledby="uploadDemaisDadosHeading" data-bs-parent="#uploadAccordionDemaisDados">
+                                            <div class="accordion-body">
+                                                <form method="post" enctype="multipart/form-data" class="row g-3">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="secao" value="requisicao_compra">
+                                                    <div class="col-12">
+                                                        <label for="file_demais_dados" class="form-label">Arquivo Excel</label>
+                                                        <input type="file" class="form-control" id="file_demais_dados" name="file_demais_dados" accept=".xlsx,.xls,.xlsm" required>
+                                                        <div class="form-text">Formatos aceitos: .xlsx, .xls, .xlsm</div>
+                                                    </div>
+                                                    <div class="col-12 d-grid d-md-flex gap-2">
+                                                        <button type="submit" class="btn btn-primary btn-lg">
+                                                            <i class="fas fa-upload me-2"></i>Enviar Arquivo
+                                                        </button>
+                                                        <a href="{% url 'ajuste_planilha_prejecao_gastos' %}" class="btn btn-outline-secondary btn-lg">
+                                                            <i class="fas fa-eraser me-2"></i>Limpar
+                                                        </a>
+                                                    </div>
+                                                </form>
+
+                                                <div class="helper-box mt-4">
+                                                    <h6 class="mb-2"><i class="fas fa-info-circle me-2"></i>Orientação</h6>
+                                                    <p class="mb-2 text-muted">
+                                                        O sistema compara o <strong>REQUISIÇÃO DE COMPRA</strong> da planilha com o campo
+                                                        <strong>RC</strong> do Controle RC/NF. Quando os números coincidem, preenche:
+                                                    </p>
+                                                    <ul class="text-muted mb-2">
+                                                        <li><strong>PEDIDO DE COMPRA</strong> ← <em>pedido</em></li>
+                                                        <li><strong>SOLICITANTE</strong> ← <em>solicitante</em></li>
+                                                        <li><strong>ORDEM DE SERVIÇO</strong> ← <em>os</em></li>
+                                                        <li><strong>DATA ABERTURA DA REQUISIÇÃO</strong> ← <em>data_rc</em></li>
+                                                        <li><strong>OBSERVAÇÃO</strong> ← <em>status</em></li>
+                                                    </ul>
+                                                    <p class="mb-2 text-muted">
+                                                        <strong>Apenas células vazias são preenchidas</strong> — valores já existentes não são alterados.
+                                                    </p>
+                                                    <p class="mb-0 text-muted">
+                                                        <span class="d-inline-block px-2 py-1 rounded" style="background-color: #FFFF00;">&nbsp;</span>
+                                                        Células preenchidas pelo sistema são destacadas em <strong>amarelo</strong> no arquivo gerado.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</section>
+{% endblock %}

@@ -19,6 +19,194 @@ import openpyxl
 LISTA_PECAS_MAQUINA_WORKBOOK_SHEET = 'LISTA COMPLETA'
 
 
+def _original_has_vba_project(original_bytes: bytes) -> bool:
+    import zipfile
+
+    with zipfile.ZipFile(io.BytesIO(original_bytes), 'r') as z_in:
+        return 'xl/vbaProject.bin' in z_in.namelist()
+
+
+def repair_ooxml_package(data: bytes) -> bytes:
+    """
+    Corrige pacotes OOXML inválidos (ex.: referência a vbaProject sem o arquivo),
+    que fazem o Excel reportar erro de formato.
+    """
+    import re
+    import zipfile
+
+    in_buf = io.BytesIO(data)
+    with zipfile.ZipFile(in_buf, 'r') as z_in:
+        names = z_in.namelist()
+        infos = {info.filename: info for info in z_in.infolist()}
+        payloads = {name: z_in.read(name) for name in names}
+
+    has_vba = 'xl/vbaProject.bin' in payloads
+
+    if not has_vba:
+        rels_name = 'xl/_rels/workbook.xml.rels'
+        if rels_name in payloads:
+            rels = payloads[rels_name].decode('utf-8')
+            rels = re.sub(
+                r'<Relationship\b[^>]*Type="[^"]*vbaProject"[^>]*/>',
+                '',
+                rels,
+            )
+            payloads[rels_name] = rels.encode('utf-8')
+
+        ct_name = '[Content_Types].xml'
+        if ct_name in payloads:
+            ct = payloads[ct_name].decode('utf-8')
+            ct = ct.replace(
+                'application/vnd.ms-excel.sheet.macroEnabled.main+xml',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml',
+            )
+            ct = re.sub(
+                r'<Override\b[^>]*PartName="/xl/vbaProject\.bin"[^>]*/>',
+                '',
+                ct,
+            )
+            payloads[ct_name] = ct.encode('utf-8')
+
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, 'w') as z_out:
+        for name in names:
+            info = infos.get(name)
+            payload = payloads[name]
+            if info is not None:
+                z_out.writestr(info, payload)
+            else:
+                z_out.writestr(name, payload)
+    return out.getvalue()
+
+
+def _merge_worksheet_root_attrs(orig: str, mod: str) -> str:
+    """Copia declarações xmlns do worksheet original (necessárias para extLst, drawing, etc.)."""
+    import re
+
+    orig_m = re.search(r'<worksheet\b([^>]*)>', orig)
+    mod_m = re.search(r'<worksheet\b([^>]*)>', mod)
+    if not orig_m or not mod_m:
+        return mod
+
+    mod_attrs = mod_m.group(1)
+    orig_attrs = orig_m.group(1)
+    for match in re.finditer(r'\s+((?:xmlns:\w+)|(?:mc:Ignorable))="[^"]*"', orig_attrs):
+        attr_name = match.group(1)
+        if f'{attr_name}="' not in mod_attrs:
+            mod_attrs += match.group(0)
+
+    new_open = f'<worksheet{mod_attrs}>'
+    return mod[:mod_m.start()] + new_open + mod[mod_m.end():]
+
+
+def _patch_worksheet_xml_from_original(orig_xml: bytes, mod_xml: bytes) -> bytes:
+    """
+    Restaura no worksheet editado pelo openpyxl referências a botões, drawings e validações
+    que existiam no arquivo original (openpyxl remove <drawing>, <control>, <extLst>, etc.).
+    """
+    import re
+
+    orig = orig_xml.decode('utf-8')
+    mod = mod_xml.decode('utf-8')
+    mod = _merge_worksheet_root_attrs(orig, mod)
+
+    # Placeholder inválido que o openpyxl injeta ao salvar com keep_vba.
+    mod = re.sub(r'<legacyDrawing[^>]*r:id="anysvml"[^>]*/>', '', mod)
+
+    fragments: list[str] = []
+
+    for tag in ('drawing', 'legacyDrawing', 'legacyDrawingHF', 'phoneticPr'):
+        orig_tags = re.findall(rf'<{tag}[^>]*/>', orig)
+        if not orig_tags:
+            continue
+        orig_frag = orig_tags[0]
+        mod_tag = re.search(rf'<{tag}[^>]*/>', mod)
+        if not mod_tag:
+            fragments.append(orig_frag)
+        elif tag == 'legacyDrawing' and mod_tag.group(0) != orig_frag:
+            mod = mod.replace(mod_tag.group(0), '', 1)
+            fragments.append(orig_frag)
+
+    for match in re.finditer(
+        r'<mc:AlternateContent\b[^>]*>.*?</mc:AlternateContent>',
+        orig,
+        re.DOTALL,
+    ):
+        block = match.group(0)
+        if '<control ' in block and block not in mod:
+            fragments.append(block)
+
+    ext_orig = re.search(r'<extLst>.*?</extLst>', orig, re.DOTALL)
+    if ext_orig and ext_orig.group(0) not in mod:
+        fragments.append(ext_orig.group(0))
+
+    if not fragments:
+        return mod.encode('utf-8')
+
+    insert = ''.join(fragments)
+    if '</worksheet>' in mod:
+        mod = mod.replace('</worksheet>', insert + '</worksheet>', 1)
+    return mod.encode('utf-8')
+
+
+def merge_xlsx_after_openpyxl_edit(original_bytes: bytes, modified_bytes: bytes) -> bytes:
+    """
+    Aplica edições de células/estilos do openpyxl sem perder macros, botões, drawings e customXml.
+
+    O openpyxl regrava o pacote OOXML e costuma remover partes que não edita (vbaProject,
+    ctrlProps, vmlDrawing, customXml) ou injetar referências inválidas (ex.: vbaProject em .xlsx).
+    Esta função mantém do arquivo original tudo que não foi editado, troca worksheets/styles/
+    sharedStrings gerados pelo openpyxl e repõe referências a botões/drawings nas planilhas.
+    """
+    import zipfile
+
+    def _take_from_modified(name: str, mod_names: set[str]) -> bool:
+        if name == 'xl/sharedStrings.xml':
+            return name in mod_names
+        if name.startswith('xl/worksheets/') and name.endswith('.xml') and '/_rels/' not in name:
+            return name in mod_names
+        if name == 'xl/styles.xml':
+            return True
+        return False
+
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(original_bytes), 'r') as z_orig, \
+            zipfile.ZipFile(io.BytesIO(modified_bytes), 'r') as z_mod, \
+            zipfile.ZipFile(out, 'w') as z_out:
+        mod_names = set(z_mod.namelist())
+        orig_names = set(z_orig.namelist())
+        orig_infos = {info.filename: info for info in z_orig.infolist()}
+        orig_order = z_orig.namelist()
+        written: set[str] = set()
+
+        def _write_entry(name: str, payload: bytes, orig_payload: bytes | None) -> None:
+            info = orig_infos.get(name)
+            if orig_payload is not None and payload == orig_payload and info is not None:
+                z_out.writestr(info, payload)
+            else:
+                z_out.writestr(name, payload, compress_type=zipfile.ZIP_DEFLATED)
+
+        for name in orig_order:
+            if _take_from_modified(name, mod_names) and name in mod_names:
+                payload = z_mod.read(name)
+                if name.startswith('xl/worksheets/') and name in orig_names:
+                    payload = _patch_worksheet_xml_from_original(z_orig.read(name), payload)
+                _write_entry(name, payload, None)
+            else:
+                orig_payload = z_orig.read(name)
+                _write_entry(name, orig_payload, orig_payload)
+            written.add(name)
+
+        for name in z_mod.namelist():
+            if name not in written and _take_from_modified(name, mod_names):
+                payload = z_mod.read(name)
+                if name.startswith('xl/worksheets/') and name in orig_names:
+                    payload = _patch_worksheet_xml_from_original(z_orig.read(name), payload)
+                _write_entry(name, payload, None)
+
+    return repair_ooxml_package(out.getvalue())
+
+
 def validate_lista_pecas_maquina_workbook(uploaded_file, extension: str) -> Tuple[bool, str | None]:
     """
     Garante que o workbook Excel contém a planilha LISTA COMPLETA.
@@ -2972,6 +3160,317 @@ def _parse_setor_trabalho_import(row_data: dict, row_num: int, errors: list):
     return False
 
 
+def _parse_decimal_br(value):
+    """Converte número no formato brasileiro (23,38) ou padrão para Decimal."""
+    from decimal import Decimal, InvalidOperation
+    if value is None or str(value).strip() == '':
+        return None
+    text = str(value).strip().replace('%', '')
+    if not text:
+        return None
+    text = text.replace('.', '').replace(',', '.') if ',' in text and text.count(',') == 1 else text.replace(',', '.')
+    try:
+        return Decimal(text)
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _coerce_matricula_value(value):
+    if value is None or str(value).strip() == '':
+        return ''
+    text = str(value).strip()
+    try:
+        number = float(text.replace(',', '.'))
+        if number == int(number):
+            return str(int(number))
+    except (ValueError, TypeError):
+        pass
+    return text
+
+
+def upload_percentual_de_horas_from_file(file, update_existing=True) -> Tuple[int, int, List[str]]:
+    """
+    Importa percentual de horas a partir de CSV (;) ou Excel.
+
+    Colunas esperadas: matricula, tempo1, tempo 2, tempo3, percentual, nome
+    """
+    from django.db import transaction
+    from app.models import PercentualDeHoras
+
+    errors = []
+    created_count = 0
+    updated_count = 0
+
+    file_name = file.name.lower()
+
+    try:
+        if file_name.endswith(('.xlsx', '.xls', '.xlsm')):
+            data = read_excel_file(file, header_row=1)
+        elif file_name.endswith('.csv'):
+            data = None
+            for encoding in ('utf-8-sig', 'utf-8', 'latin-1', 'cp1252'):
+                for delimiter in (';', ','):
+                    try:
+                        file.seek(0)
+                        data = read_csv_file(file, encoding=encoding, delimiter=delimiter)
+                        if data and _get_row_value_by_normalized_key(data[0], 'matricula'):
+                            break
+                    except Exception:
+                        continue
+                if data and _get_row_value_by_normalized_key(data[0], 'matricula'):
+                    break
+            if not data:
+                file.seek(0)
+                data = read_csv_file(file, encoding='latin-1', delimiter=';')
+        else:
+            raise ValidationError('Formato não suportado. Use .xlsx, .xls, .xlsm ou .csv')
+
+        if not data:
+            raise ValidationError('Arquivo vazio ou sem dados válidos')
+
+        with transaction.atomic():
+            for row_idx, row_data in enumerate(data, start=2):
+                try:
+                    if not any(str(v).strip() if v is not None and v != '' else '' for v in row_data.values()):
+                        continue
+
+                    matricula = _coerce_matricula_value(
+                        _get_row_value_by_normalized_key(row_data, 'matricula')
+                        or row_data.get('matricula')
+                    )
+                    if not matricula:
+                        errors.append(f'Linha {row_idx}: matrícula é obrigatória')
+                        continue
+
+                    nome = _safe_str(
+                        _get_row_value_by_normalized_key(row_data, 'nome') or row_data.get('nome'),
+                        max_length=255,
+                    )
+                    tempo1 = _safe_str(
+                        _get_row_value_by_normalized_key(row_data, 'tempo1', 'tempo_1') or row_data.get('tempo1'),
+                        max_length=50,
+                    )
+                    tempo2 = _safe_str(
+                        _get_row_value_by_normalized_key(row_data, 'tempo2', 'tempo_2') or row_data.get('tempo 2'),
+                        max_length=50,
+                    )
+                    tempo3 = _safe_str(
+                        _get_row_value_by_normalized_key(row_data, 'tempo3', 'tempo_3') or row_data.get('tempo3'),
+                        max_length=50,
+                    )
+                    percentual_raw = (
+                        _get_row_value_by_normalized_key(row_data, 'percentual')
+                        or row_data.get('percentual')
+                    )
+                    percentual = _parse_decimal_br(percentual_raw)
+
+                    defaults = {
+                        'nome': nome or None,
+                        'tempo1': tempo1 or None,
+                        'tempo2': tempo2 or None,
+                        'tempo3': tempo3 or None,
+                        'percentual': percentual,
+                    }
+
+                    if PercentualDeHoras.objects.filter(pk=matricula).exists():
+                        if update_existing:
+                            PercentualDeHoras.objects.filter(pk=matricula).update(**defaults)
+                            updated_count += 1
+                        else:
+                            errors.append(f'Linha {row_idx}: matrícula {matricula} já existe (ignorada)')
+                    else:
+                        PercentualDeHoras.objects.create(matricula=matricula, **defaults)
+                        created_count += 1
+
+                except Exception as e:
+                    errors.append(f'Linha {row_idx}: {str(e)}')
+
+    except ValidationError:
+        raise
+    except Exception as e:
+        raise ValidationError(f'Erro ao processar arquivo: {str(e)}')
+
+    return created_count, updated_count, errors
+
+
+def _parse_admissao_import(value):
+    """Converte data de admissão (Excel datetime, date ou texto DD/MM/YYYY)."""
+    from datetime import datetime, date
+    if value is None or str(value).strip() == '':
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    s = str(value).strip()
+    for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%m/%d/%Y'):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _extract_funcionario_manutencao_defaults(row_data):
+    """Extrai campos de uma linha HRCL102 / FuncionarioManutencao."""
+    matricula = _coerce_matricula_value(
+        row_data.get('Matricula')
+        or row_data.get('MATRICULA')
+        or row_data.get('matricula')
+        or _get_row_value_by_normalized_key(row_data, 'matricula')
+    )
+    if not matricula:
+        return None
+
+    colaborador = _safe_str(
+        row_data.get('Colaborador')
+        or row_data.get('COLABORADOR')
+        or _get_row_value_by_normalized_key(row_data, 'colaborador'),
+        max_length=255,
+    )
+    cargo = _safe_str(
+        row_data.get('Cargo')
+        or row_data.get('CARGO')
+        or _get_row_value_by_normalized_key(row_data, 'cargo'),
+        max_length=255,
+    )
+    admissao_raw = (
+        row_data.get('Admissão')
+        or row_data.get('Admissao')
+        or row_data.get('ADMISSAO')
+        or _get_row_value_by_normalized_key(row_data, 'admissao')
+    )
+    situacao_codigo = _safe_str(
+        row_data.get('Situação')
+        or row_data.get('Situacao')
+        or row_data.get('SITUACAO')
+        or _get_row_value_by_normalized_key(row_data, 'situacao'),
+        max_length=20,
+    )
+    situacao_descricao = _safe_str(
+        row_data.get('col_5')
+        or row_data.get('Situação Descrição')
+        or row_data.get('Situacao Descricao')
+        or _get_row_value_by_normalized_key(row_data, 'situacao_descricao'),
+        max_length=100,
+    )
+    escala_turma_codigo = _safe_str(
+        row_data.get('Escala/Turma')
+        or row_data.get('Escala_Turma')
+        or _get_row_value_by_normalized_key(row_data, 'escala_turma', 'escala/turma'),
+        max_length=20,
+    )
+    escala_turma = _safe_str(
+        row_data.get('col_7')
+        or row_data.get('Escala Turma Turno')
+        or _get_row_value_by_normalized_key(row_data, 'escala_turma_turno'),
+        max_length=20,
+    )
+    setor = _safe_str(
+        row_data.get('Setor')
+        or row_data.get('SETOR')
+        or _get_row_value_by_normalized_key(row_data, 'setor'),
+        max_length=255,
+    )
+
+    return {
+        'matricula': matricula,
+        'colaborador': colaborador or None,
+        'cargo': cargo or None,
+        'admissao': _parse_admissao_import(admissao_raw),
+        'situacao_codigo': situacao_codigo or None,
+        'situacao_descricao': situacao_descricao or None,
+        'escala_turma_codigo': escala_turma_codigo or None,
+        'escala_turma': escala_turma or None,
+        'setor': setor or None,
+    }
+
+
+def upload_funcionario_manutencao_from_file(file, update_existing=True) -> Tuple[int, int, List[str]]:
+    """
+    Importa funcionários da manutenção (planilha RH HRCL102) para FuncionarioManutencao.
+
+    Colunas esperadas: Matricula, Colaborador, Cargo, Admissão, Situação,
+    descrição da situação (col. F), Escala/Turma, turno (col. H), Setor.
+    """
+    from django.db import transaction
+    from app.models import FuncionarioManutencao
+
+    errors = []
+    created_count = 0
+    updated_count = 0
+    file_name = file.name.lower()
+
+    try:
+        header_row = 1
+        if file_name.endswith(('.xlsx', '.xls', '.xlsm')):
+            header_row = _detect_manutentor_excel_header_row(file)
+            data = read_excel_file(file, header_row=header_row)
+        elif file_name.endswith('.csv'):
+            data = None
+            for encoding in ('utf-8-sig', 'utf-8', 'latin-1', 'cp1252'):
+                for delimiter in (';', ','):
+                    try:
+                        file.seek(0)
+                        data = read_csv_file(file, encoding=encoding, delimiter=delimiter)
+                        if data and (
+                            _get_row_value_by_normalized_key(data[0], 'matricula')
+                            or data[0].get('Matricula')
+                        ):
+                            break
+                    except Exception:
+                        continue
+                if data and (
+                    _get_row_value_by_normalized_key(data[0], 'matricula')
+                    or data[0].get('Matricula')
+                ):
+                    break
+            if not data:
+                file.seek(0)
+                data = read_csv_file(file, encoding='latin-1', delimiter=';')
+        else:
+            raise ValidationError('Formato não suportado. Use .xlsx, .xls, .xlsm ou .csv')
+
+        if not data:
+            raise ValidationError('Arquivo vazio ou sem dados válidos')
+
+        data_start_row = header_row + 1
+
+        with transaction.atomic():
+            for row_idx, row_data in enumerate(data):
+                row_num = data_start_row + row_idx
+                try:
+                    if not any(str(v).strip() if v is not None and v != '' else '' for v in row_data.values()):
+                        continue
+
+                    parsed = _extract_funcionario_manutencao_defaults(row_data)
+                    if not parsed:
+                        errors.append(f'Linha {row_num}: matrícula é obrigatória')
+                        continue
+
+                    matricula = parsed.pop('matricula')
+
+                    if FuncionarioManutencao.objects.filter(pk=matricula).exists():
+                        if update_existing:
+                            FuncionarioManutencao.objects.filter(pk=matricula).update(**parsed)
+                            updated_count += 1
+                        else:
+                            errors.append(f'Linha {row_num}: matrícula {matricula} já existe (ignorada)')
+                    else:
+                        FuncionarioManutencao.objects.create(matricula=matricula, **parsed)
+                        created_count += 1
+
+                except Exception as e:
+                    errors.append(f'Linha {row_num}: {str(e)}')
+
+    except ValidationError:
+        raise
+    except Exception as e:
+        raise ValidationError(f'Erro ao processar arquivo: {str(e)}')
+
+    return created_count, updated_count, errors
+
+
 def upload_manutentores_from_file(file, update_existing=False) -> Tuple[int, int, List[str]]:
     """
     Faz upload de manutentores a partir de um arquivo CSV ou Excel
@@ -4059,6 +4558,255 @@ def upload_plano_preventiva_from_file(file, update_existing=False) -> Tuple[int,
         import traceback
         traceback.print_exc()
         return 0, 0, 0, errors
+
+
+def upload_plano_lubrificacao_from_file(file, substituir_todos=True) -> Tuple[int, int, List[str]]:
+    """
+    Importa plano de lubrificação a partir de CSV/Excel.
+
+    Por padrão substitui todos os registros existentes (snapshot do arquivo),
+    no mesmo espírito de ParadaMaquina com excluir_antigos=True.
+
+    Retorna: (created_count, deleted_count, errors)
+    """
+    from django.db import connection
+    from app.models import PlanoLubrificacao
+
+    errors = []
+    created_count = 0
+    deleted_count = 0
+    max_errors_shown = 50
+    total_row_errors = 0
+
+    table_names = connection.introspection.table_names()
+    if PlanoLubrificacao._meta.db_table not in table_names:
+        return 0, 0, [
+            'A tabela PlanoLubrificacao ainda não existe no banco. '
+            'Execute no terminal do projeto: python manage.py migrate'
+        ]
+
+    file_name = file.name.lower()
+
+    try:
+        if file_name.endswith(('.xlsx', '.xls', '.xlsm')):
+            data = read_excel_file(file)
+        elif file_name.endswith('.csv'):
+            file.seek(0)
+            data = read_csv_file_auto_encoding(file, delimiter=';')
+        else:
+            raise ValidationError("Formato de arquivo não suportado. Use .xlsx, .xls, .xlsm ou .csv")
+
+        if not data:
+            raise ValidationError("Arquivo vazio ou sem dados válidos")
+
+        objetos_novos = []
+
+        for row_num, row_data in enumerate(data, start=2):
+            try:
+                if not any(str(v).strip() if v else '' for v in row_data.values()):
+                    continue
+
+                def _v(*keys):
+                    return _get_row_value(row_data, *keys)
+
+                def _v_norm(*norm_keys):
+                    return _get_row_value_by_normalized_key(row_data, *norm_keys)
+
+                cd_maquina = _safe_int(_v('CD_MAQUINA', 'cd_maquina', 'Máquina', 'Maquina') or _v_norm('maquina'))
+                numero_plano = _safe_int(_v('NUMERO_PLANO', 'numero_plano', 'Plano') or _v_norm('plano'))
+
+                if cd_maquina is None:
+                    total_row_errors += 1
+                    if len(errors) < max_errors_shown:
+                        errors.append(f"Linha {row_num}: Campo 'Máquina' é obrigatório")
+                    continue
+                if numero_plano is None:
+                    total_row_errors += 1
+                    if len(errors) < max_errors_shown:
+                        errors.append(f"Linha {row_num}: Campo 'Plano' é obrigatório")
+                    continue
+
+                objetos_novos.append(PlanoLubrificacao(
+                    cd_unid=_safe_int(_v('CD_UNID', 'cd_unid', 'Unidade') or _v_norm('unidade')),
+                    nome_unid=_safe_str(_v('NOME_UNID', 'nome_unid', 'Nome Unidade') or _v_norm('nome_unidade'), max_length=255),
+                    cd_setor=_safe_str(_v('CD_SETOR', 'cd_setor', 'Setor') or _v_norm('setor'), max_length=50),
+                    descr_setor=_safe_str(_v('DESCR_SETOR', 'descr_setor', 'Descrição Setor', 'Descricao Setor') or _v_norm('descricao_setor'), max_length=255),
+                    cd_atividade=_safe_int(_v('CD_ATIVIDADE', 'cd_atividade', 'Atividade') or _v_norm('atividade')),
+                    cd_maquina=cd_maquina,
+                    descr_maquina=_safe_str(_v('DESCR_MAQUINA', 'descr_maquina', 'Descrição Máquina', 'Descricao Maquina') or _v_norm('descricao_maquina'), max_length=500),
+                    nro_patrimonio=_safe_str(_v('NRO_PATRIMONIO', 'nro_patrimonio', 'Nº Patrimônio', 'N Patrimonio', 'Patrimonio') or _v_norm('nro_patrimonio', 'patrimonio'), max_length=100),
+                    ponto=_safe_int(_v('PONTO', 'ponto', 'Ponto') or _v_norm('ponto')),
+                    descr_ponto=_safe_str(_v('DESCR_PONTO', 'descr_ponto', 'Descrição Ponto', 'Descricao Ponto') or _v_norm('descricao_ponto'), max_length=500),
+                    numero_plano=numero_plano,
+                    descr_plano=_safe_str(_v('DESCR_PLANO', 'descr_plano', 'Descrição Plano', 'Descricao Plano') or _v_norm('descricao_plano'), max_length=255),
+                    sequencia_manutencao=_safe_int(_v('SEQUENCIA_MANUTENCAO', 'sequencia_manutencao', 'Sequência Manutenção', 'Sequencia Manutencao') or _v_norm('sequencia_manutencao')),
+                    dt_execucao=_format_dt_execucao_plano(_v('DATA_EXECUCAO', 'data_execucao', 'Data Execução', 'Data Execucao') or _v_norm('data_execucao')),
+                    quantidade_periodo=_safe_int(_v('QUANTIDADE_PERIODO', 'quantidade_periodo', 'Quantidade Período', 'Quantidade Periodo') or _v_norm('quantidade_periodo')),
+                    quantidade_previsto=_safe_decimal(_v('QUANTIDADE_PREVISTO', 'quantidade_previsto', 'Quantidade Previsto') or _v_norm('quantidade_previsto')),
+                    sequencia_tarefa=_safe_int(_v('SEQUENCIA_TAREFA', 'sequencia_tarefa', 'Sequência Tarefa', 'Sequencia Tarefa') or _v_norm('sequencia_tarefa')),
+                    descr_tarefa=_safe_str(_v('DESCR_TAREFA', 'descr_tarefa', 'Descrição Tarefa', 'Descricao Tarefa') or _v_norm('descricao_tarefa')),
+                    item=_safe_int(_v('ITEM', 'item', 'Item') or _v_norm('item')),
+                    descr_item=_safe_str(_v('DESCR_ITEM', 'descr_item', 'Descrição Item', 'Descricao Item') or _v_norm('descricao_item'), max_length=500),
+                    unidade_medida=_safe_str(_v('UNIDADE_MEDIDA', 'unidade_medida', 'Unidade Medida') or _v_norm('unidade_medida'), max_length=50),
+                ))
+
+            except Exception as e:
+                err_text = str(e)
+                if 'no such table' in err_text.lower() or 'planolubrificacao' in err_text.lower():
+                    return 0, 0, [
+                        'A tabela PlanoLubrificacao não existe no banco. '
+                        'Execute: python manage.py migrate'
+                    ]
+                total_row_errors += 1
+                if len(errors) < max_errors_shown:
+                    errors.append(f"Linha {row_num}: Erro ao processar registro - {err_text}")
+
+        if total_row_errors > max_errors_shown:
+            errors.append(
+                f'... e mais {total_row_errors - max_errors_shown} erro(s) de linha '
+                f'(exibindo apenas os primeiros {max_errors_shown}).'
+            )
+
+        if not objetos_novos and not errors:
+            errors.append('Nenhuma linha válida encontrada no arquivo.')
+
+        with transaction.atomic():
+            if substituir_todos:
+                deleted_count = PlanoLubrificacao.objects.count()
+                PlanoLubrificacao.objects.all().delete()
+
+            if objetos_novos:
+                PlanoLubrificacao.objects.bulk_create(objetos_novos, batch_size=500)
+                created_count = len(objetos_novos)
+
+        return created_count, deleted_count, errors
+
+    except ValidationError as e:
+        errors.append(str(e))
+        return 0, 0, errors
+    except Exception as e:
+        err_text = str(e)
+        if 'no such table' in err_text.lower():
+            errors.append(
+                'A tabela PlanoLubrificacao não existe no banco. Execute: python manage.py migrate'
+            )
+        else:
+            errors.append(f"Erro geral ao processar arquivo: {err_text}")
+        return 0, 0, errors
+
+
+def upload_requisicoes_por_os_manf0044_from_file(file) -> Tuple[int, int, List[str]]:
+    """
+    Importa requisições por OS (relatório MANF0044) a partir de CSV com delimitador ;.
+
+    Substitui apenas os registros do mesmo nome de arquivo (snapshot por arquivo/máquina).
+
+    Retorna: (created_count, deleted_count, errors)
+    """
+    from django.db import connection
+    from app.models import RequisicaoPorOsMANF0044
+
+    errors = []
+    created_count = 0
+    deleted_count = 0
+    max_errors_shown = 50
+    total_row_errors = 0
+    nome_arquivo = file.name
+
+    table_names = connection.introspection.table_names()
+    if RequisicaoPorOsMANF0044._meta.db_table not in table_names:
+        return 0, 0, [
+            'A tabela requisicoes_por_os_manf0044 ainda não existe no banco. '
+            'Execute: python manage.py migrate'
+        ]
+
+    try:
+        if not nome_arquivo.lower().endswith('.csv'):
+            raise ValidationError('Formato não suportado. Use arquivo CSV (.csv) com delimitador ponto e vírgula (;).')
+
+        file.seek(0)
+        data = read_csv_file_auto_encoding(file, delimiter=';')
+
+        if not data:
+            raise ValidationError('Arquivo vazio ou sem dados válidos')
+
+        objetos_novos = []
+
+        for row_num, row_data in enumerate(data, start=2):
+            try:
+                if not any(str(v).strip() if v else '' for v in row_data.values()):
+                    continue
+
+                def _v(*keys):
+                    return _get_row_value(row_data, *keys)
+
+                cd_ordemserv = _safe_int(_v('CD_ORDEMSERV', 'cd_ordemserv'))
+                cd_requisicao = _safe_int(_v('CD_REQUISICAO', 'cd_requisicao'))
+
+                if cd_ordemserv is None and cd_requisicao is None:
+                    total_row_errors += 1
+                    if len(errors) < max_errors_shown:
+                        errors.append(
+                            f'Linha {row_num}: informe ao menos CD_ORDEMSERV ou CD_REQUISICAO'
+                        )
+                    continue
+
+                objetos_novos.append(RequisicaoPorOsMANF0044(
+                    nome_arquivo_origem=nome_arquivo,
+                    cd_unid=_safe_int(_v('CD_UNID', 'cd_unid')),
+                    nome_unid=_safe_str(_v('NOME_UNID', 'nome_unid'), max_length=255),
+                    cd_setormanut=_safe_str(_v('CD_SETORMANUT', 'cd_setormanut'), max_length=50),
+                    descr_setormanut=_safe_str(_v('DESCR_SETORMANUT', 'descr_setormanut'), max_length=255),
+                    cs_qtd_ord_setor=_safe_int(_v('CS_QTD_ORD_SETOR', 'cs_qtd_ord_setor')),
+                    cd_ordemserv=cd_ordemserv,
+                    cs_vlr=_safe_decimal(_v('CS_VLR', 'cs_vlr')),
+                    cs_qtd_ord=_safe_int(_v('CS_QTD_ORD', 'cs_qtd_ord')),
+                    cd_requisicao=cd_requisicao,
+                    cd_item=_safe_int(_v('CD_ITEM', 'cd_item')),
+                    descr_item=_safe_str(_v('DESCR_ITEM', 'descr_item'), max_length=500),
+                    qtde_item=_safe_decimal(_v('QTDE_ITEM', 'qtde_item')),
+                    vlr_item=_safe_decimal(_v('VLR_ITEM', 'vlr_item')),
+                    cd_unid_medida=_safe_str(_v('CD_UNID_MEDIDA', 'cd_unid_medida'), max_length=50),
+                ))
+
+            except Exception as e:
+                total_row_errors += 1
+                if len(errors) < max_errors_shown:
+                    errors.append(f'Linha {row_num}: Erro ao processar registro - {e}')
+
+        if total_row_errors > max_errors_shown:
+            errors.append(
+                f'... e mais {total_row_errors - max_errors_shown} erro(s) de linha '
+                f'(exibindo apenas os primeiros {max_errors_shown}).'
+            )
+
+        if not objetos_novos and not errors:
+            errors.append('Nenhuma linha válida encontrada no arquivo.')
+
+        with transaction.atomic():
+            deleted_count = RequisicaoPorOsMANF0044.objects.filter(
+                nome_arquivo_origem=nome_arquivo
+            ).count()
+            RequisicaoPorOsMANF0044.objects.filter(nome_arquivo_origem=nome_arquivo).delete()
+
+            if objetos_novos:
+                RequisicaoPorOsMANF0044.objects.bulk_create(objetos_novos, batch_size=500)
+                created_count = len(objetos_novos)
+
+        return created_count, deleted_count, errors
+
+    except ValidationError as e:
+        errors.append(str(e))
+        return 0, 0, errors
+    except Exception as e:
+        err_text = str(e)
+        if 'no such table' in err_text.lower():
+            errors.append(
+                'A tabela requisicoes_por_os_manf0044 não existe no banco. Execute: python manage.py migrate'
+            )
+        else:
+            errors.append(f'Erro geral ao processar arquivo: {err_text}')
+        return 0, 0, errors
 
 
 def upload_requisicoes_almoxarifado_from_file(file, data_requisicao, update_existing=False) -> Tuple[int, int, List[str]]:
@@ -5585,19 +6333,16 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
                     if not any(str(v).strip() if v else '' for v in row_data.values()):
                         continue
                     
-                    # ID: coluna "ID"; fallback para coluna S em layouts novos (col_18)
-                    id_excel_raw = find_column_value(row_data, ['ID', 'id', 'Id', 'col_18', 'COL_18', 'col18', 'COL18'])
+                    # ID: coluna "ID"; mantém fallback para layouts sem cabeçalho consistente.
+                    id_excel_raw = find_column_value(
+                        row_data,
+                        ['ID', 'id', 'Id', 'col_19', 'COL_19', 'col19', 'COL19', 'col_18', 'COL_18', 'col18', 'COL18']
+                    )
                     if id_excel_raw is None or (isinstance(id_excel_raw, str) and not str(id_excel_raw).strip()):
                         errors.append(f"Linha {row_num}: coluna ID não encontrada ou vazia. Linha ignorada.")
                         continue
-                    try:
-                        s = str(id_excel_raw).strip()
-                        # Suporta formatos como "ID01" (novo arquivo) e numérico puro.
-                        if re.match(r'^[A-Za-z]+\d+$', s):
-                            id_excel = int(re.sub(r'^\D+', '', s))
-                        else:
-                            id_excel = int(float(s))
-                    except (ValueError, TypeError):
+                    id_excel = _safe_str(id_excel_raw, max_length=100)
+                    if not id_excel:
                         errors.append(f"Linha {row_num}: ID inválido '{id_excel_raw}'. Linha ignorada.")
                         continue
                     
@@ -5617,16 +6362,17 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
                         ['VALOR TOTAL', 'valor_total'],
                         ['PREVISÃO \nP/ EXECUÇÃO', 'PREVISÃO P/ EXECUÇÃO', 'PREVIS�O \nP/ EXECU��O'],
                         ['USO \nCONTÁBIL', 'USO CONTÁBIL', 'USO \nCONT�BIL'],
-                        ['NÚMERO DA \nNOTA FISCAL', 'NÚMERO DA NOTA FISCAL', 'N�MERO DA \nNOTA FISCAL'],
-                        ['TIPO DE \nSOLICITAÇÃO', 'TIPO DE SOLICITAÇÃO', 'TIPO DE \nSOLICITACAO', 'TIPO DE SOLICITACAO'],
+                        ['NÚMERO DA \nNOTA FISCAL', 'NÚMERO DA NOTA FISCAL', 'N�MERO DA \nNOTA FISCAL', 'NF PARA LANÇAMENTO: SERVIÇO OU MATERIAL', 'NF PARA LANCAMENTO: SERVICO OU MATERIAL'],
+                        ['TIPO DE \nSOLICITAÇÃO', 'TIPO DE SOLICITAÇÃO', 'TIPO DE \nSOLICITACAO', 'TIPO DE SOLICITACAO', 'TIPO DE GASTO'],
                         ['ORDEM \nDE SERVIÇO', 'ORDEM DE SERVIÇO', 'ORDEM \nDE SERVI�O'],
                         ['DATA DE ABERTURA \nDA REQUISIÇÃO', 'DATA DE ABERTURA DA REQUISIÇÃO', 'DATA DE ABERTURA \nDA REQUISI��O'],
-                        ['NÚMERO DA REQUISIÇÃO \nDE COMPRA', 'NÚMERO DA REQUISIÇÃO DE COMPRA', 'N�EMRO DA REQUISI��O \nDE COMPRA'],
-                        ['NÚMERO DO \nPEDIDO DE COMPRA', 'NÚMERO DO PEDIDO DE COMPRA', 'N�MERO DO \nPEDIDO DE COMPRA'],
+                        ['NÚMERO DA REQUISIÇÃO \nDE COMPRA', 'NÚMERO DA REQUISIÇÃO DE COMPRA', 'N�EMRO DA REQUISI��O \nDE COMPRA', 'REQUISIÇÃO \nDE COMPRA', 'REQUISICAO DE COMPRA'],
+                        ['NÚMERO DO \nPEDIDO DE COMPRA', 'NÚMERO DO PEDIDO DE COMPRA', 'N�MERO DO \nPEDIDO DE COMPRA', 'PEDIDO DE COMPRA'],
                         ['SERVIÇO CONCLUÍDO', 'SERVIÇO\nCONCLUÍDO', 'SERVICO CONCLUIDO', 'SERVI�O CONCLU�DO'],
                         ['NF DE SERVIÇO RECEBIDA', 'NF DE SERVIÇO\n RECEBIDA', 'NF DE SERVICO RECEBIDA', 'NF DE SERVI�O\n RECEBIDA'],
                         ['NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA\n PARA LANÇAMENTO ', 'NF ENVIADA PARA LANCAMENTO', 'NF ENVIADA\n PARA LANAMENTO '],
-                        ['OBSERVAÇÕES', 'OBSERVAES', 'OBSERVACOES', 'OBSERVAÇÕES ']
+                        ['OBSERVAÇÕES', 'OBSERVAES', 'OBSERVACOES', 'OBSERVAÇÕES '],
+                        ['GASTO CONFIRMADO', 'GASTOS CONFIRMADO']
                     ]
                     
                     # Verificar se pelo menos um campo além do ID tem valor
@@ -5648,12 +6394,12 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
                     valor_total = _safe_decimal(find_column_value(row_data, ['VALOR TOTAL', 'valor_total']))
                     previsao_execucao = _safe_str(find_column_value(row_data, ['PREVISÃO \nP/ EXECUÇÃO', 'PREVISÃO P/ EXECUÇÃO', 'PREVIS�O \nP/ EXECU��O', 'MÊS', 'MES', 'MÊS ', 'MES ', 'M�S']), max_length=50)
                     uso_contabil = _safe_str(find_column_value(row_data, ['USO \nCONTÁBIL', 'USO CONTÁBIL', 'USO \nCONT�BIL']), max_length=100)
-                    numero_nf = _safe_str(find_column_value(row_data, ['NÚMERO DA \nNOTA FISCAL', 'NÚMERO DA NOTA FISCAL', 'N�MERO DA \nNOTA FISCAL']), max_length=100)
-                    tipo_solicitacao = _safe_str(find_column_value(row_data, ['TIPO DE \nSOLICITAÇÃO', 'TIPO DE SOLICITAÇÃO', 'TIPO DE \nSOLICITACAO', 'TIPO DE SOLICITACAO']), max_length=100)
+                    numero_nf = _safe_str(find_column_value(row_data, ['NÚMERO DA \nNOTA FISCAL', 'NÚMERO DA NOTA FISCAL', 'N�MERO DA \nNOTA FISCAL', 'NF PARA LANÇAMENTO: SERVIÇO OU MATERIAL', 'NF PARA LANCAMENTO: SERVICO OU MATERIAL']), max_length=100)
+                    tipo_solicitacao = _safe_str(find_column_value(row_data, ['TIPO DE \nSOLICITAÇÃO', 'TIPO DE SOLICITAÇÃO', 'TIPO DE \nSOLICITACAO', 'TIPO DE SOLICITACAO', 'TIPO DE GASTO']), max_length=100)
                     numero_ordem_servico = _safe_str(find_column_value(row_data, ['ORDEM \nDE SERVIÇO', 'ORDEM DE SERVIÇO', 'ORDEM \nDE SERVI�O']), max_length=100)
                     data_abertura = _safe_date(find_column_value(row_data, ['DATA DE ABERTURA \nDA REQUISIÇÃO', 'DATA DE ABERTURA DA REQUISIÇÃO', 'DATA DE ABERTURA \nDA REQUISI��O']))
-                    numero_requisicao_compra = _safe_str(find_column_value(row_data, ['NÚMERO DA REQUISIÇÃO \nDE COMPRA', 'NÚMERO DA REQUISIÇÃO DE COMPRA', 'N�EMRO DA REQUISI��O \nDE COMPRA']), max_length=100)
-                    numero_pedido_compra = _safe_str(find_column_value(row_data, ['NÚMERO DO \nPEDIDO DE COMPRA', 'NÚMERO DO PEDIDO DE COMPRA', 'N�MERO DO \nPEDIDO DE COMPRA']), max_length=100)
+                    numero_requisicao_compra = _safe_str(find_column_value(row_data, ['NÚMERO DA REQUISIÇÃO \nDE COMPRA', 'NÚMERO DA REQUISIÇÃO DE COMPRA', 'N�EMRO DA REQUISI��O \nDE COMPRA', 'REQUISIÇÃO \nDE COMPRA', 'REQUISICAO DE COMPRA']), max_length=100)
+                    numero_pedido_compra = _safe_str(find_column_value(row_data, ['NÚMERO DO \nPEDIDO DE COMPRA', 'NÚMERO DO PEDIDO DE COMPRA', 'N�MERO DO \nPEDIDO DE COMPRA', 'PEDIDO DE COMPRA']), max_length=100)
                     # Importar como está (sem análise/tratamento): valores brutos do Excel
                     def _as_is(val, max_len=255):
                         if val is None: return None
@@ -5674,6 +6420,7 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
                     nf_servico_recebida = _as_is(_get_by_name_or_pos(row_data, ['NF DE SERVIÇO RECEBIDA', 'NF DE SERVIÇO\n RECEBIDA', 'NF DE SERVICO RECEBIDA', 'NF DE SERVI�O\n RECEBIDA'], ['RECEBIDA', 'SERVI'], 16))
                     nf_enviada_lancamento = _as_is(_get_by_name_or_pos(row_data, ['NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA\n PARA LANÇAMENTO ', 'NF ENVIADA PARA LANCAMENTO', 'NF ENVIADA\n PARA LANAMENTO '], ['ENVIADA', 'LANCAMENTO'], 17))
                     observacoes = _safe_str(find_column_value(row_data, ['OBSERVAÇÕES', 'OBSERVAES', 'OBSERVACOES', 'OBSERVAÇÕES ']), max_length=None)
+                    gasto_confirmado = _safe_str(find_column_value(row_data, ['GASTO CONFIRMADO', 'GASTOS CONFIRMADO']), max_length=255)
                     
                     # Extrair mês e ano da previsão
                     mes_referencia, ano_referencia = extract_mes_ano(previsao_execucao)
@@ -5692,7 +6439,7 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
                         'SERVIÇO CONCLUÍDO', 'SERVICO CONCLUIDO', 'SERVIO CONCLUDO',
                         'NF DE SERVIÇO RECEBIDA', 'NF DE SERVIO RECEBIDA',
                         'NF ENVIADA PARA LANÇAMENTO', 'NF ENVIADA PARA LANAMENTO',
-                        'OBSERVAÇÕES', 'OBSERVACOES'
+                        'OBSERVAÇÕES', 'OBSERVACOES', 'GASTO CONFIRMADO', 'GASTOS CONFIRMADO'
                     }
                     
                     # Coletar colunas do Excel não mapeadas em dados_adicionais
@@ -5737,14 +6484,14 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
                         'nf_servico_recebida': nf_servico_recebida,
                         'nf_enviada_lancamento': nf_enviada_lancamento,
                         'observacoes': observacoes,  # Campo OBSERVAÇÕES do Excel
+                        'gasto_confirmado': gasto_confirmado,
                         'dados_adicionais': dados_adicionais if dados_adicionais else None,
                     }
                     
-                    # Atualização/criação: apenas por id_excel + setor (exato); sem fallbacks
+                    # Atualização/criação pela coluna ID do Excel (chave primária)
                     if update_existing:
                         projecao_obj, created = ProjecaoGasto.objects.update_or_create(
                             id_excel=id_excel,
-                            setor=setor_value,
                             defaults=projecao_data
                         )
                         if created:
@@ -5754,7 +6501,6 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
                     else:
                         projecao_obj, created = ProjecaoGasto.objects.get_or_create(
                             id_excel=id_excel,
-                            setor=setor_value,
                             defaults=projecao_data
                         )
                         if created:
@@ -5782,7 +6528,7 @@ def upload_projecao_gastos_from_file(file, update_existing=False, debug=False) -
             errors.append("Aviso: Nenhum valor de SERVIÇO CONCLUÍDO foi encontrado. Verifique se a coluna existe e tem dados.")
         if created_count == 0 and updated_count == 0 and data and len(data) > 1 and not any('ID não encontrado' in e for e in errors):
             total_rows = len(data)
-            errors.append(f"[INFO] Nenhum registro criado ou atualizado. Verifique: 1) Opção 'Atualizar registros existentes' está marcada? 2) ID e SETOR no Excel correspondem aos do banco? 3) {total_rows} linha(s) de dados foram lidas.")
+            errors.append(f"[INFO] Nenhum registro criado ou atualizado. Verifique: 1) Opção 'Atualizar registros existentes' está marcada? 2) ID no Excel corresponde ao do banco? 3) {total_rows} linha(s) de dados foram lidas.")
         print(f"[ProjecaoGastos] Result: created={created_count}, updated={updated_count}, errors={len(errors)}")
         if errors:
             for e in errors[:5]:
@@ -5816,12 +6562,53 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
     from app.models import ControleRCeNF
     from datetime import datetime, date
     from decimal import Decimal, InvalidOperation
+    from django.utils import timezone as dj_timezone
+    import re
+    import unicodedata
     
     errors = []
     duplicates = []
     created_count = 0
     updated_count = 0
     
+    def _normalize_header_text(value):
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            value = str(value)
+        value = value.strip().replace('\xa0', ' ').replace('\u00a0', ' ')
+        value = re.sub(r'\s+', ' ', value).strip()
+        return value or None
+
+    def _header_lookup_key(value):
+        text = _normalize_header_text(value)
+        if not text:
+            return None
+        text = unicodedata.normalize('NFKD', text)
+        text = ''.join(c for c in text if not unicodedata.combining(c))
+        return text.upper()
+
+    def _get_row_value(row_data, *keys):
+        for key in keys:
+            if key in row_data:
+                return row_data[key]
+            lookup = _header_lookup_key(key)
+            if not lookup:
+                continue
+            for existing_key, value in row_data.items():
+                if existing_key and _header_lookup_key(existing_key) == lookup:
+                    return value
+        return None
+
+    def _find_header_row(ws, max_scan=8):
+        """Localiza a linha de cabeçalhos (ID na coluna B ou A)."""
+        for row_num in range(1, max_scan + 1):
+            row_vals = [c.value for c in ws[row_num]]
+            for cell_val in row_vals:
+                if _header_lookup_key(cell_val) == 'ID':
+                    return row_num
+        return 3
+
     try:
         # Ler arquivo Excel
         if hasattr(file, 'read'):
@@ -5830,21 +6617,28 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
         else:
             wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
         
-        # Selecionar a planilha "CONTROLE RC E NF"
-        try:
-            ws = wb['CONTROLE RC E NF']
-        except KeyError:
-            raise ValidationError("Planilha 'CONTROLE RC E NF' não encontrada no arquivo")
+        # Selecionar a planilha "CONTROLE RC E NF" (tolerante a variações de nome)
+        ws = None
+        for sheet_name in wb.sheetnames:
+            if _header_lookup_key(sheet_name) == _header_lookup_key('CONTROLE RC E NF'):
+                ws = wb[sheet_name]
+                break
+        if ws is None:
+            try:
+                ws = wb['CONTROLE RC E NF']
+            except KeyError:
+                raise ValidationError(
+                    "Planilha 'CONTROLE RC E NF' não encontrada no arquivo. "
+                    f"Abas disponíveis: {', '.join(wb.sheetnames)}"
+                )
         
-        # Ler cabeçalhos da linha 3 (linha 1 está vazia, linha 2 tem título)
+        header_row_num = _find_header_row(ws)
+        data_start_row = header_row_num + 1
+        
+        # Ler cabeçalhos (linha 3 na versão Janeiro/2026; coluna A costuma ficar vazia)
         headers = []
-        for cell in ws[3]:
-            header_value = cell.value if cell.value else None
-            if isinstance(header_value, str):
-                header_value = header_value.strip().replace('\xa0', ' ').replace('\u00a0', ' ')
-                import re
-                header_value = re.sub(r'\s+', ' ', header_value).strip()
-            headers.append(header_value)
+        for cell in ws[header_row_num]:
+            headers.append(_normalize_header_text(cell.value))
         
         # Função auxiliar para converter valores
         def _safe_str(value, max_length=None):
@@ -5874,23 +6668,30 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
         def _safe_datetime(value):
             if value is None or value == '':
                 return None
+            parsed = None
             if isinstance(value, datetime):
-                return value
-            if isinstance(value, date) and not isinstance(value, datetime):
-                return datetime.combine(value, datetime.min.time())
-            if isinstance(value, str):
-                # Tentar diferentes formatos
+                parsed = value
+            elif isinstance(value, date) and not isinstance(value, datetime):
+                parsed = datetime.combine(value, datetime.min.time())
+            elif isinstance(value, str):
                 for fmt in ['%Y-%m-%d %H:%M:%S', '%Y-%m-%d', '%d/%m/%Y %H:%M:%S', '%d/%m/%Y']:
                     try:
-                        return datetime.strptime(value.strip(), fmt)
+                        parsed = datetime.strptime(value.strip(), fmt)
+                        break
                     except ValueError:
                         continue
-            return None
+            if parsed is None:
+                return None
+            if dj_timezone.is_naive(parsed):
+                return dj_timezone.make_aware(parsed)
+            return parsed
         
         # Processar dados em transação
         with transaction.atomic():
-            # Ler dados a partir da linha 4
-            for row_num, row in enumerate(ws.iter_rows(min_row=4, values_only=False), start=4):
+            for row_num, row in enumerate(
+                ws.iter_rows(min_row=data_start_row, values_only=False),
+                start=data_start_row,
+            ):
                 try:
                     # Verificar se a linha está vazia
                     if not any(cell.value for cell in row if cell.value):
@@ -5903,11 +6704,11 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                             row_data[headers[idx]] = cell.value
                     
                     # Obter ID do Excel (identificador único)
-                    id_excel = _safe_str(row_data.get('ID'))
+                    id_excel = _safe_str(_get_row_value(row_data, 'ID'))
                     
                     # Verificar se tem dados mínimos (ID é obrigatório, mas manter compatibilidade com RC/NF Saída)
-                    rc = _safe_str(row_data.get('RC'))
-                    nf_saida = _safe_str(row_data.get('NF SAÍDA'))
+                    rc = _safe_str(_get_row_value(row_data, 'RC'))
+                    nf_saida = _safe_str(_get_row_value(row_data, 'NF SAÍDA', 'NF SAIDA'))
                     
                     # Se não tem ID nem RC nem NF Saída, pular
                     if not id_excel and not rc and not nf_saida:
@@ -5932,7 +6733,7 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                                 campos_duplicados['RC'] = rc
                             if nf_saida and existing.nf_saida == nf_saida:
                                 campos_duplicados['NF Saída'] = nf_saida
-                            pedido_excel = _safe_str(row_data.get('PEDIDO'))
+                            pedido_excel = _safe_str(_get_row_value(row_data, 'PEDIDO'))
                             if pedido_excel and existing.pedido == pedido_excel:
                                 campos_duplicados['Pedido'] = pedido_excel
                     
@@ -5947,7 +6748,7 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                             # Verificar se outros campos também coincidem
                             if nf_saida and existing.nf_saida == nf_saida:
                                 campos_duplicados['NF Saída'] = nf_saida
-                            pedido_excel = _safe_str(row_data.get('PEDIDO'))
+                            pedido_excel = _safe_str(_get_row_value(row_data, 'PEDIDO'))
                             if pedido_excel and existing.pedido == pedido_excel:
                                 campos_duplicados['Pedido'] = pedido_excel
                     
@@ -5968,9 +6769,9 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                             'id_excel': id_excel or 'N/A',
                             'rc': rc or 'N/A',
                             'nf_saida': nf_saida or 'N/A',
-                            'empresa': _safe_str(row_data.get('EMPRESA')) or 'N/A',
-                            'solicitante': _safe_str(row_data.get('SOLICITANTE')) or 'N/A',
-                            'pedido': _safe_str(row_data.get('PEDIDO')) or 'N/A',
+                            'empresa': _safe_str(_get_row_value(row_data, 'EMPRESA')) or 'N/A',
+                            'solicitante': _safe_str(_get_row_value(row_data, 'SOLICITANTE')) or 'N/A',
+                            'pedido': _safe_str(_get_row_value(row_data, 'PEDIDO')) or 'N/A',
                             'motivo': duplicate_reason,
                             'campos_duplicados': campos_duplicados,
                             'registro_existente_id': existing.id_excel,  # id_excel is now the primary key
@@ -5989,34 +6790,63 @@ def upload_controle_rc_e_nf_from_file(file, update_existing=False) -> Tuple[int,
                     
                     data_dict = {
                         'id_excel': id_excel,  # ID é obrigatório (chave primária)
-                        'solicitante': _safe_str(row_data.get('SOLICITANTE')),
-                        'empresa': _safe_str(row_data.get('EMPRESA')),
+                        'solicitante': _safe_str(_get_row_value(row_data, 'SOLICITANTE')),
+                        'empresa': _safe_str(_get_row_value(row_data, 'EMPRESA')),
                         'nf_saida': nf_saida,
-                        'torno': _safe_str(row_data.get('TORNO?') or row_data.get('RETORNO?'), max_length=20),
-                        'descricao_servico': _safe_str(row_data.get('DESCRIÇÃO DO SERVIÇO'), max_length=1000),
-                        'ca_rateio': _safe_str(row_data.get('C.A/RATEIO')),
-                        'uso': _safe_str(row_data.get('USO')),
-                        'quem_abriu_rc': _safe_str(row_data.get('QUEM ABRIU \nA RC') or row_data.get('QUEM ABRIU A RC')),
-                        'orcamento': _safe_str(row_data.get('ORÇAMENTO'), max_length=500),
-                        'os': _safe_str(row_data.get('O.S')),
-                        'classificacao': _safe_str(row_data.get('CLASSIF.')),
-                        'justificativa_classificacao': _safe_str(row_data.get('JUSTIFICATIVA CLASSIFICAÇÃO'), max_length=1000),
-                        'spaf0009_acesso_portaria': _safe_str(row_data.get('SPAF0009 - Acesso portária p/ classif. 5 e 8'), max_length=255),
+                        'torno': _safe_str(
+                            _get_row_value(row_data, 'TORNO?', 'RETORNO?'),
+                            max_length=20,
+                        ),
+                        'descricao_servico': _safe_str(
+                            _get_row_value(row_data, 'DESCRIÇÃO DO SERVIÇO', 'DESCRICAO DO SERVICO'),
+                            max_length=1000,
+                        ),
+                        'ca_rateio': _safe_str(_get_row_value(row_data, 'C.A/RATEIO', 'C.A RATEIO')),
+                        'uso': _safe_str(_get_row_value(row_data, 'USO')),
+                        'quem_abriu_rc': _safe_str(
+                            _get_row_value(row_data, 'QUEM ABRIU A RC', 'QUEM ABRIU \nA RC'),
+                        ),
+                        'orcamento': _safe_str(_get_row_value(row_data, 'ORÇAMENTO', 'ORCAMENTO'), max_length=500),
+                        'os': _safe_str(_get_row_value(row_data, 'O.S', 'OS')),
+                        'classificacao': _safe_str(_get_row_value(row_data, 'CLASSIF.', 'CLASSIF')),
+                        'justificativa_classificacao': _safe_str(
+                            _get_row_value(row_data, 'JUSTIFICATIVA CLASSIFICAÇÃO', 'JUSTIFICATIVA CLASSIFICACAO'),
+                            max_length=1000,
+                        ),
+                        'spaf0009_acesso_portaria': _safe_str(
+                            _get_row_value(
+                                row_data,
+                                'SPAF0009 - Acesso portária p/ classif. 5 e 8',
+                                'SPAF0009 - Acesso portaria p/ classif. 5 e 8',
+                            ),
+                            max_length=255,
+                        ),
                         'rc': rc,
-                        'data_rc': _safe_datetime(row_data.get('DATA RC')),
-                        'pedido': _safe_str(row_data.get('PEDIDO')),
-                        'valor_total_pedido': _safe_decimal(row_data.get('VALOR TOTAL DO PEDIDO')),
-                        'previsao_para_uso': _safe_datetime(row_data.get('PREVISÃO PARA USO')),
-                        'nf_servico': _safe_str(row_data.get('NF SERVIÇO')),
-                        'nf_retorno_e_data_lancamento': _safe_str(row_data.get('NF RETORNO E DATA LANÇAMENTO'), max_length=255),
-                        'cnpj_aurora': _safe_str(row_data.get('CNPJ AURORA')),
-                        'simples_nacional': _safe_str(row_data.get('SIMPLES NACIONAL')),
-                        'valor_nf': _safe_decimal(row_data.get('VALOR NF')),
-                        'emissao': _safe_datetime(row_data.get('EMISSÃO')),
-                        'inclusao_198': _safe_datetime(row_data.get('INCLUSÃO 198')),
-                        'status': _safe_str(row_data.get('STATUS'), max_length=255),
-                        'obs': _safe_str(row_data.get('OBS'), max_length=1000),
-                        'saldo_residual_pedido': _safe_decimal(row_data.get('SALDO RESIDUAL PEDIDO ') or row_data.get('SALDO RESIDUAL PEDIDO')),
+                        'data_rc': _safe_datetime(_get_row_value(row_data, 'DATA RC')),
+                        'pedido': _safe_str(_get_row_value(row_data, 'PEDIDO')),
+                        'valor_total_pedido': _safe_decimal(
+                            _get_row_value(row_data, 'VALOR TOTAL DO PEDIDO'),
+                        ),
+                        'previsao_para_uso': _safe_datetime(
+                            _get_row_value(row_data, 'PREVISÃO PARA USO', 'PREVISAO PARA USO'),
+                        ),
+                        'nf_servico': _safe_str(_get_row_value(row_data, 'NF SERVIÇO', 'NF SERVICO')),
+                        'nf_retorno_e_data_lancamento': _safe_str(
+                            _get_row_value(row_data, 'NF RETORNO E DATA LANÇAMENTO', 'NF RETORNO E DATA LANCAMENTO'),
+                            max_length=255,
+                        ),
+                        'cnpj_aurora': _safe_str(_get_row_value(row_data, 'CNPJ AURORA')),
+                        'simples_nacional': _safe_str(_get_row_value(row_data, 'SIMPLES NACIONAL')),
+                        'valor_nf': _safe_decimal(_get_row_value(row_data, 'VALOR NF')),
+                        'emissao': _safe_datetime(_get_row_value(row_data, 'EMISSÃO', 'EMISSAO')),
+                        'inclusao_198': _safe_datetime(
+                            _get_row_value(row_data, 'INCLUSÃO 198', 'INCLUSAO 198'),
+                        ),
+                        'status': _safe_str(_get_row_value(row_data, 'STATUS'), max_length=255),
+                        'obs': _safe_str(_get_row_value(row_data, 'OBS'), max_length=1000),
+                        'saldo_residual_pedido': _safe_decimal(
+                            _get_row_value(row_data, 'SALDO RESIDUAL PEDIDO', 'SALDO RESIDUAL PEDIDO '),
+                        ),
                     }
                     
                     if existing:
@@ -6257,6 +7087,32 @@ def upload_paradas_maquina_from_file(file, update_existing=False, excluir_antigo
         error_detail = f"Erro ao processar arquivo: {str(e)}"
         errors.append(error_detail)
         return 0, 0, errors
+
+
+def parse_nf_servico_tokens(nf_servico_raw):
+    """
+    Extrai números de NF de nf_servico (ControleRCeNF).
+    Aceita múltiplos valores separados por quebra de linha, vírgula, barra, etc.
+    Retorna lista de dicts: {'original': str, 'normalized': str}
+    """
+    if nf_servico_raw is None:
+        return []
+    text = str(nf_servico_raw).strip()
+    if not text or text.upper() in ('-', '—', 'N/A', 'NA', 'NÃO', 'NAO'):
+        return []
+    import re
+    parts = re.split(r'[\n\r,;/|]+', text)
+    result = []
+    seen = set()
+    for part in parts:
+        part = part.strip()
+        if not part or part.upper() in ('-', '—'):
+            continue
+        normalized = normalize_nota_numero(part)
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            result.append({'original': part, 'normalized': normalized})
+    return result
 
 
 def normalize_nota_numero(numero_str):

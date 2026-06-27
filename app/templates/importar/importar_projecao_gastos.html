@@ -44,7 +44,7 @@
                                 <div class="form-text">Formatos aceitos: Excel (.xlsx, .xls, .xlsm)</div>
                                 <div class="form-text">
                                     <i class="fas fa-info-circle me-1"></i>
-                                    Planilha "GASTOS" com colunas: ID, SETOR, SOLICITANTE, FORNECEDOR NOME FANTASIA, FORNECEDOR CNPJ, DESCRIÇÃO DO SERVIÇO, VALOR TOTAL, PREVISÃO P/ EXECUÇÃO, USO CONTÁBIL, NÚMERO DA NOTA FISCAL, ORDEM DE SERVIÇO, DATA DE ABERTURA DA REQUISIÇÃO, NÚMERO DA REQUISIÇÃO DE COMPRA, NÚMERO DO PEDIDO DE COMPRA, <strong>SERVIÇO CONCLUÍDO</strong>, <strong>NF DE SERVIÇO RECEBIDA</strong>, <strong>NF ENVIADA PARA LANÇAMENTO</strong>.
+                                    Planilha "GASTOS" com colunas: ID, SETOR, SOLICITANTE, FORNECEDOR NOME FANTASIA, FORNECEDOR CNPJ, DESCRIÇÃO DO SERVIÇO, VALOR TOTAL, PREVISÃO P/ EXECUÇÃO, USO CONTÁBIL, NÚMERO DA NOTA FISCAL (ou NF PARA LANÇAMENTO: SERVIÇO OU MATERIAL), ORDEM DE SERVIÇO, DATA DE ABERTURA DA REQUISIÇÃO, NÚMERO DA REQUISIÇÃO DE COMPRA (ou REQUISIÇÃO DE COMPRA), NÚMERO DO PEDIDO DE COMPRA (ou PEDIDO DE COMPRA), <strong>SERVIÇO CONCLUÍDO</strong>, <strong>NF DE SERVIÇO RECEBIDA</strong>, <strong>NF ENVIADA PARA LANÇAMENTO</strong>, <strong>GASTO CONFIRMADO</strong>.
                                 </div>
                                 <div class="form-text text-muted">
                                     Se colunas de data não importarem, execute: <code>python manage.py debug_projecao_import "caminho/do/arquivo.xlsx"</code>
@@ -102,11 +102,11 @@
                             <li><strong>ID</strong> (ou Nº, CÓDIGO) – número do item</li>
                             <li><strong>SETOR</strong> (ou CENTRO) – setor responsável. Se vazio, será usado "SEM SETOR"</li>
                         </ul>
-                        <p class="mb-0">Outras colunas reconhecidas: SOLICITANTE, DESCRIÇÃO DO SERVIÇO, TIPO DE SOLICITAÇÃO, VALOR TOTAL, DATA DE ABERTURA DA REQUISIÇÃO, PREVISÃO P/ EXECUÇÃO, FORNECEDOR, CNPJ, USO CONTÁBIL, NÚMERO DA NOTA FISCAL, ORDEM DE SERVIÇO, NÚMERO DA REQUISIÇÃO DE COMPRA, NÚMERO DO PEDIDO DE COMPRA, SERVIÇO CONCLUÍDO, NF DE SERVIÇO RECEBIDA, NF ENVIADA PARA LANÇAMENTO, OBSERVAÇÕES.</p>
+                        <p class="mb-0">Outras colunas reconhecidas: SOLICITANTE, DESCRIÇÃO DO SERVIÇO, TIPO DE SOLICITAÇÃO (ou TIPO DE GASTO), VALOR TOTAL, DATA DE ABERTURA DA REQUISIÇÃO, PREVISÃO P/ EXECUÇÃO, FORNECEDOR, CNPJ, USO CONTÁBIL, NÚMERO DA NOTA FISCAL (ou NF PARA LANÇAMENTO: SERVIÇO OU MATERIAL), ORDEM DE SERVIÇO, NÚMERO DA REQUISIÇÃO DE COMPRA (ou REQUISIÇÃO DE COMPRA), NÚMERO DO PEDIDO DE COMPRA (ou PEDIDO DE COMPRA), SERVIÇO CONCLUÍDO, NF DE SERVIÇO RECEBIDA, NF ENVIADA PARA LANÇAMENTO, OBSERVAÇÕES e GASTO CONFIRMADO.</p>
                         
                         <div class="alert alert-warning mt-4">
                             <i class="fas fa-exclamation-triangle me-2"></i>
-                            <strong>Chave única:</strong> cada linha é identificada por <strong>ID + SETOR</strong>. Com "Atualizar registros existentes" marcado, registros com o mesmo ID e SETOR são atualizados; caso contrário, duplicatas são ignoradas.
+                            <strong>Chave única:</strong> cada linha é identificada pela coluna <strong>ID</strong> do Excel (ex.: ID_PCM02). Com "Atualizar registros existentes" marcado, registros com o mesmo ID são atualizados; caso contrário, duplicatas são ignoradas.
                         </div>
                     </div>
                 </div>
